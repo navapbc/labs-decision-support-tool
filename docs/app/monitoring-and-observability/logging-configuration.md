@@ -31,10 +31,6 @@ We have two separate ways of formatting the logs which are controlled by the `LO
 
 ![Human readable logs](human-readable-logs.png)
 
-## Logging Extra Data in a Request
-
-The [src.logging.flask_logger](../../../app/src/logging/flask_logger.py) module adds logging functionality to Flask applications. It automatically adds useful data from the Flask request object to logs, logs the start and end of requests, and provides a mechanism for developers to dynamically add extra data to all subsequent logs for the current request.
-
 ## PII Masking
 
 The [src.logging.pii](../../../app/src/logging/pii.py) module defines a filter that applies to all logs that automatically masks data fields that look like social security numbers.

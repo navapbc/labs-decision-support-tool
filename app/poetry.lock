@@ -62,52 +62,6 @@ test = ["anyio[trio]", "coverage[toml] (>=4.5)", "hypothesis (>=4.0)", "mock (>=
 trio = ["trio (<0.22)"]
 
 [[package]]
-name = "apiflask"
-version = "2.0.2"
-description = "A lightweight web API framework based on Flask and marshmallow-code projects."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "APIFlask-2.0.2-py3-none-any.whl", hash = "sha256:3baa1a2d56f09c5aeae3f61454871c2fa1ea82358fcbfe325d528cabb70b4f64"},
-    {file = "APIFlask-2.0.2.tar.gz", hash = "sha256:c1ab81640a1ab252888e2cc7ae556272a169b449c582abae309a8fe295f9337d"},
-]
-
-[package.dependencies]
-apispec = ">=6"
-flask = ">=2"
-flask-httpauth = ">=4"
-flask-marshmallow = ">=0.12.0"
-webargs = ">=8.3"
-
-[package.extras]
-async = ["asgiref (>=3.2)"]
-dotenv = ["python-dotenv"]
-yaml = ["pyyaml"]
-
-[[package]]
-name = "apispec"
-version = "6.3.0"
-description = "A pluggable API specification generator. Currently supports the OpenAPI Specification (f.k.a. the Swagger specification)."
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "apispec-6.3.0-py3-none-any.whl", hash = "sha256:95a0b9355785df998bb0e9b939237a30ee4c7428fd6ef97305eae3da06b9b339"},
-    {file = "apispec-6.3.0.tar.gz", hash = "sha256:6cb08d92ce73ff0b3bf46cb2ea5c00d57289b0f279fb0256a3df468182ba5344"},
-]
-
-[package.dependencies]
-packaging = ">=21.3"
-
-[package.extras]
-dev = ["PyYAML (>=3.10)", "flake8 (==5.0.4)", "flake8-bugbear (==22.9.23)", "marshmallow (>=3.13.0)", "mypy (==0.982)", "openapi-spec-validator (<0.5)", "prance[osv] (>=0.11)", "pre-commit (>=2.4,<3.0)", "pytest", "tox", "types-PyYAML"]
-docs = ["marshmallow (>=3.13.0)", "pyyaml (==6.0)", "sphinx (==5.2.3)", "sphinx-issues (==3.0.1)", "sphinx-rtd-theme (==1.0.0)"]
-lint = ["flake8 (==5.0.4)", "flake8-bugbear (==22.9.23)", "mypy (==0.982)", "pre-commit (>=2.4,<3.0)", "types-PyYAML"]
-marshmallow = ["marshmallow (>=3.18.0)"]
-tests = ["PyYAML (>=3.10)", "marshmallow (>=3.13.0)", "openapi-spec-validator (<0.5)", "prance[osv] (>=0.11)", "pytest"]
-validation = ["openapi-spec-validator (<0.5)", "prance[osv] (>=0.11)"]
-yaml = ["PyYAML (>=3.10)"]
-
-[[package]]
 name = "asyncer"
 version = "0.0.2"
 description = "Asyncer, async and await, focused on developer experience."
@@ -216,17 +170,6 @@ colorama = ["colorama (>=0.4.3)"]
 d = ["aiohttp (>=3.7.4)"]
 jupyter = ["ipython (>=7.8.0)", "tokenize-rt (>=3.2.0)"]
 uvloop = ["uvloop (>=0.15.2)"]
-
-[[package]]
-name = "blinker"
-version = "1.6.3"
-description = "Fast, simple object-to-object and broadcast signaling"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "blinker-1.6.3-py3-none-any.whl", hash = "sha256:296320d6c28b006eb5e32d4712202dbcdcbf5dc482da298c2f44881c43884aaa"},
-    {file = "blinker-1.6.3.tar.gz", hash = "sha256:152090d27c1c5c722ee7e48504b02d76502811ce02e1523553b4cf8c8b3d3a8d"},
-]
 
 [[package]]
 name = "boto3"
@@ -809,64 +752,6 @@ flake8 = ">=6.0.0"
 dev = ["coverage", "hypothesis", "hypothesmith (>=0.2)", "pre-commit", "pytest", "tox"]
 
 [[package]]
-name = "flask"
-version = "3.0.0"
-description = "A simple framework for building complex web applications."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "flask-3.0.0-py3-none-any.whl", hash = "sha256:21128f47e4e3b9d597a3e8521a329bf56909b690fcc3fa3e477725aa81367638"},
-    {file = "flask-3.0.0.tar.gz", hash = "sha256:cfadcdb638b609361d29ec22360d6070a77d7463dcb3ab08d2c2f2f168845f58"},
-]
-
-[package.dependencies]
-blinker = ">=1.6.2"
-click = ">=8.1.3"
-itsdangerous = ">=2.1.2"
-Jinja2 = ">=3.1.2"
-Werkzeug = ">=3.0.0"
-
-[package.extras]
-async = ["asgiref (>=3.2)"]
-dotenv = ["python-dotenv"]
-
-[[package]]
-name = "flask-httpauth"
-version = "4.8.0"
-description = "HTTP authentication for Flask routes"
-optional = false
-python-versions = "*"
-files = [
-    {file = "Flask-HTTPAuth-4.8.0.tar.gz", hash = "sha256:66568a05bc73942c65f1e2201ae746295816dc009edd84b482c44c758d75097a"},
-    {file = "Flask_HTTPAuth-4.8.0-py3-none-any.whl", hash = "sha256:a58fedd09989b9975448eef04806b096a3964a7feeebc0a78831ff55685b62b0"},
-]
-
-[package.dependencies]
-flask = "*"
-
-[[package]]
-name = "flask-marshmallow"
-version = "0.15.0"
-description = "Flask + marshmallow for beautiful APIs"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "flask-marshmallow-0.15.0.tar.gz", hash = "sha256:2083ae55bebb5142fff98c6bbd483a2f5dbc531a8bc1be2180ed5f75e7f3fccc"},
-    {file = "flask_marshmallow-0.15.0-py2.py3-none-any.whl", hash = "sha256:ce08a153f74da6ebfffd8065d1687508b0179df37fff7fc0c8f28ccfb64f1b56"},
-]
-
-[package.dependencies]
-Flask = "*"
-marshmallow = ">=3.0.0"
-packaging = ">=17.0"
-
-[package.extras]
-dev = ["flask-sqlalchemy (>=3.0.0)", "marshmallow-sqlalchemy (>=0.28.2)", "mock", "pre-commit", "pytest", "tox"]
-docs = ["Sphinx (==6.1.3)", "marshmallow-sqlalchemy (>=0.13.0)", "sphinx-issues (==3.0.1)"]
-sqlalchemy = ["flask-sqlalchemy (>=3.0.0)", "marshmallow-sqlalchemy (>=0.28.2)"]
-tests = ["flask-sqlalchemy (>=3.0.0)", "marshmallow-sqlalchemy (>=0.28.2)", "mock", "pytest"]
-
-[[package]]
 name = "gitdb"
 version = "4.0.10"
 description = "Git Object Database"
@@ -1048,26 +933,6 @@ files = [
 protobuf = ["grpcio-tools (>=1.64.1)"]
 
 [[package]]
-name = "gunicorn"
-version = "21.2.0"
-description = "WSGI HTTP Server for UNIX"
-optional = false
-python-versions = ">=3.5"
-files = [
-    {file = "gunicorn-21.2.0-py3-none-any.whl", hash = "sha256:3213aa5e8c24949e792bcacfc176fef362e7aac80b76c56f6b5122bf350722f0"},
-    {file = "gunicorn-21.2.0.tar.gz", hash = "sha256:88ec8bff1d634f98e61b9f65bc4bf3cd918a90806c6f5c48bc5603849ec81033"},
-]
-
-[package.dependencies]
-packaging = "*"
-
-[package.extras]
-eventlet = ["eventlet (>=0.24.1)"]
-gevent = ["gevent (>=1.4.0)"]
-setproctitle = ["setproctitle"]
-tornado = ["tornado (>=0.2)"]
-
-[[package]]
 name = "h11"
 version = "0.14.0"
 description = "A pure-Python, bring-your-own-I/O implementation of HTTP/1.1"
@@ -1180,17 +1045,6 @@ colors = ["colorama (>=0.4.3)"]
 pipfile-deprecated-finder = ["pip-shims (>=0.5.2)", "pipreqs", "requirementslib"]
 plugins = ["setuptools"]
 requirements-deprecated-finder = ["pip-api", "pipreqs"]
-
-[[package]]
-name = "itsdangerous"
-version = "2.1.2"
-description = "Safely pass data to untrusted environments and back."
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "itsdangerous-2.1.2-py3-none-any.whl", hash = "sha256:2c2349112351b88699d8d4b6b075022c0808887cb7ad10069318a8b0bc88db44"},
-    {file = "itsdangerous-2.1.2.tar.gz", hash = "sha256:5dbbc68b317e5e42f327f9021763545dc3fc3bfe22e6deb96aaf1fc38874156a"},
-]
 
 [[package]]
 name = "jinja2"
@@ -1392,7 +1246,7 @@ files = [
 
 [package.dependencies]
 marshmallow = [
-    {version = ">=3.13.0,<4.0", optional = true, markers = "python_version < \"3.7\" or extra != \"enum\""},
+    {version = ">=3.13.0,<4.0"},
     {version = ">=3.18.0,<4.0", optional = true, markers = "python_version >= \"3.7\" and extra == \"enum\""},
 ]
 typeguard = {version = ">=2.4.1,<4.0.0", optional = true, markers = "extra == \"union\""}
@@ -2862,28 +2716,6 @@ files = [
 anyio = ">=3.0.0"
 
 [[package]]
-name = "webargs"
-version = "8.3.0"
-description = "Declarative parsing and validation of HTTP request objects, with built-in support for popular web frameworks, including Flask, Django, Bottle, Tornado, Pyramid, Falcon, and aiohttp."
-optional = false
-python-versions = ">=3.7.2"
-files = [
-    {file = "webargs-8.3.0-py3-none-any.whl", hash = "sha256:69d7ac874d746b6f4f47eac923c2abf6fc7788dfca2ebcfd9f4ac52ec9646446"},
-    {file = "webargs-8.3.0.tar.gz", hash = "sha256:cab207941b0686c4d086c823632ddcd4343151644341a32fcf50b8eaa71e31c7"},
-]
-
-[package.dependencies]
-marshmallow = ">=3.0.0"
-packaging = "*"
-
-[package.extras]
-dev = ["Django (>=2.2.0)", "Flask (>=0.12.5)", "aiohttp (>=3.0.8)", "bottle (>=0.12.13)", "falcon (>=2.0.0)", "flake8 (==6.0.0)", "flake8-bugbear (==23.6.5)", "mypy (==1.4.1)", "pre-commit (>=2.4,<4.0)", "pyramid (>=1.9.1)", "pytest", "pytest-aiohttp (>=0.3.0)", "pytest-asyncio", "tornado (>=4.5.2)", "tox", "webtest (==3.0.0)", "webtest-aiohttp (==2.0.0)"]
-docs = ["Django (>=2.2.0)", "Flask (>=0.12.5)", "Sphinx (==7.0.1)", "aiohttp (>=3.0.8)", "bottle (>=0.12.13)", "falcon (>=2.0.0)", "furo (==2023.5.20)", "pyramid (>=1.9.1)", "sphinx-issues (==3.0.1)", "tornado (>=4.5.2)"]
-frameworks = ["Django (>=2.2.0)", "Flask (>=0.12.5)", "aiohttp (>=3.0.8)", "bottle (>=0.12.13)", "falcon (>=2.0.0)", "pyramid (>=1.9.1)", "tornado (>=4.5.2)"]
-lint = ["flake8 (==6.0.0)", "flake8-bugbear (==23.6.5)", "mypy (==1.4.1)", "pre-commit (>=2.4,<4.0)"]
-tests = ["Django (>=2.2.0)", "Flask (>=0.12.5)", "aiohttp (>=3.0.8)", "bottle (>=0.12.13)", "falcon (>=2.0.0)", "pyramid (>=1.9.1)", "pytest", "pytest-aiohttp (>=0.3.0)", "pytest-asyncio", "tornado (>=4.5.2)", "webtest (==3.0.0)", "webtest-aiohttp (==2.0.0)"]
-
-[[package]]
 name = "werkzeug"
 version = "3.0.0"
 description = "The comprehensive WSGI web application library."
@@ -3022,4 +2854,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "ca04e1a6d5b675aae48f643556ef568cbc7a7f7775594e9d1f090f59beb0b611"
+content-hash = "8f60ae30881d6d9193a4be74fcff48ac7f36ae18faa6a0e0d8801593bc6bde79"

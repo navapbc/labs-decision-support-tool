@@ -16,7 +16,6 @@ import faker
 from sqlalchemy.orm import scoped_session
 
 import src.adapters.db as db
-import src.db.models.user_models as user_models
 import src.util.datetime_util as datetime_util
 
 _db_session: Optional[db.Session] = None
@@ -60,27 +59,3 @@ class BaseFactory(factory.alchemy.SQLAlchemyModelFactory):
         abstract = True
         sqlalchemy_session = Session
         sqlalchemy_session_persistence = "commit"
-
-
-class RoleFactory(BaseFactory):
-    class Meta:
-        model = user_models.Role
-
-    user_id = factory.LazyAttribute(lambda u: u.user.id)
-    user = factory.SubFactory("tests.src.db.models.factories.UserFactory", roles=[])
-
-    type = factory.Iterator([r.value for r in user_models.RoleType])
-
-
-class UserFactory(BaseFactory):
-    class Meta:
-        model = user_models.User
-
-    id = Generators.UuidObj
-    first_name = factory.Faker("first_name")
-    last_name = factory.Faker("last_name")
-    phone_number = "123-456-7890"
-    date_of_birth = factory.Faker("date_object")
-    is_active = factory.Faker("boolean")
-
-    roles = factory.RelatedFactoryList(RoleFactory, size=2, factory_related_name="user")
