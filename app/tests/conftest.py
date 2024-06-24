@@ -2,13 +2,10 @@ import logging
 
 import _pytest.monkeypatch
 import boto3
-import flask
-import flask.testing
 import moto
 import pytest
 
 import src.adapters.db as db
-import src.app as app_entry
 import tests.src.db.models.factories as factories
 from src.db import models
 from src.util.local import load_local_env_vars
@@ -110,6 +107,7 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
 ####################
 # Test App & Client
 ####################
+
 
 @pytest.fixture
 def api_auth_token(monkeypatch):
