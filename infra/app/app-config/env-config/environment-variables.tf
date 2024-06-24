@@ -25,7 +25,6 @@ locals {
     #   secret_store_name = "/${var.app_name}-${var.environment}/random-secret"
     # }
 
-    # Example secret that references a manually created secret
     OPENAI_API_KEY = {
       manage_method     = "manual"
       secret_store_name = "/${var.app_name}-${var.environment}/OPENAI_API_KEY"
@@ -34,6 +33,8 @@ locals {
       manage_method     = "manual"
       secret_store_name = "/${var.app_name}-${var.environment}/LITERAL_API_KEY"
     }
+
+    # Example secret that references a manually created secret
     # SECRET_SAUCE = {
     #   manage_method     = "manual"
     #   secret_store_name = "/${var.app_name}-${var.environment}/secret-sauce"
