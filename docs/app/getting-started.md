@@ -1,0 +1,39 @@
+# Getting started
+
+This application is dockerized. Take a look at [Dockerfile](/app/Dockerfile) to see how it works.
+
+A very simple [docker-compose.yml](/docker-compose.yml) has been included to support local development and deployment. Take a look at [docker-compose.yml](/docker-compose.yml) for more information.
+
+## Prerequisites
+
+**Note:** Run everything from within the `/app` folder:
+
+1. Install the version of Python specified in [.python-version](/app/.python-version)
+   [pyenv](https://github.com/pyenv/pyenv#installation) is one popular option for installing Python,
+   or [asdf](https://asdf-vm.com/).
+
+2. After installing and activating the right version of Python, install
+   [poetry](https://python-poetry.org/docs/#installation) and follow the instructions to add poetry to your path if necessary.
+
+   ```bash
+   curl -sSL https://install.python-poetry.org | python3 -
+   ```
+
+3. If you are using an M1 mac, you will need to install postgres as well: `brew install postgresql` (The psycopg2-binary is built from source on M1 macs which requires the postgres executable to be present)
+
+4. You'll also need [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+## Run the application
+
+1. Set up an (empty) local secrets file: `touch app/.env` and copy the provided example Docker override: `cp docker-compose.override.yml.example docker-compose.override.yml`
+2. In your terminal, `cd` to the `app` directory of this repo.
+3. Make sure you have [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed & running.
+4. Run `make setup-local` to install dependencies
+5. Run `make init start` to build the image and start the container.
+6. Navigate to `localhost:8080/docs` to access the Swagger UI.
+7. Run `make run-logs` to see the logs of the running API container
+8. Run `make stop` when you are done to delete the container.
+
+## Next steps
+
+Now that you're up and running, read the [application docs](README.md) to familiarize yourself with the application.
