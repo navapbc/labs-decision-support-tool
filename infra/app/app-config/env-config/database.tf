@@ -10,6 +10,8 @@ locals {
 
     # Enable extensions that require the rds_superuser role to be created here
     # See docs/infra/set-up-database.md for more information
-    superuser_extensions = {}
+    superuser_extensions = {
+      "vector": true
+    }
   } : null
 }

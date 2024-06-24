@@ -71,6 +71,7 @@ resource "aws_ecs_task_definition" "app" {
   family             = var.service_name
   execution_role_arn = aws_iam_role.task_executor.arn
   task_role_arn      = aws_iam_role.app_service.arn
+  ephemeral_storage {size_in_gib = 40}
 
   container_definitions = jsonencode([
     {
@@ -80,7 +81,7 @@ resource "aws_ecs_task_definition" "app" {
       cpu                    = var.cpu,
       networkMode            = "awsvpc",
       essential              = true,
-      readonlyRootFilesystem = !var.enable_command_execution,
+      readonlyRootFilesystem = false,
 
       # Need to define all parameters in the healthCheck block even if we want
       # to use AWS's defaults, otherwise the terraform plan will show a diff
