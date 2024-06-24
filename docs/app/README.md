@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This is the API layer. It includes a few separate components:
+This is a Chainlit app built on top of Nava's open source [Application Flask template](https://github.com/navapbc/template-application-flask). It includes a few separate components:
 
 * The REST API
 * Backend & utility scripts
@@ -22,7 +22,6 @@ root
 │       └── route               API route definitions
 │           └── handler         API route implementations
 │       └── scripts             Backend scripts that run separate from the application
-|       └── services            Methods for service layer
 │       └── util                Utility methods and classes useful to most areas of the code
 │
 │   └── tests
@@ -37,7 +36,7 @@ root
 
 ## Information
 
-* [API Technical Overview](./technical-overview.md)
+* [Technical Overview](./technical-overview.md)
 * [Database Management](./database/database-management.md)
 * [Formatting and Linting](./formatting-and-linting.md)
 * [Writing Tests](./writing-tests.md)
@@ -89,9 +88,9 @@ export DB_HOST=localhost
 ```
 And then running `direnv allow .` in the /app folder. You should see something like:
 ```shell
-➜  template-application-flask git:(main) ✗ cd app
-direnv: loading ~/workspace/template-application-flask/app/.envrc
-direnv: export +API_AUTH_TOKEN +AWS_ACCESS_KEY_ID +AWS_DEFAULT_REGION +AWS_SECRET_ACCESS_KEY +DB_HOST +DB_NAME +DB_PASSWORD +DB_SCHEMA +DB_SSL_MODE +DB_USER +ENVIRONMENT +FLASK_APP +HIDE_SQL_PARAMETER_LOGS +LOG_ENABLE_AUDIT +LOG_FORMAT +PORT +PYTHONPATH
+➜  labs-decision-support-tool git:(main) ✗ cd app
+direnv: loading ~/workspace/labs-decision-support-tool/app/.envrc
+direnv: export +API_AUTH_TOKEN +AWS_ACCESS_KEY_ID +AWS_DEFAULT_REGION +AWS_SECRET_ACCESS_KEY +DB_HOST +DB_NAME +DB_PASSWORD +DB_SCHEMA +DB_SSL_MODE +DB_USER +ENVIRONMENT +HIDE_SQL_PARAMETER_LOGS +LOG_ENABLE_AUDIT +LOG_FORMAT +PORT +PYTHONPATH
 ```
 
 ## Environment Variables
@@ -102,9 +101,6 @@ Environment variables for local development are stored in the [local.env](/app/l
 
 Any environment variables specified directly in the [docker-compose](/docker-compose.yml) file will take precedent over those specified in the [local.env](/app/local.env) file.
 
-## Authentication
-
-This API uses a very simple [ApiKey authentication approach](https://apiflask.com/authentication/#use-external-authentication-library) which requires the caller to provide a static key. This is specified with the `API_AUTH_TOKEN` environment variable.
 
 ## VSCode Remote Attach Container Debugging
 

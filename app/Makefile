@@ -39,8 +39,6 @@ else
 PY_RUN_CMD := docker compose run $(DOCKER_EXEC_ARGS) --rm $(APP_NAME) poetry run
 endif
 
-FLASK_CMD := $(PY_RUN_CMD) flask --env-file local.env
-
 # Docker user configuration
 # This logic is to avoid issues with permissions and mounting local volumes,
 # which should be owned by the same UID for Linux distros. Mac OS can use root,
@@ -209,23 +207,6 @@ lint-mypy:
 
 lint-security: # https://bandit.readthedocs.io/en/latest/index.html
 	$(PY_RUN_CMD) bandit -c pyproject.toml -r . --number 3 --skip B101 -ll -x ./.venv
-
-
-##################################################
-# CLI Commands
-##################################################
-
-cmd: ## Run Flask app CLI command (Run `make cli args="--help"` to see list of CLI commands)
-	$(FLASK_CMD) $(args)
-
-cmd-user-create-csv: ## Create a CSV of the useres in the database (Run `make cli-user-create-csv args="--help"` to see the command's options)
-	$(FLASK_CMD) user create-csv $(args)
-
-# Set init-db as pre-requisite since there seems to be a race condition
-# where the DB can't yet receive connections if it's starting from a
-# clean state (e.g. after make stop, make clean-volumes, make openapi-spec)
-openapi-spec: init-db ## Generate OpenAPI spec
-	$(FLASK_CMD) spec --format yaml --output ./openapi.generated.yml
 
 
 ##################################################
