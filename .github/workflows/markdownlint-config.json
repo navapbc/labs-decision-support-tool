@@ -10,7 +10,7 @@
             "pattern": "127.0.0.1"
         },
         {
-            "pattern": "./.github/pull_request_template.md"
+            "pattern": "https://navalabs.atlassian.net/browse/DST-"
         }
     ],
     "replacementPatterns": [
