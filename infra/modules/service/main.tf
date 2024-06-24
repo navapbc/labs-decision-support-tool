@@ -71,7 +71,7 @@ resource "aws_ecs_task_definition" "app" {
   family             = var.service_name
   execution_role_arn = aws_iam_role.task_executor.arn
   task_role_arn      = aws_iam_role.app_service.arn
-  ephemeral_storage {size_in_gib = 40}
+  ephemeral_storage { size_in_gib = 40 }
 
   container_definitions = jsonencode([
     {
