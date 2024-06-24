@@ -8,6 +8,9 @@
         },
         {
             "pattern": "127.0.0.1"
+        },
+        {
+            "pattern": "pull_request_template.md"
         }
     ],
     "replacementPatterns": [
