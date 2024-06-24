@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "template-application-flask"
+name = "decision-support-tool"
 version = "0.1.0"
-description = "A template flask API for building ontop of"
+description = "Nava Labs Decision Support Tool pilot project"
 packages = [{ include = "src" }]
 authors = ["Nava Engineering <engineering@navapbc.com>"]
 

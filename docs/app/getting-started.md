@@ -25,13 +25,14 @@ A very simple [docker-compose.yml](/docker-compose.yml) has been included to sup
 
 ## Run the application
 
-1. In your terminal, `cd` to the `app` directory of this repo.
-2. Make sure you have [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed & running.
-3. Run `make setup-local` to install dependencies
-4. Run `make init start` to build the image and start the container.
-5. Navigate to `localhost:8080/docs` to access the Swagger UI.
-6. Run `make run-logs` to see the logs of the running API container
-7. Run `make stop` when you are done to delete the container.
+1. Set up an (empty) local secrets file: `touch app/.env` and copy the provided example Docker override: `cp docker-compose.override.yml.example docker-compose.override.yml`
+2. In your terminal, `cd` to the `app` directory of this repo.
+3. Make sure you have [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed & running.
+4. Run `make setup-local` to install dependencies
+5. Run `make init start` to build the image and start the container.
+6. Navigate to `localhost:8080/docs` to access the Swagger UI.
+7. Run `make run-logs` to see the logs of the running API container
+8. Run `make stop` when you are done to delete the container.
 
 ## Next steps
 
