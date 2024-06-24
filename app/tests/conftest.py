@@ -2,13 +2,10 @@ import logging
 
 import _pytest.monkeypatch
 import boto3
-import flask
-import flask.testing
 import moto
 import pytest
 
 import src.adapters.db as db
-import src.app as app_entry
 import tests.src.db.models.factories as factories
 from src.db import models
 from src.util.local import load_local_env_vars
@@ -110,23 +107,6 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
 ####################
 # Test App & Client
 ####################
-
-
-# Make app session scoped so the database connection pool is only created once
-# for the test session. This speeds up the tests.
-@pytest.fixture(scope="session")
-def app(db_client) -> flask.Flask:
-    return app_entry.create_app()
-
-
-@pytest.fixture
-def client(app: flask.Flask) -> flask.testing.FlaskClient:
-    return app.test_client()
-
-
-@pytest.fixture
-def cli_runner(app: flask.Flask) -> flask.testing.CliRunner:
-    return app.test_cli_runner()
 
 
 @pytest.fixture
