@@ -111,24 +111,6 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
 # Test App & Client
 ####################
 
-
-# Make app session scoped so the database connection pool is only created once
-# for the test session. This speeds up the tests.
-@pytest.fixture(scope="session")
-def app(db_client) -> flask.Flask:
-    return app_entry.create_app()
-
-
-@pytest.fixture
-def client(app: flask.Flask) -> flask.testing.FlaskClient:
-    return app.test_client()
-
-
-@pytest.fixture
-def cli_runner(app: flask.Flask) -> flask.testing.CliRunner:
-    return app.test_cli_runner()
-
-
 @pytest.fixture
 def api_auth_token(monkeypatch):
     auth_token = "abcd1234"
