@@ -18,5 +18,3 @@
 
 # Python testing stuff
 *__pycache__*
-
-docker-compose.override.yml
