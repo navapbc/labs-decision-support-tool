@@ -4,7 +4,7 @@
 
 ## Ticket
 
-Resolves #{TICKET NUMBER or URL or description}
+https://navalabs.atlassian.net/browse/DST-<TICKET_NUMBER_HERE>
 
 
 ## Changes
