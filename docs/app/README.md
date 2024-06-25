@@ -2,10 +2,7 @@
 
 ## Introduction
 
-This is a Chainlit app built on top of Nava's open source [Application Flask template](https://github.com/navapbc/template-application-flask). It includes a few separate components:
-
-* The REST API
-* Backend & utility scripts
+This is a Chainlit app built on top of Nava's open source [Application Flask template](https://github.com/navapbc/template-application-flask).
 
 ## Project Directory Structure
 
@@ -13,15 +10,11 @@ This is a Chainlit app built on top of Nava's open source [Application Flask tem
 root
 ├── app
 │   └── src
-│       └── auth                Authentication code for API
 │       └── db
 │           └── models          DB model definitions
 │           └── migrations      DB migration configs
 │               └── versions    The DB migrations
 │       └── logging
-│       └── route               API route definitions
-│           └── handler         API route implementations
-│       └── scripts             Backend scripts that run separate from the application
 │       └── util                Utility methods and classes useful to most areas of the code
 │
 │   └── tests
