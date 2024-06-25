@@ -41,7 +41,7 @@ def upgrade():
         "chunk",
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("tokens", sa.Integer(), nullable=True),
-        sa.Column("embedding", Vector(dim=768), nullable=False),
+        sa.Column("mpnet_embedding", Vector(dim=768), nullable=False),
         sa.Column("document_id", sa.UUID(), nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column(

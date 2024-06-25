@@ -27,7 +27,7 @@ class Chunk(Base, IdMixin, TimestampMixin):
 
     content: Mapped[str]
     tokens: Mapped[int | None]
-    embedding: Mapped[np.ndarray] = mapped_column(Vector(768))
+    mpnet_embedding: Mapped[np.ndarray] = mapped_column(Vector(768))
 
     document_id: Mapped[UUID] = mapped_column(ForeignKey("document.id", ondelete="CASCADE"))
     document: Mapped[Document] = relationship(Document)

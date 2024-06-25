@@ -31,4 +31,4 @@ def test_chunk_factory(enable_factory_create, db_session: db.Session):
     assert chunk_db_record.id == chunk.id
     assert chunk_db_record.content == chunk.content
     assert chunk_db_record.tokens == len(MockSentenceTransformer().tokenizer.tokenize(chunk.content))
-    assert chunk_db_record.embedding == MockSentenceTransformer().encode(chunk.content)
+    assert chunk_db_record.mpnet_embedding == MockSentenceTransformer().encode(chunk.content)

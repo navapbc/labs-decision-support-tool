@@ -80,6 +80,6 @@ class ChunkFactory(BaseFactory):
     tokens = factory.LazyAttribute(
         lambda o: len(MockSentenceTransformer().tokenizer.tokenize(o.document.content))
     )
-    embedding = factory.LazyAttribute(
+    mpnet_embedding = factory.LazyAttribute(
         lambda o: MockSentenceTransformer().encode(o.document.content)
     )
