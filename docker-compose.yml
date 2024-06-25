@@ -1,6 +1,6 @@
 services:
   main-db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: main-db
     command: postgres -c "log_lock_waits=on" -N 1000 -c "fsync=off"
     environment:
@@ -13,6 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
   main-app:
     build:
