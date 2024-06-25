@@ -20,6 +20,8 @@ marshmallow = "^3.20.1"
 psycopg = {extras = ["binary"], version = "^3.1.10"}
 pydantic-settings = "^2.0.3"
 chainlit = "^1.1.304"
+sentence-transformers = "^3.0.1"
+litellm = "^1.40.25"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.9.1"
