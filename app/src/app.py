@@ -1,13 +1,9 @@
-import logging
+from fastapi import FastAPI
+from chainlit.utils import mount_chainlit
+from src.healthcheck import healthcheck_router
 
-import chainlit as cl
+app = FastAPI()
 
-logger = logging.getLogger(__name__)
+app.include_router(healthcheck_router)
 
-
-@cl.on_message
-async def main(message: cl.Message) -> None:
-    logger.info(f"Received: {message.content}")
-    await cl.Message(
-        content=f"Hello, world! Received: {message.content}",
-    ).send()
+mount_chainlit(app=app, target="src/chainlit.py", path="/chat")
