@@ -899,6 +899,7 @@ flake8 = ">=6.0.0"
 dev = ["coverage", "hypothesis", "hypothesmith (>=0.2)", "pre-commit", "pytest", "tox"]
 
 [[package]]
+<<<<<<< HEAD
 name = "frozenlist"
 version = "1.4.1"
 description = "A list-like structure which implements collections.abc.MutableSequence"
@@ -985,6 +986,8 @@ files = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "fsspec"
 version = "2024.6.0"
 description = "File-system specification"
@@ -1796,6 +1799,7 @@ gmpy = ["gmpy2 (>=2.1.0a4)"]
 tests = ["pytest (>=4.6)"]
 
 [[package]]
+<<<<<<< HEAD
 name = "multidict"
 version = "6.0.5"
 description = "multidict implementation"
@@ -1895,6 +1899,8 @@ files = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "mypy"
 version = "1.10.0"
 description = "Optional static typing for Python"
@@ -2168,6 +2174,7 @@ files = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "openai"
 version = "1.35.3"
 description = "The official Python library for the openai API"
@@ -2191,6 +2198,8 @@ typing-extensions = ">=4.7,<5"
 datalib = ["numpy (>=1)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
 
 [[package]]
+=======
+>>>>>>> main
 name = "opentelemetry-api"
 version = "1.25.0"
 description = "OpenTelemetry Python API"
@@ -3649,6 +3658,7 @@ files = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "tiktoken"
 version = "0.7.0"
 description = "tiktoken is a fast BPE tokeniser for use with OpenAI's models"
@@ -3701,6 +3711,8 @@ requests = ">=2.26.0"
 blobfile = ["blobfile (>=2)"]
 
 [[package]]
+=======
+>>>>>>> main
 name = "tokenizers"
 version = "0.19.1"
 description = ""
@@ -4413,4 +4425,8 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
+<<<<<<< HEAD
 content-hash = "5c8e78a4c9c1b251fbcc7eb787c8bc6f9399daf4bf5ebc11f281df54eda48b33"
+=======
+content-hash = "7d4da63870f04e69817548ec30fede0e17687014f3bc939893effb597eda3b8b"
+>>>>>>> main
