@@ -1,5 +1,4 @@
 services:
-
   main-db:
     image: postgres:16-alpine
     container_name: main-db
@@ -22,7 +21,18 @@ services:
       args:
         - RUN_UID=${RUN_UID:-4000}
         - RUN_USER=${RUN_USER:-app}
-    command: ["poetry", "run", "chainlit", "run", "src/app.py", "-w"]
+    command:
+      [
+        "poetry",
+        "run",
+        "uvicorn",
+        "src.app:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+      ]
     container_name: main-app
     env_file: ./app/local.env
     ports:
@@ -34,5 +44,3 @@ services:
 
 volumes:
   dbdata:
-
-
