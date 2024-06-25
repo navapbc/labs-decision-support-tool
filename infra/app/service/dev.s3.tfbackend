@@ -1,0 +1,4 @@
+bucket         = "decision-support-tool-654654379445-us-east-1-tf"
+key            = "infra/app/service/dev.tfstate"
+dynamodb_table = "decision-support-tool-654654379445-us-east-1-tf-state-locks"
+region         = "us-east-1"
