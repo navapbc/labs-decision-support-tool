@@ -26,7 +26,7 @@ A very simple [docker-compose.yml](/docker-compose.yml) has been included to sup
 **Note:** Run everything from within the `/app` folder:
 
 1. Set up an (empty) local secrets file: `touch .env` and copy the provided example Docker override: `cp ../docker-compose.override.yml.example ../docker-compose.override.yml`
-2. Download the `multi-qa-mpnet-base-dot-v1` model into the `models` directory: `mkdir models && git clone https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-dot-v1 models/multi-qa-mpnet-base-dot-v1`
+2. Download the `multi-qa-mpnet-base-dot-v1` model into the `models` directory: `git clone https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-dot-v1 models/multi-qa-mpnet-base-dot-v1`
 3. Run `make init start` to build the image and start the container.
 4. Navigate to `localhost:8080/docs` to access the Swagger UI.
 5. Run `make run-logs` to see the logs of the running API container
