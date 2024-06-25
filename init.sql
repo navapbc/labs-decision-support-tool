@@ -1,0 +1,1 @@
+CREATE EXTENSION vector schema pg_catalog;
