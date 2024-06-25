@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
 
-"""
-This is a sample API file that demonstrates how to create an API using FastAPI,
-which is compatible with Chainlit. This file is a starting point for creating
-an API that can be deployed with the Chainlit chatbot.
-"""
-
 import logging
 import os
 import platform
@@ -15,7 +9,7 @@ from fastapi import APIRouter, Request, status
 from pydantic import BaseModel
 
 healthcheck_router = APIRouter()
-logger = logging.getLogger("chatbot.healthcheck")
+logger = logging.getLogger(__name__)
 
 
 class HealthCheck(BaseModel):
@@ -48,13 +42,13 @@ async def health(request: Request) -> HealthCheck:
     """
     logger.info(request.headers)
 
-    git_sha = os.environ.get("GIT_SHA", "")
+    git_sha = os.environ.get("IMAGE_TAG", "")
     build_date = os.environ.get("BUILD_DATE", "")
 
     service_name = os.environ.get("SERVICE_NAME", "")
     hostname = f"{platform.node()} {socket.gethostname()}"
 
-    logger.info(f"Healthy {git_sha} built at {build_date}<br/>{service_name} {hostname}")
+    logger.info(f"Healthy {git_sha} built at {build_date}: {service_name} {hostname}")
     return HealthCheck(
         build_date=build_date,
         git_sha=git_sha,
@@ -62,9 +56,3 @@ async def health(request: Request) -> HealthCheck:
         service_name=service_name,
         hostname=hostname,
     )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("__main__:app", port=8001, log_level="info")
