@@ -35,3 +35,6 @@ poetry-installer-error-*.log
 
 # Cached models
 models/
+
+# Guru cards
+guru*.json
