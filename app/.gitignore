@@ -32,3 +32,6 @@ poetry-installer-error-*.log
 
 # Chainlit
 .chainlit
+
+# Cached models
+models/
