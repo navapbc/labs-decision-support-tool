@@ -18,6 +18,7 @@ from sqlalchemy.orm import scoped_session
 import src.adapters.db as db
 import src.util.datetime_util as datetime_util
 from src.db.models.document import Chunk, Document
+from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 
 _db_session: Optional[db.Session] = None
 
@@ -75,8 +76,8 @@ class ChunkFactory(BaseFactory):
         model = Chunk
 
     document = factory.SubFactory(DocumentFactory)
-    content = factory.lazyAttribute(lambda o: o.document.content)
-    tokens = factory.lazyAttribute(
+    content = factory.LazyAttribute(lambda o: o.document.content)
+    tokens = factory.LazyAttribute(
         lambda o: len(MockSentenceTransformer().tokenizer.tokenize(o.document.content))
     )
     embedding = factory.LazyAttribute(

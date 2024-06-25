@@ -2,6 +2,7 @@ from sqlalchemy import delete, select
 
 import src.adapters.db as db
 from src.db.models.document import Chunk, Document
+from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
@@ -29,5 +30,5 @@ def test_chunk_factory(enable_factory_create, db_session: db.Session):
     chunk_db_record = db_session.execute(select(Chunk)).scalar_one()
     assert chunk_db_record.id == chunk.id
     assert chunk_db_record.content == chunk.content
-    assert chunk_db_record.tokens == MockSentenceTransformer.tokenizer.tokenize(chunk.content)
+    assert chunk_db_record.tokens == len(MockSentenceTransformer().tokenizer.tokenize(chunk.content))
     assert chunk_db_record.embedding == MockSentenceTransformer().encode(chunk.content)
