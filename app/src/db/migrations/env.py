@@ -3,6 +3,7 @@ from typing import Any
 
 import alembic.context as context
 import sqlalchemy
+from pgvector.sqlalchemy import Vector
 
 import src.adapters.db as db
 import src.logging
@@ -50,6 +51,7 @@ with src.logging.init("migrations"):
         db_client = db.PostgresDBClient()
 
         with db_client.get_connection() as connection:
+            connection.dialect.ischema_names["vector"] = Vector
             context.configure(
                 connection=connection,
                 target_metadata=target_metadata,
