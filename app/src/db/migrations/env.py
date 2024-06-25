@@ -51,7 +51,7 @@ with src.logging.init("migrations"):
         db_client = db.PostgresDBClient()
 
         with db_client.get_connection() as connection:
-            connection.dialect.ischema_names["vector"] = Vector
+            connection.dialect.ischema_names["vector"] = Vector  # type: ignore
             context.configure(
                 connection=connection,
                 target_metadata=target_metadata,
