@@ -17,6 +17,7 @@ from sqlalchemy.orm import scoped_session
 
 import src.adapters.db as db
 import src.util.datetime_util as datetime_util
+from src.db.models.document import Chunk, Document
 
 _db_session: Optional[db.Session] = None
 
@@ -59,3 +60,25 @@ class BaseFactory(factory.alchemy.SQLAlchemyModelFactory):
         abstract = True
         sqlalchemy_session = Session
         sqlalchemy_session_persistence = "commit"
+
+
+class DocumentFactory(BaseFactory):
+    class Meta:
+        model = Document
+
+    name = factory.Faker("word")
+    content = factory.Faker("text")
+
+
+class ChunkFactory(BaseFactory):
+    class Meta:
+        model = Chunk
+
+    document = factory.SubFactory(DocumentFactory)
+    content = factory.lazyAttribute(lambda o: o.document.content)
+    tokens = factory.lazyAttribute(
+        lambda o: len(MockSentenceTransformer().tokenizer.tokenize(o.document.content))
+    )
+    embedding = factory.LazyAttribute(
+        lambda o: MockSentenceTransformer().encode(o.document.content)
+    )
