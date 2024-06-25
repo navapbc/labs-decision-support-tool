@@ -67,4 +67,4 @@ async def health(request: Request) -> HealthCheck:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("__main__:app", host="0.0.0.0", port=8001, log_level="info")
+    uvicorn.run("__main__:app", port=8001, log_level="info")
