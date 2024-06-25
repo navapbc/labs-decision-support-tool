@@ -1,7 +1,7 @@
 import json
 import logging
-import pytest
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.healthcheck import healthcheck_router

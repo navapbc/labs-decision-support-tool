@@ -10,12 +10,13 @@ import logging
 import os
 import platform
 import socket
+
 from fastapi import APIRouter, Request, status
 from pydantic import BaseModel
 
-
 healthcheck_router = APIRouter()
 logger = logging.getLogger("chatbot.healthcheck")
+
 
 class HealthCheck(BaseModel):
     """Response model to validate and return when performing a health check."""
@@ -55,8 +56,13 @@ async def health(request: Request) -> HealthCheck:
 
     logger.info(f"Healthy {git_sha} built at {build_date}<br/>{service_name} {hostname}")
     return HealthCheck(
-        build_date=build_date, git_sha=git_sha, status="OK", service_name=service_name, hostname=hostname
+        build_date=build_date,
+        git_sha=git_sha,
+        status="OK",
+        service_name=service_name,
+        hostname=hostname,
     )
+
 
 if __name__ == "__main__":
     import uvicorn
