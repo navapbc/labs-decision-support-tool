@@ -1,9 +1,10 @@
-import dotenv
 import os
 
+import dotenv
 from litellm import completion
 
 dotenv.load_dotenv()
+
 
 def get_models() -> dict[str, str]:
     """
@@ -16,6 +17,7 @@ def get_models() -> dict[str, str]:
     if "OPENAI_API_KEY" in os.environ:
         return {"OpenAI GPT-4o": "gpt-4o"}
     return {}
+
 
 def generate(query: str) -> str:
     """
@@ -31,4 +33,4 @@ def generate(query: str) -> str:
         {"content": query, "role": "user"},
     ]
     response = completion(model="gpt-3.5-turbo", messages=messages)
-    return response['choices'][0]['message']['content']
+    return response["choices"][0]["message"]["content"]

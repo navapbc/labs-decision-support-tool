@@ -1,7 +1,6 @@
 import logging
 
 import chainlit as cl
-
 from src.generate import generate
 
 logger = logging.getLogger(__name__)
