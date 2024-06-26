@@ -19,7 +19,14 @@ class HealthCheck(BaseModel):
     service_name: str
     hostname: str
 
-
+@healthcheck_router.get(
+    "/",
+    tags=["health"],
+    summary="Perform a Health Check",
+    response_description="Return HTTP Status Code 200 (OK)",
+    status_code=status.HTTP_200_OK,
+    response_model=HealthCheck,
+)
 @healthcheck_router.head(
     "/health",
     tags=["health"],
