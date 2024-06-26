@@ -20,3 +20,7 @@ class TestAPI:
             assert response.status_code == 200
             assert response_data["status"] == "OK"
             assert "Healthy" in caplog.messages[1]
+
+    def test_head_healthcheck_200(self, caplog, test_client):
+        response = test_client.head("/health")
+        assert response.status_code == 200
