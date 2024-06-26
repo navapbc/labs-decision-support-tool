@@ -19,6 +19,7 @@ class HealthCheck(BaseModel):
     service_name: str
     hostname: str
 
+
 @healthcheck_router.get(
     "/",
     tags=["health"],
