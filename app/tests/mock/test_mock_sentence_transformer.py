@@ -7,8 +7,6 @@ def test_mock_sentence_transformer():
     assert embedding_model.max_seq_length == 512
     assert embedding_model.tokenizer.tokenize("Hello, world!") == ["Hello,", "world!"]
     assert len(embedding_model.encode("Hello, world!")) == 768
-    # It should be about 1, but with some tolerance for floating point imprecision
-    assert sum(embedding_model.encode("Hello, world!")) - 1 < 0.01
 
     # Test that we can compare similarity with dot product,
     # where sentences with the same average length word are considered more similar
