@@ -1,9 +1,6 @@
 import os
 
-import dotenv
 from litellm import completion
-
-dotenv.load_dotenv()
 
 
 def get_models() -> dict[str, str]:
@@ -32,5 +29,5 @@ def generate(query: str) -> str:
         },
         {"content": query, "role": "user"},
     ]
-    response = completion(model="gpt-3.5-turbo", messages=messages)
+    response = completion(model="gpt-4o", messages=messages)
     return response["choices"][0]["message"]["content"]
