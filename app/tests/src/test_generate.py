@@ -1,8 +1,10 @@
-from src.generate import generate, get_models
-from tests import mock_completion
+from src.generate import PROMPT, generate, get_models
+from tests.mock import mock_completion
+from tests.src.db.models.factories import ChunkFactory
 
 
 def test_get_models(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY")
     assert get_models() == {}
 
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
@@ -11,5 +13,23 @@ def test_get_models(monkeypatch):
 
 def test_generate(monkeypatch):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
-    expected_response = 'Called gpt-4o with [{"content": "Provide answers in plain language written at the average American reading level. \\n            Use bullet points. Keep your answers brief, max of 5 sentences. \\n            Keep your answers as similar to your knowledge text as you can", "role": "system"}, {"content": "some_string", "role": "user"}]'
-    assert generate("some_string") == expected_response
+    expected_response = (
+        'Called gpt-4o with [{"content": "'
+        + PROMPT
+        + '", "role": "system"}, {"content": "some query", "role": "user"}]'
+    )
+    assert generate("some query") == expected_response
+
+
+def test_generate_with_context(monkeypatch):
+    monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
+    context = [ChunkFactory.build(), ChunkFactory.build()]
+    context_text = f"{context[0].document.name}\n{context[0].content}\n\n{context[1].document.name}\n{context[1].content}"
+    expected_response = (
+        'Called gpt-4o with [{"content": "'
+        + PROMPT
+        + '", "role": "system"}, {"content": "Use the following context to answer the question: '
+        + context_text
+        + '", "role": "system"}, {"content": "some query", "role": "user"}]'
+    )
+    assert generate("some query", context=context) == expected_response

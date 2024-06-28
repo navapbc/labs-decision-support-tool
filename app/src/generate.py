@@ -2,6 +2,12 @@ import os
 
 from litellm import completion
 
+from src.db.models.document import Chunk
+
+PROMPT = """Provide answers in plain language written at the average American reading level.
+Use bullet points. Keep your answers brief, max of 5 sentences.
+Keep your answers as similar to your knowledge text as you can"""
+
 
 def get_models() -> dict[str, str]:
     """
@@ -16,18 +22,33 @@ def get_models() -> dict[str, str]:
     return {}
 
 
-def generate(query: str) -> str:
+def generate(query: str, context: list[Chunk] | None = None) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
     """
-    messages = [
-        {
-            "content": """Provide answers in plain language written at the average American reading level. 
-            Use bullet points. Keep your answers brief, max of 5 sentences. 
-            Keep your answers as similar to your knowledge text as you can""",
-            "role": "system",
-        },
-        {"content": query, "role": "user"},
-    ]
+    if context:
+        context_text = "\n\n".join(
+            [chunk.document.name + "\n" + chunk.content for chunk in context]
+        )
+        messages = [
+            {
+                "content": PROMPT,
+                "role": "system",
+            },
+            {
+                "content": f"Use the following context to answer the question: {context_text}",
+                "role": "system",
+            },
+            {"content": query, "role": "user"},
+        ]
+
+    else:
+        messages = [
+            {
+                "content": PROMPT,
+                "role": "system",
+            },
+            {"content": query, "role": "user"},
+        ]
     response = completion(model="gpt-4o", messages=messages)
     return response["choices"][0]["message"]["content"]
