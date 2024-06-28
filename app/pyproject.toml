@@ -52,6 +52,7 @@ build-backend = "poetry.core.masonry.api"
 db-migrate = "src.db.migrations.run:up"
 db-migrate-down = "src.db.migrations.run:down"
 db-migrate-down-all = "src.db.migrations.run:downall"
+ingest-guru-cards = "src.ingest_guru_cards:main"
 
 [tool.black]
 line-length = 100
