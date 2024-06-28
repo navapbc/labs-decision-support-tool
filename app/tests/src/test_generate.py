@@ -1,10 +1,12 @@
+import os
 from src.generate import PROMPT, generate, get_models
 from tests.mock import mock_completion
 from tests.src.db.models.factories import ChunkFactory
 
 
 def test_get_models(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY")
+    if "OPENAI_API_KEY" in os.environ:
+        monkeypatch.delenv("OPENAI_API_KEY")
     assert get_models() == {}
 
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
