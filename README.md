@@ -26,7 +26,7 @@ After authenticating with AWS, from the root of this repo run:
 
 ```bash
 aws s3 cp path/to/some_cards.json s3://decision-support-tool-app-dev/
-./bin/run-command.bin app <ENVIRONMENT> command='["ingest-guru-cards", "s3://decision-support-tool-app-dev/some_cards.json"]'
+./bin/run-command app <ENVIRONMENT> '["ingest-guru-cards", "s3://decision-support-tool-app-dev/some_cards.json"]'
 ```
 
 Replace `<ENVIRONMENT>` with your environment, e.g., `dev`.
