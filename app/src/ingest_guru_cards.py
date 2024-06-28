@@ -1,7 +1,6 @@
 import json
 import logging
 import sys
-from html.parser import HTMLParser
 
 from sentence_transformers import SentenceTransformer
 from smart_open import open
@@ -9,6 +8,7 @@ from smart_open import open
 import src.adapters.db as db
 from src.app_config import AppConfig
 from src.db.models.document import Chunk, Document
+from src.util.html import get_text_from_html
 
 logger = logging.getLogger(__name__)
 
@@ -21,26 +21,18 @@ NAME_KEY = "preferredPhrase"
 CONTENT_KEY = "content"
 
 
-def get_content_from_html(html: str) -> str:
-    html_parser = HTMLParser()
-    text = []
-    html_parser.handle_data = lambda data: text.append(data)  # type: ignore
-    html_parser.feed(html)
-    return "\n".join(text)
-
-
-def ingest_cards(
+def _ingest_cards(
     db_session: db.Session, embedding_model: SentenceTransformer, guru_cards_filepath: str
 ) -> None:
     with open(guru_cards_filepath, "r") as guru_cards_file:
         cards_as_json = json.load(guru_cards_file)
 
     for card in cards_as_json:
-        logger.info(f"Processing card '{card[NAME_KEY]}'")
+        logger.info(f"Processing card {card[NAME_KEY]!r}")
 
         # Strip the HTML of the content and return just the content
         name = card[NAME_KEY].strip()
-        content = get_content_from_html(card[CONTENT_KEY])
+        content = get_text_from_html(card[CONTENT_KEY])
 
         document = Document(name=name, content=content)
         db_session.add(document)
@@ -54,7 +46,7 @@ def ingest_cards(
 
         if tokens > embedding_model.max_seq_length:
             logger.warning(
-                f"Card '{name}' has {tokens} tokens, which exceeds the embedding model's max sequence length."
+                f"Card {name!r} has {tokens} tokens, which exceeds the embedding model's max sequence length."
             )
 
 
@@ -70,7 +62,7 @@ def main() -> None:
     embedding_model = SentenceTransformer(AppConfig().embedding_model)
 
     with db.PostgresDBClient().get_session() as db_session:
-        ingest_cards(db_session, embedding_model, guru_cards_filepath)
+        _ingest_cards(db_session, embedding_model, guru_cards_filepath)
         db_session.commit()
 
     logger.info("Finished processing Guru cards.")
