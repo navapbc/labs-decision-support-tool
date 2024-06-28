@@ -1,5 +1,5 @@
 from src.generate import generate, get_models
-from tests import mock_completion
+from tests.mock import mock_completion
 
 
 def test_get_models(monkeypatch):
