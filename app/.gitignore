@@ -30,9 +30,6 @@ coverage.*
 # Poetry installer local error logs
 poetry-installer-error-*.log
 
-# Chainlit
-.chainlit
-
 # Cached models
 models/
 
