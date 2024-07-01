@@ -30,7 +30,7 @@ auto_tag_thread = true
 
 # Authorize users to spontaneously upload files with messages
 [features.spontaneous_file_upload]
-    enabled = true
+    enabled = false
     accept = ["*/*"]
     max_files = 20
     max_size_mb = 500
@@ -51,7 +51,7 @@ auto_tag_thread = true
 
 [UI]
 # Name of the assistant.
-name = "Assistant"
+name = "Decision support tool"
 
 # Description of the assistant. This is used for HTML tags.
 # description = ""
@@ -63,7 +63,7 @@ default_collapse_content = true
 hide_cot = false
 
 # Link to your github repo. This will add a github button in the UI's header.
-# github = ""
+# github = "https://github.com/navapbc/labs-decision-support-tool"
 
 # Specify a CSS file that can be used to customize the user interface.
 # The CSS file can be served from the public directory or via an external link.
@@ -85,7 +85,7 @@ custom_js = "https://cdnjs.cloudflare.com/ajax/libs/uswds/3.8.1/js/uswds.min.js"
 # custom_build = "./public/build"
 
 [UI.theme]
-    default = "dark"
+    default = "light"
     #layout = "wide"
     #font_family = "Inter, sans-serif"
 # Override default MUI light theme. (Check theme.ts)
