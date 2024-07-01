@@ -28,4 +28,4 @@ def format_guru_cards(chunks: Sequence[Chunk]) -> str:
         <p>Summary: {chunk.document.content}</p>
     </div>
 </div>"""
-    return "<h4>Related Guru cards</h4>" + cards_html
+    return "<h3>Related Guru cards</h3>" + cards_html
