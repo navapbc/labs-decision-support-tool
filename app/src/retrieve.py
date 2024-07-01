@@ -22,7 +22,7 @@ def retrieve(
     ).all()
 
     for chunk in chunks:
-        logger.info(f"Retrieved: {chunk.document.name!r}")
+        logger.debug(f"Retrieved: {chunk.document.name!r}")
 
     return chunks
 
