@@ -6,8 +6,8 @@ from sentence_transformers import SentenceTransformer
 from smart_open import open
 
 import src.adapters.db as db
-from src.cache import get_embedding_model
 from src.db.models.document import Chunk, Document
+from src.shared import get_embedding_model
 from src.util.html import get_text_from_html
 
 logger = logging.getLogger(__name__)

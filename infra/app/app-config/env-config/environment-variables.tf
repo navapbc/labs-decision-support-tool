@@ -19,6 +19,9 @@ locals {
   #   }
   # }
   secrets = {
+
+    # This is used by Chainlit to sign authentication tokens
+    # See: https://docs.chainlit.io/authentication/overview
     CHAINLIT_AUTH_SECRET = {
       manage_method     = "generated"
       secret_store_name = "/${var.app_name}-${var.environment}/CHAINLIT_AUTH_SECRET"
@@ -37,11 +40,5 @@ locals {
       manage_method     = "manual"
       secret_store_name = "/${var.app_name}-${var.environment}/LITERAL_API_KEY"
     }
-
-    # Example secret that references a manually created secret
-    # SECRET_SAUCE = {
-    #   manage_method     = "manual"
-    #   secret_store_name = "/${var.app_name}-${var.environment}/secret-sauce"
-    # }
   }
 }
