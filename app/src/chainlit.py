@@ -2,15 +2,15 @@ import logging
 
 import chainlit as cl
 import src.adapters.db as db
-from src.auth import require_auth
 from src.cache import get_embedding_model
 from src.format import format_guru_cards
 from src.generate import generate
+from src.login import require_login
 from src.retrieve import retrieve
 
 logger = logging.getLogger(__name__)
 
-require_auth()
+require_login()
 
 
 @cl.on_message

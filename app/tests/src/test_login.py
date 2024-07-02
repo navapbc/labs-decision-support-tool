@@ -2,33 +2,31 @@ import os
 
 import chainlit.config
 import src.cache
-from src.auth import auth_callback, require_auth
+from src.login import login_callback, require_login
 
 
-def test_require_auth_no_password(monkeypatch):
+def test_require_login_no_password(monkeypatch):
     if "GLOBAL_PASSWORD" in os.environ:
         monkeypatch.delenv("GLOBAL_PASSWORD")
     src.cache._app_config = None
 
-    require_auth()
+    require_login()
 
     assert not chainlit.config.code.password_auth_callback
 
 
-def test_require_auth_with_password(monkeypatch):
+def test_require_login_with_password(monkeypatch):
     monkeypatch.setenv("GLOBAL_PASSWORD", "password")
     src.cache._app_config = None
 
-    require_auth()
+    require_login()
 
     assert chainlit.config.code.password_auth_callback
 
 
-def test_auth_callback(monkeypatch):
+def test_login_callback(monkeypatch):
     monkeypatch.setenv("GLOBAL_PASSWORD", "correct pass")
     src.cache._app_config = None
 
-    require_auth()
-
-    assert auth_callback("some user", "wrong pass") is None
-    assert auth_callback("some user", "correct pass").identifier == "some user"
+    assert login_callback("some user", "wrong pass") is None
+    assert login_callback("some user", "correct pass").identifier == "some user"
