@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 from smart_open import open
 
 import src.adapters.db as db
-from src.app_config import AppConfig
+from src.cache import get_embedding_model
 from src.db.models.document import Chunk, Document
 from src.util.html import get_text_from_html
 
@@ -59,7 +59,7 @@ def main() -> None:
 
     logger.info(f"Processing Guru cards at {guru_cards_filepath}")
 
-    embedding_model = SentenceTransformer(AppConfig().embedding_model)
+    embedding_model = get_embedding_model()
 
     with db.PostgresDBClient().get_session() as db_session:
         _ingest_cards(db_session, embedding_model, guru_cards_filepath)

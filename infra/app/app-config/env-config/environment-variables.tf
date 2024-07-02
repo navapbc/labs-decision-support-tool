@@ -19,11 +19,15 @@ locals {
   #   }
   # }
   secrets = {
-    # Example generated secret
-    # RANDOM_SECRET = {
-    #   manage_method     = "generated"
-    #   secret_store_name = "/${var.app_name}-${var.environment}/random-secret"
-    # }
+    CHAINLIT_AUTH_SECRET = {
+      manage_method     = "generated"
+      secret_store_name = "/${var.app_name}-${var.environment}/CHAINLIT_AUTH_SECRET"
+    }
+
+    GLOBAL_PASSWORD = {
+      manage_method     = "manual"
+      secret_store_name = "/${var.app_name}-${var.environment}/GLOBAL_PASSWORD"
+    }
 
     OPENAI_API_KEY = {
       manage_method     = "manual"

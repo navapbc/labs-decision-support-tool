@@ -1,17 +1,16 @@
 import logging
 
-from sentence_transformers import SentenceTransformer
-
 import chainlit as cl
 import src.adapters.db as db
-from src.app_config import AppConfig
+from src.auth import require_auth
+from src.cache import get_embedding_model
 from src.format import format_guru_cards
 from src.generate import generate
 from src.retrieve import retrieve
 
 logger = logging.getLogger(__name__)
 
-embedding_model = SentenceTransformer(AppConfig().embedding_model)
+require_auth()
 
 
 @cl.on_message
@@ -21,7 +20,7 @@ async def main(message: cl.Message) -> None:
     with db.PostgresDBClient().get_session() as db_session:
         chunks = retrieve(
             db_session,
-            embedding_model,
+            get_embedding_model(),
             message.content,
         )
 
