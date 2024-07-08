@@ -9,8 +9,7 @@ from tests.mock import mock_completion
 from tests.src.db.models.factories import ChunkFactory
 
 
-@pytest.fixture(name="ollama_models")
-def fixture_model_list():
+def ollama_model_list():
     return {
         "models": [
             {
@@ -88,12 +87,11 @@ def test_get_models(monkeypatch):
     assert get_models() == {"OpenAI GPT-4o": "gpt-4o"}
 
 
-@patch("ollama.list")
-def test_get_models_ollama(monkeypatch, ollama_models):
+def test_get_models_ollama(monkeypatch):
     if "OPENAI_API_KEY" in os.environ:
         monkeypatch.delenv("OPENAI_API_KEY")
     monkeypatch.setenv("OLLAMA_HOST", "mock_key")
-    ollama.list.return_value = ollama_models
+    monkeypatch.setattr(ollama, "list", ollama_model_list)
 
     assert get_models() == {
         "ollama/llama3:latest": "llama3:latest",
