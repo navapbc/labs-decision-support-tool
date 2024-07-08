@@ -24,6 +24,7 @@ sentence-transformers = "^3.0.1"
 litellm = "^1.40.25"
 
 pgvector = "^0.2.5"
+ollama = "^0.2.1"
 [tool.poetry.group.dev.dependencies]
 black = "^23.9.1"
 flake8 = "^6.1.0"
