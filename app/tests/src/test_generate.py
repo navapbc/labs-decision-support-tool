@@ -1,8 +1,6 @@
 import os
-from unittest.mock import patch
 
 import ollama
-import pytest
 
 from src.generate import PROMPT, generate, get_models
 from tests.mock import mock_completion

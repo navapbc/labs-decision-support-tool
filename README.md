@@ -10,13 +10,13 @@ To set up your local development environment, follow the instructions in [Gettin
 
 You can install ollama on macOSX by calling `brew install ollama`, for other operating systems or the desktop app see the [Ollama repository](https://github.com/ollama/ollama).
 
-To download a model run `ollama pull model_name`
+To download a model run `ollama pull <model_name>`
 
 Ex: `ollama pull llama2:7b`
 
 To start Ollama without the desktop app run `ollama serve`
 
-To configure a local secret to enable Ollama add `OLLAMA_HOST=http://host.docker.internal:11434` to your `.env` file.
+To configure a local secret to enable Ollama locally through docker add `OLLAMA_HOST=http://host.docker.internal:11434` to your `.env` file.
 
 ## Loading documents
 
