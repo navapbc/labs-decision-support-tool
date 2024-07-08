@@ -10,7 +10,9 @@ To set up your local development environment, follow the instructions in [Gettin
 
 You can install ollama on macOSX by calling `brew install ollama`, for other operating systems or the desktop app see the [Ollama repository](https://github.com/ollama/ollama).
 
-To download a model run `ollama pull model_name` ex: `ollama pull llama2:7b`
+To download a model run `ollama pull model_name`
+
+Ex: `ollama pull llama2:7b`
 
 To start Ollama without the desktop app run `ollama serve`
 
