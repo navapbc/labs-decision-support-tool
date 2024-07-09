@@ -25,7 +25,7 @@ def get_models() -> dict[str, str]:
         ollama_models = {}
         models = ollama.list()
         for model in models["models"]:
-            ollama_models[f"ollama/{model['name']}"] = model["name"]
+            ollama_models[f"Ollama {model['name']}"] = f"ollama/{model['name']}"
         return ollama_models
     return {}
 

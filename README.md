@@ -16,7 +16,7 @@ Ex: `ollama pull llama2:7b`
 
 To start Ollama without the desktop app run `ollama serve`
 
-To configure a local secret to enable Ollama locally add `OLLAMA_HOST=http://localhost:11434` to your `.env` file.
+To configure a local secret to enable Ollama locally add `OLLAMA_HOST=http://host.docker.internal:11434` to your `.env` file.
 
 ## Loading documents
 
