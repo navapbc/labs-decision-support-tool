@@ -92,10 +92,10 @@ def test_get_models_ollama(monkeypatch):
     monkeypatch.setattr(ollama, "list", ollama_model_list)
 
     assert get_models() == {
-        "ollama/llama3:latest": "llama3:latest",
-        "ollama/dolphin-mistral:latest": "dolphin-mistral:latest",
-        "ollama/openhermes:latest": "openhermes:latest",
-        "ollama/llama2:latest": "llama2:latest",
+        "Ollama llama3:latest": "ollama/llama3:latest",
+        "Ollama dolphin-mistral:latest": "ollama/dolphin-mistral:latest",
+        "Ollama openhermes:latest": "ollama/openhermes:latest",
+        "Ollama llama2:latest": "ollama/llama2:latest",
     }
 
 
