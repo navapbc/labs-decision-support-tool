@@ -6,7 +6,7 @@ Welcome! You are at the root of the Nava Labs Decision Support Tool pilot repo.
 
 To set up your local development environment, follow the instructions in [Getting Started](docs/app/getting-started.md).
 
-## Installing Ollama
+### Installing Ollama
 
 You can install ollama on macOSX by calling `brew install ollama`, for other operating systems or the desktop app see the [Ollama repository](https://github.com/ollama/ollama).
 
