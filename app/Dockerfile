@@ -62,7 +62,7 @@ COPY . /app
 ENV HOST=0.0.0.0
 
 # Run the application.
-CMD ["poetry","run","gunicorn","src.app:app","--host","0.0.0.0","--port","8000","--reload"]
+CMD ["poetry", "run", "gunicorn","-k uvicorn.workers.UvicornWorker","-b 0.0.0.0:8000", "src.app:app"]
 
 #---------
 # Release
@@ -114,4 +114,4 @@ ENV HOST=0.0.0.0
 USER ${RUN_USER}
 
 # Run the application.
-CMD ["poetry","run","uvicorn","src.app:app","--host","0.0.0.0","--port","8000"]
+CMD ["poetry", "run", "gunicorn","-k uvicorn.workers.UvicornWorker","-b 0.0.0.0:8000", "src.app:app"]
