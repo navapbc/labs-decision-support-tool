@@ -9,8 +9,6 @@ Attributes:
 For more information, see https://docs.gunicorn.org/en/stable/configure.html
 """
 
-import os
-
 from src.app_config import AppConfig
 
 app_config = AppConfig()
