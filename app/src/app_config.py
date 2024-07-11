@@ -16,4 +16,3 @@ class AppConfig(PydanticBaseEnvConfig):
 
     embedding_model: str = "multi-qa-mpnet-base-dot-v1"
     global_password: str | None = None
-
