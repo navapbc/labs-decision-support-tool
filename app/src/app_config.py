@@ -16,5 +16,5 @@ class AppConfig(PydanticBaseEnvConfig):
 
     embedding_model: str = "multi-qa-mpnet-base-dot-v1"
     global_password: str | None = None
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8080
