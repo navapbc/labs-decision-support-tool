@@ -1,7 +1,5 @@
 import os
 
-import ollama
-
 from src.generate import PROMPT, generate, get_models
 from tests.mock import mock_completion
 from tests.src.db.models.factories import ChunkFactory
