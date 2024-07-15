@@ -2,12 +2,9 @@ import logging
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
-import src.adapters.db as db
+from src import chat_engine
 from src.format import format_guru_cards
-from src.generate import generate
 from src.login import require_login
-from src.retrieve import retrieve
-from src.shared import get_embedding_model
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +13,24 @@ require_login()
 
 @cl.on_chat_start
 async def start() -> None:
-    chat_engine = engine_url_query_value()
-    print("chat_engine", chat_engine)
+    engine_id = engine_url_query_value()
+    logger.info("engine: %s", engine_id)
+    engine = chat_engine.create_engine(engine_id)
+    if not engine:
+        await cl.Message(
+            author="backend",
+            metadata={"engine": engine_id},
+            content=f"Available engines: {chat_engine.available_engines()}",
+        ).send()
+        return
+
+    cl.user_session.set("chat_engine", engine)
+    engine.on_start()
+    await cl.Message(
+        author="backend",
+        metadata={"engine": engine_id},
+        content=f"Chat engine started: {engine.name}",
+    ).send()
 
 
 def engine_url_query_value() -> str:
@@ -31,19 +44,11 @@ def engine_url_query_value() -> str:
 
 
 @cl.on_message
-async def main(message: cl.Message) -> None:
+async def on_message(message: cl.Message) -> None:
     logger.info(f"Received: {message.content!r}")
 
-    with db.PostgresDBClient().get_session() as db_session:
-        chunks = retrieve(
-            db_session,
-            get_embedding_model(),
-            message.content,
-        )
+    engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+    result = engine.on_message(question=message.content, cl_message=message)
+    content = engine.format_answer_message(result)
 
-    response = generate(message.content, context=chunks)
-    formatted_guru_cards = format_guru_cards(chunks)
-
-    await cl.Message(
-        content=response + formatted_guru_cards,
-    ).send()
+    await cl.Message(content=content).send()
