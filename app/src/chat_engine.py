@@ -1,6 +1,6 @@
 import logging
-from typing import Type
 from abc import ABC, abstractmethod
+from typing import Type
 
 import chainlit as cl
 import src.adapters.db as db
