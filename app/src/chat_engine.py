@@ -1,4 +1,5 @@
 import logging
+from typing import Type
 from abc import ABC, abstractmethod
 
 import chainlit as cl
@@ -17,19 +18,19 @@ class ChatEngineInterface(ABC):
     name: str
 
     @abstractmethod
-    async def on_start(self):
+    async def on_start(self) -> None:
         pass
 
     @abstractmethod
-    def on_message(self, question: str, **kwargs):
+    def on_message(self, question: str, cl_message: cl.Message) -> dict:
         pass
 
     @abstractmethod
-    def format_answer_message(self, results: dict):
+    def format_answer_message(self, results: dict) -> str:
         pass
 
 
-def all_subclasses(cls):
+def all_subclasses(cls: Type) -> set:
     return {cls}.union(s for c in cls.__subclasses__() for s in all_subclasses(c))
 
 
@@ -50,7 +51,7 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
         for engine_class in all_subclasses(ChatEngineInterface)
         if hasattr(engine_class, "engine_id") and engine_class.engine_id == engine_id
     )
-    return chat_engine_class()  # type: ignore
+    return chat_engine_class()
 
 
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
@@ -58,7 +59,7 @@ class GuruBaseEngine(ChatEngineInterface):
     use_guru_snap_dataset = False
     use_guru_multiprogram_dataset = False
 
-    async def on_start(self):
+    async def on_start(self) -> None:
         logger.info("chat_engine name: %s", self.name)
         chat_settings = cl.ChatSettings(
             [
@@ -91,7 +92,7 @@ class GuruBaseEngine(ChatEngineInterface):
         settings = await chat_settings.send()
         cl.user_session.set("settings", settings)
 
-    def on_message(self, question: str, **_kwargs):
+    def on_message(self, question: str, cl_message: cl.Message) -> dict:
         logger.info("chat_engine name: %s", self.name)
 
         with db.PostgresDBClient().get_session() as db_session:
@@ -104,7 +105,7 @@ class GuruBaseEngine(ChatEngineInterface):
         response = generate(question, context=chunks)
         return {"chunks": chunks, "response": response}
 
-    def format_answer_message(self, results: dict):
+    def format_answer_message(self, results: dict) -> str:
         formatted_guru_cards = format_guru_cards(results["chunks"])
         return results["response"] + formatted_guru_cards
 
@@ -120,7 +121,7 @@ class GuruSnapEngine(GuruBaseEngine):
     name: str = "Guru SNAP Chat Engine"
     use_guru_snap_dataset = True
 
-    def on_message(self, question: str, **_kwargs):
+    def on_message(self, question: str, cl_message: cl.Message) -> dict:
         chunks = ["TODO: Only retrieve SNAP Guru cards"]
         response = "TEMP: Replace with generated response once chunks are correct"
         return {"chunks": chunks, "response": response}
@@ -130,6 +131,6 @@ class PolicyMichiganEngine(GuruBaseEngine):
     engine_id: str = "policy-mi"
     name: str = "Michigan Bridges Policy Manual Chat Engine"
 
-    def format_answer_message(self, results: dict):
+    def format_answer_message(self, results: dict) -> str:
         # Placeholder for Policy Manual Citation format
         return f"TODO: Placeholder for Policy Manual Citation format. {results}"
