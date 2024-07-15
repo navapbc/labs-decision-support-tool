@@ -122,7 +122,7 @@ class GuruSnapEngine(GuruBaseEngine):
 
     def on_message(self, question: str, cl_message: cl.Message) -> dict:
         # TODO: Only retrieve SNAP Guru cards https://navalabs.atlassian.net/browse/DST-328
-        logger.warn("TODO: Only retrieve SNAP Guru cards")
+        logger.warning("TODO: Only retrieve SNAP Guru cards")
         chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
         return {"chunks": chunks, "response": response}
@@ -136,7 +136,7 @@ class PolicyMichiganEngine(ChatEngineInterface):
         return {}
 
     def on_message(self, question: str, cl_message: cl.Message) -> dict:
-        logger.warn("TODO: Retrieve from MI Policy Manual")
+        logger.warning("TODO: Retrieve from MI Policy Manual")
         chunks = ["TODO: Retrieve from MI Policy Manual"]
         response = "TEMP: Replace with generated response once chunks are correct"
         return {"chunks": chunks, "response": response}
