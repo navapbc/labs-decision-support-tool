@@ -1,8 +1,9 @@
 import os
 from typing import Sequence
 
-import ollama
 from litellm import completion
+if "OLLAMA_HOST" in os.environ:
+    import ollama
 
 from src.db.models.document import Chunk
 
