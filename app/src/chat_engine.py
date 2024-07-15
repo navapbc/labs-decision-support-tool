@@ -18,7 +18,7 @@ class ChatEngineInterface(ABC):
     name: str
 
     @abstractmethod
-    async def on_start(self) -> None:
+    async def on_start(self) -> dict:
         pass
 
     @abstractmethod
@@ -56,10 +56,10 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
 class GuruBaseEngine(ChatEngineInterface):
-    use_guru_snap_dataset = False
-    use_guru_multiprogram_dataset = False
+    use_snap_dataset_default = False
+    use_multiprogram_dataset_default = False
 
-    async def on_start(self) -> None:
+    async def on_start(self) -> dict:
         logger.info("chat_engine name: %s", self.name)
         chat_settings = cl.ChatSettings(
             [
@@ -80,17 +80,18 @@ class GuruBaseEngine(ChatEngineInterface):
                     step=1,
                 ),
                 Switch(
-                    id="guru-snap", label="Guru cards: SNAP", initial=self.use_guru_snap_dataset
+                    id="guru-snap", label="Guru cards: SNAP", initial=self.use_snap_dataset_default
                 ),
                 Switch(
                     id="guru-multiprogram",
                     label="Guru cards: Multi-program",
-                    initial=self.use_guru_multiprogram_dataset,
+                    initial=self.use_multiprogram_dataset_default,
                 ),
             ]
         )
         settings = await chat_settings.send()
         cl.user_session.set("settings", settings)
+        return settings
 
     def on_message(self, question: str, cl_message: cl.Message) -> dict:
         logger.info("chat_engine name: %s", self.name)
@@ -113,15 +114,16 @@ class GuruBaseEngine(ChatEngineInterface):
 class GuruMultiprogramEngine(GuruBaseEngine):
     engine_id: str = "guru-multiprogram"
     name: str = "Guru Multi-program Chat Engine"
-    use_guru_multiprogram_dataset = True
+    use_multiprogram_dataset_default = True
 
 
 class GuruSnapEngine(GuruBaseEngine):
     engine_id: str = "guru-snap"
     name: str = "Guru SNAP Chat Engine"
-    use_guru_snap_dataset = True
+    use_snap_dataset_default = True
 
     def on_message(self, question: str, cl_message: cl.Message) -> dict:
+        # TODO: https://navalabs.atlassian.net/browse/DST-328
         chunks = ["TODO: Only retrieve SNAP Guru cards"]
         response = "TEMP: Replace with generated response once chunks are correct"
         return {"chunks": chunks, "response": response}
