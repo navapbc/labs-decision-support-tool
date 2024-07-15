@@ -61,7 +61,6 @@ class GuruBaseEngine(ChatEngineInterface):
     use_multiprogram_dataset_default = False
 
     async def on_start(self) -> dict:
-        logger.info("chat_engine name: %s", self.name)
         chat_settings = cl.ChatSettings(
             [
                 Slider(
@@ -95,8 +94,6 @@ class GuruBaseEngine(ChatEngineInterface):
         return settings
 
     def on_message(self, question: str, cl_message: cl.Message) -> dict:
-        logger.info("chat_engine name: %s", self.name)
-
         with db.PostgresDBClient().get_session() as db_session:
             chunks = retrieve(
                 db_session,
@@ -125,16 +122,21 @@ class GuruSnapEngine(GuruBaseEngine):
 
     def on_message(self, question: str, cl_message: cl.Message) -> dict:
         # TODO: Only retrieve SNAP Guru cards https://navalabs.atlassian.net/browse/DST-328
+        logger.warn("TODO: Only retrieve SNAP Guru cards")
         chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
         return {"chunks": chunks, "response": response}
 
 
-class PolicyMichiganEngine(GuruBaseEngine):
+class PolicyMichiganEngine(ChatEngineInterface):
     engine_id: str = "policy-mi"
     name: str = "Michigan Bridges Policy Manual Chat Engine"
 
+    async def on_start(self) -> dict:
+        return {}
+
     def on_message(self, question: str, cl_message: cl.Message) -> dict:
+        logger.warn("TODO: Retrieve from MI Policy Manual")
         chunks = ["TODO: Retrieve from MI Policy Manual"]
         response = "TEMP: Replace with generated response once chunks are correct"
         return {"chunks": chunks, "response": response}

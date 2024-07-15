@@ -47,7 +47,15 @@ async def on_message(message: cl.Message) -> None:
     logger.info("Received: %r", message.content)
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
-    results = engine.on_message(question=message.content, cl_message=message)
-    answer = engine.format_answer_message(results)
-
-    await cl.Message(content=answer).send()
+    try:
+        results = engine.on_message(question=message.content, cl_message=message)
+        answer = engine.format_answer_message(results)
+        await cl.Message(content=answer).send()
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        await cl.Message(
+            author="backend",
+            metadata={"error_class": err.__class__.__name__, "error": str(err)},
+            content=f"{err.__class__.__name__}: {err}",
+        ).send()
+        # Re-raise error to have it in the logs
+        raise err
