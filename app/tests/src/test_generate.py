@@ -21,8 +21,8 @@ def test_get_models_ollama(monkeypatch):
     if "OPENAI_API_KEY" in os.environ:
         monkeypatch.delenv("OPENAI_API_KEY")
     monkeypatch.setenv("OLLAMA_HOST", "mock_key")
-
-    sys.modules["ollama"] = __import__("mock_ollama")
+    monkeypatch.setattr(ollama, "list", ollama_model_list)
+    #sys.modules["ollama"] = __import__("mock_ollama")
     # TODO: use `monkeypatch_module` so that sys.modules doesn't mess up other tests
     assert get_models() == {
         "Ollama llama3:latest": "ollama/llama3:latest",
