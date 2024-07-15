@@ -12,6 +12,8 @@ from src.app_config import AppConfig
 
 app_config = AppConfig()
 
+# Since the `-b 0.0.0.0:8000` argument is used when running in the Docker environment,
+# this bind variable is only used when not using Docker
 bind = app_config.host + ':' + str(app_config.port)
 # Calculates the number of usable cores and doubles it. Recommended number of workers per core is two.
 # https://docs.gunicorn.org/en/latest/design.html#how-many-workers
