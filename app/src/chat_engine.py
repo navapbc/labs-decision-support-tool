@@ -1,8 +1,9 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Mapping, Type
 
+import chainlit as cl
 import src.adapters.db as db
+from chainlit.input_widget import Slider, Switch
 from src.format import format_guru_cards
 from src.generate import generate
 from src.retrieve import retrieve
@@ -12,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 class ChatEngineInterface(ABC):
-    id: str
-    name: str = "Chat Engine Interface"
+    engine_id: str
+    name: str
 
     @abstractmethod
-    def on_start(self):
+    async def on_start(self):
         pass
 
     @abstractmethod
@@ -24,31 +25,71 @@ class ChatEngineInterface(ABC):
         pass
 
     @abstractmethod
-    def format_answer_message(self, result: dict):
+    def format_answer_message(self, results: dict):
         pass
 
 
-def available_engines():
-    return [engine_class.id for engine_class in ChatEngineInterface.__subclasses__()]
+def all_subclasses(cls):
+    return {cls}.union(s for c in cls.__subclasses__() for s in all_subclasses(c))
 
 
-def create_engine(id: str) -> ChatEngineInterface | None:
-    engines: Mapping[str, Type[ChatEngineInterface]] = {engine_class.id: engine_class for engine_class in ChatEngineInterface.__subclasses__()}  # type: ignore
+def available_engines() -> list[str]:
+    return [
+        engine_class.engine_id
+        for engine_class in all_subclasses(ChatEngineInterface)
+        if hasattr(engine_class, "engine_id") and engine_class.engine_id
+    ]
 
-    if id not in engines:
+
+def create_engine(engine_id: str) -> ChatEngineInterface | None:
+    if engine_id not in available_engines():
         return None
 
-    chat_engine_class = engines[id]
-    return chat_engine_class()
+    chat_engine_class = next(
+        engine_class
+        for engine_class in all_subclasses(ChatEngineInterface)
+        if hasattr(engine_class, "engine_id") and engine_class.engine_id == engine_id
+    )
+    return chat_engine_class()  # type: ignore
 
 
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
-class GuruMultiprogramEngine(ChatEngineInterface):
-    id: str = "guru-multiprogram"
-    name: str = "Guru Multi-program Chat Engine"
+class GuruBaseEngine(ChatEngineInterface):
+    use_guru_snap_dataset = False
+    use_guru_multiprogram_dataset = False
 
-    def on_start(self):
+    async def on_start(self):
         logger.info("chat_engine name: %s", self.name)
+        chat_settings = cl.ChatSettings(
+            [
+                Slider(
+                    id="temperature",
+                    label="Temperature for primary LLM",
+                    initial=0.1,
+                    min=0,
+                    max=2,
+                    step=0.1,
+                ),
+                Slider(
+                    id="retrieve_k",
+                    label="Guru cards to retrieve",
+                    initial=5,
+                    min=1,
+                    max=10,
+                    step=1,
+                ),
+                Switch(
+                    id="guru-snap", label="Guru cards: SNAP", initial=self.use_guru_snap_dataset
+                ),
+                Switch(
+                    id="guru-multiprogram",
+                    label="Guru cards: Multi-program",
+                    initial=self.use_guru_multiprogram_dataset,
+                ),
+            ]
+        )
+        settings = await chat_settings.send()
+        cl.user_session.set("settings", settings)
 
     def on_message(self, question: str, **_kwargs):
         logger.info("chat_engine name: %s", self.name)
@@ -63,6 +104,32 @@ class GuruMultiprogramEngine(ChatEngineInterface):
         response = generate(question, context=chunks)
         return {"chunks": chunks, "response": response}
 
-    def format_answer_message(self, result: dict):
-        formatted_guru_cards = format_guru_cards(result["chunks"])
-        return result["response"] + formatted_guru_cards
+    def format_answer_message(self, results: dict):
+        formatted_guru_cards = format_guru_cards(results["chunks"])
+        return results["response"] + formatted_guru_cards
+
+
+class GuruMultiprogramEngine(GuruBaseEngine):
+    engine_id: str = "guru-multiprogram"
+    name: str = "Guru Multi-program Chat Engine"
+    use_guru_multiprogram_dataset = True
+
+
+class GuruSnapEngine(GuruBaseEngine):
+    engine_id: str = "guru-snap"
+    name: str = "Guru SNAP Chat Engine"
+    use_guru_snap_dataset = True
+
+    def on_message(self, question: str, **_kwargs):
+        chunks = ["TODO: Only retrieve SNAP Guru cards"]
+        response = "TEMP: Replace with generated response once chunks are correct"
+        return {"chunks": chunks, "response": response}
+
+
+class PolicyMichiganEngine(GuruBaseEngine):
+    engine_id: str = "policy-mi"
+    name: str = "Michigan Bridges Policy Manual Chat Engine"
+
+    def format_answer_message(self, results: dict):
+        # Placeholder for Policy Manual Citation format
+        return f"TODO: Placeholder for Policy Manual Citation format. {results}"

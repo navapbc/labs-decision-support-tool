@@ -3,7 +3,6 @@ from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
 from src import chat_engine
-from src.format import format_guru_cards
 from src.login import require_login
 
 logger = logging.getLogger(__name__)
@@ -14,7 +13,7 @@ require_login()
 @cl.on_chat_start
 async def start() -> None:
     engine_id = engine_url_query_value()
-    logger.info("engine: %s", engine_id)
+    logger.info("engine_id: %s", engine_id)
     engine = chat_engine.create_engine(engine_id)
     if not engine:
         await cl.Message(
@@ -25,7 +24,7 @@ async def start() -> None:
         return
 
     cl.user_session.set("chat_engine", engine)
-    engine.on_start()
+    await engine.on_start()
     await cl.Message(
         author="backend",
         metadata={"engine": engine_id},
@@ -45,10 +44,10 @@ def engine_url_query_value() -> str:
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
-    logger.info(f"Received: {message.content!r}")
+    logger.info("Received: %r", message.content)
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
-    result = engine.on_message(question=message.content, cl_message=message)
-    content = engine.format_answer_message(result)
+    results = engine.on_message(question=message.content, cl_message=message)
+    answer = engine.format_answer_message(results)
 
-    await cl.Message(content=content).send()
+    await cl.Message(content=answer).send()
