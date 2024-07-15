@@ -44,6 +44,11 @@ ARG RUN_USER
 USER ${RUN_USER}
 WORKDIR /app
 
+# Gunicorn requires this workaround to create writable temporary directory in
+# our readonly root file system. https://github.com/aws/containers-roadmap/issues/736
+RUN mkdir -p /tmp
+VOLUME ["/tmp"]
+
 COPY pyproject.toml poetry.lock ./
 # Explicitly create a new virtualenv to avoid getting overridden by mounted .venv folders
 RUN poetry config virtualenvs.in-project false && poetry env use python
@@ -57,7 +62,7 @@ COPY . /app
 ENV HOST=0.0.0.0
 
 # Run the application.
-CMD ["poetry","run","uvicorn","src.app:app","--host","0.0.0.0","--port","8000","--reload"]
+CMD ["poetry", "run", "gunicorn","-k uvicorn.workers.UvicornWorker","-b 0.0.0.0:8000", "src.app:app"]
 
 #---------
 # Release
@@ -109,4 +114,4 @@ ENV HOST=0.0.0.0
 USER ${RUN_USER}
 
 # Run the application.
-CMD ["poetry","run","uvicorn","src.app:app","--host","0.0.0.0","--port","8000"]
+CMD ["poetry", "run", "gunicorn","-k uvicorn.workers.UvicornWorker","-b 0.0.0.0:8000", "src.app:app"]

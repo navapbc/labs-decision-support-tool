@@ -25,6 +25,8 @@ litellm = "^1.40.25"
 
 pgvector = "^0.2.5"
 ollama = "^0.2.1"
+torch = "2.2.2"
+gunicorn = "^22.0.0"
 [tool.poetry.group.dev.dependencies]
 black = "^23.9.1"
 flake8 = "^6.1.0"
