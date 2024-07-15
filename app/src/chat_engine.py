@@ -5,6 +5,7 @@ from typing import Type
 import chainlit as cl
 import src.adapters.db as db
 from chainlit.input_widget import Slider, Switch
+from src.db.models.document import Chunk
 from src.format import format_guru_cards
 from src.generate import generate
 from src.retrieve import retrieve
@@ -123,8 +124,8 @@ class GuruSnapEngine(GuruBaseEngine):
     use_snap_dataset_default = True
 
     def on_message(self, question: str, cl_message: cl.Message) -> dict:
-        # TODO: https://navalabs.atlassian.net/browse/DST-328
-        chunks = ["TODO: Only retrieve SNAP Guru cards"]
+        # TODO: Only retrieve SNAP Guru cards https://navalabs.atlassian.net/browse/DST-328
+        chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
         return {"chunks": chunks, "response": response}
 
@@ -132,6 +133,11 @@ class GuruSnapEngine(GuruBaseEngine):
 class PolicyMichiganEngine(GuruBaseEngine):
     engine_id: str = "policy-mi"
     name: str = "Michigan Bridges Policy Manual Chat Engine"
+
+    def on_message(self, question: str, cl_message: cl.Message) -> dict:
+        chunks = ["TODO: Retrieve from MI Policy Manual"]
+        response = "TEMP: Replace with generated response once chunks are correct"
+        return {"chunks": chunks, "response": response}
 
     def format_answer_message(self, results: dict) -> str:
         # Placeholder for Policy Manual Citation format
