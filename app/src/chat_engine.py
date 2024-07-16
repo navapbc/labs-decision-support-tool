@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Type
+from dataclasses import dataclass
+from typing import Optional, Sequence, Type
 
 import chainlit as cl
 import src.adapters.db as db
@@ -14,6 +15,13 @@ from src.shared import get_embedding_model
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class OnMessageResult:
+    response: str
+    chunks: Sequence[Chunk]
+    data: Optional[dict] = None
+
+
 class ChatEngineInterface(ABC):
     engine_id: str
     name: str
@@ -23,11 +31,11 @@ class ChatEngineInterface(ABC):
         pass
 
     @abstractmethod
-    def on_message(self, question: str, cl_message: cl.Message) -> dict:
+    def on_message(self, question: str, cl_message: cl.Message) -> OnMessageResult:
         pass
 
     @abstractmethod
-    def format_answer_message(self, results: dict) -> str:
+    def format_answer_message(self, result: OnMessageResult) -> str:
         pass
 
 
@@ -93,7 +101,7 @@ class GuruBaseEngine(ChatEngineInterface):
         cl.user_session.set("settings", settings)
         return settings
 
-    def on_message(self, question: str, cl_message: cl.Message) -> dict:
+    def on_message(self, question: str, cl_message: cl.Message) -> OnMessageResult:
         with db.PostgresDBClient().get_session() as db_session:
             chunks = retrieve(
                 db_session,
@@ -102,11 +110,10 @@ class GuruBaseEngine(ChatEngineInterface):
             )
 
         response = generate(question, context=chunks)
-        return {"chunks": chunks, "response": response}
+        return OnMessageResult(response, chunks)
 
-    def format_answer_message(self, results: dict) -> str:
-        formatted_guru_cards = format_guru_cards(results["chunks"])
-        return results["response"] + formatted_guru_cards
+    def format_answer_message(self, result: OnMessageResult) -> str:
+        return result.response + format_guru_cards(result.chunks)
 
 
 class GuruMultiprogramEngine(GuruBaseEngine):
@@ -120,12 +127,12 @@ class GuruSnapEngine(GuruBaseEngine):
     name: str = "Guru SNAP Chat Engine"
     use_snap_dataset_default = True
 
-    def on_message(self, question: str, cl_message: cl.Message) -> dict:
+    def on_message(self, question: str, cl_message: cl.Message) -> OnMessageResult:
         # TODO: Only retrieve SNAP Guru cards https://navalabs.atlassian.net/browse/DST-328
         logger.warning("TODO: Only retrieve SNAP Guru cards")
         chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
-        return {"chunks": chunks, "response": response}
+        return OnMessageResult(response, chunks)
 
 
 class PolicyMichiganEngine(ChatEngineInterface):
@@ -135,12 +142,12 @@ class PolicyMichiganEngine(ChatEngineInterface):
     async def on_start(self) -> dict:
         return {}
 
-    def on_message(self, question: str, cl_message: cl.Message) -> dict:
+    def on_message(self, question: str, cl_message: cl.Message) -> OnMessageResult:
         logger.warning("TODO: Retrieve from MI Policy Manual")
-        chunks = ["TODO: Retrieve from MI Policy Manual"]
+        chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
-        return {"chunks": chunks, "response": response}
+        return OnMessageResult(response, chunks)
 
-    def format_answer_message(self, results: dict) -> str:
+    def format_answer_message(self, result: OnMessageResult) -> str:
         # Placeholder for Policy Manual Citation format
-        return f"TODO: Placeholder for Policy Manual Citation format. {results}"
+        return f"TODO: Placeholder for Policy Manual Citation format. {result}"
