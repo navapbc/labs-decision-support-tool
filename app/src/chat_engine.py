@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Optional, Sequence
 
 import src.adapters.db as db
-from chainlit.input_widget import Switch
 from src.db.models.document import Chunk
 from src.format import format_guru_cards
 from src.generate import generate
@@ -65,21 +64,7 @@ class GuruBaseEngine(ChatEngineInterface):
     use_multiprogram_dataset_default = False
 
     async def on_start(self) -> dict:
-        chat_settings = cl.ChatSettings(
-            [
-                Switch(
-                    id="guru-snap", label="Guru cards: SNAP", initial=self.use_snap_dataset_default
-                ),
-                Switch(
-                    id="guru-multiprogram",
-                    label="Guru cards: Multi-program",
-                    initial=self.use_multiprogram_dataset_default,
-                ),
-            ]
-        )
-        settings = await chat_settings.send()
-        cl.user_session.set("settings", settings)
-        return settings
+        return {}
 
     def on_message(self, question: str) -> OnMessageResult:
         with db.PostgresDBClient().get_session() as db_session:
