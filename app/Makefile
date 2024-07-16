@@ -228,10 +228,15 @@ help: ## Prints the help documentation and info about each command
 # ETL
 ##################################################
 
+check-dataset-id:
+ifndef DATASET_ID
+	$(error DATASET_ID is undefined)
+endif
+
 check-filepath:
 ifndef FILEPATH
 	$(error FILEPATH is undefined)
 endif
 
-ingest-guru-cards: check-filepath
-	$(PY_RUN_CMD) ingest-guru-cards $(FILEPATH)
+ingest-guru-cards: check-dataset-id check-filepath
+	$(PY_RUN_CMD) ingest-guru-cards $(DATASET_ID) $(FILEPATH)

@@ -51,13 +51,14 @@ def _ingest_cards(
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        logger.warning("No argument for filepath.")
+    if len(sys.argv) < 3:
+        logger.warning("Expecting 2 arguments: dataset_id and filepath. Got %s", sys.argv)
         return
 
-    guru_cards_filepath = sys.argv[1]
+    dataset_id = sys.argv[1]
+    guru_cards_filepath = sys.argv[2]
 
-    logger.info(f"Processing Guru cards at {guru_cards_filepath}")
+    logger.info(f"Processing Guru cards '{dataset_id}' at {guru_cards_filepath}")
 
     embedding_model = get_embedding_model()
 
