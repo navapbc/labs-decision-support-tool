@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Sequence
 
 import src.adapters.db as db
 from src.db.models.document import Chunk
