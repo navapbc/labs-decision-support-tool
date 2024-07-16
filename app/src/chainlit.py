@@ -49,7 +49,7 @@ async def on_message(message: cl.Message) -> None:
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
-        result = engine.on_message(question=message.content, cl_message=message)
+        result = engine.on_message(question=message.content)
         answer = engine.format_answer_message(result)
         await cl.Message(content=answer).send()
     except Exception as err:  # pylint: disable=broad-exception-caught

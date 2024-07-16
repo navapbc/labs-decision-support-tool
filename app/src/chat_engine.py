@@ -32,7 +32,7 @@ class ChatEngineInterface(ABC):
         pass
 
     @abstractmethod
-    def on_message(self, question: str, cl_message: cl.Message) -> OnMessageResult:
+    def on_message(self, question: str) -> OnMessageResult:
         pass
 
     @abstractmethod
@@ -82,7 +82,7 @@ class GuruBaseEngine(ChatEngineInterface):
         cl.user_session.set("settings", settings)
         return settings
 
-    def on_message(self, question: str, cl_message: cl.Message) -> OnMessageResult:
+    def on_message(self, question: str) -> OnMessageResult:
         with db.PostgresDBClient().get_session() as db_session:
             chunks = retrieve(
                 db_session,
@@ -108,7 +108,7 @@ class GuruSnapEngine(GuruBaseEngine):
     name: str = "Guru SNAP Chat Engine"
     use_snap_dataset_default = True
 
-    def on_message(self, question: str, cl_message: cl.Message) -> OnMessageResult:
+    def on_message(self, question: str) -> OnMessageResult:
         # TODO: Only retrieve SNAP Guru cards https://navalabs.atlassian.net/browse/DST-328
         logger.warning("TODO: Only retrieve SNAP Guru cards")
         chunks: list[Chunk] = []
@@ -123,7 +123,7 @@ class PolicyMichiganEngine(ChatEngineInterface):
     async def on_start(self) -> dict:
         return {}
 
-    def on_message(self, question: str, cl_message: cl.Message) -> OnMessageResult:
+    def on_message(self, question: str) -> OnMessageResult:
         logger.warning("TODO: Retrieve from MI Policy Manual")
         chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
