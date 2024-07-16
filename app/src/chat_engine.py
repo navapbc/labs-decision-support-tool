@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Sequence, Type
+from typing import Optional, Sequence
 
 import chainlit as cl
 import src.adapters.db as db
@@ -11,6 +11,7 @@ from src.format import format_guru_cards
 from src.generate import generate
 from src.retrieve import retrieve
 from src.shared import get_embedding_model
+from src.util.class_utils import all_subclasses
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +38,6 @@ class ChatEngineInterface(ABC):
     @abstractmethod
     def format_answer_message(self, result: OnMessageResult) -> str:
         pass
-
-
-def all_subclasses(cls: Type) -> set:
-    return {cls}.union(s for c in cls.__subclasses__() for s in all_subclasses(c))
 
 
 def available_engines() -> list[str]:
