@@ -5,7 +5,6 @@ from typing import Sequence
 
 import src.adapters.db as db
 from src.db.models.document import Chunk
-from src.format import format_guru_cards
 from src.generate import generate
 from src.retrieve import retrieve
 from src.shared import get_embedding_model
@@ -26,10 +25,6 @@ class ChatEngineInterface(ABC):
 
     @abstractmethod
     def on_message(self, question: str) -> OnMessageResult:
-        pass
-
-    @abstractmethod
-    def format_answer_message(self, result: OnMessageResult) -> str:
         pass
 
 
@@ -66,9 +61,6 @@ class GuruBaseEngine(ChatEngineInterface):
         response = generate(question, context=chunks)
         return OnMessageResult(response, chunks)
 
-    def format_answer_message(self, result: OnMessageResult) -> str:
-        return result.response + format_guru_cards(result.chunks)
-
 
 class GuruMultiprogramEngine(GuruBaseEngine):
     engine_id: str = "guru-multiprogram"
@@ -96,7 +88,3 @@ class PolicyMichiganEngine(ChatEngineInterface):
         chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
         return OnMessageResult(response, chunks)
-
-    def format_answer_message(self, result: OnMessageResult) -> str:
-        # Placeholder for Policy Manual Citation format
-        return f"TODO: Placeholder for Policy Manual Citation format. {result}"

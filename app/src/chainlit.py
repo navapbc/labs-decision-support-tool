@@ -4,6 +4,7 @@ from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
 from src import chat_engine
+from src.format import format_guru_cards
 from src.login import require_login
 
 logger = logging.getLogger(__name__)
@@ -49,8 +50,8 @@ async def on_message(message: cl.Message) -> None:
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
         result = engine.on_message(question=message.content)
-        answer = engine.format_answer_message(result)
-        await cl.Message(content=answer).send()
+        msg_content = result.response + format_guru_cards(result.chunks)
+        await cl.Message(content=msg_content).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
             author="backend",

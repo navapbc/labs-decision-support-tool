@@ -1,5 +1,5 @@
 import src.chat_engine as chat_engine
-from src.chat_engine import GuruMultiprogramEngine, GuruSnapEngine, OnMessageResult
+from src.chat_engine import GuruMultiprogramEngine, GuruSnapEngine
 
 
 def test_available_engines():
@@ -11,17 +11,11 @@ def test_available_engines():
     assert "policy-mi" in engines
 
 
-def create_on_message_result(response="Some LLM response", chunks=None):
-    return OnMessageResult(response, chunks or [])
-
-
 def test_create_engine_Guru_Multiprogram():
     engine_id = "guru-multiprogram"
     engine = chat_engine.create_engine(engine_id)
     assert engine is not None
     assert engine.name == GuruMultiprogramEngine.name
-
-    assert engine.format_answer_message(create_on_message_result()).startswith("Some LLM response")
 
 
 def test_create_engine_Guru_SNAP():
@@ -29,5 +23,3 @@ def test_create_engine_Guru_SNAP():
     engine = chat_engine.create_engine(engine_id)
     assert engine is not None
     assert engine.name == GuruSnapEngine.name
-
-    assert engine.format_answer_message(create_on_message_result()).startswith("Some LLM response")
