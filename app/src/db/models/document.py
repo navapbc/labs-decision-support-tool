@@ -24,7 +24,7 @@ class Document(Base, IdMixin, TimestampMixin):
     # Domain-specific columns follow
     # benefit program
     program: Mapped[str | None]
-    # region that the benefit program is relevant to
+    # geographical region of the benefit program
     region: Mapped[str | None]
 
 

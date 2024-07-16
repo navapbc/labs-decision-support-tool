@@ -65,6 +65,7 @@ def main() -> None:
 
     embedding_model = get_embedding_model()
 
+    # TODO: Add `region` as a argv element or have a better way to set document attributes
     doc_attribs: dict[str, str | None] = {"program": dataset_id, "region": "Michigan"}
     with db.PostgresDBClient().get_session() as db_session:
         _ingest_cards(db_session, embedding_model, guru_cards_filepath, doc_attribs)
