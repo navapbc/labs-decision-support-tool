@@ -7,6 +7,7 @@ that are persisted to the database.
 The factories are based on the `factory_boy` library. See
 https://factoryboy.readthedocs.io/en/latest/ for more information.
 """
+import random
 from datetime import datetime
 from typing import Optional
 
@@ -69,6 +70,8 @@ class DocumentFactory(BaseFactory):
 
     name = factory.Faker("word")
     content = factory.Faker("text")
+    program = random.choice([None, "SNAP", "Medicaid", "TANF"])
+    region = random.choice([None, "MI", "MD", "PA"])
 
 
 class ChunkFactory(BaseFactory):
@@ -80,6 +83,4 @@ class ChunkFactory(BaseFactory):
     tokens = factory.LazyAttribute(
         lambda o: len(MockSentenceTransformer().tokenizer.tokenize(o.content))
     )
-    mpnet_embedding = factory.LazyAttribute(
-        lambda o: MockSentenceTransformer().encode(o.content)
-    )
+    mpnet_embedding = factory.LazyAttribute(lambda o: MockSentenceTransformer().encode(o.content))

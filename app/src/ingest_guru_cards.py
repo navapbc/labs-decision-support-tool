@@ -25,7 +25,7 @@ def _ingest_cards(
     db_session: db.Session,
     embedding_model: SentenceTransformer,
     guru_cards_filepath: str,
-    doc_attribs: None | dict[str, str | None],
+    **doc_attribs: str | None,
 ) -> None:
     with open(guru_cards_filepath, "r") as guru_cards_file:
         cards_as_json = json.load(guru_cards_file)
@@ -68,7 +68,7 @@ def main() -> None:
     # TODO: Add `region` as a argv element or have a better way to set document attributes
     doc_attribs: dict[str, str | None] = {"program": dataset_id, "region": "Michigan"}
     with db.PostgresDBClient().get_session() as db_session:
-        _ingest_cards(db_session, embedding_model, guru_cards_filepath, doc_attribs)
+        _ingest_cards(db_session, embedding_model, guru_cards_filepath, **doc_attribs)
         db_session.commit()
 
     logger.info("Finished processing Guru cards.")
