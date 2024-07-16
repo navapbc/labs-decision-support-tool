@@ -68,22 +68,6 @@ class GuruBaseEngine(ChatEngineInterface):
     async def on_start(self) -> dict:
         chat_settings = cl.ChatSettings(
             [
-                Slider(
-                    id="temperature",
-                    label="Temperature for primary LLM",
-                    initial=0.1,
-                    min=0,
-                    max=2,
-                    step=0.1,
-                ),
-                Slider(
-                    id="retrieve_k",
-                    label="Guru cards to retrieve",
-                    initial=5,
-                    min=1,
-                    max=10,
-                    step=1,
-                ),
                 Switch(
                     id="guru-snap", label="Guru cards: SNAP", initial=self.use_snap_dataset_default
                 ),
