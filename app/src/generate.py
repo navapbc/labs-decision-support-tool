@@ -1,7 +1,6 @@
 import os
 from typing import Sequence
 
-import ollama
 from litellm import completion
 
 from src.db.models.document import Chunk
@@ -23,6 +22,8 @@ def get_models() -> dict[str, str]:
         return {"OpenAI GPT-4o": "gpt-4o"}
     if "OLLAMA_HOST" in os.environ:
         ollama_models = {}
+        import ollama
+
         models = ollama.list()
         for model in models["models"]:
             ollama_models[f"Ollama {model['name']}"] = f"ollama/{model['name']}"
