@@ -5,7 +5,7 @@ from typing import Optional, Sequence
 
 import chainlit as cl
 import src.adapters.db as db
-from chainlit.input_widget import Slider, Switch
+from chainlit.input_widget import Switch
 from src.db.models.document import Chunk
 from src.format import format_guru_cards
 from src.generate import generate
