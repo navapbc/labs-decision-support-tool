@@ -60,9 +60,6 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
 class GuruBaseEngine(ChatEngineInterface):
-    use_snap_dataset_default = False
-    use_multiprogram_dataset_default = False
-
     async def on_start(self) -> dict:
         return {}
 
@@ -84,13 +81,11 @@ class GuruBaseEngine(ChatEngineInterface):
 class GuruMultiprogramEngine(GuruBaseEngine):
     engine_id: str = "guru-multiprogram"
     name: str = "Guru Multi-program Chat Engine"
-    use_multiprogram_dataset_default = True
 
 
 class GuruSnapEngine(GuruBaseEngine):
     engine_id: str = "guru-snap"
     name: str = "Guru SNAP Chat Engine"
-    use_snap_dataset_default = True
 
     def on_message(self, question: str) -> OnMessageResult:
         # TODO: Only retrieve SNAP Guru cards https://navalabs.atlassian.net/browse/DST-328
