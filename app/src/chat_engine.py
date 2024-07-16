@@ -25,10 +25,6 @@ class ChatEngineInterface(ABC):
     name: str
 
     @abstractmethod
-    def on_start(self) -> None:
-        pass
-
-    @abstractmethod
     def on_message(self, question: str) -> OnMessageResult:
         pass
 
@@ -59,9 +55,6 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
 class GuruBaseEngine(ChatEngineInterface):
-    def on_start(self) -> None:
-        pass
-
     def on_message(self, question: str) -> OnMessageResult:
         with db.PostgresDBClient().get_session() as db_session:
             chunks = retrieve(
@@ -97,9 +90,6 @@ class GuruSnapEngine(GuruBaseEngine):
 class PolicyMichiganEngine(ChatEngineInterface):
     engine_id: str = "policy-mi"
     name: str = "Michigan Bridges Policy Manual Chat Engine"
-
-    def on_start(self) -> None:
-        pass
 
     def on_message(self, question: str) -> OnMessageResult:
         logger.warning("TODO: Retrieve from MI Policy Manual")

@@ -20,7 +20,6 @@ def test_create_engine_Guru_Multiprogram():
     engine = chat_engine.create_engine(engine_id)
     assert engine is not None
     assert engine.name == GuruMultiprogramEngine.name
-    engine.on_start()
 
     assert engine.format_answer_message(create_on_message_result()).startswith("Some LLM response")
 
@@ -30,6 +29,5 @@ def test_create_engine_Guru_SNAP():
     engine = chat_engine.create_engine(engine_id)
     assert engine is not None
     assert engine.name == GuruSnapEngine.name
-    engine.on_start()
 
     assert engine.format_answer_message(create_on_message_result()).startswith("Some LLM response")
