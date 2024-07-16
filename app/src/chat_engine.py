@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 class OnMessageResult:
     response: str
     chunks: Sequence[Chunk]
-    data: Optional[dict] = None
 
 
 class ChatEngineInterface(ABC):
