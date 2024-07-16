@@ -21,6 +21,12 @@ class Document(Base, IdMixin, TimestampMixin):
         "Chunk", back_populates="document", cascade="all, delete"
     )
 
+    # Domain-specific columns follow
+    # benefit program
+    program: Mapped[str | None]
+    # region that the benefit program is relevant to
+    region: Mapped[str | None]
+
 
 class Chunk(Base, IdMixin, TimestampMixin):
     __tablename__ = "chunk"

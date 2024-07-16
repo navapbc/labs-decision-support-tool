@@ -22,7 +22,10 @@ CONTENT_KEY = "content"
 
 
 def _ingest_cards(
-    db_session: db.Session, embedding_model: SentenceTransformer, guru_cards_filepath: str
+    db_session: db.Session,
+    embedding_model: SentenceTransformer,
+    guru_cards_filepath: str,
+    doc_attribs: None | dict[str, str | None],
 ) -> None:
     with open(guru_cards_filepath, "r") as guru_cards_file:
         cards_as_json = json.load(guru_cards_file)
@@ -34,7 +37,7 @@ def _ingest_cards(
         name = card[NAME_KEY].strip()
         content = get_text_from_html(card[CONTENT_KEY])
 
-        document = Document(name=name, content=content)
+        document = Document(name=name, content=content, **doc_attribs)
         db_session.add(document)
 
         tokens = len(embedding_model.tokenizer.tokenize(content))
@@ -58,12 +61,13 @@ def main() -> None:
     dataset_id = sys.argv[1]
     guru_cards_filepath = sys.argv[2]
 
-    logger.info(f"Processing Guru cards '{dataset_id}' at {guru_cards_filepath}")
+    logger.info(f"Processing Guru cards {dataset_id} at {guru_cards_filepath}")
 
     embedding_model = get_embedding_model()
 
+    doc_attribs: dict[str, str | None] = {"program": dataset_id, "region": "Michigan"}
     with db.PostgresDBClient().get_session() as db_session:
-        _ingest_cards(db_session, embedding_model, guru_cards_filepath)
+        _ingest_cards(db_session, embedding_model, guru_cards_filepath, doc_attribs)
         db_session.commit()
 
     logger.info("Finished processing Guru cards.")
