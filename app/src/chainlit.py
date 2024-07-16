@@ -14,7 +14,7 @@ require_login()
 @cl.on_chat_start
 async def start() -> None:
     engine_id = engine_url_query_value()
-    logger.info("engine_id: %s", engine_id)
+    logger.info("Engine ID: %s", engine_id)
     engine = chat_engine.create_engine(engine_id)
     if not engine:
         await cl.Message(
@@ -35,7 +35,7 @@ async def start() -> None:
 
 def engine_url_query_value() -> str:
     url = cl.user_session.get("http_referer")
-    logger.debug("URL: %s", url)
+    logger.debug("Referer URL: %s", url)
 
     # Using this suggestion: https://github.com/Chainlit/chainlit/issues/144#issuecomment-2227543547
     parsed_url = urlparse(url)
