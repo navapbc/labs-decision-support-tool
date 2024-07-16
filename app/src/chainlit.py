@@ -25,7 +25,7 @@ async def start() -> None:
         return
 
     cl.user_session.set("chat_engine", engine)
-    await engine.on_start()
+    engine.on_start()
     await cl.Message(
         author="backend",
         metadata={"engine": engine_id},
