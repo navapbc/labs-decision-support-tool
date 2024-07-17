@@ -3,7 +3,7 @@ import os
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
-from src import chat_engine
+from src import chat_engine, shared
 from src.format import format_guru_cards
 from src.login import require_login
 
@@ -40,7 +40,7 @@ def engine_url_query_value() -> str:
     # Using this suggestion: https://github.com/Chainlit/chainlit/issues/144#issuecomment-2227543547
     parsed_url = urlparse(url)
     qs = parse_qs(parsed_url.query)
-    return qs.get("engine", [os.environ.get("CHAT_ENGINE", "guru-snap")])[0]
+    return qs.get("engine", [shared.get_app_config().chat_engine])[0]
 
 
 @cl.on_message
