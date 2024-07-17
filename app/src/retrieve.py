@@ -17,11 +17,24 @@ def retrieve(
     k: int = 5,
     **filters: Sequence | None,
 ) -> Sequence[Chunk]:
+    chunks_with_scores = retrieve_with_scores(db_session, embedding_model, query, k, **filters)
+    return [chunk for chunk, _ in chunks_with_scores]
+
+
+def retrieve_with_scores(
+    db_session: db.Session,
+    embedding_model: SentenceTransformer,
+    query: str,
+    k: int = 5,
+    **filters: Sequence | None,
+) -> Sequence[Row[Tuple[Chunk, float]]]:
     logger.info("Retrieving context for %r", query)
 
     query_embedding = embedding_model.encode(query, show_progress_bar=False)
 
-    statement = select(Chunk).join(Chunk.document)
+    statement = select(Chunk, Chunk.mpnet_embedding.max_inner_product(query_embedding)).join(
+        Chunk.document
+    )
     if benefit_dataset := filters.pop("datasets", None):
         statement = statement.filter(Document.dataset.in_(benefit_dataset))
     if benefit_programs := filters.pop("programs", None):
@@ -32,27 +45,8 @@ def retrieve(
     if filters:
         raise ValueError(f"Unknown filters: {filters.keys()}")
 
-    chunks = db_session.scalars(
-        statement.order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding)).limit(k)
-    ).all()
-
-    for chunk in chunks:
-        logger.debug("Retrieved: %r", chunk.document.name)
-
-    return chunks
-
-
-def retrieve_with_scores(
-    db_session: db.Session, embedding_model: SentenceTransformer, query: str, k: int = 5
-) -> Sequence[Row[Tuple[Chunk, float]]]:
-    logger.info(f"Retrieving context for {query!r}")
-
-    query_embedding = embedding_model.encode(query, show_progress_bar=False)
-
     chunks_with_scores = db_session.execute(
-        select(Chunk, Chunk.mpnet_embedding.max_inner_product(query_embedding))
-        .order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding))
-        .limit(k)
+        statement.order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding)).limit(k)
     ).all()
 
     for chunk, score in chunks_with_scores:
