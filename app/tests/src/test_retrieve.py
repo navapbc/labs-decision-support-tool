@@ -34,6 +34,15 @@ def test_retrieve(db_session, enable_factory_create):
     assert results == [short_chunk, medium_chunk]
 
 
+def test_retrieve__with_empty_filter(db_session, enable_factory_create):
+    db_session.execute(delete(Document))
+    _, medium_chunk, short_chunk = _create_chunks()
+
+    results = retrieve(db_session, mock_embedding_model, "Very tiny words.", k=2, datasets=[])
+
+    assert results == [short_chunk, medium_chunk]
+
+
 def test_retrieve__with_unknown_filter(db_session, enable_factory_create):
     with pytest.raises(ValueError):
         retrieve(

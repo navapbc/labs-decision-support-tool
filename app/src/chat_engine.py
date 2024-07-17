@@ -50,12 +50,15 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
 class GuruBaseEngine(ChatEngineInterface):
+    datasets: list[str] = []
+
     def on_message(self, question: str) -> OnMessageResult:
         with db.PostgresDBClient().get_session() as db_session:
             chunks = retrieve(
                 db_session,
                 get_embedding_model(),
                 question,
+                datasets=self.datasets,
             )
 
         response = generate(question, context=chunks)
@@ -65,18 +68,13 @@ class GuruBaseEngine(ChatEngineInterface):
 class GuruMultiprogramEngine(GuruBaseEngine):
     engine_id: str = "guru-multiprogram"
     name: str = "Guru Multi-program Chat Engine"
+    datasets = ["guru-multiprogram"]
 
 
 class GuruSnapEngine(GuruBaseEngine):
     engine_id: str = "guru-snap"
     name: str = "Guru SNAP Chat Engine"
-
-    def on_message(self, question: str) -> OnMessageResult:
-        # TODO: Only retrieve SNAP Guru cards https://navalabs.atlassian.net/browse/DST-328
-        logger.warning("TODO: Only retrieve SNAP Guru cards")
-        chunks: list[Chunk] = []
-        response = "TEMP: Replace with generated response once chunks are correct"
-        return OnMessageResult(response, chunks)
+    datasets = ["guru-snap"]
 
 
 class PolicyMichiganEngine(ChatEngineInterface):

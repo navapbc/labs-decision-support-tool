@@ -17,7 +17,7 @@ def retrieve(
     k: int = 5,
     **filters: Sequence | None,
 ) -> Sequence[Chunk]:
-    logger.info(f"Retrieving context for {query!r}")
+    logger.info("Retrieving context for %r", query)
 
     query_embedding = embedding_model.encode(query, show_progress_bar=False)
 
@@ -37,7 +37,7 @@ def retrieve(
     ).all()
 
     for chunk in chunks:
-        print(f"Retrieved: {chunk.document.name!r} {chunk.content!r}")
+        logger.debug("Retrieved: %r", chunk.document.name)
 
     return chunks
 
