@@ -10,8 +10,6 @@ from src.db.models.document import Chunk, Document
 
 logger = logging.getLogger(__name__)
 _DEBUGGING = True
-if _DEBUGGING:
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 
 def retrieve(
@@ -19,8 +17,7 @@ def retrieve(
     embedding_model: SentenceTransformer,
     query: str,
     k: int = 5,
-    benefit_programs: Sequence | None = None,
-    benefit_regions: Sequence | None = None,
+    **filters: Sequence | None,
 ) -> Sequence[Chunk]:
     logger.info(f"Retrieving context for {query!r}")
 
@@ -36,21 +33,16 @@ def retrieve(
         chs = db_session.execute(chstmt).all()
         print("chunks:")
         pprint(chs)
-        if benefit_programs:
+        if benefit_programs := filters.get("programs", None):
             chs = db_session.execute(chstmt.filter(Document.program.in_(benefit_programs))).all()
             print("filtered chunks:")
             pprint(chs)
 
     statement = select(Chunk).join(Chunk.document)
-    if benefit_programs:
+    if benefit_programs := filters.get("programs", None):
         statement = statement.filter(Document.program.in_(benefit_programs))
-    if benefit_regions:
+    if benefit_regions := filters.get("regions", None):
         statement = statement.filter(Document.region.in_(benefit_regions))
-    rchs = db_session.execute(statement.limit(k)).all()
-
-    if _DEBUGGING:
-        print("returned chunks:")
-        pprint(rchs)
 
     chunks = db_session.scalars(
         statement.order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding)).limit(k)

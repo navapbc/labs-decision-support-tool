@@ -40,9 +40,7 @@ def test_retrieve__with_1_filter(db_session, enable_factory_create):
         document=DocumentFactory.create(program="SNAP")
     )
 
-    results = retrieve(
-        db_session, mock_embedding_model, "Very tiny words.", k=2, benefit_programs=["SNAP"]
-    )
+    results = retrieve(db_session, mock_embedding_model, "Very tiny words.", k=2, programs=["SNAP"])
 
     assert results == [snap_short_chunk, snap_medium_chunk]
 
@@ -59,8 +57,8 @@ def test_retrieve__with_2_filters(db_session, enable_factory_create):
         mock_embedding_model,
         "Very tiny words.",
         k=2,
-        benefit_programs=["SNAP"],
-        benefit_regions=["MI"],
+        programs=["SNAP"],
+        regions=["MI"],
     )
 
     assert results == [snap_short_chunk, snap_medium_chunk]
