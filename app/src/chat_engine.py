@@ -6,7 +6,7 @@ from typing import Sequence
 import src.adapters.db as db
 from src.db.models.document import Chunk
 from src.generate import generate
-from src.retrieve import retrieve
+from src.retrieve import retrieve_with_scores
 from src.shared import get_embedding_model
 from src.util.class_utils import all_subclasses
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 class OnMessageResult:
     response: str
     chunks: Sequence[Chunk]
+    response_format: str
 
 
 class ChatEngineInterface(ABC):
@@ -52,14 +53,16 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 class GuruBaseEngine(ChatEngineInterface):
     def on_message(self, question: str) -> OnMessageResult:
         with db.PostgresDBClient().get_session() as db_session:
-            chunks = retrieve(
+            chunks = retrieve_with_scores(
                 db_session,
                 get_embedding_model(),
                 question,
             )
 
         response = generate(question, context=chunks)
-        return OnMessageResult(response, chunks)
+        print("RESPONSE IN ENGINE")
+        print(response)
+        return OnMessageResult(response, chunks, response_format="with_score")
 
 
 class GuruMultiprogramEngine(GuruBaseEngine):
@@ -76,7 +79,7 @@ class GuruSnapEngine(GuruBaseEngine):
         logger.warning("TODO: Only retrieve SNAP Guru cards")
         chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
-        return OnMessageResult(response, chunks)
+        return OnMessageResult(response, chunks, response_format="no_score")
 
 
 class PolicyMichiganEngine(ChatEngineInterface):
@@ -87,4 +90,4 @@ class PolicyMichiganEngine(ChatEngineInterface):
         logger.warning("TODO: Retrieve from MI Policy Manual")
         chunks: list[Chunk] = []
         response = "TEMP: Replace with generated response once chunks are correct"
-        return OnMessageResult(response, chunks)
+        return OnMessageResult(response, chunks, response_format="no_score")

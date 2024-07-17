@@ -7,11 +7,15 @@ from src.db.models.document import Chunk
 _accordion_id = 0
 
 
-def format_guru_cards(chunks: Sequence[Chunk]) -> str:
+def format_guru_cards(chunks: Sequence[Chunk], response_format="with_score") -> str:
     cards_html = ""
     for chunk in chunks:
         global _accordion_id
+        chunk_response = chunk[0] if "with_score" else chunk
         _accordion_id += 1
+        similarity_score = (
+            f"<p>Similarity Score: {str(chunk[1])}</p>" if response_format == "with_score" else ""
+        )
         cards_html += f"""
 <div class="usa-accordion" id=accordion-{_accordion_id}>
     <h4 class="usa-accordion__heading">
@@ -21,11 +25,12 @@ def format_guru_cards(chunks: Sequence[Chunk]) -> str:
             aria-expanded="false"
             aria-controls="a-{_accordion_id}"
             >
-            <a href='https://link/to/guru_card'>{chunk.document.name}</a>
+            <a href='https://link/to/guru_card'>{chunk_response.document.name}</a>
         </button>
     </h4>
     <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-        <p>Summary: {chunk.document.content}</p>
+        <p>Summary: {chunk_response.document.content}</p>
+        {similarity_score}
     </div>
 </div>"""
     return "<h3>Related Guru cards</h3>" + cards_html
