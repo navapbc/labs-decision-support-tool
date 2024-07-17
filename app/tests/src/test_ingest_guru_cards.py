@@ -58,6 +58,9 @@ def test__ingest_cards(db_session, guru_local_file, guru_s3_file, file_location)
 
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 3
+    assert set(d.dataset for d in documents) == {"test_dataset"}
+    assert set(d.program for d in documents) == {"test_benefit_program"}
+    assert set(d.region for d in documents) == {"Michigan"}
 
     assert documents[0].name == "Long Card"
     assert documents[0].content == "word " * 600
