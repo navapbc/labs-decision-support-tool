@@ -228,10 +228,19 @@ help: ## Prints the help documentation and info about each command
 # ETL
 ##################################################
 
-check-filepath:
+check-ingest-arguments:
+ifndef DATASET_ID
+	$(error DATASET_ID is undefined)
+endif
+ifndef BENEFIT_PROGRAM
+	$(error BENEFIT_PROGRAM is undefined)
+endif
+ifndef BENEFIT_REGION
+	$(error BENEFIT_REGION is undefined)
+endif
 ifndef FILEPATH
 	$(error FILEPATH is undefined)
 endif
 
-ingest-guru-cards: check-filepath
-	$(PY_RUN_CMD) ingest-guru-cards $(FILEPATH)
+ingest-guru-cards: check-ingest-arguments
+	$(PY_RUN_CMD) ingest-guru-cards $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)

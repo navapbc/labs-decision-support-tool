@@ -69,6 +69,9 @@ class DocumentFactory(BaseFactory):
 
     name = factory.Faker("word")
     content = factory.Faker("text")
+    dataset = factory.Faker("word")
+    program = factory.Faker("random_choices", elements=["SNAP", "Medicaid", "TANF"])
+    region = factory.Faker("random_choices", elements=["MI", "MD", "PA"])
 
 
 class ChunkFactory(BaseFactory):
@@ -80,6 +83,4 @@ class ChunkFactory(BaseFactory):
     tokens = factory.LazyAttribute(
         lambda o: len(MockSentenceTransformer().tokenizer.tokenize(o.content))
     )
-    mpnet_embedding = factory.LazyAttribute(
-        lambda o: MockSentenceTransformer().encode(o.content)
-    )
+    mpnet_embedding = factory.LazyAttribute(lambda o: MockSentenceTransformer().encode(o.content))
