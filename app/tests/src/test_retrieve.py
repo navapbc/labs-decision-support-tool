@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import delete
 
 from src.db.models.document import Document
@@ -33,19 +34,31 @@ def test_retrieve(db_session, enable_factory_create):
     assert results == [short_chunk, medium_chunk]
 
 
-def test_retrieve__with_1_filter(db_session, enable_factory_create):
+def test_retrieve__with_unknown_filter(db_session, enable_factory_create):
+    with pytest.raises(ValueError):
+        retrieve(
+            db_session, mock_embedding_model, "Very tiny words.", k=2, unknown_column=["some value"]
+        )
+
+
+def test_retrieve__with_dataset_filter(db_session, enable_factory_create):
     db_session.execute(delete(Document))
-    _create_chunks(document=DocumentFactory.create(program="Medicaid"))
+    _create_chunks(document=DocumentFactory.create())
     _, snap_medium_chunk, snap_short_chunk = _create_chunks(
-        document=DocumentFactory.create(program="SNAP")
+        document=DocumentFactory.create(dataset="my_very_unique_dataset")
     )
 
-    results = retrieve(db_session, mock_embedding_model, "Very tiny words.", k=2, programs=["SNAP"])
-
+    results = retrieve(
+        db_session,
+        mock_embedding_model,
+        "Very tiny words.",
+        k=2,
+        datasets=["my_very_unique_dataset"],
+    )
     assert results == [snap_short_chunk, snap_medium_chunk]
 
 
-def test_retrieve__with_2_filters(db_session, enable_factory_create):
+def test_retrieve__with_other_filters(db_session, enable_factory_create):
     db_session.execute(delete(Document))
     _create_chunks(document=DocumentFactory.create(program="Medicaid", region="PA"))
     _, snap_medium_chunk, snap_short_chunk = _create_chunks(
@@ -60,7 +73,6 @@ def test_retrieve__with_2_filters(db_session, enable_factory_create):
         programs=["SNAP"],
         regions=["MI"],
     )
-
     assert results == [snap_short_chunk, snap_medium_chunk]
 
 

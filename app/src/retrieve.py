@@ -1,5 +1,4 @@
 import logging
-from pprint import pprint
 from typing import Sequence, Tuple
 
 from sentence_transformers import SentenceTransformer
@@ -9,7 +8,6 @@ import src.adapters.db as db
 from src.db.models.document import Chunk, Document
 
 logger = logging.getLogger(__name__)
-_DEBUGGING = True
 
 
 def retrieve(
@@ -23,26 +21,16 @@ def retrieve(
 
     query_embedding = embedding_model.encode(query, show_progress_bar=False)
 
-    if _DEBUGGING:
-        docstmt = select(Document.name, Document.program, Document.region)
-        print("stmt", docstmt.compile(compile_kwargs={"literal_binds": True}))
-        docs = db_session.execute(docstmt).all()
-        print("docs:", docs)
-
-        chstmt = select(Chunk.tokens, Document.program, Chunk.content).join(Chunk.document)
-        chs = db_session.execute(chstmt).all()
-        print("chunks:")
-        pprint(chs)
-        if benefit_programs := filters.get("programs", None):
-            chs = db_session.execute(chstmt.filter(Document.program.in_(benefit_programs))).all()
-            print("filtered chunks:")
-            pprint(chs)
-
     statement = select(Chunk).join(Chunk.document)
-    if benefit_programs := filters.get("programs", None):
+    if benefit_dataset := filters.pop("datasets", None):
+        statement = statement.filter(Document.dataset.in_(benefit_dataset))
+    if benefit_programs := filters.pop("programs", None):
         statement = statement.filter(Document.program.in_(benefit_programs))
-    if benefit_regions := filters.get("regions", None):
+    if benefit_regions := filters.pop("regions", None):
         statement = statement.filter(Document.region.in_(benefit_regions))
+
+    if filters:
+        raise ValueError(f"Unknown filters: {filters.keys()}")
 
     chunks = db_session.scalars(
         statement.order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding)).limit(k)
