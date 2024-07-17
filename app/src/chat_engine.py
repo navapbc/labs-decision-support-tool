@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Sequence
 
+from sqlalchemy import Row
+
 import src.adapters.db as db
 from src.db.models.document import Chunk
 from src.generate import generate
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class OnMessageResult:
     response: str
-    chunks: Sequence[Chunk]
+    chunks: Sequence[Chunk] | Sequence[Row[tuple[Chunk, float]]]
     response_format: str
 
 
@@ -60,8 +62,6 @@ class GuruBaseEngine(ChatEngineInterface):
             )
 
         response = generate(question, context=chunks)
-        print("RESPONSE IN ENGINE")
-        print(response)
         return OnMessageResult(response, chunks, response_format="with_score")
 
 

@@ -53,7 +53,7 @@ async def on_message(message: cl.Message) -> None:
         msg_content = result.response + format_guru_cards(result.chunks)
         await cl.Message(
             content=msg_content,
-            metadata={chunk[0].document.name: chunk[1] for chunk in result.chunks},
+            metadata={chunk[0].document.name: chunk[1] for chunk in result.chunks if isinstance(chunk, tuple)},
         ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
