@@ -22,10 +22,12 @@ class Document(Base, IdMixin, TimestampMixin):
     )
 
     # Domain-specific columns follow
+    # dataset in which the document belongs
+    dataset: Mapped[str]
     # benefit program
-    program: Mapped[str | None]
+    program: Mapped[str]
     # geographical region of the benefit program
-    region: Mapped[str | None]
+    region: Mapped[str]
 
 
 class Chunk(Base, IdMixin, TimestampMixin):
