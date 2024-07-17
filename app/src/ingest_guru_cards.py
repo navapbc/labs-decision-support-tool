@@ -57,7 +57,7 @@ def main() -> None:
     if len(sys.argv) < 5:
         logger.warning(
             "Expecting 4 arguments: DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH\n   but got: %s",
-            sys.argv,
+            sys.argv[1:],
         )
         return
 
@@ -73,7 +73,6 @@ def main() -> None:
 
     embedding_model = get_embedding_model()
 
-    # TODO: Add `region` as a argv element or have a better way to set document attributes
     doc_attribs = {
         "dataset": dataset_id,
         "program": benefit_program,

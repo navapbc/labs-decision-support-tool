@@ -31,7 +31,7 @@ make ingest-guru-cards DATASET_ID=dataset_identifier BENEFIT_PROGRAM=SNAP BENEFI
 ```
 
 - The same `DATASET_ID` identifier can be used for multiple documents (`FILEPATH`) to represent that the documents belong in the same dataset.
-- Example `BENEFIT_PROGRAM` values include `housing`, `utilities`, `food`, `medical`, `employment`, `SNAP`, `Medicaid`.
+- Example `BENEFIT_PROGRAM` values include `housing`, `utilities`, `food`, `medical`, `employment`, `SNAP`, `Medicaid`, etc.
 - `BENEFIT_REGION` can correspond to a town, city, state, country, or any geographic area.
 
 The Docker container mounts the `/app` folder, so FILEPATH should be relative to `/app`. `/app/documents` is ignored by git, so is a good place for files you want to load but not commit.
