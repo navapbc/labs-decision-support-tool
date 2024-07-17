@@ -51,7 +51,10 @@ async def on_message(message: cl.Message) -> None:
     try:
         result = engine.on_message(question=message.content)
         msg_content = result.response + format_guru_cards(result.chunks)
-        await cl.Message(content=msg_content).send()
+        await cl.Message(
+            content=msg_content,
+            metadata={chunk[0].document.name: chunk[1] for chunk in result.chunks},
+        ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
             author="backend",
