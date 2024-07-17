@@ -7,11 +7,11 @@ from src.db.models.document import Chunk
 _accordion_id = 0
 
 
-def format_guru_cards(chunks: Sequence[Chunk], response_format="with_score") -> str:
+def format_guru_cards(chunks: Sequence[Chunk], response_format: str = "with_score") -> str:
     cards_html = ""
     for chunk in chunks:
         global _accordion_id
-        chunk_response = chunk[0] if "with_score" else chunk
+        chunk_response = chunk[0] if response_format == "with_score" else chunk
         _accordion_id += 1
         similarity_score = (
             f"<p>Similarity Score: {str(chunk[1])}</p>" if response_format == "with_score" else ""
