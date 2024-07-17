@@ -16,6 +16,7 @@ def test_document_factory(enable_factory_create, db_session: db.Session):
     assert db_record.id == document.id
     assert db_record.content == document.content
     assert db_record.name == document.name
+    assert db_record.dataset == document.dataset
     assert db_record.program == document.program
     assert db_record.region == document.region
 
