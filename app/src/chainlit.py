@@ -40,7 +40,7 @@ def engine_url_query_value() -> str:
     # Using this suggestion: https://github.com/Chainlit/chainlit/issues/144#issuecomment-2227543547
     parsed_url = urlparse(url)
     qs = parse_qs(parsed_url.query)
-    return qs.get("engine", [os.environ.get("CHAT_ENGINE", "default_engine")])[0]
+    return qs.get("engine", [os.environ.get("CHAT_ENGINE", "guru-snap")])[0]
 
 
 @cl.on_message
