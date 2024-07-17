@@ -7,7 +7,6 @@ that are persisted to the database.
 The factories are based on the `factory_boy` library. See
 https://factoryboy.readthedocs.io/en/latest/ for more information.
 """
-import random
 from datetime import datetime
 from typing import Optional
 
@@ -70,8 +69,8 @@ class DocumentFactory(BaseFactory):
 
     name = factory.Faker("word")
     content = factory.Faker("text")
-    program = random.choice([None, "SNAP", "Medicaid", "TANF"])
-    region = random.choice([None, "MI", "MD", "PA"])
+    program = factory.Faker("random_choices", elements=["SNAP", "Medicaid", "TANF"])
+    region = factory.Faker("random_choices", elements=["MI", "MD", "PA"])
 
 
 class ChunkFactory(BaseFactory):
