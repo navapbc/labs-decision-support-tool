@@ -27,8 +27,12 @@ The application supports loading Guru cards from .json files.
 To load a JSON file containing Guru cards in your local environment, from within `/app`:
 
 ```bash
-make ingest-guru-cards DATASET_ID=some_identifier FILEPATH=path/to/some_cards.json
+make ingest-guru-cards DATASET_ID=some_identifier BENEFIT_PROGRAM=SNAP BENEFIT_REGION=Michigan FILEPATH=path/to/some_cards.json
 ```
+
+- The same `DATASET_ID` identifier can be used for multiple documents (`FILEPATH`) to represent that the documents belong in the same dataset.
+- Example `BENEFIT_PROGRAM` values include `housing`, `utilities`, `food`, `medical`, `employment`, `SNAP`, `Medicaid`.
+- `BENEFIT_REGION` can correspond to a town, city, state, country, or any geographic area.
 
 The Docker container mounts the `/app` folder, so FILEPATH should be relative to `/app`. `/app/documents` is ignored by git, so is a good place for files you want to load but not commit.
 

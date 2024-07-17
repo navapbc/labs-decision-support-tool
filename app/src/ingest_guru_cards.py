@@ -58,6 +58,7 @@ def main() -> None:
         logger.warning("Expecting 2 arguments: dataset_id and filepath. Got %s", sys.argv)
         return
 
+    # TODO: improve command-line argument handling using getopt module
     dataset_id = sys.argv[1]
     benefit_program = sys.argv[2]
     benefit_region = sys.argv[3]
