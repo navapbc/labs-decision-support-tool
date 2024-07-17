@@ -55,7 +55,10 @@ def _ingest_cards(
 
 def main() -> None:
     if len(sys.argv) < 3:
-        logger.warning("Expecting 2 arguments: dataset_id and filepath. Got %s", sys.argv)
+        logger.warning(
+            "Expecting 4 arguments: DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH\n   but got: %s",
+            sys.argv,
+        )
         return
 
     # TODO: improve command-line argument handling using getopt module
@@ -64,7 +67,9 @@ def main() -> None:
     benefit_region = sys.argv[3]
     guru_cards_filepath = sys.argv[4]
 
-    logger.info(f"Processing Guru cards {dataset_id} at {guru_cards_filepath}")
+    logger.info(
+        f"Processing Guru cards {dataset_id} at {guru_cards_filepath} for {benefit_program} in {benefit_region}"
+    )
 
     embedding_model = get_embedding_model()
 
