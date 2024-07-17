@@ -5,6 +5,8 @@ from src.retrieve import retrieve, retrieve_with_scores
 from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
+mock_embedding_model = MockSentenceTransformer()
+
 
 def _create_chunks(document=None):
     if not document:
@@ -24,7 +26,6 @@ def _create_chunks(document=None):
 
 def test_retrieve(db_session, enable_factory_create):
     db_session.execute(delete(Document))
-    mock_embedding_model = MockSentenceTransformer()
     _, medium_chunk, short_chunk = _create_chunks()
 
     results = retrieve(db_session, mock_embedding_model, "Very tiny words.", k=2)
@@ -34,7 +35,6 @@ def test_retrieve(db_session, enable_factory_create):
 
 def test_retrieve__with_1_filter(db_session, enable_factory_create):
     db_session.execute(delete(Document))
-    mock_embedding_model = MockSentenceTransformer()
     _create_chunks(document=DocumentFactory.create(program="Medicaid"))
     _, snap_medium_chunk, snap_short_chunk = _create_chunks(
         document=DocumentFactory.create(program="SNAP")
@@ -47,9 +47,27 @@ def test_retrieve__with_1_filter(db_session, enable_factory_create):
     assert results == [snap_short_chunk, snap_medium_chunk]
 
 
+def test_retrieve__with_2_filters(db_session, enable_factory_create):
+    db_session.execute(delete(Document))
+    _create_chunks(document=DocumentFactory.create(program="Medicaid", region="PA"))
+    _, snap_medium_chunk, snap_short_chunk = _create_chunks(
+        document=DocumentFactory.create(program="SNAP", region="MI")
+    )
+
+    results = retrieve(
+        db_session,
+        mock_embedding_model,
+        "Very tiny words.",
+        k=2,
+        benefit_programs=["SNAP"],
+        benefit_regions=["MI"],
+    )
+
+    assert results == [snap_short_chunk, snap_medium_chunk]
+
+
 def test_retrieve_with_scores(db_session, enable_factory_create):
     db_session.execute(delete(Document))
-    mock_embedding_model = MockSentenceTransformer()
     _, medium_chunk, short_chunk = _create_chunks()
 
     results = retrieve_with_scores(db_session, mock_embedding_model, "Very tiny words.", k=2)

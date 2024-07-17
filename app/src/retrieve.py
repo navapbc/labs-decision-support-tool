@@ -20,6 +20,7 @@ def retrieve(
     query: str,
     k: int = 5,
     benefit_programs: Sequence | None = None,
+    benefit_regions: Sequence | None = None,
 ) -> Sequence[Chunk]:
     logger.info(f"Retrieving context for {query!r}")
 
@@ -43,6 +44,8 @@ def retrieve(
     statement = select(Chunk).join(Chunk.document)
     if benefit_programs:
         statement = statement.filter(Document.program.in_(benefit_programs))
+    if benefit_regions:
+        statement = statement.filter(Document.region.in_(benefit_regions))
     rchs = db_session.execute(statement.limit(k)).all()
 
     if _DEBUGGING:
