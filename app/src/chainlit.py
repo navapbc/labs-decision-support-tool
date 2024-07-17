@@ -1,5 +1,4 @@
 import logging
-import os
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
