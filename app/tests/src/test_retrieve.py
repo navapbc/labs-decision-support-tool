@@ -54,7 +54,7 @@ def test_retrieve__with_dataset_filter(db_session, enable_factory_create):
     db_session.execute(delete(Document))
     _create_chunks(document=DocumentFactory.create())
     _, snap_medium_chunk, snap_short_chunk = _create_chunks(
-        document=DocumentFactory.create(dataset="my_very_unique_dataset")
+        document=DocumentFactory.create(dataset="SNAP")
     )
 
     results = retrieve(
@@ -62,7 +62,7 @@ def test_retrieve__with_dataset_filter(db_session, enable_factory_create):
         mock_embedding_model,
         "Very tiny words.",
         k=2,
-        datasets=["my_very_unique_dataset"],
+        datasets=["SNAP"],
     )
     assert results == [snap_short_chunk, snap_medium_chunk]
 

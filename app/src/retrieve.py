@@ -15,7 +15,7 @@ def retrieve(
     embedding_model: SentenceTransformer,
     query: str,
     k: int = 5,
-    **filters: Sequence | None,
+    **filters: Sequence[str] | None,
 ) -> Sequence[Chunk]:
     chunks_with_scores = retrieve_with_scores(db_session, embedding_model, query, k, **filters)
     return [chunk for chunk, _ in chunks_with_scores]
@@ -26,7 +26,7 @@ def retrieve_with_scores(
     embedding_model: SentenceTransformer,
     query: str,
     k: int = 5,
-    **filters: Sequence | None,
+    **filters: Sequence[str] | None,
 ) -> Sequence[Row[Tuple[Chunk, float]]]:
     logger.info("Retrieving context for %r", query)
 
@@ -36,11 +36,11 @@ def retrieve_with_scores(
         Chunk.document
     )
     if benefit_dataset := filters.pop("datasets", None):
-        statement = statement.filter(Document.dataset.in_(benefit_dataset))
+        statement = statement.where(Document.dataset.in_(benefit_dataset))
     if benefit_programs := filters.pop("programs", None):
-        statement = statement.filter(Document.program.in_(benefit_programs))
+        statement = statement.where(Document.program.in_(benefit_programs))
     if benefit_regions := filters.pop("regions", None):
-        statement = statement.filter(Document.region.in_(benefit_regions))
+        statement = statement.where(Document.region.in_(benefit_regions))
 
     if filters:
         raise ValueError(f"Unknown filters: {filters.keys()}")
