@@ -22,7 +22,10 @@ CONTENT_KEY = "content"
 
 
 def _ingest_cards(
-    db_session: db.Session, embedding_model: SentenceTransformer, guru_cards_filepath: str
+    db_session: db.Session,
+    embedding_model: SentenceTransformer,
+    guru_cards_filepath: str,
+    doc_attribs: dict[str, str],
 ) -> None:
     with open(guru_cards_filepath, "r") as guru_cards_file:
         cards_as_json = json.load(guru_cards_file)
@@ -34,7 +37,7 @@ def _ingest_cards(
         name = card[NAME_KEY].strip()
         content = get_text_from_html(card[CONTENT_KEY])
 
-        document = Document(name=name, content=content)
+        document = Document(name=name, content=content, **doc_attribs)
         db_session.add(document)
 
         tokens = len(embedding_model.tokenizer.tokenize(content))
@@ -51,18 +54,32 @@ def _ingest_cards(
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        logger.warning("No argument for filepath.")
+    if len(sys.argv) < 5:
+        logger.warning(
+            "Expecting 4 arguments: DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH\n   but got: %s",
+            sys.argv[1:],
+        )
         return
 
-    guru_cards_filepath = sys.argv[1]
+    # TODO: improve command-line argument handling using getopt module
+    dataset_id = sys.argv[1]
+    benefit_program = sys.argv[2]
+    benefit_region = sys.argv[3]
+    guru_cards_filepath = sys.argv[4]
 
-    logger.info(f"Processing Guru cards at {guru_cards_filepath}")
+    logger.info(
+        f"Processing Guru cards {dataset_id} at {guru_cards_filepath} for {benefit_program} in {benefit_region}"
+    )
 
     embedding_model = get_embedding_model()
 
+    doc_attribs = {
+        "dataset": dataset_id,
+        "program": benefit_program,
+        "region": benefit_region,
+    }
     with db.PostgresDBClient().get_session() as db_session:
-        _ingest_cards(db_session, embedding_model, guru_cards_filepath)
+        _ingest_cards(db_session, embedding_model, guru_cards_filepath, doc_attribs)
         db_session.commit()
 
     logger.info("Finished processing Guru cards.")

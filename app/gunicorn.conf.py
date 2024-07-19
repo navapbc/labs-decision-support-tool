@@ -7,11 +7,10 @@ Attributes:
 
 For more information, see https://docs.gunicorn.org/en/stable/configure.html
 """
-import os
 
-from src.app_config import AppConfig
+from src import shared
 
-app_config = AppConfig()
+app_config = shared.get_app_config()
 
 # Since the `-b 0.0.0.0:8000` argument is used when running in the Docker environment,
 # this bind variable is only used when not using Docker
