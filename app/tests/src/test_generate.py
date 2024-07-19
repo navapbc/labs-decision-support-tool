@@ -109,23 +109,6 @@ def test_generate(monkeypatch):
     assert generate("some query") == expected_response
 
 
-def test_generate_with_context_without_score(monkeypatch):
-    monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
-    context = [ChunkFactory.build(), ChunkFactory.build()]
-    context_text = f"{context[0].document.name}\n{context[0].content}\n\n{context[1].document.name}\n{context[1].content}"
-    expected_response = (
-        'Called gpt-4o with [{"content": "'
-        + PROMPT
-        + '", "role": "system"}, {"content": "Use the following context to answer the question: '
-        + context_text
-        + '", "role": "system"}, {"content": "some query", "role": "user"}]'
-    )
-    assert (
-        generate("some query", context=context, response_format="without_score")
-        == expected_response
-    )
-
-
 def test_generate_with_context_with_score(monkeypatch):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
     context = [(ChunkFactory.build(), 0.2000), (ChunkFactory.build(), -0.3000)]

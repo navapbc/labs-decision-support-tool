@@ -9,15 +9,14 @@ from src.db.models.document import Chunk
 _accordion_id = 0
 
 
-def format_guru_cards(chunks: Sequence[Chunk] | Sequence[Row[tuple[Chunk, float]]], response_format: str = "with_score") -> str:
+def format_guru_cards(chunks_with_score: Sequence[Row[tuple[Chunk, float]]]) -> str:
     cards_html = ""
-    for chunk in chunks:
+    for chunk in chunks_with_score:
         global _accordion_id
-        chunk_response = chunk[0] if response_format == "with_score" and isinstance(chunk, tuple) else chunk
+        chunk_response = chunk[0]
+        score = chunk[1]
         _accordion_id += 1
-        similarity_score = (
-            f"<p>Similarity Score: {str(chunk[1])}</p>" if response_format == "with_score" else ""
-        )
+        similarity_score = f"<p>Similarity Score: {str(score)}</p>"
         cards_html += f"""
 <div class="usa-accordion" id=accordion-{_accordion_id}>
     <h4 class="usa-accordion__heading">

@@ -49,10 +49,16 @@ async def on_message(message: cl.Message) -> None:
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
         result = engine.on_message(question=message.content)
-        msg_content = result.response + format_guru_cards(result.chunks)
+        msg_content = result.response + format_guru_cards(result.chunks_with_scores)
+        chunk_titles_and_scores: dict[str, float] = {}
+        for chunk in result.chunks_with_scores:
+            score = chunk[1]
+            title = chunk[0].document.name
+            chunk_titles_and_scores |= {title: score}
+
         await cl.Message(
             content=msg_content,
-            metadata={chunk[0].document.name: chunk[1] for chunk in result.chunks if isinstance(chunk, tuple)},
+            metadata=chunk_titles_and_scores,
         ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(

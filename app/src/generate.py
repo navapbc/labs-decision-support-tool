@@ -33,21 +33,17 @@ def get_models() -> dict[str, str]:
 
 
 def generate(
-    query: str, context: Sequence[Chunk] | Sequence[Row[tuple[Chunk, float]]] | None = None, response_format: str = "with_score"
+    query: str,
+    context: Sequence[Row[tuple[Chunk, float]]] | None = None,
 ) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
     """
 
     if context:
-        if response_format == "with_score":
-            context_text = "\n\n".join(
-                [chunk[0].document.name + "\n" + chunk[0].content for chunk in context]
-            )
-        else:
-            context_text = "\n\n".join(
-                [chunk.document.name + "\n" + chunk.content for chunk in context]
-            )
+        context_text = "\n\n".join(
+            [chunk[0].document.name + "\n" + chunk[0].content for chunk in context]
+        )
         messages = [
             {
                 "content": PROMPT,
