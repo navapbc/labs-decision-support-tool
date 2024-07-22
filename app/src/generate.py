@@ -2,6 +2,7 @@ import os
 from typing import Sequence
 
 from litellm import completion
+from sqlalchemy import Row
 
 from src.db.models.document import Chunk
 
@@ -31,13 +32,17 @@ def get_models() -> dict[str, str]:
     return {}
 
 
-def generate(query: str, context: Sequence[Chunk] | None = None) -> str:
+def generate(
+    query: str,
+    context: Sequence[Row[tuple[Chunk, float]]] | None = None,
+) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
     """
+
     if context:
         context_text = "\n\n".join(
-            [chunk.document.name + "\n" + chunk.content for chunk in context]
+            [chunk[0].document.name + "\n" + chunk[0].content for chunk in context]
         )
         messages = [
             {

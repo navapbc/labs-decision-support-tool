@@ -10,17 +10,6 @@ from src.db.models.document import Chunk, Document
 logger = logging.getLogger(__name__)
 
 
-def retrieve(
-    db_session: db.Session,
-    embedding_model: SentenceTransformer,
-    query: str,
-    k: int = 5,
-    **filters: Sequence[str] | None,
-) -> Sequence[Chunk]:
-    chunks_with_scores = retrieve_with_scores(db_session, embedding_model, query, k, **filters)
-    return [chunk for chunk, _ in chunks_with_scores]
-
-
 def retrieve_with_scores(
     db_session: db.Session,
     embedding_model: SentenceTransformer,

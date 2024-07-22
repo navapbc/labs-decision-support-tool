@@ -3,10 +3,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Sequence
 
+from sqlalchemy import Row
+
 import src.adapters.db as db
 from src.db.models.document import Chunk
 from src.generate import generate
-from src.retrieve import retrieve
+from src.retrieve import retrieve_with_scores
 from src.shared import get_embedding_model
 from src.util.class_utils import all_subclasses
 
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class OnMessageResult:
     response: str
-    chunks: Sequence[Chunk]
+    chunks_with_scores: Sequence[Row[tuple[Chunk, float]]]
 
 
 class ChatEngineInterface(ABC):
@@ -54,15 +56,15 @@ class GuruBaseEngine(ChatEngineInterface):
 
     def on_message(self, question: str) -> OnMessageResult:
         with db.PostgresDBClient().get_session() as db_session:
-            chunks = retrieve(
+            chunks_with_scores = retrieve_with_scores(
                 db_session,
                 get_embedding_model(),
                 question,
                 datasets=self.datasets,
             )
 
-        response = generate(question, context=chunks)
-        return OnMessageResult(response, chunks)
+        response = generate(question, context=chunks_with_scores)
+        return OnMessageResult(response, chunks_with_scores)
 
 
 class GuruMultiprogramEngine(GuruBaseEngine):
@@ -83,6 +85,6 @@ class PolicyMichiganEngine(ChatEngineInterface):
 
     def on_message(self, question: str) -> OnMessageResult:
         logger.warning("TODO: Retrieve from MI Policy Manual")
-        chunks: list[Chunk] = []
+        chunks: Sequence[Row[tuple[Chunk, float]]] = []
         response = "TEMP: Replace with generated response once chunks are correct"
         return OnMessageResult(response, chunks)
