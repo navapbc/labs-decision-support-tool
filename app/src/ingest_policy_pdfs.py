@@ -1,7 +1,7 @@
 import logging
+import os
 import sys
 
-import os
 from sentence_transformers import SentenceTransformer
 
 import src.adapters.db as db
@@ -20,17 +20,15 @@ def _ingest_policy_pdfs(
     pdf_file_dir: str,
     doc_attribs: dict[str, str],
 ) -> None:
-
     directory = os.fsencode(pdf_file_dir)
-    
+
     for file in os.listdir(directory):
         pdf_file_path = os.fsdecode(file)
-        if (pdf_file_path.endswith(".pdf")):
+        if pdf_file_path.endswith(".pdf"):
             logger.info(
                 f"Processing pdf file: {pdf_file_path} at {pdf_file_dir} using {embedding_model}, {db_session}, with {doc_attribs}"
             )
-        
-        
+
 
 def main() -> None:
     if len(sys.argv) < 5:
