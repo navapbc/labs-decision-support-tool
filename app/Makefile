@@ -245,5 +245,5 @@ endif
 ingest-guru-cards: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-guru-cards $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
 
-ingest-policy-cards: check-ingest-arguments
+ingest-policy-pdfs: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-policy-pdfs $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)

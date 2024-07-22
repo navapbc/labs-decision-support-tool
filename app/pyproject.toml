@@ -27,7 +27,6 @@ pgvector = "^0.2.5"
 torch = "2.2.2"
 gunicorn = "^22.0.0"
 
-pdfminer-six = "^20240706"
 [tool.poetry.group.dev.dependencies]
 black = "^23.9.1"
 flake8 = "^6.1.0"
