@@ -42,4 +42,3 @@ def test__ingest_policy_pdfs(caplog, db_session, policy_s3_file, file_location):
             _ingest_policy_pdfs(db_session, mock_embedding, policy_s3_file, doc_attribs)
 
         assert any(text.startswith("Processing pdf file:") for text in caplog.messages)
-        assert caplog.messages == ""
