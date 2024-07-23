@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 
 import src.adapters.db as db
 from src.shared import get_embedding_model
+from src.util.file_util import get_files
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,9 @@ def _ingest_policy_pdfs(
     pdf_file_dir: str,
     doc_attribs: dict[str, str],
 ) -> None:
-    directory = os.fsencode(pdf_file_dir)
+    file_list = get_files(pdf_file_dir)
 
-    for file in os.listdir(directory):
+    for file in file_list:
         pdf_file_path = os.fsdecode(file)
         if pdf_file_path.endswith(".pdf"):
             logger.info(
