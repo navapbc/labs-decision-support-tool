@@ -3,10 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Sequence
 
-from sqlalchemy import Row
-
 import src.adapters.db as db
-from src.db.models.document import Chunk
+from src.db.models.document import ChunkWithScore
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
 from src.shared import get_embedding_model
@@ -18,7 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class OnMessageResult:
     response: str
-    chunks_with_scores: Sequence[Row[tuple[Chunk, float]]]
+    chunks_with_scores: Sequence[ChunkWithScore]
 
 
 class ChatEngineInterface(ABC):
@@ -85,6 +83,6 @@ class PolicyMichiganEngine(ChatEngineInterface):
 
     def on_message(self, question: str) -> OnMessageResult:
         logger.warning("TODO: Retrieve from MI Policy Manual")
-        chunks: Sequence[Row[tuple[Chunk, float]]] = []
+        chunks: Sequence[ChunkWithScore] = []
         response = "TEMP: Replace with generated response once chunks are correct"
         return OnMessageResult(response, chunks)

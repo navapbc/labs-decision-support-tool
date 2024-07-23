@@ -2,6 +2,7 @@ import os
 
 import ollama
 
+from src.db.models.document import ChunkWithScore
 from src.generate import PROMPT, generate, get_models
 from tests.mock import mock_completion
 from tests.src.db.models.factories import ChunkFactory
@@ -111,8 +112,11 @@ def test_generate(monkeypatch):
 
 def test_generate_with_context_with_score(monkeypatch):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
-    context = [(ChunkFactory.build(), 0.2000), (ChunkFactory.build(), -0.3000)]
-    context_text = f"{context[0][0].document.name}\n{context[0][0].content}\n\n{context[1][0].document.name}\n{context[1][0].content}"
+    context = [
+        ChunkWithScore(ChunkFactory.build(), 0.2000),
+        ChunkWithScore(ChunkFactory.build(), -0.3000),
+    ]
+    context_text = f"{context[0].chunk.document.name}\n{context[0].chunk.content}\n\n{context[1].chunk.document.name}\n{context[1].chunk.content}"
     expected_response = (
         'Called gpt-4o with [{"content": "'
         + PROMPT

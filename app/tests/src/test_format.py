@@ -16,17 +16,17 @@ def _get_chunks_with_scores(db_session):
 
 def test_format_guru_cards_with_score(db_session, enable_factory_create):
     db_session.execute(delete(Document))
-    chunks = _get_chunks_with_scores(db_session)
-    html = format_guru_cards(chunks)
+    chunks_with_scores = _get_chunks_with_scores(db_session)
+    html = format_guru_cards(chunks_with_scores)
     assert "accordion-1" in html
     assert "Related Guru cards" in html
-    assert chunks[0][0].document.name in html
-    assert chunks[0][0].document.content in html
-    assert chunks[1][0].document.name in html
-    assert chunks[1][0].document.content in html
+    assert chunks_with_scores[0].chunk.document.name in html
+    assert chunks_with_scores[0].chunk.document.content in html
+    assert chunks_with_scores[1].chunk.document.name in html
+    assert chunks_with_scores[1].chunk.document.content in html
     assert "Similarity Score" in html
 
     # Check that a second call doesn't re-use the IDs
-    next_html = format_guru_cards(chunks)
+    next_html = format_guru_cards(chunks_with_scores)
     assert "accordion-1" not in next_html
     assert "accordion-4" in next_html
