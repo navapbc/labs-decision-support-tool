@@ -26,7 +26,7 @@ def _create_chunks(document=None):
 
 
 def _format_retrieval_results(retrieval_results):
-    return [chunk for chunk, _ in retrieval_results]
+    return [chunk_with_score.chunk for chunk_with_score in retrieval_results]
 
 
 def test_retrieve__with_empty_filter(db_session, enable_factory_create):
@@ -89,7 +89,7 @@ def test_retrieve_with_scores(db_session, enable_factory_create):
     results = retrieve_with_scores(db_session, mock_embedding_model, "Very tiny words.", k=2)
 
     assert len(results) == 2
-    assert results[0][0] == short_chunk
-    assert results[0][1] == -0.7071067690849304
-    assert results[1][0] == medium_chunk
-    assert results[1][1] == -0.25881901383399963
+    assert results[0].chunk == short_chunk
+    assert results[0].score == -0.7071067690849304
+    assert results[1].chunk == medium_chunk
+    assert results[1].score == -0.25881901383399963
