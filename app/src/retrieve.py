@@ -1,11 +1,11 @@
 import logging
-from typing import Sequence, Tuple
+from typing import Sequence
 
 from sentence_transformers import SentenceTransformer
-from sqlalchemy import Row, select
+from sqlalchemy import select
 
 import src.adapters.db as db
-from src.db.models.document import Chunk, Document
+from src.db.models.document import Chunk, ChunkWithScore, Document
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ def retrieve_with_scores(
     query: str,
     k: int = 5,
     **filters: Sequence[str] | None,
-) -> Sequence[Row[Tuple[Chunk, float]]]:
+) -> Sequence[ChunkWithScore]:
     logger.info("Retrieving context for %r", query)
 
     query_embedding = embedding_model.encode(query, show_progress_bar=False)
@@ -41,4 +41,4 @@ def retrieve_with_scores(
     for chunk, score in chunks_with_scores:
         logger.info(f"Retrieved: {chunk.document.name!r} with score {score}")
 
-    return chunks_with_scores
+    return [ChunkWithScore(chunk, score) for chunk, score in chunks_with_scores]

@@ -51,10 +51,9 @@ async def on_message(message: cl.Message) -> None:
         result = engine.on_message(question=message.content)
         msg_content = result.response + format_guru_cards(result.chunks_with_scores)
         chunk_titles_and_scores: dict[str, float] = {}
-        for chunk in result.chunks_with_scores:
-            score = chunk[1]
-            title = chunk[0].document.name
-            chunk_titles_and_scores |= {title: score}
+        for chunk_with_score in result.chunks_with_scores:
+            title = chunk_with_score.chunk.document.name
+            chunk_titles_and_scores |= {title: chunk_with_score.score}
 
         await cl.Message(
             content=msg_content,

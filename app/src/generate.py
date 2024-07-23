@@ -2,9 +2,8 @@ import os
 from typing import Sequence
 
 from litellm import completion
-from sqlalchemy import Row
 
-from src.db.models.document import Chunk
+from src.db.models.document import ChunkWithScore
 
 PROMPT = """Provide answers in plain language written at the average American reading level.
 Use bullet points. Keep your answers brief, max of 5 sentences.
@@ -34,7 +33,7 @@ def get_models() -> dict[str, str]:
 
 def generate(
     query: str,
-    context: Sequence[Row[tuple[Chunk, float]]] | None = None,
+    context: Sequence[ChunkWithScore] | None = None,
 ) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
@@ -42,7 +41,10 @@ def generate(
 
     if context:
         context_text = "\n\n".join(
-            [chunk[0].document.name + "\n" + chunk[0].content for chunk in context]
+            [
+                chunk_with_score.chunk.document.name + "\n" + chunk_with_score.chunk.content
+                for chunk_with_score in context
+            ]
         )
         messages = [
             {

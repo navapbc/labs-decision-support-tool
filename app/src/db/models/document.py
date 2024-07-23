@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from uuid import UUID
 
 import numpy as np
@@ -39,3 +40,9 @@ class Chunk(Base, IdMixin, TimestampMixin):
 
     document_id: Mapped[UUID] = mapped_column(ForeignKey("document.id", ondelete="CASCADE"))
     document: Mapped[Document] = relationship(Document)
+
+
+@dataclass
+class ChunkWithScore:
+    chunk: Chunk
+    score: float
