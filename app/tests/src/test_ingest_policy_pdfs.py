@@ -1,10 +1,9 @@
 import io
 import logging
 import tempfile
-from unittest import mock
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete
 
 from src.db.models.document import Document
 from src.ingest_policy_pdfs import _ingest_policy_pdfs
