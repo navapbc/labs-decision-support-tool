@@ -5,13 +5,13 @@ from sentence_transformers import SentenceTransformer
 from sqlalchemy import select
 
 import src.adapters.db as db
+from src import shared
 from src.db.models.document import Chunk, ChunkWithScore, Document
 
 logger = logging.getLogger(__name__)
 
 
 def retrieve_with_scores(
-    db_session: db.Session,
     embedding_model: SentenceTransformer,
     query: str,
     k: int = 5,
@@ -34,11 +34,12 @@ def retrieve_with_scores(
     if filters:
         raise ValueError(f"Unknown filters: {filters.keys()}")
 
-    chunks_with_scores = db_session.execute(
-        statement.order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding)).limit(k)
-    ).all()
+    with shared.get_app_config().db_session() as db_session:
+        chunks_with_scores = db_session.execute(
+            statement.order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding)).limit(k)
+        ).all()
 
-    for chunk, score in chunks_with_scores:
-        logger.info(f"Retrieved: {chunk.document.name!r} with score {score}")
+        for chunk, score in chunks_with_scores:
+            logger.info(f"Retrieved: {chunk.document.name!r} with score {score}")
 
-    return [ChunkWithScore(chunk, score) for chunk, score in chunks_with_scores]
+        return [ChunkWithScore(chunk, score) for chunk, score in chunks_with_scores]

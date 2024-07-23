@@ -6,7 +6,9 @@ import moto
 import pytest
 
 import src.adapters.db as db
+from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 import tests.src.db.models.factories as factories
+from src import shared
 from src.db import models
 from src.util.local import load_local_env_vars
 from tests.lib import db_testing
@@ -102,6 +104,22 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
     """
     monkeypatch.setattr(factories, "_db_session", db_session)
     return db_session
+
+
+@pytest.fixture
+def app_config(monkeypatch, db_session):
+    class MockAppConfig:
+        def db_session(self):
+            print("==============MockAppConfig.db_session")
+            return db_session
+
+        def create_embedding_model(self):
+            print("==============MockAppConfig.create_embedding_model")
+            return MockSentenceTransformer()
+
+    app_config = MockAppConfig()
+    monkeypatch.setattr(shared, "get_app_config", lambda: app_config)
+    return app_config
 
 
 ####################

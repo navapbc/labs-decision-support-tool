@@ -1,3 +1,4 @@
+import src.adapters.db as db
 from src.util.env_config import PydanticBaseEnvConfig
 
 
@@ -19,3 +20,6 @@ class AppConfig(PydanticBaseEnvConfig):
     host: str = "127.0.0.1"
     port: int = 8080
     chat_engine: str = "guru-snap"
+
+    def db_session(self) -> db.Session:
+        return db.PostgresDBClient().get_session()
