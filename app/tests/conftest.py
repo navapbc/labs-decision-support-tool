@@ -120,6 +120,8 @@ def app_config(monkeypatch, db_session):
             return MockSentenceTransformer()
 
     mock_app_config = MockAppConfig()
+    print("\n=====\n=========mock_app_config", monkeypatch)
+    # input("Press Enter app_config...")
     monkeypatch.setattr(shared, "get_app_config", lambda: mock_app_config)
     return mock_app_config
 

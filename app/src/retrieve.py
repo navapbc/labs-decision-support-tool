@@ -3,8 +3,8 @@ from typing import Sequence
 
 from sqlalchemy import select
 
+from src import shared
 from src.db.models.document import Chunk, ChunkWithScore, Document
-from src.shared import get_app_config
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ def retrieve_with_scores(
 ) -> Sequence[ChunkWithScore]:
     logger.info("Retrieving context for %r", query)
 
-    embedding_model = get_app_config().sentence_transformer
+    embedding_model = shared.get_app_config().sentence_transformer
     query_embedding = embedding_model.encode(query, show_progress_bar=False)
 
     statement = select(Chunk, Chunk.mpnet_embedding.max_inner_product(query_embedding)).join(
@@ -32,7 +32,7 @@ def retrieve_with_scores(
     if filters:
         raise ValueError(f"Unknown filters: {filters.keys()}")
 
-    with get_app_config().db_session() as db_session:
+    with shared.get_app_config().db_session() as db_session:
         chunks_with_scores = db_session.execute(
             statement.order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding)).limit(k)
         ).all()

@@ -25,11 +25,15 @@ class AppConfig(PydanticBaseEnvConfig):
     port: int = 8080
     chat_engine: str = "guru-snap"
 
+    print("\n=====\n========= Creating REAL AppConfig")
+
     def db_session(self) -> db.Session:
         print("\n=====\n========= REAL AppConfig.db_session")
+        input("UNEXPECTED Press Enter app_config...")
         return db.PostgresDBClient().get_session()
 
     @cached_property
     def sentence_transformer(self) -> SentenceTransformer:
         print("\n=====\n========= REAL AppConfig.sentence_transformer")
+        input("UNEXPECTED Press Enter app_config...")
         return SentenceTransformer(self.embedding_model)
