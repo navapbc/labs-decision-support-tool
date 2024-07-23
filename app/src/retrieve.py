@@ -4,7 +4,6 @@ from typing import Sequence
 from sentence_transformers import SentenceTransformer
 from sqlalchemy import select
 
-import src.adapters.db as db
 from src import shared
 from src.db.models.document import Chunk, ChunkWithScore, Document
 

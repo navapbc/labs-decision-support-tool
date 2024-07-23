@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Sequence
 
-from src import shared
 from src.db.models.document import ChunkWithScore
 from src.generate import generate
 from src.retrieve import retrieve_with_scores

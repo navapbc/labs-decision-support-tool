@@ -33,9 +33,7 @@ def test_retrieve__with_empty_filter(app_config, db_session, enable_factory_crea
     db_session.execute(delete(Document))
     _, medium_chunk, short_chunk = _create_chunks()
 
-    results = retrieve_with_scores(
-        mock_embedding_model, "Very tiny words.", k=2, datasets=[]
-    )
+    results = retrieve_with_scores(mock_embedding_model, "Very tiny words.", k=2, datasets=[])
 
     assert _format_retrieval_results(results) == [short_chunk, medium_chunk]
 

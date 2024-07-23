@@ -6,12 +6,12 @@ import moto
 import pytest
 
 import src.adapters.db as db
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 import tests.src.db.models.factories as factories
 from src import shared
 from src.db import models
 from src.util.local import load_local_env_vars
 from tests.lib import db_testing
+from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 
 logger = logging.getLogger(__name__)
 
