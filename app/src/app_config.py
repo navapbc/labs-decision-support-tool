@@ -1,3 +1,7 @@
+from functools import cached_property
+
+from sentence_transformers import SentenceTransformer
+
 import src.adapters.db as db
 from src.util.env_config import PydanticBaseEnvConfig
 
@@ -22,4 +26,10 @@ class AppConfig(PydanticBaseEnvConfig):
     chat_engine: str = "guru-snap"
 
     def db_session(self) -> db.Session:
+        print("\n=====\n========= REAL AppConfig.db_session")
         return db.PostgresDBClient().get_session()
+
+    @cached_property
+    def sentence_transformer(self) -> SentenceTransformer:
+        print("\n=====\n========= REAL AppConfig.sentence_transformer")
+        return SentenceTransformer(self.embedding_model)

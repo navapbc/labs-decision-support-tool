@@ -2,12 +2,11 @@ import json
 import logging
 import sys
 
-from sentence_transformers import SentenceTransformer
 from smart_open import open
 
 import src.adapters.db as db
 from src.db.models.document import Chunk, Document
-from src.shared import get_embedding_model
+from src.shared import get_app_config
 from src.util.html import get_text_from_html
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,6 @@ CONTENT_KEY = "content"
 
 def _ingest_cards(
     db_session: db.Session,
-    embedding_model: SentenceTransformer,
     guru_cards_filepath: str,
     doc_attribs: dict[str, str],
 ) -> None:
@@ -40,6 +38,7 @@ def _ingest_cards(
         document = Document(name=name, content=content, **doc_attribs)
         db_session.add(document)
 
+        embedding_model = get_app_config().sentence_transformer
         tokens = len(embedding_model.tokenizer.tokenize(content))
         mpnet_embedding = embedding_model.encode(content, show_progress_bar=False)
         chunk = Chunk(
@@ -71,15 +70,13 @@ def main() -> None:
         f"Processing Guru cards {dataset_id} at {guru_cards_filepath} for {benefit_program} in {benefit_region}"
     )
 
-    embedding_model = get_embedding_model()
-
     doc_attribs = {
         "dataset": dataset_id,
         "program": benefit_program,
         "region": benefit_region,
     }
     with db.PostgresDBClient().get_session() as db_session:
-        _ingest_cards(db_session, embedding_model, guru_cards_filepath, doc_attribs)
+        _ingest_cards(db_session, guru_cards_filepath, doc_attribs)
         db_session.commit()
 
     logger.info("Finished processing Guru cards.")

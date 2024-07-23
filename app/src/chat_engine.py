@@ -6,7 +6,6 @@ from typing import Sequence
 from src.db.models.document import ChunkWithScore
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
-from src.shared import get_embedding_model
 from src.util.class_utils import all_subclasses
 
 logger = logging.getLogger(__name__)
@@ -53,7 +52,6 @@ class GuruBaseEngine(ChatEngineInterface):
 
     def on_message(self, question: str) -> OnMessageResult:
         chunks_with_scores = retrieve_with_scores(
-            get_embedding_model(),
             question,
             datasets=self.datasets,
         )

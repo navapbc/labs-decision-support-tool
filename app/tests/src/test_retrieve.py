@@ -3,10 +3,7 @@ from sqlalchemy import delete
 
 from src.db.models.document import Document
 from src.retrieve import retrieve_with_scores
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
-
-mock_embedding_model = MockSentenceTransformer()
 
 
 def _create_chunks(document=None):
@@ -33,16 +30,14 @@ def test_retrieve__with_empty_filter(app_config, db_session, enable_factory_crea
     db_session.execute(delete(Document))
     _, medium_chunk, short_chunk = _create_chunks()
 
-    results = retrieve_with_scores(mock_embedding_model, "Very tiny words.", k=2, datasets=[])
+    results = retrieve_with_scores("Very tiny words.", k=2, datasets=[])
 
     assert _format_retrieval_results(results) == [short_chunk, medium_chunk]
 
 
 def test_retrieve__with_unknown_filter(app_config, db_session, enable_factory_create):
     with pytest.raises(ValueError):
-        retrieve_with_scores(
-            mock_embedding_model, "Very tiny words.", k=2, unknown_column=["some value"]
-        )
+        retrieve_with_scores("Very tiny words.", k=2, unknown_column=["some value"])
 
 
 def test_retrieve__with_dataset_filter(app_config, db_session, enable_factory_create):
@@ -53,7 +48,6 @@ def test_retrieve__with_dataset_filter(app_config, db_session, enable_factory_cr
     )
 
     results = retrieve_with_scores(
-        mock_embedding_model,
         "Very tiny words.",
         k=2,
         datasets=["SNAP"],
@@ -69,7 +63,6 @@ def test_retrieve__with_other_filters(app_config, db_session, enable_factory_cre
     )
 
     results = retrieve_with_scores(
-        mock_embedding_model,
         "Very tiny words.",
         k=2,
         programs=["SNAP"],
@@ -82,7 +75,7 @@ def test_retrieve_with_scores(app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
     _, medium_chunk, short_chunk = _create_chunks()
 
-    results = retrieve_with_scores(mock_embedding_model, "Very tiny words.", k=2)
+    results = retrieve_with_scores("Very tiny words.", k=2)
 
     assert len(results) == 2
     assert results[0].chunk == short_chunk

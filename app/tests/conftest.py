@@ -1,4 +1,5 @@
 import logging
+from functools import cached_property
 
 import _pytest.monkeypatch
 import boto3
@@ -110,16 +111,17 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
 def app_config(monkeypatch, db_session):
     class MockAppConfig:
         def db_session(self):
-            print("==============MockAppConfig.db_session")
+            print("\n=====\n=========MockAppConfig.db_session")
             return db_session
 
-        def create_embedding_model(self):
-            print("==============MockAppConfig.create_embedding_model")
+        @cached_property
+        def sentence_transformer(self):
+            print("\n=====\n=========MockAppConfig.sentence_transformer")
             return MockSentenceTransformer()
 
-    app_config = MockAppConfig()
-    monkeypatch.setattr(shared, "get_app_config", lambda: app_config)
-    return app_config
+    mock_app_config = MockAppConfig()
+    monkeypatch.setattr(shared, "get_app_config", lambda: mock_app_config)
+    return mock_app_config
 
 
 ####################

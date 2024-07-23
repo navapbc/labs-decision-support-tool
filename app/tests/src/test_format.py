@@ -3,14 +3,12 @@ from sqlalchemy import delete
 from src.db.models.document import Document
 from src.format import format_guru_cards
 from src.retrieve import retrieve_with_scores
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 from tests.src.test_retrieve import _create_chunks
 
 
 def _get_chunks_with_scores():
-    mock_embedding_model = MockSentenceTransformer()  # TODO: remove
     _create_chunks()
-    return retrieve_with_scores(mock_embedding_model, "Very tiny words.", k=2)
+    return retrieve_with_scores("Very tiny words.", k=2)
 
 
 # def mock_app_config(db_session):
