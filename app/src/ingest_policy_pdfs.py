@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 
 from sentence_transformers import SentenceTransformer
@@ -22,12 +21,10 @@ def _ingest_policy_pdfs(
     doc_attribs: dict[str, str],
 ) -> None:
     file_list = get_files(pdf_file_dir)
-
     for file in file_list:
-        pdf_file_path = os.fsdecode(file)
-        if pdf_file_path.endswith(".pdf"):
+        if file.endswith(".pdf"):
             logger.info(
-                f"Processing pdf file: {pdf_file_path} at {pdf_file_dir} using {embedding_model}, {db_session}, with {doc_attribs}"
+                f"Processing pdf file: {file} at {pdf_file_dir} using {embedding_model}, {db_session}, with {doc_attribs}"
             )
 
 
