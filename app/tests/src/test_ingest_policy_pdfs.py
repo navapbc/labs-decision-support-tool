@@ -11,6 +11,13 @@ from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 
 
 @pytest.fixture
+def policy_local_file():
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        tempfile.NamedTemporaryFile(prefix="policy", suffix=".pdf", dir=tmpdirname, delete=False)
+        yield tmpdirname
+
+
+@pytest.fixture
 def policy_s3_file(mock_s3_bucket_resource):
     mock_s3_bucket_resource.put_object(
         Body=io.BytesIO(b"%PDF-1.4\n%Fake PDF content for testing\n"), Key="policy.pdf"
@@ -26,17 +33,13 @@ doc_attribs = {
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
-def test__ingest_policy_pdfs(caplog, db_session, policy_s3_file, file_location):
+def test__ingest_policy_pdfs(caplog, db_session, policy_s3_file, policy_local_file, file_location):
     db_session.execute(delete(Document))
     mock_embedding = MockSentenceTransformer()
 
     with caplog.at_level(logging.INFO):
         if file_location == "local":
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                tempfile.NamedTemporaryFile(
-                    prefix="policy", suffix=".pdf", dir=tmpdirname, delete=False
-                )
-                _ingest_policy_pdfs(db_session, mock_embedding, tmpdirname, doc_attribs)
+            _ingest_policy_pdfs(db_session, mock_embedding, policy_local_file, doc_attribs)
         else:
             _ingest_policy_pdfs(db_session, mock_embedding, policy_s3_file, doc_attribs)
 
