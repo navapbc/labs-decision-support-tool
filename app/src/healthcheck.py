@@ -57,8 +57,7 @@ async def health(request: Request) -> HealthCheck:
 
     git_sha = os.environ.get("IMAGE_TAG", "")
     build_date = os.environ.get("BUILD_DATE", "")
-
-    service_name = os.environ.get("SERVICE_NAME", "")
+    service_name = os.environ.get("ENVIRONMENT", "")
     hostname = f"{platform.node()} {socket.gethostname()}"
 
     logger.info(f"Healthy {git_sha} built at {build_date}: {service_name} {hostname}")
