@@ -79,6 +79,6 @@ def test_retrieve_with_scores(app_config, db_session, enable_factory_create):
 
     assert len(results) == 2
     assert results[0].chunk == short_chunk
-    assert results[0].score == -0.7071067690849304
+    assert results[0].score == 0.7071067690849304
     assert results[1].chunk == medium_chunk
-    assert results[1].score == -0.25881901383399963
+    assert results[1].score == 0.25881901383399963

@@ -2,7 +2,6 @@ import logging
 from typing import Sequence
 
 from sqlalchemy import select
-from sentence_transformers import util
 
 from src.app_config import app_config
 from src.db.models.document import Chunk, ChunkWithScore, Document
@@ -39,7 +38,9 @@ def retrieve_with_scores(
         ).all()
 
         for chunk, score in chunks_with_scores:
-            dot_score = util.dot_score(chunk.mpnet_embedding, query_embedding).item()
-            logger.info(f"Retrieved: {chunk.document.name!r} with score {-score}, dot score: {dot_score}")
+            # Confirmed that the `max_inner_product` method returns the same score as using sentence_transformers.util.dot_score
+            # used in code at https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-cos-v1
+            logger.info(f"Retrieved: {chunk.document.name!r} with score {-score}")
 
+        # Scores from the DB query are negated, presumably to reverse the default sort order
         return [ChunkWithScore(chunk, -score) for chunk, score in chunks_with_scores]
