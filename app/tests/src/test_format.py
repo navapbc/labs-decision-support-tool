@@ -11,7 +11,7 @@ def _get_chunks_with_scores():
     return retrieve_with_scores("Very tiny words.", k=2)
 
 
-def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
+def test_format_guru_cards_with_score(app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
 
     chunks_with_scores = _get_chunks_with_scores()
