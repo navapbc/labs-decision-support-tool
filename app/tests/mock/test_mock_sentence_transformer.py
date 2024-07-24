@@ -29,14 +29,15 @@ def test_mock_sentence_transformer():
     assert dot_product(medium_text, medium_text) > dot_product(medium_text, short_text)
 
 
-# This test doesn't normally run with the other tests because it requires downloading large embedding models.
-# To run this test, remove the `manual_` prefix so that the function begins with `test_`.
-# Run the test locally: pytest tests/mock/test_mock_sentence_transformer.py --capture=no -k test_sentence_transformer
+# This test is skipped because it requires downloading large embedding models but is good for manual testing.
+# To run this test, comment out the `@pytest.mark.skip ...` line, then run the test locally with:
+# pytest tests/mock/test_mock_sentence_transformer.py --capture=no -k test_sentence_transformer
 # The embedding models will be downloaded automatically to ~/.cache/huggingface/hub, if it does not already exist.
+@pytest.mark.skip(reason="requires downloading large embedding models")
 @pytest.mark.parametrize(
     "embedding_model", ["multi-qa-mpnet-base-cos-v1", "multi-qa-mpnet-base-dot-v1"]
 )
-def manual_test_sentence_transformer(embedding_model):
+def test_sentence_transformer(embedding_model):
     transformer = SentenceTransformer(embedding_model)
     text = "Curiosity inspires creative, innovative communities worldwide."
     embedding = transformer.encode(text)
