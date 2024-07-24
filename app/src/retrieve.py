@@ -2,6 +2,7 @@ import logging
 from typing import Sequence
 
 from sqlalchemy import select
+from sentence_transformers import util
 
 from src.app_config import app_config
 from src.db.models.document import Chunk, ChunkWithScore, Document
@@ -38,6 +39,7 @@ def retrieve_with_scores(
         ).all()
 
         for chunk, score in chunks_with_scores:
-            logger.info(f"Retrieved: {chunk.document.name!r} with score {score}")
+            dot_score = util.dot_score(chunk.mpnet_embedding, query_embedding).item()
+            logger.info(f"Retrieved: {chunk.document.name!r} with score {-score}, dot score: {dot_score}")
 
-        return [ChunkWithScore(chunk, score) for chunk, score in chunks_with_scores]
+        return [ChunkWithScore(chunk, -score) for chunk, score in chunks_with_scores]

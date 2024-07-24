@@ -43,11 +43,12 @@ def manual_test_sentence_transformer(embedding_model):
     print("\n===", embedding_model, len(embedding))
 
     for query in [
+        text,
         "How does curiosity inspire communities?",
         "What's the best pet?",
         "What's the meaning of life?",
     ]:
         query_embedding = transformer.encode(query)
         # Code adapted from https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-cos-v1
-        score = util.dot_score(query_embedding, embedding)[0]
-        print("Score:", score, "for:", query)
+        score = util.dot_score(embedding, query_embedding)
+        print("Score:", score.item(), "for:", query)
