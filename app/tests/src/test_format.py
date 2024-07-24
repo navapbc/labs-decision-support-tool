@@ -3,20 +3,18 @@ from sqlalchemy import delete
 from src.db.models.document import Document
 from src.format import format_guru_cards
 from src.retrieve import retrieve_with_scores
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 from tests.src.test_retrieve import _create_chunks
 
 
-def _get_chunks_with_scores(db_session):
-    db_session.execute(delete(Document))
-    mock_embedding_model = MockSentenceTransformer()
+def _get_chunks_with_scores():
     _create_chunks()
-    return retrieve_with_scores(db_session, mock_embedding_model, "Very tiny words.", k=2)
+    return retrieve_with_scores("Very tiny words.", k=2)
 
 
-def test_format_guru_cards_with_score(db_session, enable_factory_create):
+def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
-    chunks_with_scores = _get_chunks_with_scores(db_session)
+
+    chunks_with_scores = _get_chunks_with_scores()
     html = format_guru_cards(chunks_with_scores)
     assert "accordion-1" in html
     assert "Related Guru cards" in html
