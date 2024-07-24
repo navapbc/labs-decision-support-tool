@@ -8,7 +8,7 @@ import pytest
 
 import src.adapters.db as db
 import tests.src.db.models.factories as factories
-from src import shared
+
 from src.db import models
 from src.util.local import load_local_env_vars
 from tests.lib import db_testing
@@ -120,9 +120,12 @@ def app_config(monkeypatch, db_session):
             return MockSentenceTransformer()
 
     mock_app_config = MockAppConfig()
-    print("\n=====\n=========mock_app_config", monkeypatch)
+    print("\n=====\n=========mock_app_config", monkeypatch, mock_app_config.db_session())
     # input("Press Enter app_config...")
-    monkeypatch.setattr(shared, "get_app_config", lambda: mock_app_config)
+    # monkeypatch.setattr(shared, "get_app_config", lambda: mock_app_config)
+    # monkeypatch.setattr("src.shared.get_app_config", lambda: mock_app_config)
+    monkeypatch.setattr("src.app_config.AppConfig.db_session", mock_app_config.db_session)
+    monkeypatch.setattr("src.app_config.AppConfig.sentence_transformer", mock_app_config.sentence_transformer)
     return mock_app_config
 
 

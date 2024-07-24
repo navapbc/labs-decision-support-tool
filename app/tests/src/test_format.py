@@ -20,9 +20,9 @@ def _get_chunks_with_scores():
 
 
 def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
-    print("\n=====\n=========test_format_guru_cards_with_score", monkeypatch)
+    print("\n=====\n=========test_format_guru_cards_with_score", monkeypatch, app_config.db_session())
     db_session.execute(delete(Document))
-    # monkeypatch.setattr(shared, "get_app_config", mock_app_config(db_session)) # TODO: get app_config from conftest.py and/or set db_session in shared.app_config
+
     chunks_with_scores = _get_chunks_with_scores()
     html = format_guru_cards(chunks_with_scores)
     assert "accordion-1" in html
