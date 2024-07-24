@@ -5,7 +5,7 @@ import sys
 from smart_open import open
 
 import src.adapters.db as db
-from src.app_config import get_app_config
+from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.html import get_text_from_html
 
@@ -38,7 +38,7 @@ def _ingest_cards(
         document = Document(name=name, content=content, **doc_attribs)
         db_session.add(document)
 
-        embedding_model = get_app_config().sentence_transformer
+        embedding_model = app_config.sentence_transformer
         tokens = len(embedding_model.tokenizer.tokenize(content))
         mpnet_embedding = embedding_model.encode(content, show_progress_bar=False)
         chunk = Chunk(
@@ -75,7 +75,7 @@ def main() -> None:
         "program": benefit_program,
         "region": benefit_region,
     }
-    with get_app_config().db_session() as db_session:
+    with app_config.db_session() as db_session:
         _ingest_cards(db_session, guru_cards_filepath, doc_attribs)
         db_session.commit()
 

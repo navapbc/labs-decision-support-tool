@@ -8,9 +8,7 @@ Attributes:
 For more information, see https://docs.gunicorn.org/en/stable/configure.html
 """
 
-from src.app_config import get_app_config
-
-app_config = get_app_config()
+from src.app_config import app_config
 
 # Since the `-b 0.0.0.0:8000` argument is used when running in the Docker environment,
 # this bind variable is only used when not using Docker
