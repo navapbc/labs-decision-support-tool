@@ -153,6 +153,7 @@ module "service" {
   extra_environment_variables = merge({
     FEATURE_FLAGS_PROJECT = module.feature_flags.evidently_project_name
     BUCKET_NAME           = local.storage_config.bucket_name
+    ENVIRONMENT           = var.environment_name
   }, local.service_config.extra_environment_variables)
 
   secrets = [
