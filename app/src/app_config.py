@@ -20,7 +20,7 @@ class AppConfig(PydanticBaseEnvConfig):
     # To customize these values in deployed environments, set
     # them in infra/app/app-config/env-config/environment-variables.tf
 
-    embedding_model: str = "multi-qa-mpnet-base-dot-v1"
+    embedding_model: str = "multi-qa-mpnet-base-cos-v1"
     global_password: str | None = None
     host: str = "127.0.0.1"
     port: int = 8080
