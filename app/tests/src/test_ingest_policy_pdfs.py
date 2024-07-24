@@ -7,7 +7,6 @@ from sqlalchemy import delete
 
 from src.db.models.document import Document
 from src.ingest_policy_pdfs import _ingest_policy_pdfs
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 
 
 @pytest.fixture
@@ -33,14 +32,15 @@ doc_attribs = {
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
-def test__ingest_policy_pdfs(caplog, db_session, policy_s3_file, policy_local_file, file_location):
+def test__ingest_policy_pdfs(
+    caplog, app_config, db_session, policy_s3_file, policy_local_file, file_location
+):
     db_session.execute(delete(Document))
-    mock_embedding = MockSentenceTransformer()
 
     with caplog.at_level(logging.INFO):
         if file_location == "local":
-            _ingest_policy_pdfs(db_session, mock_embedding, policy_local_file, doc_attribs)
+            _ingest_policy_pdfs(db_session, policy_local_file, doc_attribs)
         else:
-            _ingest_policy_pdfs(db_session, mock_embedding, policy_s3_file, doc_attribs)
+            _ingest_policy_pdfs(db_session, policy_s3_file, doc_attribs)
 
         assert any(text.startswith("Processing pdf file:") for text in caplog.messages)

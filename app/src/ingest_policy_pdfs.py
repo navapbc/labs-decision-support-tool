@@ -1,10 +1,8 @@
 import logging
 import sys
 
-from sentence_transformers import SentenceTransformer
-
 import src.adapters.db as db
-from src.shared import get_embedding_model
+from src.app_config import app_config
 from src.util.file_util import get_files
 
 logger = logging.getLogger(__name__)
@@ -16,11 +14,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def _ingest_policy_pdfs(
     db_session: db.Session,
-    embedding_model: SentenceTransformer,
     pdf_file_dir: str,
     doc_attribs: dict[str, str],
 ) -> None:
     file_list = get_files(pdf_file_dir)
+    embedding_model = app_config.sentence_transformer
     for file in file_list:
         if file.endswith(".pdf"):
             logger.info(
@@ -46,15 +44,14 @@ def main() -> None:
         f"Processing pdf files {dataset_id} at {pdf_file_dir} for {benefit_program} in {benefit_region}"
     )
 
-    embedding_model = get_embedding_model()
-
     doc_attribs = {
         "dataset": dataset_id,
         "program": benefit_program,
         "region": benefit_region,
     }
-    with db.PostgresDBClient().get_session() as db_session:
-        _ingest_policy_pdfs(db_session, embedding_model, pdf_file_dir, doc_attribs)
+
+    with app_config.db_session() as db_session:
+        _ingest_policy_pdfs(db_session, pdf_file_dir, doc_attribs)
         db_session.commit()
 
     logger.info("Finished processing PDFs.")
