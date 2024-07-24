@@ -1,4 +1,5 @@
 import logging
+from functools import cached_property
 
 import _pytest.monkeypatch
 import boto3
@@ -7,9 +8,11 @@ import pytest
 
 import src.adapters.db as db
 import tests.src.db.models.factories as factories
+from src.app_config import AppConfig
 from src.db import models
 from src.util.local import load_local_env_vars
 from tests.lib import db_testing
+from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +105,22 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
     """
     monkeypatch.setattr(factories, "_db_session", db_session)
     return db_session
+
+
+@pytest.fixture
+def app_config(monkeypatch, db_session):
+    class MockAppConfig:
+        def db_session(self):
+            return db_session
+
+        @cached_property
+        def sentence_transformer(self):
+            return MockSentenceTransformer()
+
+    mock_app_config = MockAppConfig()
+    monkeypatch.setattr(AppConfig, "db_session", mock_app_config.db_session)
+    monkeypatch.setattr(AppConfig, "sentence_transformer", mock_app_config.sentence_transformer)
+    return mock_app_config
 
 
 ####################
