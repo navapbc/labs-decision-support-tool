@@ -22,11 +22,6 @@ on:
           - dev
           - staging
           - prod
-      build_date:
-        description: "date of build"
-        required: true
-        default: timestamp()
-        type: string
 
 jobs:
   deploy:
@@ -35,4 +30,3 @@ jobs:
     with:
       app_name: "app"
       environment: ${{ inputs.environment || 'dev' }}
-      build_date: ${{ inputs.build_date }}

@@ -11,10 +11,6 @@ on:
         description: "the name of the application environment (e.g. dev, staging, prod)"
         required: true
         type: string
-      build_date:
-        description: "the date the application is deployed"
-        required: true
-        type: string
 
 concurrency: cd-${{inputs.app_name}}-${{ inputs.environment }}
 
@@ -46,5 +42,8 @@ jobs:
           app_name: ${{ inputs.app_name }}
           environment: ${{ inputs.environment }}
 
+      - name: Set current timestamp as env variable
+        run: echo "BUILD_DATE=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
+
       - name: Deploy release
-        run: make release-deploy APP_NAME=${{ inputs.app_name }} ENVIRONMENT=${{ inputs.environment }} BUILD_DATE=${{ inputs.build_date }}
+        run: make release-deploy APP_NAME=${{ inputs.app_name }} ENVIRONMENT=${{ inputs.environment }}
