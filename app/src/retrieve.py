@@ -3,8 +3,8 @@ from typing import Sequence
 
 from sqlalchemy import select
 
+from src.app_config import get_app_config
 from src.db.models.document import Chunk, ChunkWithScore, Document
-from src.shared import get_app_config
 
 logger = logging.getLogger(__name__)
 

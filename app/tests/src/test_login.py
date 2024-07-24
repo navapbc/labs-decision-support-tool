@@ -1,7 +1,7 @@
 import os
 
 import chainlit.config
-import src.shared
+from src.app_config import get_app_config
 from src.login import login_callback, require_login
 
 
@@ -10,7 +10,7 @@ def test_require_login_no_password(monkeypatch):
         monkeypatch.delenv("GLOBAL_PASSWORD")
 
     # Rebuild AppConfig with new environment variables
-    src.shared.get_app_config.cache_clear()
+    get_app_config.cache_clear()
 
     require_login()
 
@@ -19,7 +19,7 @@ def test_require_login_no_password(monkeypatch):
 
 def test_require_login_with_password(monkeypatch):
     monkeypatch.setenv("GLOBAL_PASSWORD", "password")
-    src.shared.get_app_config.cache_clear()
+    get_app_config.cache_clear()
 
     require_login()
 
@@ -28,7 +28,7 @@ def test_require_login_with_password(monkeypatch):
 
 def test_login_callback(monkeypatch):
     monkeypatch.setenv("GLOBAL_PASSWORD", "correct pass")
-    src.shared.get_app_config.cache_clear()
+    get_app_config.cache_clear()
 
     assert login_callback("some user", "wrong pass") is None
     assert login_callback("some user", "correct pass").identifier == "some user"

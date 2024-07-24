@@ -1,4 +1,4 @@
-from functools import cached_property
+from functools import cache, cached_property
 
 from sentence_transformers import SentenceTransformer
 
@@ -7,6 +7,7 @@ from src.util.env_config import PydanticBaseEnvConfig
 
 
 class AppConfig(PydanticBaseEnvConfig):
+    # Do not instantiate this class directly. Use get_app_config() instead.
     # These are default configuration values for the app, and
     # are shared across both local and deployed environments.
 
@@ -31,3 +32,8 @@ class AppConfig(PydanticBaseEnvConfig):
     @cached_property
     def sentence_transformer(self) -> SentenceTransformer:
         return SentenceTransformer(self.embedding_model)
+
+
+@cache
+def get_app_config() -> AppConfig:
+    return AppConfig()

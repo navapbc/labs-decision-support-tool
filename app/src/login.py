@@ -1,5 +1,5 @@
 import chainlit as cl
-from src.shared import get_app_config
+from src.app_config import get_app_config
 
 
 def login_callback(username: str, password: str) -> cl.User | None:

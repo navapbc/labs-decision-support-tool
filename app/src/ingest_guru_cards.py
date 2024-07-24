@@ -5,8 +5,8 @@ import sys
 from smart_open import open
 
 import src.adapters.db as db
+from src.app_config import get_app_config
 from src.db.models.document import Chunk, Document
-from src.shared import get_app_config
 from src.util.html import get_text_from_html
 
 logger = logging.getLogger(__name__)
