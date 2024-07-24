@@ -3,11 +3,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Sequence
 
-import src.adapters.db as db
 from src.db.models.document import ChunkWithScore
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
-from src.shared import get_embedding_model
 from src.util.class_utils import all_subclasses
 
 logger = logging.getLogger(__name__)
@@ -53,13 +51,10 @@ class GuruBaseEngine(ChatEngineInterface):
     datasets: list[str] = []
 
     def on_message(self, question: str) -> OnMessageResult:
-        with db.PostgresDBClient().get_session() as db_session:
-            chunks_with_scores = retrieve_with_scores(
-                db_session,
-                get_embedding_model(),
-                question,
-                datasets=self.datasets,
-            )
+        chunks_with_scores = retrieve_with_scores(
+            question,
+            datasets=self.datasets,
+        )
 
         response = generate(question, context=chunks_with_scores)
         return OnMessageResult(response, chunks_with_scores)

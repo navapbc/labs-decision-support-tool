@@ -1,7 +1,13 @@
+from functools import cached_property
+
+from sentence_transformers import SentenceTransformer
+
+import src.adapters.db as db
 from src.util.env_config import PydanticBaseEnvConfig
 
 
 class AppConfig(PydanticBaseEnvConfig):
+    # Do not instantiate this class directly. Use app_config instead.
     # These are default configuration values for the app, and
     # are shared across both local and deployed environments.
 
@@ -19,3 +25,13 @@ class AppConfig(PydanticBaseEnvConfig):
     host: str = "127.0.0.1"
     port: int = 8080
     chat_engine: str = "guru-snap"
+
+    def db_session(self) -> db.Session:
+        return db.PostgresDBClient().get_session()
+
+    @cached_property
+    def sentence_transformer(self) -> SentenceTransformer:
+        return SentenceTransformer(self.embedding_model)
+
+
+app_config = AppConfig()
