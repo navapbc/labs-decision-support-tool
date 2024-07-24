@@ -11,16 +11,7 @@ def _get_chunks_with_scores():
     return retrieve_with_scores("Very tiny words.", k=2)
 
 
-# def mock_app_config(db_session):
-#     class MockAppConfig:
-#         def db_session(self):
-#             print("==============MockAppConfig.db_session")
-#             return db_session
-#     return lambda: MockAppConfig()
-
-
 def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
-    print("\n=====\n=========test_format_guru_cards_with_score", monkeypatch, app_config.db_session())
     db_session.execute(delete(Document))
 
     chunks_with_scores = _get_chunks_with_scores()

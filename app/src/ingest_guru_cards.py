@@ -5,8 +5,8 @@ import sys
 from smart_open import open
 
 import src.adapters.db as db
-from src.shared import get_app_config
 from src.db.models.document import Chunk, Document
+from src.shared import get_app_config
 from src.util.html import get_text_from_html
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ def main() -> None:
         "program": benefit_program,
         "region": benefit_region,
     }
-    with db.PostgresDBClient().get_session() as db_session:
+    with get_app_config().db_session() as db_session:
         _ingest_cards(db_session, guru_cards_filepath, doc_attribs)
         db_session.commit()
 
