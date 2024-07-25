@@ -38,6 +38,9 @@ def retrieve_with_scores(
         ).all()
 
         for chunk, score in chunks_with_scores:
-            logger.info(f"Retrieved: {chunk.document.name!r} with score {score}")
+            # Confirmed that the `max_inner_product` method returns the same score as using sentence_transformers.util.dot_score
+            # used in code at https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-cos-v1
+            logger.info(f"Retrieved: {chunk.document.name!r} with score {-score}")
 
-        return [ChunkWithScore(chunk, score) for chunk, score in chunks_with_scores]
+        # Scores from the DB query are negated, presumably to reverse the default sort order
+        return [ChunkWithScore(chunk, -score) for chunk, score in chunks_with_scores]
