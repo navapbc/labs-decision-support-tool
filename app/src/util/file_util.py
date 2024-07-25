@@ -35,8 +35,7 @@ def get_file_name(path: str) -> str:
 
 
 def get_files(path: str) -> list[str]:
-    # Return a list of paths to all files in a directory,
-    # whether on local disk or on S3
+    """Return a list of paths to all files in a directory, whether on local disk or on S3"""
     if is_s3_path(path):
         bucket_name, prefix = split_s3_url(path)
         s3 = boto3.resource("s3")
