@@ -4,6 +4,7 @@ import sys
 import src.adapters.db as db
 from src.app_config import app_config
 from src.util.file_util import get_files
+from src.util.ingest_utils import process_and_ingest_sys_args
 
 logger = logging.getLogger(__name__)
 
@@ -34,24 +35,4 @@ def main() -> None:
         )
         return
 
-    # TODO: improve command-line argument handling using getopt module
-    dataset_id = sys.argv[1]
-    benefit_program = sys.argv[2]
-    benefit_region = sys.argv[3]
-    pdf_file_dir = sys.argv[4]
-
-    logger.info(
-        f"Processing pdf files {dataset_id} at {pdf_file_dir} for {benefit_program} in {benefit_region}"
-    )
-
-    doc_attribs = {
-        "dataset": dataset_id,
-        "program": benefit_program,
-        "region": benefit_region,
-    }
-
-    with app_config.db_session() as db_session:
-        _ingest_policy_pdfs(db_session, pdf_file_dir, doc_attribs)
-        db_session.commit()
-
-    logger.info("Finished processing PDFs.")
+    process_and_ingest_sys_args(sys, logger, _ingest_policy_pdfs)
