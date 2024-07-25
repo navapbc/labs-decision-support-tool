@@ -1,7 +1,8 @@
 from functools import cached_property
 
-import src.adapters.db as db
 from sentence_transformers import SentenceTransformer
+
+import src.adapters.db as db
 from src.util.env_config import PydanticBaseEnvConfig
 
 
