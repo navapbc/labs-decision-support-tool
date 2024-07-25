@@ -101,7 +101,7 @@ RUN poetry install --no-root --only main
 # include section in pyproject.toml. Also note that if you change the name or
 # version section in pyproject.toml, you will need to change the dist/... to match
 # or the application will not build
-RUN poetry build --format wheel && poetry run pip install 'dist/decision_support_tool-0.1.0-py3-none-any.whl' BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+RUN poetry build --format wheel && poetry run pip install 'dist/decision_support_tool-0.1.0-py3-none-any.whl'
 
 # Add project's virtual env to the PATH so we can directly run poetry scripts
 # defined in pyproject.toml
@@ -111,7 +111,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 # to the Docker container that it's running in.
 ENV HOST=0.0.0.0
 
-ENV BUILD_DATE="$BUILD_DATE"
+ENV BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
 USER ${RUN_USER}
 
