@@ -1,6 +1,3 @@
-import pytest
-from sentence_transformers import SentenceTransformer, util
-
 from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 
 
@@ -27,29 +24,3 @@ def test_mock_sentence_transformer():
     assert dot_product(long_text, long_text) > dot_product(long_text, medium_text)
     assert dot_product(long_text, medium_text) > dot_product(long_text, short_text)
     assert dot_product(medium_text, medium_text) > dot_product(medium_text, short_text)
-
-
-# This test is skipped because it requires downloading large embedding models but is good for manual testing.
-# To run this test, comment out the `@pytest.mark.skip ...` line, then run the test locally with:
-# pytest tests/mock/test_mock_sentence_transformer.py --capture=no -k test_sentence_transformer
-# The embedding models will be downloaded automatically to ~/.cache/huggingface/hub, if it does not already exist.
-@pytest.mark.skip(reason="requires downloading large embedding models")
-@pytest.mark.parametrize(
-    "embedding_model", ["multi-qa-mpnet-base-cos-v1", "multi-qa-mpnet-base-dot-v1"]
-)
-def test_sentence_transformer(embedding_model):
-    transformer = SentenceTransformer(embedding_model)
-    text = "Curiosity inspires creative, innovative communities worldwide."
-    embedding = transformer.encode(text)
-    print("\n===", embedding_model, len(embedding))
-
-    for query in [
-        text,
-        "How does curiosity inspire communities?",
-        "What's the best pet?",
-        "What's the meaning of life?",
-    ]:
-        query_embedding = transformer.encode(query)
-        # Code adapted from https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-cos-v1
-        score = util.dot_score(embedding, query_embedding)
-        print("Score:", score.item(), "for:", query)
