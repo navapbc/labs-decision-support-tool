@@ -111,7 +111,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 # to the Docker container that it's running in.
 ENV HOST=0.0.0.0
 
-ENV BUILD_DATE=${BUILD_DATE}
+ENV BUILD_DATE="$BUILD_DATE"
 
 USER ${RUN_USER}
 

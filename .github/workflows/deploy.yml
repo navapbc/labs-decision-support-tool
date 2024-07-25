@@ -42,10 +42,5 @@ jobs:
           app_name: ${{ inputs.app_name }}
           environment: ${{ inputs.environment }}
 
-      - name: Set current timestamp as env variable
-        run: |
-          echo "BUILD_DATE=$(%Y-%m-%dT%H:%M:%S)" >> "$GITHUB_ENV"
-          echo ${{ env.BUILD_DATE }}
-
       - name: Deploy release
         run: make release-deploy APP_NAME=${{ inputs.app_name }} ENVIRONMENT=${{ inputs.environment }}
