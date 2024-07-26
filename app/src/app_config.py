@@ -1,4 +1,6 @@
+import types
 from functools import cached_property
+from typing import Any
 
 from sentence_transformers import SentenceTransformer
 
@@ -43,4 +45,31 @@ class AppConfig(PydanticBaseEnvConfig):
         return SentenceTransformer(self.embedding_model)
 
 
-app_config = AppConfig()
+class DynamicAppConfig:
+    """
+    This class is needed as a wrapper around AppConfig to support dynamically changing
+    or reloading configuration values for unit testing, while still allowing cleaner calls
+    like `app_config.retrieval_k` (as opposed to `app_config().retrieval_k`).
+    """
+    def __init__(self) -> None:
+        self.reinit()
+
+    def reinit(self, new_config: AppConfig | None = None) -> None:
+        self.app_config = new_config if new_config else AppConfig()
+
+    def __getattr__(self, name: str) -> Any:
+        attrib = getattr(self.app_config, name)
+
+        if not hasattr(self.app_config, name):
+            raise AttributeError(f"No such field/method: {name}")
+
+        if isinstance(attrib, types.MethodType):
+            def func_wrapper(*args: Any, **kwargs: dict[str, Any]) -> Any:
+                return attrib(*args, **kwargs)
+            return func_wrapper
+
+        return attrib
+
+
+app_config = DynamicAppConfig()
+

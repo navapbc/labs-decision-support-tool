@@ -1,5 +1,4 @@
 import logging
-from unittest.mock import patch
 
 import _pytest.monkeypatch
 import boto3
@@ -113,9 +112,9 @@ def app_config(monkeypatch, db_session):
     monkeypatch.setattr(AppConfig, "db_session", lambda _self: db_session)
     monkeypatch.setattr(AppConfig, "sentence_transformer", MockSentenceTransformer())
 
-    with patch("src.app_config.app_config.retrieval_k_min_score", 0.0):
-        with patch("src.app_config.app_config.docs_shown_min_score", 0.0):
-            yield src_app_config.app_config
+    monkeypatch.setenv("RETRIEVAL_K_MIN_SCORE", "0.0")
+    src_app_config.app_config.reinit()
+    return src_app_config.app_config
 
 
 ####################

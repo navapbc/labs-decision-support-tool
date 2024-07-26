@@ -19,8 +19,11 @@ def _unique_accordion_ids(html):
     )
 
 
-def test_format_guru_cards_with_score(app_config, db_session, enable_factory_create):
+def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
+
+    monkeypatch.setenv("DOCS_SHOWN_MIN_SCORE", "0.0")
+    app_config.reinit()
 
     chunks_with_scores = _get_chunks_with_scores()
     html = format_guru_cards(chunks_with_scores)
