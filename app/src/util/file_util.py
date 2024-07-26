@@ -34,6 +34,18 @@ def get_file_name(path: str) -> str:
     return os.path.basename(path)
 
 
+def get_files(path: str) -> list[str]:
+    """Return a list of paths to all files in a directory, whether on local disk or on S3"""
+    if is_s3_path(path):
+        bucket_name, prefix = split_s3_url(path)
+        s3 = boto3.resource("s3")
+        bucket = s3.Bucket(bucket_name)
+        files = [f"s3://{bucket_name}/{obj.key}" for obj in bucket.objects.filter(Prefix=prefix)]
+        return files
+
+    return [str(file) for file in PosixPath(path).rglob("*") if file.is_file()]
+
+
 ##################################
 # S3 Utilities
 ##################################

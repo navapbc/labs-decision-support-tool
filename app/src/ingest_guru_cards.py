@@ -8,6 +8,7 @@ import src.adapters.db as db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.html import get_text_from_html
+from src.util.ingest_utils import process_and_ingest_sys_args
 
 logger = logging.getLogger(__name__)
 
@@ -60,23 +61,4 @@ def main() -> None:
         )
         return
 
-    # TODO: improve command-line argument handling using getopt module
-    dataset_id = sys.argv[1]
-    benefit_program = sys.argv[2]
-    benefit_region = sys.argv[3]
-    guru_cards_filepath = sys.argv[4]
-
-    logger.info(
-        f"Processing Guru cards {dataset_id} at {guru_cards_filepath} for {benefit_program} in {benefit_region}"
-    )
-
-    doc_attribs = {
-        "dataset": dataset_id,
-        "program": benefit_program,
-        "region": benefit_region,
-    }
-    with app_config.db_session() as db_session:
-        _ingest_cards(db_session, guru_cards_filepath, doc_attribs)
-        db_session.commit()
-
-    logger.info("Finished processing Guru cards.")
+    process_and_ingest_sys_args(sys, logger, _ingest_cards)
