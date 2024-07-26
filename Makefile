@@ -202,8 +202,7 @@ release-run-database-migrations: ## Run $APP_NAME's database migrations in $ENVI
 release-deploy: ## Deploy release to $APP_NAME's web service in $ENVIRONMENT
 	@:$(call check_defined, APP_NAME, the name of subdirectory of /infra that holds the application's infrastructure code)
 	@:$(call check_defined, ENVIRONMENT, the name of the application environment e.g. "prod" or "dev")
-	@:$(call check_defined, DATE, the date the application is deployed")
-	./bin/deploy-release $(APP_NAME) $(IMAGE_TAG) $(ENVIRONMENT) $(DATE)
+	./bin/deploy-release $(APP_NAME) $(IMAGE_TAG) $(ENVIRONMENT)
 
 release-image-name: ## Prints the image name of the release image
 	@:$(call check_defined, APP_NAME, the name of subdirectory of /infra that holds the application's infrastructure code)
@@ -223,7 +222,6 @@ help: ## Prints the help documentation and info about each command
 	column -t -s "$$(printf '\t')"
 	@echo ""
 	@echo "APP_NAME=$(APP_NAME)"
-	@echo "BUILD_DATE=$(DATE)"
 	@echo "ENVIRONMENT=$(ENVIRONMENT)"
 	@echo "IMAGE_NAME=$(IMAGE_NAME)"
 	@echo "IMAGE_TAG=$(IMAGE_TAG)"
