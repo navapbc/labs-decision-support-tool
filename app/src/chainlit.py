@@ -3,7 +3,7 @@ from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
 from src import chat_engine
-from src.app_config import app_config
+from src.app_config import UserConfig, app_config
 from src.format import format_guru_cards
 from src.login import require_login
 
@@ -14,6 +14,18 @@ require_login()
 
 @cl.on_chat_start
 async def start() -> None:
+    await _init_user_config()
+
+    await _init_chat_engine()
+
+
+async def _init_user_config() -> None:
+    user_config = app_config.create_user_config()
+    cl.user_session.set("user_config", user_config)
+    # TODO: Add settings to UI
+
+
+async def _init_chat_engine() -> None:
     engine_id = engine_url_query_value()
     logger.info("Engine ID: %s", engine_id)
     engine = chat_engine.create_engine(engine_id)
@@ -48,9 +60,10 @@ async def on_message(message: cl.Message) -> None:
     logger.info("Received: %r", message.content)
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+    user_config: UserConfig = cl.user_session.get("user_config")
     try:
-        result = engine.on_message(question=message.content)
-        msg_content = result.response + format_guru_cards(result.chunks_with_scores)
+        result = engine.on_message(user_config, question=message.content)
+        msg_content = result.response + format_guru_cards(user_config, result.chunks_with_scores)
         chunk_titles_and_scores: dict[str, float] = {}
         for chunk_with_score in result.chunks_with_scores:
             title = chunk_with_score.chunk.document.name

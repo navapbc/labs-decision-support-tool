@@ -2,7 +2,7 @@ import logging
 import random
 from typing import Sequence
 
-from src.app_config import app_config
+from src.app_config import UserConfig
 from src.db.models.document import ChunkWithScore
 
 logger = logging.getLogger(__name__)
@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 _accordion_id = random.randint(0, 1000000)
 
 
-def format_guru_cards(chunks_with_scores: Sequence[ChunkWithScore]) -> str:
+def format_guru_cards(user_config: UserConfig, chunks_with_scores: Sequence[ChunkWithScore]) -> str:
     cards_html = ""
-    for chunk_with_score in chunks_with_scores[: app_config.docs_shown_max_num]:
-        if chunk_with_score.score < app_config.docs_shown_min_score:
+    for chunk_with_score in chunks_with_scores[: user_config.docs_shown_max_num]:
+        if chunk_with_score.score < user_config.docs_shown_min_score:
             logger.info(
-                "Skipping remaining chunks with score less than %f", app_config.docs_shown_min_score
+                "Skipping remaining chunks with score less than %f",
+                user_config.docs_shown_min_score,
             )
             break
 

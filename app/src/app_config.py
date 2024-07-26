@@ -1,4 +1,5 @@
 import types
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Any
 
@@ -45,12 +46,31 @@ class AppConfig(PydanticBaseEnvConfig):
         return SentenceTransformer(self.embedding_model)
 
 
+@dataclass
+class UserConfig:
+    """
+    Similar to AppConfig, but for user-changeable configurations.
+    If created using `UserConfig(app_config.model_dump())` or `app_config.create_user_config()`,
+    then app_config's configurations are set as default values.
+    """
+
+    retrieval_k: int
+    retrieval_k_min_score: float
+    docs_shown_max_num: int
+    docs_shown_min_score: float
+
+    def __init__(self, model_dump: dict[str, Any]) -> None:
+        for key, value in model_dump.items():
+            setattr(self, key, value)
+
+
 class DynamicAppConfig:
     """
     This class is needed as a wrapper around AppConfig to support dynamically changing
     or reloading configuration values for unit testing, while still allowing cleaner calls
     like `app_config.retrieval_k` (as opposed to `app_config().retrieval_k`).
     """
+
     def __init__(self) -> None:
         self.reinit()
 
@@ -64,12 +84,21 @@ class DynamicAppConfig:
             raise AttributeError(f"No such field/method: {name}")
 
         if isinstance(attrib, types.MethodType):
+
             def func_wrapper(*args: Any, **kwargs: dict[str, Any]) -> Any:
                 return attrib(*args, **kwargs)
+
             return func_wrapper
 
         return attrib
 
+    def create_user_config(self, **kwargs: dict[str, Any]) -> UserConfig:
+        user_config = UserConfig(self.app_config.model_dump())
+        for key, value in kwargs.items():
+            setattr(user_config, key, value)
+        return user_config
+
 
 app_config = DynamicAppConfig()
+
 

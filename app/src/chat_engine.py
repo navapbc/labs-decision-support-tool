@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Sequence
 
+from src.app_config import UserConfig
 from src.db.models.document import ChunkWithScore
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
@@ -22,7 +23,7 @@ class ChatEngineInterface(ABC):
     name: str
 
     @abstractmethod
-    def on_message(self, question: str) -> OnMessageResult:
+    def on_message(self, user_config: UserConfig, question: str) -> OnMessageResult:
         pass
 
 
@@ -50,11 +51,8 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 class GuruBaseEngine(ChatEngineInterface):
     datasets: list[str] = []
 
-    def on_message(self, question: str) -> OnMessageResult:
-        chunks_with_scores = retrieve_with_scores(
-            question,
-            datasets=self.datasets,
-        )
+    def on_message(self, user_config: UserConfig, question: str) -> OnMessageResult:
+        chunks_with_scores = retrieve_with_scores(question, user_config, datasets=self.datasets)
 
         response = generate(question, context=chunks_with_scores)
         return OnMessageResult(response, chunks_with_scores)
@@ -76,7 +74,7 @@ class PolicyMichiganEngine(ChatEngineInterface):
     engine_id: str = "policy-mi"
     name: str = "Michigan Bridges Policy Manual Chat Engine"
 
-    def on_message(self, question: str) -> OnMessageResult:
+    def on_message(self, user_config: UserConfig, question: str) -> OnMessageResult:
         logger.warning("TODO: Retrieve from MI Policy Manual")
         chunks: Sequence[ChunkWithScore] = []
         response = "TEMP: Replace with generated response once chunks are correct"

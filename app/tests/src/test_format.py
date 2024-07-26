@@ -2,15 +2,16 @@ import re
 
 from sqlalchemy import delete
 
+from src.app_config import app_config
 from src.db.models.document import Document
 from src.format import format_guru_cards
 from src.retrieve import retrieve_with_scores
 from tests.src.test_retrieve import _create_chunks
 
 
-def _get_chunks_with_scores():
+def _get_chunks_with_scores(user_config):
     _create_chunks()
-    return retrieve_with_scores("Very tiny words.", k=2)
+    return retrieve_with_scores("Very tiny words.", user_config)
 
 
 def _unique_accordion_ids(html):
@@ -24,9 +25,10 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
     monkeypatch.setenv("DOCS_SHOWN_MIN_SCORE", "0.0")
     app_config.reinit()
+    user_config = app_config.create_user_config(retrieval_k=2)
 
-    chunks_with_scores = _get_chunks_with_scores()
-    html = format_guru_cards(chunks_with_scores)
+    chunks_with_scores = _get_chunks_with_scores(user_config)
+    html = format_guru_cards(user_config, chunks_with_scores)
     assert len(_unique_accordion_ids(html)) == len(chunks_with_scores)
     assert "Related Guru cards" in html
     assert chunks_with_scores[0].chunk.document.name in html
@@ -36,5 +38,5 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
     assert "Similarity Score" in html
 
     # Check that a second call doesn't re-use the IDs
-    next_html = format_guru_cards(chunks_with_scores)
+    next_html = format_guru_cards(user_config, chunks_with_scores)
     assert len(_unique_accordion_ids(html + next_html)) == 2 * len(chunks_with_scores)
