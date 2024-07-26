@@ -1,4 +1,5 @@
 import logging
+from unittest.mock import patch
 
 import _pytest.monkeypatch
 import boto3
@@ -111,9 +112,10 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
 def app_config(monkeypatch, db_session):
     monkeypatch.setattr(AppConfig, "db_session", lambda _self: db_session)
     monkeypatch.setattr(AppConfig, "sentence_transformer", MockSentenceTransformer())
-    src_app_config.app_config.retrieval_k_min_score = 0.0
-    src_app_config.app_config.docs_shown_min_score = 0.0
-    return src_app_config.app_config
+
+    with patch("src.app_config.app_config.retrieval_k_min_score", 0.0):
+        with patch("src.app_config.app_config.docs_shown_min_score", 0.0):
+            yield src_app_config.app_config
 
 
 ####################
