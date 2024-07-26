@@ -7,6 +7,7 @@ import pytest
 
 import src.adapters.db as db
 import tests.src.db.models.factories as factories
+from src import app_config as src_app_config
 from src.app_config import AppConfig
 from src.db import models
 from src.util.local import load_local_env_vars
@@ -110,6 +111,9 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
 def app_config(monkeypatch, db_session):
     monkeypatch.setattr(AppConfig, "db_session", lambda _self: db_session)
     monkeypatch.setattr(AppConfig, "sentence_transformer", MockSentenceTransformer())
+    src_app_config.app_config.retrieval_k_min_score = 0.0
+    src_app_config.app_config.docs_shown_min_score = 0.0
+    return src_app_config.app_config
 
 
 ####################

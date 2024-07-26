@@ -1,18 +1,25 @@
-import time
+import logging
+import random
 from typing import Sequence
 
 from src.app_config import app_config
 from src.db.models.document import ChunkWithScore
 
+logger = logging.getLogger(__name__)
+
 # We need a unique identifier for each accordion,
-# even across multiple calls to this function
-_accordion_id = int(time.time())
+# even across multiple calls to this function.
+# Choose a random number to avoid id collisions when hotloading the app during development.
+_accordion_id = random.randint(0, 1000000)
 
 
 def format_guru_cards(chunks_with_scores: Sequence[ChunkWithScore]) -> str:
     cards_html = ""
     for chunk_with_score in chunks_with_scores[: app_config.docs_shown_max_num]:
         if chunk_with_score.score < app_config.docs_shown_min_score:
+            logger.info(
+                "Skipping remaining chunks with score less than %f", app_config.docs_shown_min_score
+            )
             break
 
         global _accordion_id
