@@ -20,11 +20,20 @@ class AppConfig(PydanticBaseEnvConfig):
     # To customize these values in deployed environments, set
     # them in infra/app/app-config/env-config/environment-variables.tf
 
-    embedding_model: str = "multi-qa-mpnet-base-cos-v1"
     global_password: str | None = None
     host: str = "127.0.0.1"
     port: int = 8080
+
+    embedding_model: str = "multi-qa-mpnet-base-cos-v1"
     chat_engine: str = "guru-snap"
+
+    # Thresholds that determine which documents are sent to the LLM
+    retrieval_k: int = 8
+    retrieval_k_min_score: float = 0.45
+
+    # Thresholds that determine which retrieved documents are shown in the UI
+    docs_shown_max_num: int = 5
+    docs_shown_min_score: float = 0.65
 
     def db_session(self) -> db.Session:
         return db.PostgresDBClient().get_session()

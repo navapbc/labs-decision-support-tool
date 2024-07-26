@@ -1,15 +1,20 @@
+import time
 from typing import Sequence
 
+from src.app_config import app_config
 from src.db.models.document import ChunkWithScore
 
 # We need a unique identifier for each accordion,
 # even across multiple calls to this function
-_accordion_id = 0
+_accordion_id = int(time.time())
 
 
 def format_guru_cards(chunks_with_scores: Sequence[ChunkWithScore]) -> str:
     cards_html = ""
-    for chunk_with_score in chunks_with_scores:
+    for chunk_with_score in chunks_with_scores[: app_config.docs_shown_max_num]:
+        if chunk_with_score.score < app_config.docs_shown_min_score:
+            break
+
         global _accordion_id
         _accordion_id += 1
         similarity_score = f"<p>Similarity Score: {str(chunk_with_score.score)}</p>"
