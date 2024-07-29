@@ -2,7 +2,6 @@ import re
 
 from sqlalchemy import delete
 
-from src.app_config import app_config
 from src.db.models.document import Document
 from src.format import format_guru_cards
 from src.retrieve import retrieve_with_scores

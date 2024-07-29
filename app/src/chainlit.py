@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlparse
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Slider
 from src import chat_engine
-from src.app_config import UserConfig, app_config
+from src.app_config import app_config
 from src.format import format_guru_cards
 from src.login import require_login
 
