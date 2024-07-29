@@ -1,7 +1,10 @@
 import logging
+import pprint
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
+from chainlit.input_widget import InputWidget, Slider
 from src import chat_engine
 from src.app_config import UserConfig, app_config
 from src.format import format_guru_cards
@@ -14,15 +17,66 @@ require_login()
 
 @cl.on_chat_start
 async def start() -> None:
-    await _init_user_config()
-
     await _init_chat_engine()
+    await _init_user_config()
 
 
 async def _init_user_config() -> None:
-    user_config = app_config.create_user_config()
-    cl.user_session.set("user_config", user_config)
-    # TODO: Add settings to UI
+    engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+
+    # Add initial settings to UI
+    input_widgets: list[InputWidget] = [
+        factory(engine.user_config)
+        for attrib_name, factory in _WIDGET_FACTORIES.items()
+        if hasattr(engine.user_config, attrib_name)
+    ]
+    settings = await cl.ChatSettings(input_widgets).send()
+    logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
+
+
+@cl.on_settings_update
+def update_settings(settings: dict[str, Any]) -> Any:
+    logger.info("Updating settings: %s", pprint.pformat(settings, indent=4))
+    engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+    for setting_id, value in settings.items():
+        setattr(engine.user_config, setting_id, value)
+
+
+# The ordering of _WIDGET_FACTORIES affects the order of the settings in the UI
+_WIDGET_FACTORIES = {
+    "retrieval_k": lambda user_config: Slider(
+        id="retrieval_k",
+        label="Number of documents to retrieve for generating LLM response",
+        initial=user_config.retrieval_k,
+        min=0,
+        max=10,
+        step=1,
+    ),
+    "retrieval_k_min_score": lambda user_config: Slider(
+        id="retrieval_k_min_score",
+        label="Minimum document score required for generating LLM response",
+        initial=user_config.retrieval_k_min_score,
+        min=-1,
+        max=1,
+        step=0.25,
+    ),
+    "docs_shown_max_num": lambda user_config: Slider(
+        id="docs_shown_max_num",
+        label="Maximum number of retrieved documents to show in the UI",
+        initial=user_config.docs_shown_max_num,
+        min=0,
+        max=10,
+        step=1,
+    ),
+    "docs_shown_min_score": lambda user_config: Slider(
+        id="docs_shown_min_score",
+        label="Minimum document score required to show document in the UI",
+        initial=user_config.docs_shown_min_score,
+        min=-1,
+        max=1,
+        step=0.25,
+    ),
+}
 
 
 async def _init_chat_engine() -> None:
@@ -60,10 +114,11 @@ async def on_message(message: cl.Message) -> None:
     logger.info("Received: %r", message.content)
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
-    user_config: UserConfig = cl.user_session.get("user_config")
     try:
-        result = engine.on_message(user_config, question=message.content)
-        msg_content = result.response + format_guru_cards(user_config, result.chunks_with_scores)
+        result = engine.on_message(question=message.content)
+        msg_content = result.response + format_guru_cards(
+            engine.user_config, result.chunks_with_scores
+        )
         chunk_titles_and_scores: dict[str, float] = {}
         for chunk_with_score in result.chunks_with_scores:
             title = chunk_with_score.chunk.document.name

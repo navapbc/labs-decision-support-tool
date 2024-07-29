@@ -100,4 +100,3 @@ class DynamicAppConfig:
 
 
 app_config = DynamicAppConfig()
-
