@@ -27,8 +27,14 @@ class AppConfig(PydanticBaseEnvConfig):
     host: str = "127.0.0.1"
     port: int = 8080
 
+    # Used for ingestion (before chatbot application starts) and retrieval (during chatbot interactions)
     embedding_model: str = "multi-qa-mpnet-base-cos-v1"
+
+    # Default chat engine
     chat_engine: str = "guru-snap"
+
+    # The following are default configuration values regardless of chat_engine.
+    # Set engine-specific defaults in chat_engine.py.
 
     # Thresholds that determine which documents are sent to the LLM
     retrieval_k: int = 8

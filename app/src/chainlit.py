@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlparse
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Slider
 from src import chat_engine
+from src.chat_engine import ChatEngineInterface
 from src.app_config import app_config
 from src.format import format_guru_cards
 from src.login import require_login
@@ -17,14 +18,35 @@ require_login()
 
 @cl.on_chat_start
 async def start() -> None:
-    await _init_chat_engine()
-    await _init_user_config()
+    engine_id = engine_url_query_value()
+    logger.info("Engine ID: %s", engine_id)
+
+    engine = _init_chat_engine(engine_id)
+    if not engine:
+        await cl.Message(
+            author="backend",
+            metadata={"engine": engine_id},
+            content=f"Available engines: {chat_engine.available_engines()}",
+        ).send()
+        return
+
+    settings = await _init_chat_settings(engine)
+    await cl.Message(
+        author="backend",
+        metadata={"engine": engine_id, "settings": str(settings)},
+        content=f"{engine.name} started with settings:\n{pprint.pformat(settings, indent=3)}",
+    ).send()
 
 
-async def _init_user_config() -> None:
-    engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+def _init_chat_engine(engine_id: str) -> ChatEngineInterface | None:
+    engine = chat_engine.create_engine(engine_id)
+    if engine:
+        cl.user_session.set("chat_engine", engine)
+        return engine
+    return None
 
-    # Add initial settings to UI
+
+async def _init_chat_settings(engine: ChatEngineInterface) -> dict[str, Any]:
     input_widgets: list[InputWidget] = [
         factory(engine.user_config)
         for attrib_name, factory in _WIDGET_FACTORIES.items()
@@ -32,6 +54,7 @@ async def _init_user_config() -> None:
     ]
     settings = await cl.ChatSettings(input_widgets).send()
     logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
+    return settings
 
 
 @cl.on_settings_update
@@ -77,26 +100,6 @@ _WIDGET_FACTORIES = {
         step=0.25,
     ),
 }
-
-
-async def _init_chat_engine() -> None:
-    engine_id = engine_url_query_value()
-    logger.info("Engine ID: %s", engine_id)
-    engine = chat_engine.create_engine(engine_id)
-    if not engine:
-        await cl.Message(
-            author="backend",
-            metadata={"engine": engine_id},
-            content=f"Available engines: {chat_engine.available_engines()}",
-        ).send()
-        return
-
-    cl.user_session.set("chat_engine", engine)
-    await cl.Message(
-        author="backend",
-        metadata={"engine": engine_id},
-        content=f"Chat engine started: {engine.name}",
-    ).send()
 
 
 def engine_url_query_value() -> str:
