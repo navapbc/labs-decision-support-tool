@@ -27,7 +27,7 @@ class ChatEngineInterface(ABC):
         super().__init__()
         self.user_config = app_config.create_user_config()
         # To set a default configuration for an engine: self.user_config.retrieval_k = 2
-        # To delete a configuration for an engine: self.user_config.__delattr__("retrieval_k")
+        # To remove a configuration for an engine: self.user_config.__delattr__("retrieval_k")
 
     @abstractmethod
     def on_message(self, question: str) -> OnMessageResult:
