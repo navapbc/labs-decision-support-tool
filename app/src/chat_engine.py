@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Sequence
 
-from src.app_config import UserConfig, app_config
 from src.db.models.document import ChunkWithScore
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
@@ -21,13 +20,17 @@ class OnMessageResult:
 class ChatEngineInterface(ABC):
     engine_id: str
     name: str
-    user_config: UserConfig
+
+    # Thresholds that determine which retrieved documents are shown in the UI
+    docs_shown_max_num: int = 5
+    docs_shown_min_score: float = 0.65
+
+    # List of engine-specific configuration settings that can be set by the user.
+    # The string elements must match the attribute names for the configuration setting.
+    user_settings: list[str]
 
     def __init__(self) -> None:
         super().__init__()
-        self.user_config = app_config.create_user_config()
-        # To set a default configuration for an engine: self.user_config.retrieval_k = 2
-        # To remove a configuration for an engine: self.user_config.__delattr__("retrieval_k")
 
     @abstractmethod
     def on_message(self, question: str) -> OnMessageResult:
@@ -58,9 +61,23 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 class GuruBaseEngine(ChatEngineInterface):
     datasets: list[str] = []
 
+    # Thresholds that determine which documents are sent to the LLM
+    retrieval_k: int = 8
+    retrieval_k_min_score: float = 0.45
+
+    user_settings = [
+        "retrieval_k",
+        "retrieval_k_min_score",
+        "docs_shown_max_num",
+        "docs_shown_min_score",
+    ]
+
     def on_message(self, question: str) -> OnMessageResult:
         chunks_with_scores = retrieve_with_scores(
-            question, self.user_config, datasets=self.datasets
+            question,
+            retrieval_k=self.retrieval_k,
+            retrieval_k_min_score=self.retrieval_k_min_score,
+            datasets=self.datasets,
         )
 
         response = generate(question, context=chunks_with_scores)

@@ -22,30 +22,31 @@ def _create_chunks(document=None):
     ]
 
 
-@pytest.fixture
-def user_config(app_config):
-    return app_config.create_user_config(retrieval_k=2)
-
-
 def _format_retrieval_results(retrieval_results):
     return [chunk_with_score.chunk for chunk_with_score in retrieval_results]
 
 
-def test_retrieve__with_empty_filter(user_config, db_session, enable_factory_create):
+def test_retrieve__with_empty_filter(app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
     _, medium_chunk, short_chunk = _create_chunks()
 
-    results = retrieve_with_scores("Very tiny words.", user_config, datasets=[])
-
+    results = retrieve_with_scores(
+        "Very tiny words.", retrieval_k=2, retrieval_k_min_score=0.0, datasets=[]
+    )
     assert _format_retrieval_results(results) == [short_chunk, medium_chunk]
 
 
-def test_retrieve__with_unknown_filter(user_config, db_session, enable_factory_create):
+def test_retrieve__with_unknown_filter(app_config, db_session, enable_factory_create):
     with pytest.raises(ValueError):
-        retrieve_with_scores("Very tiny words.", user_config, unknown_column=["some value"])
+        retrieve_with_scores(
+            "Very tiny words.",
+            retrieval_k=2,
+            retrieval_k_min_score=0.0,
+            unknown_column=["some value"],
+        )
 
 
-def test_retrieve__with_dataset_filter(user_config, db_session, enable_factory_create):
+def test_retrieve__with_dataset_filter(app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
     _create_chunks(document=DocumentFactory.create())
     _, snap_medium_chunk, snap_short_chunk = _create_chunks(
@@ -54,13 +55,14 @@ def test_retrieve__with_dataset_filter(user_config, db_session, enable_factory_c
 
     results = retrieve_with_scores(
         "Very tiny words.",
-        user_config,
+        retrieval_k=2,
+        retrieval_k_min_score=0.0,
         datasets=["SNAP"],
     )
     assert _format_retrieval_results(results) == [snap_short_chunk, snap_medium_chunk]
 
 
-def test_retrieve__with_other_filters(user_config, db_session, enable_factory_create):
+def test_retrieve__with_other_filters(app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
     _create_chunks(document=DocumentFactory.create(program="Medicaid", region="PA"))
     _, snap_medium_chunk, snap_short_chunk = _create_chunks(
@@ -69,18 +71,19 @@ def test_retrieve__with_other_filters(user_config, db_session, enable_factory_cr
 
     results = retrieve_with_scores(
         "Very tiny words.",
-        user_config,
+        retrieval_k=2,
+        retrieval_k_min_score=0.0,
         programs=["SNAP"],
         regions=["MI"],
     )
     assert _format_retrieval_results(results) == [snap_short_chunk, snap_medium_chunk]
 
 
-def test_retrieve_with_scores(user_config, db_session, enable_factory_create):
+def test_retrieve_with_scores(app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
     _, medium_chunk, short_chunk = _create_chunks()
 
-    results = retrieve_with_scores("Very tiny words.", user_config)
+    results = retrieve_with_scores("Very tiny words.", retrieval_k=2, retrieval_k_min_score=0.0)
 
     assert len(results) == 2
     assert results[0].chunk == short_chunk

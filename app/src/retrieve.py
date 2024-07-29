@@ -3,7 +3,7 @@ from typing import Sequence
 
 from sqlalchemy import select
 
-from src.app_config import UserConfig, app_config
+from src.app_config import app_config
 from src.db.models.document import Chunk, ChunkWithScore, Document
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 def retrieve_with_scores(
     query: str,
-    user_config: UserConfig,
+    retrieval_k: int,
+    retrieval_k_min_score: float,
     **filters: Sequence[str] | None,
 ) -> Sequence[ChunkWithScore]:
     logger.info("Retrieving context for %r", query)
@@ -37,7 +38,7 @@ def retrieve_with_scores(
         # used in code at https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-cos-v1
         chunks_with_scores = db_session.execute(
             statement.order_by(Chunk.mpnet_embedding.max_inner_product(query_embedding)).limit(
-                user_config.retrieval_k
+                retrieval_k
             )
         ).all()
 
@@ -51,13 +52,13 @@ def retrieve_with_scores(
         filtered_chunks_with_scores = [
             ChunkWithScore(chunk, -score)
             for chunk, score in chunks_with_scores
-            if -score >= user_config.retrieval_k_min_score
+            if -score >= retrieval_k_min_score
         ]
         if len(filtered_chunks_with_scores) < len(chunks_with_scores):
             logger.info(
                 "Keeping only the top %d, which meet the %f score threshold.",
                 len(filtered_chunks_with_scores),
-                user_config.retrieval_k_min_score,
+                retrieval_k_min_score,
             )
 
         return filtered_chunks_with_scores

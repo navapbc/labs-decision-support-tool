@@ -48,9 +48,9 @@ def _init_chat_engine(engine_id: str) -> ChatEngineInterface | None:
 
 async def _init_chat_settings(engine: ChatEngineInterface) -> dict[str, Any]:
     input_widgets: list[InputWidget] = [
-        factory(engine.user_config)
-        for attrib_name, factory in _WIDGET_FACTORIES.items()
-        if hasattr(engine.user_config, attrib_name)
+        _WIDGET_FACTORIES[setting_name](getattr(engine, setting_name))
+        for setting_name in engine.user_settings
+        if setting_name in _WIDGET_FACTORIES
     ]
     settings = await cl.ChatSettings(input_widgets).send()
     logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
@@ -62,39 +62,39 @@ def update_settings(settings: dict[str, Any]) -> Any:
     logger.info("Updating settings: %s", pprint.pformat(settings, indent=4))
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     for setting_id, value in settings.items():
-        setattr(engine.user_config, setting_id, value)
+        setattr(engine, setting_id, value)
 
 
 # The ordering of _WIDGET_FACTORIES affects the order of the settings in the UI
 _WIDGET_FACTORIES = {
-    "retrieval_k": lambda user_config: Slider(
+    "retrieval_k": lambda default_value: Slider(
         id="retrieval_k",
         label="Number of documents to retrieve for generating LLM response",
-        initial=user_config.retrieval_k,
+        initial=default_value,
         min=0,
         max=10,
         step=1,
     ),
-    "retrieval_k_min_score": lambda user_config: Slider(
+    "retrieval_k_min_score": lambda default_value: Slider(
         id="retrieval_k_min_score",
         label="Minimum document score required for generating LLM response",
-        initial=user_config.retrieval_k_min_score,
+        initial=default_value,
         min=-1,
         max=1,
         step=0.25,
     ),
-    "docs_shown_max_num": lambda user_config: Slider(
+    "docs_shown_max_num": lambda default_value: Slider(
         id="docs_shown_max_num",
         label="Maximum number of retrieved documents to show in the UI",
-        initial=user_config.docs_shown_max_num,
+        initial=default_value,
         min=0,
         max=10,
         step=1,
     ),
-    "docs_shown_min_score": lambda user_config: Slider(
+    "docs_shown_min_score": lambda default_value: Slider(
         id="docs_shown_min_score",
         label="Minimum document score required to show document in the UI",
-        initial=user_config.docs_shown_min_score,
+        initial=default_value,
         min=-1,
         max=1,
         step=0.25,
@@ -120,7 +120,9 @@ async def on_message(message: cl.Message) -> None:
     try:
         result = engine.on_message(question=message.content)
         msg_content = result.response + format_guru_cards(
-            engine.user_config, result.chunks_with_scores
+            docs_shown_max_num=engine.docs_shown_max_num,
+            docs_shown_min_score=engine.docs_shown_min_score,
+            chunks_with_scores=result.chunks_with_scores,
         )
         chunk_titles_and_scores: dict[str, float] = {}
         for chunk_with_score in result.chunks_with_scores:
