@@ -16,17 +16,18 @@ _accordion_id = random.randint(0, 1000000)
 def format_guru_cards(user_config: UserConfig, chunks_with_scores: Sequence[ChunkWithScore]) -> str:
     cards_html = ""
     for chunk_with_score in chunks_with_scores[: user_config.docs_shown_max_num]:
+        document = chunk_with_score.chunk.document
         if chunk_with_score.score < user_config.docs_shown_min_score:
             logger.info(
-                "Skipping remaining chunks with score less than %f",
+                "Skipping chunk with score less than %f: %s",
                 user_config.docs_shown_min_score,
+                document.name,
             )
-            break
+            continue
 
         global _accordion_id
         _accordion_id += 1
         similarity_score = f"<p>Similarity Score: {str(chunk_with_score.score)}</p>"
-        document = chunk_with_score.chunk.document
         cards_html += f"""
 <div class="usa-accordion" id=accordion-{_accordion_id}>
     <h4 class="usa-accordion__heading">
