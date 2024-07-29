@@ -5,7 +5,7 @@ from typing import Any
 
 from sentence_transformers import SentenceTransformer
 
-import src.adapters.db as db
+from src.adapters import db
 from src.util.env_config import PydanticBaseEnvConfig
 
 
@@ -100,5 +100,4 @@ class DynamicAppConfig:
 
 
 app_config = DynamicAppConfig()
-
 
