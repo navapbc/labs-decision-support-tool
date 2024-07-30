@@ -53,7 +53,7 @@ async def _init_chat_settings(engine: ChatEngineInterface) -> dict[str, Any]:
         for setting_name in engine.user_settings
         if setting_name in _WIDGET_FACTORIES
     ]
-    input_widgets.append(_WIDGET_FACTORIES["llm"](getattr(engine, "llm", None)))
+    input_widgets.append(_WIDGET_FACTORIES["llm"](app_config.llm or getattr(engine, "llm", None)))
     settings = await cl.ChatSettings(input_widgets).send()
     logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
     return settings
