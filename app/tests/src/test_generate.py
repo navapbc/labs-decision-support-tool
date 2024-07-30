@@ -85,6 +85,9 @@ def test_get_models(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
     assert get_models() == {"OpenAI GPT-4o": "gpt-4o"}
 
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "mock_key")
+    assert get_models()["Anthropic Claude 3.5 Sonnet"] == "claude-3-5-sonnet-20240620"
+
 
 def test_get_models_ollama(monkeypatch):
     if "OPENAI_API_KEY" in os.environ:

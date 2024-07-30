@@ -23,6 +23,8 @@ def get_models() -> dict[str, str]:
     models: dict[str, str] = {}
     if "OPENAI_API_KEY" in os.environ:
         models |= {"OpenAI GPT-4o": "gpt-4o"}
+    if "ANTHROPIC_API_KEY" in os.environ:
+        models |= {"Anthropic Claude 3.5 Sonnet": "claude-3-5-sonnet-20240620"}
     if "OLLAMA_HOST" in os.environ:
         import ollama
 
