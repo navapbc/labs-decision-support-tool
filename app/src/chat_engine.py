@@ -60,6 +60,7 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
 class GuruBaseEngine(ChatEngineInterface):
     datasets: list[str] = []
+    llm: str = "gpt-4o"
 
     # Thresholds that determine which documents are sent to the LLM
     retrieval_k: int = 8
@@ -80,7 +81,7 @@ class GuruBaseEngine(ChatEngineInterface):
             datasets=self.datasets,
         )
 
-        response = generate(question, context=chunks_with_scores)
+        response = generate(self.llm, question, context=chunks_with_scores)
         return OnMessageResult(response, chunks_with_scores)
 
 

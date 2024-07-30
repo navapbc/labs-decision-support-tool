@@ -4,11 +4,12 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
-from chainlit.input_widget import InputWidget, Slider
+from chainlit.input_widget import InputWidget, Select, Slider
 from src import chat_engine
 from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface
 from src.format import format_guru_cards
+from src.generate import get_models
 from src.login import require_login
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ async def _init_chat_settings(engine: ChatEngineInterface) -> dict[str, Any]:
         for setting_name in engine.user_settings
         if setting_name in _WIDGET_FACTORIES
     ]
+    input_widgets.append(_WIDGET_FACTORIES["llm"](getattr(engine, "llm", None)))
     settings = await cl.ChatSettings(input_widgets).send()
     logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
     return settings
@@ -67,6 +69,12 @@ def update_settings(settings: dict[str, Any]) -> Any:
 
 # The ordering of _WIDGET_FACTORIES affects the order of the settings in the UI
 _WIDGET_FACTORIES = {
+    "llm": lambda default_value: Select(
+        id="llm",
+        label="Language model",
+        initial_value=default_value,
+        items=get_models(),
+    ),
     "retrieval_k": lambda default_value: Slider(
         id="retrieval_k",
         label="Number of documents to retrieve for generating LLM response",

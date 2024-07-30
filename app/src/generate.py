@@ -1,9 +1,12 @@
+import logging
 import os
 from typing import Sequence
 
 from litellm import completion
 
 from src.db.models.document import ChunkWithScore
+
+logger = logging.getLogger(__name__)
 
 PROMPT = """Provide answers in plain language written at the average American reading level.
 Use bullet points. Keep your answers brief, max of 5 sentences.
@@ -17,21 +20,22 @@ def get_models() -> dict[str, str]:
     human-formatted model names, and the values are the model
     IDs for use with LiteLLM.
     """
-
+    models: dict[str, str] = {}
     if "OPENAI_API_KEY" in os.environ:
-        return {"OpenAI GPT-4o": "gpt-4o"}
+        models |= {"OpenAI GPT-4o": "gpt-4o"}
     if "OLLAMA_HOST" in os.environ:
-        ollama_models = {}
         import ollama
 
-        models = ollama.list()
-        for model in models["models"]:
-            ollama_models[f"Ollama {model['name']}"] = f"ollama/{model['name']}"
-        return ollama_models
-    return {}
+        ollama_models = {
+            f"Ollama {model['name']}": f"ollama/{model['name']}"
+            for model in ollama.list()["models"]
+        }
+        models |= ollama_models
+    return models
 
 
 def generate(
+    llm: str,
     query: str,
     context: Sequence[ChunkWithScore] | None = None,
 ) -> str:
@@ -66,5 +70,7 @@ def generate(
             },
             {"content": query, "role": "user"},
         ]
-    response = completion(model="gpt-4o", messages=messages)
+
+    logger.info("Calling %s for query: %s", llm, query)
+    response = completion(model=llm, messages=messages)
     return response["choices"][0]["message"]["content"]
