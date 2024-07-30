@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Sequence
+from typing import Any, Sequence
 
 from litellm import completion
 
@@ -74,5 +74,11 @@ def generate(
         ]
 
     logger.info("Calling %s for query: %s", llm, query)
-    response = completion(model=llm, messages=messages)
+    response = completion(model=llm, messages=messages, **completion_args(llm))
     return response["choices"][0]["message"]["content"]
+
+
+def completion_args(llm: str) -> dict[str, Any]:
+    if llm.startswith("ollama/"):
+        return {"api_base": os.environ["OLLAMA_HOST"]}
+    return {}
