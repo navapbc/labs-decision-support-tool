@@ -126,7 +126,7 @@ async def on_message(message: cl.Message) -> None:
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
-        result = engine.on_message(question=message.content)
+        result = await cl.make_async(lambda: engine.on_message(question=message.content))()
         msg_content = result.response + format_guru_cards(
             docs_shown_max_num=engine.docs_shown_max_num,
             docs_shown_min_score=engine.docs_shown_min_score,
