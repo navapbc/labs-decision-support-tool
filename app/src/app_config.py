@@ -31,6 +31,9 @@ class AppConfig(PydanticBaseEnvConfig):
     # Default chat engine
     chat_engine: str = "guru-snap"
 
+    # Default LLM model
+    llm: str | None = None
+
     def db_session(self) -> db.Session:
         return db.PostgresDBClient().get_session()
 

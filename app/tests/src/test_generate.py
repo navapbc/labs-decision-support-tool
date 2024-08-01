@@ -85,6 +85,9 @@ def test_get_models(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
     assert get_models() == {"OpenAI GPT-4o": "gpt-4o"}
 
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "mock_key")
+    assert get_models()["Anthropic Claude 3.5 Sonnet"] == "claude-3-5-sonnet-20240620"
+
 
 def test_get_models_ollama(monkeypatch):
     if "OPENAI_API_KEY" in os.environ:
@@ -107,7 +110,7 @@ def test_generate(monkeypatch):
         + PROMPT
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
-    assert generate("some query") == expected_response
+    assert generate("gpt-4o", "some query") == expected_response
 
 
 def test_generate_with_context_with_score(monkeypatch):
@@ -124,5 +127,4 @@ def test_generate_with_context_with_score(monkeypatch):
         + context_text
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
-    print(generate("some query", context=context))
-    assert generate("some query", context=context) == expected_response
+    assert generate("gpt-4o", "some query", context=context) == expected_response
