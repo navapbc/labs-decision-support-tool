@@ -31,7 +31,7 @@ def _ingest_policy_pdfs(
     embedding_model = app_config.sentence_transformer
     for file in file_list:
         if file.endswith(".pdf"):
-            with open("/app/documents/BEM Mobile.pdf", "r") as fin:
+            with open(file, "r") as fin:
                 extract_text_to_fp(
                     fin, output_string, laparams=LAParams(), output_type="text", codec=None
                 )
