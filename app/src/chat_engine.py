@@ -73,6 +73,17 @@ class GuruBaseEngine(ChatEngineInterface):
         "docs_shown_min_score",
     ]
 
+    # Thresholds that determine which documents are sent to the LLM
+    retrieval_k: int = 8
+    retrieval_k_min_score: float = 0.45
+
+    user_settings = [
+        "retrieval_k",
+        "retrieval_k_min_score",
+        "docs_shown_max_num",
+        "docs_shown_min_score",
+    ]
+
     def on_message(self, question: str) -> OnMessageResult:
         chunks_with_scores = retrieve_with_scores(
             question,
