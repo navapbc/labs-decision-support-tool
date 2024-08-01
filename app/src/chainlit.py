@@ -78,14 +78,6 @@ def _init_chat_settings(
     if query_values:
         logger.warning("Unused query values: %r", query_values)
 
-    # Add the LLM widget if it's not already in the list
-    if not any(widget for widget in input_widgets if widget.id == "llm"):
-        input_widgets.append(
-            _WIDGET_FACTORIES["llm"](
-                query_values.pop("llm", None) or app_config.llm or getattr(engine, "llm", None)
-            )
-        )
-
     return input_widgets
 
 

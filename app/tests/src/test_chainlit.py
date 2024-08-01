@@ -11,7 +11,6 @@ def test_url_query_values():
 
     input_widgets = chainlit._init_chat_settings(engine, query_values)
 
-    # The `+ 1` is to account for the LLM setting
-    assert len(input_widgets) == len(engine.user_settings) + 1
+    assert len(input_widgets) == len(engine.user_settings)
     assert len(query_values) == 1
     assert query_values["someunknownparam"] == "42"
