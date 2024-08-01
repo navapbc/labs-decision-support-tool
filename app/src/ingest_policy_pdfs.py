@@ -55,7 +55,7 @@ def parse_pdf_and_add_to_db(
     embedding_model: SentenceTransformer,
 ) -> None:
     # Splits by headers in text
-    header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w*)"
+    header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
     text_split_by_header = re.split(header_pattern, contents)
 
     for ind, text_contents in enumerate(text_split_by_header):
