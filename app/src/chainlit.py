@@ -4,11 +4,12 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
-from chainlit.input_widget import InputWidget, Slider
+from chainlit.input_widget import InputWidget, Select, Slider
 from src import chat_engine
 from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface
 from src.format import format_guru_cards
+from src.generate import get_models
 from src.login import require_login
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,8 @@ async def _init_chat_settings(
     ]
     if query_values:
         logger.warning("Unused query values: %r", query_values)
+
+    input_widgets.append(_WIDGET_FACTORIES["llm"](app_config.llm or getattr(engine, "llm", None)))
     settings = await cl.ChatSettings(input_widgets).send()
     logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
     return settings
@@ -86,7 +89,13 @@ def update_settings(settings: dict[str, Any]) -> Any:
 
 # The ordering of _WIDGET_FACTORIES affects the order of the settings in the UI
 _WIDGET_FACTORIES = {
-    "retrieval_k": lambda initial_value: Slider(
+    "llm": lambda default_value: Select(
+        id="llm",
+        label="Language model",
+        initial_value=default_value,
+        items=get_models(),
+    ),
+    "retrieval_k": lambda default_value: Slider(
         id="retrieval_k",
         label="Number of documents to retrieve for generating LLM response",
         initial=initial_value,
@@ -127,7 +136,7 @@ async def on_message(message: cl.Message) -> None:
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
-        result = engine.on_message(question=message.content)
+        result = await cl.make_async(lambda: engine.on_message(question=message.content))()
         msg_content = result.response + format_guru_cards(
             docs_shown_max_num=engine.docs_shown_max_num,
             docs_shown_min_score=engine.docs_shown_min_score,
