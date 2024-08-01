@@ -59,6 +59,70 @@ def _init_chat_engine(engine_id: str) -> ChatEngineInterface | None:
     return None
 
 
+async def _init_chat_settings(engine: ChatEngineInterface) -> dict[str, Any]:
+    input_widgets: list[InputWidget] = [
+        _WIDGET_FACTORIES[setting_name](getattr(engine, setting_name))
+        for setting_name in engine.user_settings
+        if setting_name in _WIDGET_FACTORIES
+    ]
+    settings = await cl.ChatSettings(input_widgets).send()
+    logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
+    return settings
+
+
+@cl.on_settings_update
+def update_settings(settings: dict[str, Any]) -> Any:
+    logger.info("Updating settings: %s", pprint.pformat(settings, indent=4))
+    engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+    for setting_id, value in settings.items():
+        setattr(engine, setting_id, value)
+
+
+# The ordering of _WIDGET_FACTORIES affects the order of the settings in the UI
+_WIDGET_FACTORIES = {
+    "retrieval_k": lambda default_value: Slider(
+        id="retrieval_k",
+        label="Number of documents to retrieve for generating LLM response",
+        initial=default_value,
+        min=0,
+        max=10,
+        step=1,
+    ),
+    "retrieval_k_min_score": lambda default_value: Slider(
+        id="retrieval_k_min_score",
+        label="Minimum document score required for generating LLM response",
+        initial=default_value,
+        min=-1,
+        max=1,
+        step=0.25,
+    ),
+    "docs_shown_max_num": lambda default_value: Slider(
+        id="docs_shown_max_num",
+        label="Maximum number of retrieved documents to show in the UI",
+        initial=default_value,
+        min=0,
+        max=10,
+        step=1,
+    ),
+    "docs_shown_min_score": lambda default_value: Slider(
+        id="docs_shown_min_score",
+        label="Minimum document score required to show document in the UI",
+        initial=default_value,
+        min=-1,
+        max=1,
+        step=0.25,
+    ),
+}
+
+
+def _init_chat_engine(engine_id: str) -> ChatEngineInterface | None:
+    engine = chat_engine.create_engine(engine_id)
+    if engine:
+        cl.user_session.set("chat_engine", engine)
+        return engine
+    return None
+
+
 async def _init_chat_settings(
     engine: ChatEngineInterface, query_values: dict[str, str]
 ) -> dict[str, Any]:
