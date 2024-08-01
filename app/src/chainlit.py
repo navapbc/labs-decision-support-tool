@@ -19,7 +19,10 @@ require_login()
 
 @cl.on_chat_start
 async def start() -> None:
-    query_values = url_query_values()
+    url = cl.user_session.get("http_referer")
+    logger.debug("Referer URL: %s", url)
+    query_values = url_query_values(url)
+
     engine_id = query_values.pop("engine", app_config.chat_engine)
     logger.info("Engine ID: %s", engine_id)
 
@@ -40,10 +43,7 @@ async def start() -> None:
     ).send()
 
 
-def url_query_values() -> dict[str, str]:
-    url = cl.user_session.get("http_referer")
-    logger.debug("Referer URL: %s", url)
-
+def url_query_values(url: str) -> dict[str, str]:
     # Using this suggestion: https://github.com/Chainlit/chainlit/issues/144#issuecomment-2227543547
     parsed_url = urlparse(url)
     # For a given query key, only the first value is used
@@ -98,7 +98,7 @@ _WIDGET_FACTORIES = {
     "retrieval_k": lambda default_value: Slider(
         id="retrieval_k",
         label="Number of documents to retrieve for generating LLM response",
-        initial=initial_value,
+        initial=default_value,
         min=0,
         max=10,
         step=1,
