@@ -67,7 +67,6 @@ class GuruBaseEngine(ChatEngineInterface):
     retrieval_k_min_score: float = 0.45
 
     user_settings = [
-        "llm",
         "retrieval_k",
         "retrieval_k_min_score",
         "docs_shown_max_num",

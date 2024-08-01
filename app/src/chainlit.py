@@ -35,7 +35,10 @@ async def start() -> None:
         ).send()
         return
 
-    settings = await _init_chat_settings(engine, query_values)
+    input_widgets = _init_chat_settings(engine, query_values)
+    settings = await cl.ChatSettings(input_widgets).send()
+    logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
+
     await cl.Message(
         author="backend",
         metadata={"engine": engine_id, "settings": str(settings)},
@@ -60,12 +63,14 @@ def _init_chat_engine(engine_id: str) -> ChatEngineInterface | None:
     return None
 
 
-async def _init_chat_settings(
+def _init_chat_settings(
     engine: ChatEngineInterface, query_values: dict[str, str]
-) -> dict[str, Any]:
+) -> list[InputWidget]:
     input_widgets: list[InputWidget] = [
         _WIDGET_FACTORIES[setting_name](
-            query_values.pop(setting_name, None) or getattr(engine, setting_name)
+            query_values.pop(setting_name, None)
+            or getattr(app_config, setting_name, None)
+            or getattr(engine, setting_name)
         )
         for setting_name in engine.user_settings
         if setting_name in _WIDGET_FACTORIES
@@ -73,10 +78,15 @@ async def _init_chat_settings(
     if query_values:
         logger.warning("Unused query values: %r", query_values)
 
-    input_widgets.append(_WIDGET_FACTORIES["llm"](app_config.llm or getattr(engine, "llm", None)))
-    settings = await cl.ChatSettings(input_widgets).send()
-    logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
-    return settings
+    # Add the LLM widget if it's not already in the list
+    if not any(widget for widget in input_widgets if widget.id == "llm"):
+        input_widgets.append(
+            _WIDGET_FACTORIES["llm"](
+                query_values.pop("llm", None) or app_config.llm or getattr(engine, "llm", None)
+            )
+        )
+
+    return input_widgets
 
 
 @cl.on_settings_update
