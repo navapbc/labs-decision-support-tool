@@ -38,6 +38,13 @@ async def start() -> None:
     input_widgets = _init_chat_settings(engine, query_values)
     settings = await cl.ChatSettings(input_widgets).send()
     logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
+    if query_values:
+        logger.warning("Unused URL query parameters: %r", query_values)
+        await cl.Message(
+            author="backend",
+            metadata={"url": url},
+            content=f"Unused URL query parameters: {query_values}",
+        ).send()
 
     await cl.Message(
         author="backend",
@@ -75,9 +82,6 @@ def _init_chat_settings(
         for setting_name in engine.user_settings
         if setting_name in _WIDGET_FACTORIES
     ]
-    if query_values:
-        logger.warning("Unused query values: %r", query_values)
-
     return input_widgets
 
 

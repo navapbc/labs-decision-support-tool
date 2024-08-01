@@ -8,9 +8,9 @@ def test_url_query_values():
     assert engine_id == "guru-snap"
 
     engine = chat_engine.create_engine(engine_id)
-
     input_widgets = chainlit._init_chat_settings(engine, query_values)
-
     assert len(input_widgets) == len(engine.user_settings)
+
+    # Only 1 query parameter remains
     assert len(query_values) == 1
     assert query_values["someunknownparam"] == "42"
