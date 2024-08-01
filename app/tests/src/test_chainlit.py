@@ -1,7 +1,9 @@
 from src import chainlit, chat_engine
 
 
-def test_url_query_values():
+def test_url_query_values(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
+
     url = "https://example.com/chat/?engine=guru-snap&llm=gpt-4o&retrieval_k=3&someunknownparam=42"
     query_values = chainlit.url_query_values(url)
     engine_id = query_values.pop("engine")
