@@ -31,11 +31,11 @@ def _ingest_policy_pdfs(
     embedding_model = app_config.sentence_transformer
     for file in file_list:
         if file.endswith(".pdf"):
-            with open("/app/documents/BEM Mobile.pdf", "rb") as fin:
+            with open("/app/documents/BEM Mobile.pdf", "r") as fin:
                 extract_text_to_fp(
                     fin, output_string, laparams=LAParams(), output_type="text", codec=None
                 )
-                
+
                 parse_pdf_and_add_to_db(
                     contents=output_string.getvalue(),
                     db_session=db_session,

@@ -10,17 +10,35 @@ from src.ingest_policy_pdfs import _ingest_policy_pdfs
 
 
 @pytest.fixture
-def policy_local_file():
+def sample_text():
+    return """
+    BEM 800 
+    
+    8 of 22 
+    
+    DISASTER ASSISTANCE 
+    
+    BPB 2023-024 
+    
+    10-1-2023 
+    Applicants must have been evacuated from their home or forced to relocate in order to receive a payment. The family cannot be resid-ing in the home where the disaster occurred at the time of applica-tion. 
+    """
+
+
+@pytest.fixture
+def policy_local_file(sample_text):
     with tempfile.TemporaryDirectory() as tmpdirname:
-        tempfile.NamedTemporaryFile(prefix="policy", suffix=".pdf", dir=tmpdirname, delete=False)
+        with tempfile.NamedTemporaryFile(
+            prefix="policy", suffix=".pdf", dir=tmpdirname, delete=False
+        ) as tf:
+            tf.write(sample_text)
         yield tmpdirname
 
 
 @pytest.fixture
-def policy_s3_file(mock_s3_bucket_resource):
-    mock_s3_bucket_resource.put_object(
-        Body=io.BytesIO(b"%PDF-1.4\n%Fake PDF content for testing\n"), Key="policy.pdf"
-    )
+def policy_s3_file(mock_s3_bucket_resource, sample_text):
+    bytes_text = sample_text.encode("utf-8")
+    mock_s3_bucket_resource.put_object(Body=io.BytesIO(bytes_text), Key="policy.pdf")
     return "s3://test_bucket/policy.pdf"
 
 
