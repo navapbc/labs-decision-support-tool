@@ -58,14 +58,18 @@ def parse_pdf_and_add_to_db(
     # Splits by headers in text
     header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
     text_split_by_header = re.split(header_pattern, contents)
-
+    content = ""
+    title = ""
+    last_section = False
     for ind, text_contents in enumerate(text_split_by_header):
-        # accounting for instances in header where seperating page n of x
-        if "BEM" in text_contents and "of" in text_contents:
-            bem_val, page_num, title = text_contents.split("\n\n")
-            content = text_contents[ind + 1]
-            name = f"{bem_val}: {title}"
-            document = Document(name=name, content=content, **doc_attribs)
+        line_contents = get_header_and_is_current_section(text_contents)
+        if len(line_contents) == 2:
+            title, last_section = line_contents
+
+        content += f"{text_contents}\n"
+
+        if last_section:
+            document = Document(name=title, content=content, **doc_attribs)
             db_session.add(document)
             tokens = len(embedding_model.tokenizer.tokenize(content))
             mpnet_embedding = embedding_model.encode(content, show_progress_bar=False)
@@ -76,8 +80,22 @@ def parse_pdf_and_add_to_db(
 
             if tokens > embedding_model.max_seq_length:
                 logger.warning(
-                    f"Page {name!r} has {tokens} tokens, which exceeds the embedding model's max sequence length."
+                    f"Page {title!r} has {tokens} tokens, which exceeds the embedding model's max sequence length."
                 )
+            last_section = False
+            content = ""
+
+
+def get_header_and_is_current_section(line_contents):
+    line_details = line_contents.split("\n\n")
+    if "BEM" in line_contents and "of" in line_contents and len(line_details) == 3:
+        bem_val, page_num, title = line_details
+        current_page, last_page = [x.strip() for x in page_num.split(" of ")]
+        last_section = current_page == last_page
+        title = f"{bem_val}: {title}".strip()
+        return title, last_section
+    else:
+        return line_contents
 
 
 def main() -> None:
