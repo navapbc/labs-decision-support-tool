@@ -1,9 +1,7 @@
-import io
 import logging
-import tempfile
 
-import os
 import pytest
+from smart_open import open
 from sqlalchemy import delete
 
 from src.db.models.document import Document
@@ -17,9 +15,10 @@ def policy_local_file():
 
 @pytest.fixture
 def policy_s3_file(mock_s3_bucket_resource):
-    data = open("/app/tests/docs/policy_pdf.pdf", 'rb')
+    data = open("/app/tests/docs/policy_pdf.pdf", "rb")
     mock_s3_bucket_resource.put_object(Body=data, Key="policy_pdf.pdf")
     return "s3://test_bucket/"
+
 
 doc_attribs = {
     "dataset": "test_dataset",
@@ -36,7 +35,7 @@ def test__ingest_policy_pdfs(
 
     with caplog.at_level(logging.INFO):
         if file_location == "local":
-            _ingest_policy_pdfs(db_session,policy_local_file, doc_attribs)
+            _ingest_policy_pdfs(db_session, policy_local_file, doc_attribs)
         else:
             _ingest_policy_pdfs(db_session, policy_s3_file, doc_attribs)
 

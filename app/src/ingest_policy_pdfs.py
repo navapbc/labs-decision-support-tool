@@ -6,6 +6,7 @@ from io import StringIO
 from pdfminer.high_level import extract_text_to_fp
 from pdfminer.layout import LAParams
 from sentence_transformers import SentenceTransformer
+from smart_open import open as smart_open_file
 
 import src.adapters.db as db
 from src.app_config import app_config
@@ -31,7 +32,7 @@ def _ingest_policy_pdfs(
     embedding_model = app_config.sentence_transformer
     for file in file_list:
         if file.endswith(".pdf"):
-            with open(file, "rb") as fin:
+            with smart_open_file(file, "rb") as fin:
                 extract_text_to_fp(
                     fin, output_string, laparams=LAParams(), output_type="text", codec=None
                 )
