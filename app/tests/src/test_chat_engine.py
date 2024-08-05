@@ -1,4 +1,4 @@
-import src.chat_engine as chat_engine
+from src import chat_engine
 from src.chat_engine import GuruMultiprogramEngine, GuruSnapEngine
 
 

@@ -1,10 +1,15 @@
 import logging
+import pprint
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
+from chainlit.input_widget import InputWidget, Select, Slider
 from src import chat_engine
 from src.app_config import app_config
+from src.chat_engine import ChatEngineInterface
 from src.format import format_guru_cards
+from src.generate import get_models
 from src.login import require_login
 
 logger = logging.getLogger(__name__)
@@ -16,7 +21,8 @@ require_login()
 async def start() -> None:
     engine_id = engine_url_query_value()
     logger.info("Engine ID: %s", engine_id)
-    engine = chat_engine.create_engine(engine_id)
+
+    engine = _init_chat_engine(engine_id)
     if not engine:
         await cl.Message(
             author="backend",
@@ -25,12 +31,83 @@ async def start() -> None:
         ).send()
         return
 
-    cl.user_session.set("chat_engine", engine)
+    settings = await _init_chat_settings(engine)
     await cl.Message(
         author="backend",
-        metadata={"engine": engine_id},
-        content=f"Chat engine started: {engine.name}",
+        metadata={"engine": engine_id, "settings": str(settings)},
+        content=f"{engine.name} started with settings:\n{pprint.pformat(settings, indent=3)}",
     ).send()
+
+
+def _init_chat_engine(engine_id: str) -> ChatEngineInterface | None:
+    engine = chat_engine.create_engine(engine_id)
+    if engine:
+        cl.user_session.set("chat_engine", engine)
+        return engine
+    return None
+
+
+async def _init_chat_settings(engine: ChatEngineInterface) -> dict[str, Any]:
+    input_widgets: list[InputWidget] = [
+        _WIDGET_FACTORIES[setting_name](getattr(engine, setting_name))
+        for setting_name in engine.user_settings
+        if setting_name in _WIDGET_FACTORIES
+    ]
+    input_widgets.append(_WIDGET_FACTORIES["llm"](app_config.llm or getattr(engine, "llm", None)))
+    settings = await cl.ChatSettings(input_widgets).send()
+    logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
+    return settings
+
+
+@cl.on_settings_update
+def update_settings(settings: dict[str, Any]) -> Any:
+    logger.info("Updating settings: %s", pprint.pformat(settings, indent=4))
+    engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+    for setting_id, value in settings.items():
+        setattr(engine, setting_id, value)
+
+
+# The ordering of _WIDGET_FACTORIES affects the order of the settings in the UI
+_WIDGET_FACTORIES = {
+    "llm": lambda default_value: Select(
+        id="llm",
+        label="Language model",
+        initial_value=default_value,
+        items=get_models(),
+    ),
+    "retrieval_k": lambda default_value: Slider(
+        id="retrieval_k",
+        label="Number of documents to retrieve for generating LLM response",
+        initial=default_value,
+        min=0,
+        max=10,
+        step=1,
+    ),
+    "retrieval_k_min_score": lambda default_value: Slider(
+        id="retrieval_k_min_score",
+        label="Minimum document score required for generating LLM response",
+        initial=default_value,
+        min=-1,
+        max=1,
+        step=0.25,
+    ),
+    "docs_shown_max_num": lambda default_value: Slider(
+        id="docs_shown_max_num",
+        label="Maximum number of retrieved documents to show in the UI",
+        initial=default_value,
+        min=0,
+        max=10,
+        step=1,
+    ),
+    "docs_shown_min_score": lambda default_value: Slider(
+        id="docs_shown_min_score",
+        label="Minimum document score required to show document in the UI",
+        initial=default_value,
+        min=-1,
+        max=1,
+        step=0.25,
+    ),
+}
 
 
 def engine_url_query_value() -> str:
@@ -49,8 +126,12 @@ async def on_message(message: cl.Message) -> None:
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
-        result = engine.on_message(question=message.content)
-        msg_content = result.response + format_guru_cards(result.chunks_with_scores)
+        result = await cl.make_async(lambda: engine.on_message(question=message.content))()
+        msg_content = result.response + format_guru_cards(
+            docs_shown_max_num=engine.docs_shown_max_num,
+            docs_shown_min_score=engine.docs_shown_min_score,
+            chunks_with_scores=result.chunks_with_scores,
+        )
         chunk_titles_and_scores: dict[str, float] = {}
         for chunk_with_score in result.chunks_with_scores:
             title = chunk_with_score.chunk.document.name

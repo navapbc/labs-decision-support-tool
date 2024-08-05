@@ -21,6 +21,17 @@ class ChatEngineInterface(ABC):
     engine_id: str
     name: str
 
+    # Thresholds that determine which retrieved documents are shown in the UI
+    docs_shown_max_num: int = 5
+    docs_shown_min_score: float = 0.65
+
+    # List of engine-specific configuration settings that can be set by the user.
+    # The string elements must match the attribute names for the configuration setting.
+    user_settings: list[str]
+
+    def __init__(self) -> None:
+        super().__init__()
+
     @abstractmethod
     def on_message(self, question: str) -> OnMessageResult:
         pass
@@ -49,14 +60,28 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
 class GuruBaseEngine(ChatEngineInterface):
     datasets: list[str] = []
+    llm: str = "gpt-4o"
+
+    # Thresholds that determine which documents are sent to the LLM
+    retrieval_k: int = 8
+    retrieval_k_min_score: float = 0.45
+
+    user_settings = [
+        "retrieval_k",
+        "retrieval_k_min_score",
+        "docs_shown_max_num",
+        "docs_shown_min_score",
+    ]
 
     def on_message(self, question: str) -> OnMessageResult:
         chunks_with_scores = retrieve_with_scores(
             question,
+            retrieval_k=self.retrieval_k,
+            retrieval_k_min_score=self.retrieval_k_min_score,
             datasets=self.datasets,
         )
 
-        response = generate(question, context=chunks_with_scores)
+        response = generate(self.llm, question, context=chunks_with_scores)
         return OnMessageResult(response, chunks_with_scores)
 
 
