@@ -33,9 +33,7 @@ def _ingest_policy_pdfs(
     for file in file_list:
         if file.endswith(".pdf"):
             with smart_open_file(file, "rb") as fin:
-                extract_text_to_fp(
-                    fin, output_string, laparams=LAParams(), output_type="text", codec=None
-                )
+                extract_text_to_fp(fin, output_string, laparams=LAParams(), output_type="text")
 
                 parse_pdf_and_add_to_db(
                     contents=output_string.getvalue(),
@@ -102,7 +100,9 @@ def parse_pdf_and_add_to_db(
             body_content = ""
 
 
-def get_header_and_is_current_section(line_contents, start_new_section):
+def get_header_and_is_current_section(
+    line_contents: str, start_new_section: bool
+) -> tuple[bool, str, bool]:
     line_details = line_contents.split("\n\n")
     is_header = True
     if "BEM" in line_contents and "of" in line_contents and len(line_details) == 3:
