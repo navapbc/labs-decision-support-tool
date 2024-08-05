@@ -109,6 +109,7 @@ def get_header_and_is_current_section(
         bem_val, page_num, title = line_details
         current_page, last_page = [x.strip() for x in page_num.split(" of ")]
         start_new_section = current_page == "1" or current_page == last_page
+        bem_val = bem_val.strip()
         title = f"{bem_val}: {title}".strip()
         contents = title
     else:

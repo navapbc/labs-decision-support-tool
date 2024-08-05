@@ -45,7 +45,7 @@ def test__ingest_policy_pdfs(
         assert set(d.program for d in documents) == {"test_benefit_program"}
         assert set(d.region for d in documents) == {"Michigan"}
 
-        assert documents[0].name == "BEM 105 : MEDICAID OVERVIEW"
+        assert documents[0].name == "BEM 105: MEDICAID OVERVIEW"
         assert "BPB 2024-001" in documents[0].content
         assert len(documents[0].chunks) == 1
         assert documents[0].chunks[0].tokens == 62
