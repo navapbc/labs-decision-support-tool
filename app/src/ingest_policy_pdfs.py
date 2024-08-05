@@ -55,47 +55,67 @@ def parse_pdf_and_add_to_db(
     doc_attribs: dict[str, str],
     embedding_model: SentenceTransformer,
 ) -> None:
-    # Splits by headers in text
+    # Match header in BEM manual
     header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
     text_split_by_header = re.split(header_pattern, contents)
-    content = ""
-    title = ""
-    last_section = False
-    for ind, text_contents in enumerate(text_split_by_header):
-        line_contents = get_header_and_is_current_section(text_contents)
-        if len(line_contents) == 2:
-            title, last_section = line_contents
+    current_title = ""
+    body_content = ""
+    start_new_section = True
+    for text_contents in text_split_by_header:
+        is_header, contents, start_new_section = get_header_and_is_current_section(
+            text_contents, start_new_section
+        )
+        # Check if we need to start a new section
+        if is_header and start_new_section and body_content != "":
+            current_title = contents
+        else:
+            body_content += f"{contents}\n"
 
-        content += f"{text_contents}\n"
-
-        if last_section:
-            document = Document(name=title, content=content, **doc_attribs)
+        # If starting a new section and body content is not empty, process and save it
+        if start_new_section and body_content.strip():
+            # Create and add the document to the database
+            document = Document(name=current_title, content=body_content, **doc_attribs)
             db_session.add(document)
-            tokens = len(embedding_model.tokenizer.tokenize(content))
-            mpnet_embedding = embedding_model.encode(content, show_progress_bar=False)
+
+            # Tokenize and encode the content
+            tokens = len(embedding_model.tokenizer.tokenize(body_content))
+            mpnet_embedding = embedding_model.encode(body_content, show_progress_bar=False)
+
+            # Create and add the chunk to the database
             chunk = Chunk(
-                document=document, content=content, tokens=tokens, mpnet_embedding=mpnet_embedding
+                document=document,
+                content=body_content,
+                tokens=tokens,
+                mpnet_embedding=mpnet_embedding,
             )
             db_session.add(chunk)
 
+            # Check if token count exceeds the maximum sequence length
             if tokens > embedding_model.max_seq_length:
                 logger.warning(
-                    f"Page {title!r} has {tokens} tokens, which exceeds the embedding model's max sequence length."
+                    f"Page {current_title!r} has {tokens} tokens, which exceeds the embedding model's max sequence length."
                 )
-            last_section = False
-            content = ""
+
+            # Reset the section state
+            current_title = contents
+            start_new_section = False
+            body_content = ""
 
 
-def get_header_and_is_current_section(line_contents):
+def get_header_and_is_current_section(line_contents, start_new_section):
     line_details = line_contents.split("\n\n")
+    is_header = True
     if "BEM" in line_contents and "of" in line_contents and len(line_details) == 3:
         bem_val, page_num, title = line_details
         current_page, last_page = [x.strip() for x in page_num.split(" of ")]
-        last_section = current_page == last_page
+        start_new_section = current_page == "1" or current_page == last_page
         title = f"{bem_val}: {title}".strip()
-        return title, last_section
+        contents = title
     else:
-        return line_contents
+        is_header = False
+        contents = line_contents
+
+    return is_header, contents, start_new_section
 
 
 def main() -> None:
