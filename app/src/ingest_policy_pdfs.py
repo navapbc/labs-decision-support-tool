@@ -1,20 +1,15 @@
 import logging
 import re
 import sys
-from io import StringIO
 
-from pdfminer.high_level import extract_text_to_fp
+from pdfminer.high_level import extract_text
 from pdfminer.layout import LAParams
-from sentence_transformers import SentenceTransformer
 from smart_open import open as smart_open_file
 
-import src.adapters.db as db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
-
-output_string = StringIO()
 
 logger = logging.getLogger(__name__)
 
@@ -24,35 +19,33 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def _ingest_policy_pdfs(
-    db_session: db.Session,
     pdf_file_dir: str,
     doc_attribs: dict[str, str],
 ) -> None:
     file_list = get_files(pdf_file_dir)
     embedding_model = app_config.sentence_transformer
+    db_session = app_config.db_session()
     for file in file_list:
         if file.endswith(".pdf"):
             with smart_open_file(file, "rb") as fin:
-                extract_text_to_fp(fin, output_string, laparams=LAParams(), output_type="text")
-
-                parse_pdf_and_add_to_db(
-                    contents=output_string.getvalue(),
-                    db_session=db_session,
-                    doc_attribs=doc_attribs,
-                    embedding_model=embedding_model,
+                output_string = extract_text(fin, laparams=LAParams())
+                logger.info(
+                    f"Processing pdf file: {file} at {pdf_file_dir} using {embedding_model}, {db_session}, with {doc_attribs}"
                 )
 
-            logger.info(
-                f"Processing pdf file: {file} at {pdf_file_dir} using {embedding_model}, {db_session}, with {doc_attribs}"
-            )
+                parse_pdf_and_add_to_db(
+                    contents=output_string,
+                    doc_attribs=doc_attribs,
+                )
 
 
 def parse_pdf_and_add_to_db(
     contents: str,
-    db_session: db.Session,
     doc_attribs: dict[str, str],
-    embedding_model: SentenceTransformer,
 ) -> None:
+    db_session = app_config.db_session()
+    embedding_model = app_config.sentence_transformer
+
     # Match header in BEM manual
     header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
     text_split_by_header = re.split(header_pattern, contents)
