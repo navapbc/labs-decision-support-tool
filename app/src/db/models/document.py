@@ -46,3 +46,9 @@ class Chunk(Base, IdMixin, TimestampMixin):
 class ChunkWithScore:
     chunk: Chunk
     score: float
+
+
+@dataclass
+class DocumentWithMaxScore:
+    document: Document
+    max_score: float
