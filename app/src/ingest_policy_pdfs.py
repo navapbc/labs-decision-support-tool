@@ -6,6 +6,7 @@ from pdfminer.high_level import extract_text
 from pdfminer.layout import LAParams
 from smart_open import open as smart_open_file
 
+from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.file_util import get_files
@@ -34,17 +35,13 @@ def _ingest_policy_pdfs(
                 )
 
                 parse_pdf_and_add_to_db(
-                    contents=output_string,
-                    doc_attribs=doc_attribs,
+                    contents=output_string, doc_attribs=doc_attribs, db_session=db_session
                 )
 
 
 def parse_pdf_and_add_to_db(
-    contents: str,
-    doc_attribs: dict[str, str],
+    contents: str, doc_attribs: dict[str, str], db_session: db.Session
 ) -> None:
-    db_session = app_config.db_session()
-
     # Match header in BEM manual
     header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
     text_split_by_header = re.split(header_pattern, contents)
@@ -64,7 +61,8 @@ def parse_pdf_and_add_to_db(
     document = Document(name=current_title, content=body_content, **doc_attribs)
     db_session.add(document)
 
-    process_chunk(body_content, document)
+    process_chunk(body_content, document, db_session)
+    db_session.commit()
 
 
 def get_header_and_is_current_section(
@@ -86,8 +84,7 @@ def get_header_and_is_current_section(
     return is_header, contents, start_new_section
 
 
-def process_chunk(text: str, document: Document) -> None:
-    db_session = app_config.db_session()
+def process_chunk(text: str, document: Document, db_session: db.Session) -> None:
     embedding_model = app_config.sentence_transformer
     sentence_boundary_pattern = r"(?<=[.!?])\s+(?=[^\d])"
     sentence_boundaries = [
