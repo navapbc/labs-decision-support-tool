@@ -10,8 +10,8 @@ from src.ingest_policy_pdfs import _ingest_policy_pdfs
 
 @pytest.fixture
 def policy_s3_file(mock_s3_bucket_resource):
-    data = open("/app/tests/docs/policy_pdf.pdf", "rb")
-    mock_s3_bucket_resource.put_object(Body=data, Key="policy_pdf.pdf")
+    data = open("/app/tests/docs/bem_policy_pdf.pdf", "rb")
+    mock_s3_bucket_resource.put_object(Body=data, Key="bem_policy_pdf.pdf")
     return "s3://test_bucket/"
 
 
