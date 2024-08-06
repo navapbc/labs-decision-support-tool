@@ -26,17 +26,18 @@ def _ingest_policy_pdfs(
     file_list = get_files(pdf_file_dir)
     embedding_model = app_config.sentence_transformer
     db_session = app_config.db_session()
+
+    logger.info(f"Processing pdfs {pdf_file_dir} using {embedding_model} with {doc_attribs}")
     for file in file_list:
         if file.endswith(".pdf"):
+            logger.info(f"Processing pdf file: {file}")
             with smart_open_file(file, "rb") as fin:
                 output_string = extract_text(fin, laparams=LAParams())
-                logger.info(
-                    f"Processing pdf file: {file} at {pdf_file_dir} using {embedding_model}, {db_session}, with {doc_attribs}"
-                )
 
                 parse_pdf_and_add_to_db(
                     contents=output_string, doc_attribs=doc_attribs, db_session=db_session
                 )
+    db_session.commit()
 
 
 def parse_pdf_and_add_to_db(
@@ -62,7 +63,6 @@ def parse_pdf_and_add_to_db(
     db_session.add(document)
 
     process_chunk(body_content, document, db_session)
-    db_session.commit()
 
 
 def get_header_and_is_current_section(
