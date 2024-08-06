@@ -4,7 +4,6 @@ import sys
 
 from smart_open import open
 
-import src.adapters.db as db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.html import get_text_from_html
@@ -22,10 +21,10 @@ CONTENT_KEY = "content"
 
 
 def _ingest_cards(
-    db_session: db.Session,
     guru_cards_filepath: str,
     doc_attribs: dict[str, str],
 ) -> None:
+    db_session = app_config.db_session()
     with open(guru_cards_filepath, "r") as guru_cards_file:
         cards_as_json = json.load(guru_cards_file)
 

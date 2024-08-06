@@ -44,7 +44,6 @@ def parse_pdf_and_add_to_db(
     doc_attribs: dict[str, str],
 ) -> None:
     db_session = app_config.db_session()
-    embedding_model = app_config.sentence_transformer
 
     # Match header in BEM manual
     header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
@@ -62,35 +61,10 @@ def parse_pdf_and_add_to_db(
         else:
             body_content += f"{contents}\n"
 
-        # If starting a new section and body content is not empty, process and save it
-        if start_new_section and body_content.strip():
-            # Create and add the document to the database
-            document = Document(name=current_title, content=body_content, **doc_attribs)
-            db_session.add(document)
+    document = Document(name=current_title, content=body_content, **doc_attribs)
+    db_session.add(document)
 
-            # Tokenize and encode the content
-            tokens = len(embedding_model.tokenizer.tokenize(body_content))
-            mpnet_embedding = embedding_model.encode(body_content, show_progress_bar=False)
-
-            # Create and add the chunk to the database
-            chunk = Chunk(
-                document=document,
-                content=body_content,
-                tokens=tokens,
-                mpnet_embedding=mpnet_embedding,
-            )
-            db_session.add(chunk)
-
-            # Check if token count exceeds the maximum sequence length
-            if tokens > embedding_model.max_seq_length:
-                logger.warning(
-                    f"Page {current_title!r} has {tokens} tokens, which exceeds the embedding model's max sequence length."
-                )
-
-            # Reset the section state
-            current_title = contents
-            start_new_section = False
-            body_content = ""
+    process_chunk(body_content, document)
 
 
 def get_header_and_is_current_section(
@@ -110,6 +84,53 @@ def get_header_and_is_current_section(
         contents = line_contents
 
     return is_header, contents, start_new_section
+
+
+def process_chunk(text: str, document: Document) -> None:
+    db_session = app_config.db_session()
+    embedding_model = app_config.sentence_transformer
+    sentence_boundary_pattern = r"(?<=[.!?])\s+(?=[^\d])"
+    sentence_boundaries = [
+        (m.start(), m.end()) for m in re.finditer(sentence_boundary_pattern, text)
+    ]
+
+    current_chunk = []
+    current_token_count = 0
+    current_position = 0
+
+    # Tokenize and encode the content
+    mpnet_embedding = embedding_model.encode(text, show_progress_bar=False)
+    for boundary_start, boundary_end in sentence_boundaries:
+        sentence = text[current_position : boundary_start + 1]
+        current_position = boundary_end
+
+        token_count = len(embedding_model.tokenizer.tokenize(sentence))
+
+        if current_token_count + token_count <= embedding_model.max_seq_length:
+            current_chunk.append(sentence)
+            current_token_count += token_count
+        else:
+            chunk = Chunk(
+                document=document,
+                content="".join(current_chunk),
+                tokens=current_token_count,
+                mpnet_embedding=mpnet_embedding,
+            )
+            db_session.add(chunk)
+            current_chunk = [sentence]
+            current_token_count = token_count
+
+    # Append the last sentence
+    last_sentence = text[current_position:]
+    current_chunk.append(last_sentence)
+    final_chunk = Chunk(
+        document=document,
+        content="".join(current_chunk),
+        tokens=current_token_count,
+        mpnet_embedding=mpnet_embedding,
+    )
+
+    db_session.add(final_chunk)
 
 
 def main() -> None:

@@ -48,5 +48,5 @@ def test__ingest_policy_pdfs(
         assert documents[0].name == "BEM 105: MEDICAID OVERVIEW"
         assert "BPB 2024-001" in documents[0].content
         assert len(documents[0].chunks) == 1
-        assert documents[0].chunks[0].tokens == 62
+        assert documents[0].chunks[0].tokens == 50
         assert "Social Security" in documents[0].chunks[0].content
