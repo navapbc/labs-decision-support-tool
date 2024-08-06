@@ -58,7 +58,7 @@ def create_engine(engine_id: str) -> ChatEngineInterface | None:
 
 
 # Subclasses of ChatEngineInterface can be extracted into a separate file if it gets too large
-class GuruBaseEngine(ChatEngineInterface):
+class BaseEngine(ChatEngineInterface):
     datasets: list[str] = []
     llm: str = "gpt-4o"
 
@@ -85,24 +85,19 @@ class GuruBaseEngine(ChatEngineInterface):
         return OnMessageResult(response, chunks_with_scores)
 
 
-class GuruMultiprogramEngine(GuruBaseEngine):
+class GuruMultiprogramEngine(BaseEngine):
     engine_id: str = "guru-multiprogram"
     name: str = "Guru Multi-program Chat Engine"
     datasets = ["guru-multiprogram"]
 
 
-class GuruSnapEngine(GuruBaseEngine):
+class GuruSnapEngine(BaseEngine):
     engine_id: str = "guru-snap"
     name: str = "Guru SNAP Chat Engine"
     datasets = ["guru-snap"]
 
 
-class PolicyMichiganEngine(ChatEngineInterface):
-    engine_id: str = "policy-mi"
-    name: str = "Michigan Bridges Policy Manual Chat Engine"
-
-    def on_message(self, question: str) -> OnMessageResult:
-        logger.warning("TODO: Retrieve from MI Policy Manual")
-        chunks: Sequence[ChunkWithScore] = []
-        response = "TEMP: Replace with generated response once chunks are correct"
-        return OnMessageResult(response, chunks)
+class BridgesEligibilityManualEngine(BaseEngine):
+    engine_id: str = "bridges-eligibility-manual"
+    name: str = "Michigan Bridges Eligibility Manual Chat Engine"
+    datasets = ["bridges-eligibility-manual"]

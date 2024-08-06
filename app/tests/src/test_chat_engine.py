@@ -1,5 +1,5 @@
 from src import chat_engine
-from src.chat_engine import GuruMultiprogramEngine, GuruSnapEngine
+from src.chat_engine import GuruMultiprogramEngine, GuruSnapEngine, BridgesEligibilityManualEngine
 
 
 def test_available_engines():
@@ -23,3 +23,10 @@ def test_create_engine_Guru_SNAP():
     engine = chat_engine.create_engine(engine_id)
     assert engine is not None
     assert engine.name == GuruSnapEngine.name
+
+
+def test_create_engine_BridgesEligibilityManualEngine():
+    engine_id = "bridges-eligibility-manual"
+    engine = chat_engine.create_engine(engine_id)
+    assert engine is not None
+    assert engine.name == BridgesEligibilityManualEngine.name
