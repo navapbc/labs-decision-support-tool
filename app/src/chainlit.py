@@ -19,7 +19,11 @@ require_login()
 
 @cl.on_chat_start
 async def start() -> None:
-    engine_id = engine_url_query_value()
+    url = cl.user_session.get("http_referer")
+    logger.debug("Referer URL: %s", url)
+    query_values = url_query_values(url)
+
+    engine_id = query_values.pop("engine", app_config.chat_engine)
     logger.info("Engine ID: %s", engine_id)
 
     engine = _init_chat_engine(engine_id)
@@ -31,12 +35,31 @@ async def start() -> None:
         ).send()
         return
 
-    settings = await _init_chat_settings(engine)
+    input_widgets = _init_chat_settings(engine, query_values)
+    settings = await cl.ChatSettings(input_widgets).send()
+    logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
+    if query_values:
+        logger.warning("Unused URL query parameters: %r", query_values)
+        await cl.Message(
+            author="backend",
+            metadata={"url": url},
+            content=f"Unused URL query parameters: {query_values}",
+        ).send()
+
     await cl.Message(
         author="backend",
         metadata={"engine": engine_id, "settings": str(settings)},
         content=f"{engine.name} started with settings:\n{pprint.pformat(settings, indent=3)}",
     ).send()
+
+
+def url_query_values(url: str) -> dict[str, str]:
+    # Using this suggestion: https://github.com/Chainlit/chainlit/issues/144#issuecomment-2227543547
+    parsed_url = urlparse(url)
+    # For a given query key, only the first value is used
+    query_values = {key: values[0] for key, values in parse_qs(parsed_url.query).items()}
+    logger.info("URL query values: %r", query_values)
+    return query_values
 
 
 def _init_chat_engine(engine_id: str) -> ChatEngineInterface | None:
@@ -47,16 +70,19 @@ def _init_chat_engine(engine_id: str) -> ChatEngineInterface | None:
     return None
 
 
-async def _init_chat_settings(engine: ChatEngineInterface) -> dict[str, Any]:
+def _init_chat_settings(
+    engine: ChatEngineInterface, query_values: dict[str, str]
+) -> list[InputWidget]:
     input_widgets: list[InputWidget] = [
-        _WIDGET_FACTORIES[setting_name](getattr(engine, setting_name))
+        _WIDGET_FACTORIES[setting_name](
+            query_values.pop(setting_name, None)
+            or getattr(app_config, setting_name, None)
+            or getattr(engine, setting_name)
+        )
         for setting_name in engine.user_settings
         if setting_name in _WIDGET_FACTORIES
     ]
-    input_widgets.append(_WIDGET_FACTORIES["llm"](app_config.llm or getattr(engine, "llm", None)))
-    settings = await cl.ChatSettings(input_widgets).send()
-    logger.info("Initialized settings: %s", pprint.pformat(settings, indent=4))
-    return settings
+    return input_widgets
 
 
 @cl.on_settings_update
@@ -83,41 +109,31 @@ _WIDGET_FACTORIES = {
         max=10,
         step=1,
     ),
-    "retrieval_k_min_score": lambda default_value: Slider(
+    "retrieval_k_min_score": lambda initial_value: Slider(
         id="retrieval_k_min_score",
         label="Minimum document score required for generating LLM response",
-        initial=default_value,
+        initial=initial_value,
         min=-1,
         max=1,
         step=0.25,
     ),
-    "docs_shown_max_num": lambda default_value: Slider(
+    "docs_shown_max_num": lambda initial_value: Slider(
         id="docs_shown_max_num",
         label="Maximum number of retrieved documents to show in the UI",
-        initial=default_value,
+        initial=initial_value,
         min=0,
         max=10,
         step=1,
     ),
-    "docs_shown_min_score": lambda default_value: Slider(
+    "docs_shown_min_score": lambda initial_value: Slider(
         id="docs_shown_min_score",
         label="Minimum document score required to show document in the UI",
-        initial=default_value,
+        initial=initial_value,
         min=-1,
         max=1,
         step=0.25,
     ),
 }
-
-
-def engine_url_query_value() -> str:
-    url = cl.user_session.get("http_referer")
-    logger.debug("Referer URL: %s", url)
-
-    # Using this suggestion: https://github.com/Chainlit/chainlit/issues/144#issuecomment-2227543547
-    parsed_url = urlparse(url)
-    qs = parse_qs(parsed_url.query)
-    return qs.get("engine", [app_config.chat_engine])[0]
 
 
 @cl.on_message
