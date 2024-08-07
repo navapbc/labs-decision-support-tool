@@ -29,7 +29,7 @@ def process_and_ingest_sys_args(sys: ModuleType, logger: Logger, ingestion_call:
     }
 
     with app_config.db_session() as db_session:
-        ingestion_call(pdf_file_dir, doc_attribs)
+        ingestion_call(db_session, pdf_file_dir, doc_attribs)
         db_session.commit()
 
     logger.info("Finished processing")

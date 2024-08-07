@@ -28,9 +28,9 @@ def test__ingest_policy_pdfs(caplog, app_config, db_session, policy_s3_file, fil
 
     with caplog.at_level(logging.INFO):
         if file_location == "local":
-            _ingest_policy_pdfs("/app/tests/docs/", doc_attribs)
+            _ingest_policy_pdfs(db_session, "/app/tests/docs/", doc_attribs)
         else:
-            _ingest_policy_pdfs(policy_s3_file, doc_attribs)
+            _ingest_policy_pdfs(db_session, policy_s3_file, doc_attribs)
 
         assert any(text.startswith("Processing pdf file:") for text in caplog.messages)
         documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
