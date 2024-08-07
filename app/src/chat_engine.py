@@ -93,18 +93,18 @@ class GuruMultiprogramEngine(BaseEngine):
     engine_id: str = "guru-multiprogram"
     name: str = "Guru Multi-program Chat Engine"
     datasets = ["guru-multiprogram"]
-    formatter = format_guru_cards
+    formatter = staticmethod(format_guru_cards)
 
 
 class GuruSnapEngine(BaseEngine):
     engine_id: str = "guru-snap"
     name: str = "Guru SNAP Chat Engine"
     datasets = ["guru-snap"]
-    formatter = format_guru_cards
+    formatter = staticmethod(format_guru_cards)
 
 
 class BridgesEligibilityManualEngine(BaseEngine):
     engine_id: str = "bridges-eligibility-manual"
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
     datasets = ["bridges-eligibility-manual"]
-    formatter = format_bem_documents
+    formatter = staticmethod(format_bem_documents)
