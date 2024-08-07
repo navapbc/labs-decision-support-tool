@@ -2,7 +2,7 @@ import logging
 import random
 from typing import Sequence
 
-from src.db.models.document import ChunkWithScore
+from src.db.models.document import ChunkWithScore, Document, DocumentWithMaxScore
 
 logger = logging.getLogger(__name__)
 
@@ -49,3 +49,42 @@ def format_guru_cards(
     </div>
 </div>"""
     return "<h3>Related Guru cards</h3>" + cards_html
+
+
+def _get_bem_documents_to_show(
+    docs_shown_max_num: int,
+    docs_shown_min_score: float,
+    chunks_with_scores: Sequence[ChunkWithScore],
+) -> Sequence[Document]:
+    # Build a deduplicated list of documents with the max score
+    # of all chunks associated with the document.
+    documents_with_scores: list[DocumentWithMaxScore] = []
+    for chunk_with_score in chunks_with_scores:
+        if chunk_with_score.score >= docs_shown_min_score:
+            document = chunk_with_score.chunk.document
+            existing_doc = next(
+                (d for d in documents_with_scores if d.document == document),
+                None,
+            )
+            if existing_doc:
+                existing_doc.max_score = max(existing_doc.max_score, chunk_with_score.score)
+            else:
+                documents_with_scores.append(DocumentWithMaxScore(document, chunk_with_score.score))
+
+    # Sort the list by score
+    documents_with_scores.sort(key=lambda d: d.max_score, reverse=True)
+
+    # Only return the top docs_shown_max_num documents
+    return [d.document for d in documents_with_scores[:docs_shown_max_num]]
+
+
+def format_bem_documents(
+    docs_shown_max_num: int,
+    docs_shown_min_score: float,
+    chunks_with_scores: Sequence[ChunkWithScore],
+) -> str:
+    documents = _get_bem_documents_to_show(
+        docs_shown_max_num, docs_shown_min_score, chunks_with_scores
+    )
+    formatted_documents = "".join([f"<li>{document.name}</li>" for document in documents])
+    return f"<h3>Source(s)</h3><ul>{formatted_documents}</ul>"

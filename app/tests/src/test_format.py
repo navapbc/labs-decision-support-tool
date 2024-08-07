@@ -2,9 +2,10 @@ import re
 
 from sqlalchemy import delete
 
-from src.db.models.document import Chunk, ChunkWithScore, Document
-from src.format import format_guru_cards
+from src.db.models.document import ChunkWithScore, Document
+from src.format import format_bem_documents, format_guru_cards
 from src.retrieve import retrieve_with_scores
+from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 from tests.src.test_retrieve import _create_chunks
 
 
@@ -43,9 +44,9 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
 def _chunks_with_scores():
     return [
-        ChunkWithScore(Chunk(document=Document(name="name1", content="content1")), 0.99),
-        ChunkWithScore(Chunk(document=Document(name="name2", content="content2")), 0.90),
-        ChunkWithScore(Chunk(document=Document(name="name3", content="content3")), 0.85),
+        ChunkWithScore(ChunkFactory.build(), 0.99),
+        ChunkWithScore(ChunkFactory.build(), 0.90),
+        ChunkWithScore(ChunkFactory.build(), 0.85),
     ]
 
 
@@ -61,3 +62,29 @@ def test_format_guru_cards_given_docs_shown_max_num_and_min_score():
         docs_shown_max_num=2, docs_shown_min_score=0.91, chunks_with_scores=_chunks_with_scores()
     )
     assert len(_unique_accordion_ids(html)) == 1
+
+
+def test_format_bem_documents():
+    docs = DocumentFactory.build_batch(4)
+
+    chunks_with_scores = [
+        # This document is ignored because below docs_shown_min_score
+        ChunkWithScore(ChunkFactory.build(document=docs[0]), 0.90),
+        # This document is excluded because docs_shown_max_num = 2,
+        # and it has the lowest score of the three documents with chunks over
+        # the docs_shown_min_score threshold
+        ChunkWithScore(ChunkFactory.build(document=docs[1]), 0.92),
+        # This document is included because a chunk puts
+        # it over the docs_shown_min_score threshold
+        ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.90),
+        ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.93),
+        # This document is included, but only once
+        # And it will be displayed first because it has the highest score
+        ChunkWithScore(ChunkFactory.build(document=docs[3]), 0.94),
+        ChunkWithScore(ChunkFactory.build(document=docs[3]), 0.95),
+    ]
+
+    html = format_bem_documents(
+        docs_shown_max_num=2, docs_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
+    )
+    assert html == f"<h3>Source(s)</h3><ul><li>{docs[3].name}</li><li>{docs[2].name}</li></ul>"

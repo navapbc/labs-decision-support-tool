@@ -1,5 +1,5 @@
 from src import chat_engine
-from src.chat_engine import GuruMultiprogramEngine, GuruSnapEngine
+from src.chat_engine import BridgesEligibilityManualEngine, GuruMultiprogramEngine, GuruSnapEngine
 
 
 def test_available_engines():
@@ -8,7 +8,7 @@ def test_available_engines():
     assert len(engines) > 0
     assert "guru-multiprogram" in engines
     assert "guru-snap" in engines
-    assert "policy-mi" in engines
+    assert "bridges-eligibility-manual" in engines
 
 
 def test_create_engine_Guru_Multiprogram():
@@ -23,3 +23,10 @@ def test_create_engine_Guru_SNAP():
     engine = chat_engine.create_engine(engine_id)
     assert engine is not None
     assert engine.name == GuruSnapEngine.name
+
+
+def test_create_engine_BridgesEligibilityManualEngine():
+    engine_id = "bridges-eligibility-manual"
+    engine = chat_engine.create_engine(engine_id)
+    assert engine is not None
+    assert engine.name == BridgesEligibilityManualEngine.name
