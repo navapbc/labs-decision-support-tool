@@ -94,9 +94,9 @@ custom_js = "https://cdnjs.cloudflare.com/ajax/libs/uswds/3.8.1/js/uswds.min.js"
     #paper = "#FFFFFF"
 
     [UI.theme.light.primary]
-        #main = "#F80061"
-        #dark = "#980039"
-        #light = "#FFE7EB"
+        main = "#4d8055"
+        dark = "#1a1f1a"
+        light = "#ecf3ec"
     [UI.theme.light.text]
         #primary = "#212121"
         #secondary = "#616161"
@@ -107,9 +107,9 @@ custom_js = "https://cdnjs.cloudflare.com/ajax/libs/uswds/3.8.1/js/uswds.min.js"
     #paper = "#FFFFFF"
 
     [UI.theme.dark.primary]
-        #main = "#F80061"
-        #dark = "#980039"
-        #light = "#FFE7EB"
+        main = "#4d8055"
+        dark = "#1a1f1a"
+        light = "#ecf3ec"
     [UI.theme.dark.text]
         #primary = "#EEEEEE"
         #secondary = "#BDBDBD"
