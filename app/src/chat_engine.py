@@ -1,9 +1,10 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Callable, Sequence
 
 from src.db.models.document import ChunkWithScore
+from src.format import format_bem_documents, format_guru_cards
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
@@ -20,6 +21,9 @@ class OnMessageResult:
 class ChatEngineInterface(ABC):
     engine_id: str
     name: str
+
+    # Function for formatting responses
+    formatter: Callable
 
     # Thresholds that determine which retrieved documents are shown in the UI
     docs_shown_max_num: int = 5
@@ -89,15 +93,18 @@ class GuruMultiprogramEngine(BaseEngine):
     engine_id: str = "guru-multiprogram"
     name: str = "Guru Multi-program Chat Engine"
     datasets = ["guru-multiprogram"]
+    formatter = format_guru_cards
 
 
 class GuruSnapEngine(BaseEngine):
     engine_id: str = "guru-snap"
     name: str = "Guru SNAP Chat Engine"
     datasets = ["guru-snap"]
+    formatter = format_guru_cards
 
 
 class BridgesEligibilityManualEngine(BaseEngine):
     engine_id: str = "bridges-eligibility-manual"
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
     datasets = ["bridges-eligibility-manual"]
+    formatter = format_bem_documents

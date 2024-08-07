@@ -7,8 +7,7 @@ import chainlit as cl
 from chainlit.input_widget import InputWidget, Select, Slider
 from src import chat_engine
 from src.app_config import app_config
-from src.chat_engine import BridgesEligibilityManualEngine, ChatEngineInterface
-from src.format import format_bem_documents, format_guru_cards
+from src.chat_engine import ChatEngineInterface
 from src.generate import get_models
 from src.login import require_login
 
@@ -128,20 +127,11 @@ async def on_message(message: cl.Message) -> None:
     try:
         result = await cl.make_async(lambda: engine.on_message(question=message.content))()
 
-        msg_content = result.response
-
-        if isinstance(engine, BridgesEligibilityManualEngine):
-            msg_content += format_bem_documents(
-                docs_shown_max_num=engine.docs_shown_max_num,
-                docs_shown_min_score=engine.docs_shown_min_score,
-                chunks_with_scores=result.chunks_with_scores,
-            )
-        else:
-            msg_content += format_guru_cards(
-                docs_shown_max_num=engine.docs_shown_max_num,
-                docs_shown_min_score=engine.docs_shown_min_score,
-                chunks_with_scores=result.chunks_with_scores,
-            )
+        msg_content = result.response + engine.formatter(
+            docs_shown_max_num=engine.docs_shown_max_num,
+            docs_shown_min_score=engine.docs_shown_min_score,
+            chunks_with_scores=result.chunks_with_scores,
+        )
 
         chunk_titles_and_scores: dict[str, float] = {}
         for chunk_with_score in result.chunks_with_scores:

@@ -51,4 +51,5 @@ class ChunkWithScore:
 @dataclass
 class DocumentWithMaxScore:
     document: Document
+    # The maxmium similarity score of all Chunks associated with that document
     max_score: float
