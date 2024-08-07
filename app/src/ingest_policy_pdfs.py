@@ -20,9 +20,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def _ingest_policy_pdfs(
+    db_session: db.Session,
     pdf_file_dir: str,
     doc_attribs: dict[str, str],
-    db_session: db.Session,
 ) -> None:
     file_list = get_files(pdf_file_dir)
     embedding_model = app_config.sentence_transformer

@@ -4,11 +4,11 @@ import sys
 
 from smart_open import open
 
+from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.html import get_text_from_html
 from src.util.ingest_utils import process_and_ingest_sys_args
-from src.adapters import db
 
 logger = logging.getLogger(__name__)
 
