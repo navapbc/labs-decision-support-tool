@@ -130,11 +130,4 @@ def process_chunk(text: str, document: Document, db_session: db.Session) -> None
 
 
 def main() -> None:
-    if len(sys.argv) < 5:
-        logger.warning(
-            "Expecting 4 arguments: DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH\n   but got: %s",
-            sys.argv[1:],
-        )
-        return
-
-    process_and_ingest_sys_args(sys, logger, _ingest_policy_pdfs)
+    process_and_ingest_sys_args(sys.argv, logger, _ingest_policy_pdfs)
