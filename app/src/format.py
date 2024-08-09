@@ -66,7 +66,8 @@ def format_bem_documents(
     documents = _get_bem_documents_to_show(
         docs_shown_max_num, docs_shown_min_score, chunks_with_scores
     )
-    pdf_chunks = ""
+
+    document_by_source = {}
     for chunk_with_score in documents:
         document = chunk_with_score.document
         if chunk_with_score.max_score < docs_shown_min_score:
@@ -76,9 +77,11 @@ def format_bem_documents(
                 document.name,
             )
             continue
-        pdf_chunks += format_to_accordion_html(document=document, score=chunk_with_score.max_score)
+        doc_grouping = document_by_source.setdefault(document.name, [])
+        doc_grouping.append(DocumentWithMaxScore(document, chunk_with_score.max_score))
 
-    return "<h3>Source(s)</h3>" + pdf_chunks
+    pdf_chunks = format_to_accordion_group_html(document_by_source)
+    return "<h3>Source(s)</h3>" + pdf_chunks if pdf_chunks else ""
 
 
 def format_to_accordion_html(document: Document, score: float) -> str:
@@ -95,7 +98,7 @@ def format_to_accordion_html(document: Document, score: float) -> str:
                 aria-expanded="false"
                 aria-controls="a-{_accordion_id}"
                 >
-                <a href='https://link/to/guru_card'>{document.name}</a>
+                <a href='https://link'>{document.name}</a>
             </button>
         </h4>
         <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
@@ -103,3 +106,32 @@ def format_to_accordion_html(document: Document, score: float) -> str:
             {similarity_score}
         </div>
     </div>"""
+
+
+def format_to_accordion_group_html(documents: dict[str, list[DocumentWithMaxScore]]) -> str:
+    global _accordion_id
+    _accordion_id += 1
+    for document_name, document_content in documents.items():
+        document_content = documents[document_name]
+        internal_citation = ""
+        for document_details in document_content:
+            document = document_details.document
+            max_score = document_details.max_score
+            internal_citation += f"""<div id="a-{_accordion_id}" class="usa-accordion__content usa-prose margin-left-2 border-left-1 border-base-lighter" hidden>
+                    <p>Summary: {document.content.strip() if document.content else ""}</p>
+                    <p>Similarity Score: {str(max_score)}</p>
+                </div>"""
+        return f"""
+        <div class="usa-accordion" id=accordion-{_accordion_id}>
+            <h4 class="usa-accordion__heading">
+                <button
+                    type="button"
+                    class="usa-accordion__button"
+                    aria-expanded="false"
+                    aria-controls="a-{_accordion_id}"
+                    >
+                    <a href='https://link'>{document_name}</a>
+                </button>
+            </h4>
+            {internal_citation}
+        </div>"""
