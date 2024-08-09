@@ -83,6 +83,21 @@ def get_header_and_is_current_section(
     return is_header, contents, start_new_section
 
 
+def _add_chunk(
+    db_session: db.Session, current_chunk: list[str], document: Document, current_token_count: int
+) -> None:
+    embedding_model = app_config.sentence_transformer
+    chunk_text = "".join(current_chunk)
+    chunk_embedding = embedding_model.encode(chunk_text, show_progress_bar=False)
+    chunk = Chunk(
+        document=document,
+        content=chunk_text,
+        tokens=current_token_count,
+        mpnet_embedding=chunk_embedding,
+    )
+    db_session.add(chunk)
+
+
 def process_chunk(text: str, document: Document, db_session: db.Session) -> None:
     embedding_model = app_config.sentence_transformer
     sentence_boundary_pattern = r"(?<=[.!?])\s+(?=[^\d])"
@@ -94,8 +109,6 @@ def process_chunk(text: str, document: Document, db_session: db.Session) -> None
     current_token_count = 0
     current_position = 0
 
-    # Tokenize and encode the content
-    mpnet_embedding = embedding_model.encode(text, show_progress_bar=False)
     for boundary_start, boundary_end in sentence_boundaries:
         sentence = text[current_position : boundary_start + 1]
         current_position = boundary_end
@@ -106,27 +119,15 @@ def process_chunk(text: str, document: Document, db_session: db.Session) -> None
             current_chunk.append(sentence)
             current_token_count += token_count
         else:
-            chunk = Chunk(
-                document=document,
-                content="".join(current_chunk),
-                tokens=current_token_count,
-                mpnet_embedding=mpnet_embedding,
-            )
-            db_session.add(chunk)
+            _add_chunk(db_session, current_chunk, document, current_token_count)
+            # Initialize the variable with sentence, which was not used in the above chunk added to the DB
             current_chunk = [sentence]
             current_token_count = token_count
 
     # Append the last sentence
     last_sentence = text[current_position:]
     current_chunk.append(last_sentence)
-    final_chunk = Chunk(
-        document=document,
-        content="".join(current_chunk),
-        tokens=current_token_count,
-        mpnet_embedding=mpnet_embedding,
-    )
-
-    db_session.add(final_chunk)
+    _add_chunk(db_session, current_chunk, document, current_token_count)
 
 
 def main() -> None:
