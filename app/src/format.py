@@ -27,27 +27,7 @@ def format_guru_cards(
                 document.name,
             )
             continue
-
-        global _accordion_id
-        _accordion_id += 1
-        similarity_score = f"<p>Similarity Score: {str(chunk_with_score.score)}</p>"
-        cards_html += f"""
-<div class="usa-accordion" id=accordion-{_accordion_id}>
-    <h4 class="usa-accordion__heading">
-        <button
-            type="button"
-            class="usa-accordion__button"
-            aria-expanded="false"
-            aria-controls="a-{_accordion_id}"
-            >
-            <a href='https://link/to/guru_card'>{document.name}</a>
-        </button>
-    </h4>
-    <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-        <p>Summary: {document.content}</p>
-        {similarity_score}
-    </div>
-</div>"""
+        cards_html += format_to_accordion_html(document=document, score=chunk_with_score.score)
     return "<h3>Related Guru cards</h3>" + cards_html
 
 
@@ -55,7 +35,7 @@ def _get_bem_documents_to_show(
     docs_shown_max_num: int,
     docs_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
-) -> Sequence[Document]:
+) -> Sequence[DocumentWithMaxScore]:
     # Build a deduplicated list of documents with the max score
     # of all chunks associated with the document.
     documents_with_scores: list[DocumentWithMaxScore] = []
@@ -75,7 +55,7 @@ def _get_bem_documents_to_show(
     documents_with_scores.sort(key=lambda d: d.max_score, reverse=True)
 
     # Only return the top docs_shown_max_num documents
-    return [d.document for d in documents_with_scores[:docs_shown_max_num]]
+    return documents_with_scores[:docs_shown_max_num]
 
 
 def format_bem_documents(
@@ -86,5 +66,40 @@ def format_bem_documents(
     documents = _get_bem_documents_to_show(
         docs_shown_max_num, docs_shown_min_score, chunks_with_scores
     )
-    formatted_documents = "".join([f"<li>{document.name}</li>" for document in documents])
-    return f"<h3>Source(s)</h3><ul>{formatted_documents}</ul>"
+    cards_html = ""
+    for chunk_with_score in documents:
+        document = chunk_with_score.document
+        if chunk_with_score.max_score < docs_shown_min_score:
+            logger.info(
+                "Skipping chunk with score less than %f: %s",
+                docs_shown_min_score,
+                document.name,
+            )
+            continue
+        cards_html += format_to_accordion_html(document=document, score=chunk_with_score.max_score)
+
+    return "<h3>Source(s)</h3>" + cards_html
+
+
+def format_to_accordion_html(document: Document, score: float) -> str:
+    global _accordion_id
+    _accordion_id += 1
+    similarity_score = f"<p>Similarity Score: {str(score)}</p>"
+
+    return f"""
+    <div class="usa-accordion" id=accordion-{_accordion_id}>
+        <h4 class="usa-accordion__heading">
+            <button
+                type="button"
+                class="usa-accordion__button"
+                aria-expanded="false"
+                aria-controls="a-{_accordion_id}"
+                >
+                <a href='https://link/to/guru_card'>{document.name}</a>
+            </button>
+        </h4>
+        <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
+            <p>Summary: {document.content.strip() if document.content else document.content}</p>
+            {similarity_score}
+        </div>
+    </div>"""
