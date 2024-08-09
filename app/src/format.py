@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import Sequence
+from typing import OrderedDict, Sequence
 
 from src.db.models.document import ChunkWithScore, Document, DocumentWithMaxScore
 
@@ -27,35 +27,36 @@ def format_guru_cards(
                 document.name,
             )
             continue
-        cards_html += format_to_accordion_html(document=document, score=chunk_with_score.score)
+        cards_html += _format_to_accordion_html(document=document, score=chunk_with_score.score)
     return "<h3>Related Guru cards</h3>" + cards_html
 
 
 def _get_bem_documents_to_show(
     docs_shown_max_num: int,
     docs_shown_min_score: float,
-    chunks_with_scores: Sequence[ChunkWithScore],
-) -> Sequence[DocumentWithMaxScore]:
-    # Build a deduplicated list of documents with the max score
-    # of all chunks associated with the document.
-    documents_with_scores: list[DocumentWithMaxScore] = []
-    for chunk_with_score in chunks_with_scores:
-        if chunk_with_score.score >= docs_shown_min_score:
-            document = chunk_with_score.chunk.document
-            existing_doc = next(
-                (d for d in documents_with_scores if d.document == document),
-                None,
+    chunks_with_scores: list[ChunkWithScore],
+) -> OrderedDict[Document, list[ChunkWithScore]]:
+    chunks_with_scores.sort(key=lambda c: c.score, reverse=True)
+
+    # Build a dictionary of documents with their associated chunks,
+    # Ordered by the highest score of each chunk associated with the document
+    documents: OrderedDict[Document, list[ChunkWithScore]] = OrderedDict()
+    for chunk_with_score in chunks_with_scores[:docs_shown_max_num]:
+        document = chunk_with_score.chunk.document
+        if chunk_with_score.score < docs_shown_min_score:
+            logger.info(
+                "Skipping chunk with score less than %f: %s",
+                docs_shown_min_score,
+                chunk_with_score.chunk.document.name,
             )
-            if existing_doc:
-                existing_doc.max_score = max(existing_doc.max_score, chunk_with_score.score)
-            else:
-                documents_with_scores.append(DocumentWithMaxScore(document, chunk_with_score.score))
+            continue
 
-    # Sort the list by score
-    documents_with_scores.sort(key=lambda d: d.max_score, reverse=True)
+        if document in documents:
+            documents[document].append(chunk_with_score)
+        else:
+            documents[document] = [chunk_with_score]
 
-    # Only return the top docs_shown_max_num documents
-    return documents_with_scores[:docs_shown_max_num]
+    return documents
 
 
 def format_bem_documents(
@@ -67,24 +68,10 @@ def format_bem_documents(
         docs_shown_max_num, docs_shown_min_score, chunks_with_scores
     )
 
-    document_by_source = {}
-    for chunk_with_score in documents:
-        document = chunk_with_score.document
-        if chunk_with_score.max_score < docs_shown_min_score:
-            logger.info(
-                "Skipping chunk with score less than %f: %s",
-                docs_shown_min_score,
-                document.name,
-            )
-            continue
-        doc_grouping = document_by_source.setdefault(document.name, [])
-        doc_grouping.append(DocumentWithMaxScore(document, chunk_with_score.max_score))
-
-    pdf_chunks = format_to_accordion_group_html(document_by_source)
-    return "<h3>Source(s)</h3>" + pdf_chunks if pdf_chunks else ""
+    return _format_to_accordion_group_html(documents)
 
 
-def format_to_accordion_html(document: Document, score: float) -> str:
+def _format_to_accordion_html(document: Document, score: float) -> str:
     global _accordion_id
     _accordion_id += 1
     similarity_score = f"<p>Similarity Score: {str(score)}</p>"
@@ -102,36 +89,38 @@ def format_to_accordion_html(document: Document, score: float) -> str:
             </button>
         </h4>
         <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-            <p>Summary: {document.content.strip() if document.content else ""}</p>
+            {"<p>Summary: " + document.content.strip() if document.content else ""}</p>
             {similarity_score}
         </div>
     </div>"""
 
 
-def format_to_accordion_group_html(documents: dict[str, list[DocumentWithMaxScore]]) -> str:
+def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkWithScore]]) -> str:
     global _accordion_id
     _accordion_id += 1
-    for document_name, document_content in documents.items():
-        document_content = documents[document_name]
-        internal_citation = ""
-        for document_details in document_content:
-            document = document_details.document
-            max_score = document_details.max_score
+    print(documents)
+    html = "<h3>Source(s)</h3>"
+    for document in documents:
+        internal_citation=""
+        for index, chunk in enumerate(documents[document], start=1):
             internal_citation += f"""<div id="a-{_accordion_id}" class="usa-accordion__content usa-prose margin-left-2 border-left-1 border-base-lighter" hidden>
-                    <p>Summary: {document.content.strip() if document.content else ""}</p>
-                    <p>Similarity Score: {str(max_score)}</p>
+                    <h4>Citation #{index} (score: {chunk.score})</h4>
+                    {f"<p>Summary: {chunk.chunk.content.strip()} </p>" if chunk.chunk.content else ""}
+                    <p>Similarity Score: {str(chunk.score)}</p>
                 </div>"""
-        return f"""
-        <div class="usa-accordion" id=accordion-{_accordion_id}>
-            <h4 class="usa-accordion__heading">
-                <button
-                    type="button"
-                    class="usa-accordion__button"
-                    aria-expanded="false"
-                    aria-controls="a-{_accordion_id}"
-                    >
-                    <a href='https://link'>{document_name}</a>
-                </button>
-            </h4>
-            {internal_citation}
-        </div>"""
+        
+        html+= f"""
+            <div class="usa-accordion" id=accordion-{_accordion_id}>
+                <h4 class="usa-accordion__heading">
+                    <button
+                        type="button"
+                        class="usa-accordion__button"
+                        aria-expanded="false"
+                        aria-controls="a-{_accordion_id}"
+                        >
+                        <a href='https://link'>{document.name}</a>
+                    </button>
+                </h4>
+                {internal_citation}
+            </div>"""
+    return html

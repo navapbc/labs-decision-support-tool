@@ -3,7 +3,7 @@ import re
 from sqlalchemy import delete
 
 from src.db.models.document import ChunkWithScore, Document
-from src.format import format_bem_documents, format_guru_cards, format_to_accordion_html
+from src.format import format_bem_documents, format_guru_cards, _format_to_accordion_html
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 from tests.src.test_retrieve import _create_chunks
@@ -64,12 +64,12 @@ def test_format_guru_cards_given_docs_shown_max_num_and_min_score():
     assert len(_unique_accordion_ids(html)) == 1
 
 
-def test_format_to_accordion_html(app_config, db_session, enable_factory_create):
+def test__format_to_accordion_html(app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
     chunks_with_scores = _get_chunks_with_scores()
     document = chunks_with_scores[0].chunk.document
     score = 0.92
-    html = format_to_accordion_html(document=document, score=score)
+    html = _format_to_accordion_html(document=document, score=score)
     assert document.name in html
     assert document.content in html
     assert "<p>Similarity Score: 0.92</p>" in html
