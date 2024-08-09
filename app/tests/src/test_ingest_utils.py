@@ -11,7 +11,7 @@ from tests.src.db.models.factories import DocumentFactory
 def test__drop_existing_dataset(db_session, enable_factory_create):
     db_session.execute(delete(Document))
 
-    docs = DocumentFactory.create_batch(2)
+    docs = DocumentFactory(dataset="1"), DocumentFactory(dataset="2")
 
     # This shouldn't do anything
     assert _drop_existing_dataset(db_session, "nonexistent dataset") is False
