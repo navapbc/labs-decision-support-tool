@@ -66,7 +66,7 @@ def format_bem_documents(
     documents = _get_bem_documents_to_show(
         docs_shown_max_num, docs_shown_min_score, chunks_with_scores
     )
-    cards_html = ""
+    pdf_chunks = ""
     for chunk_with_score in documents:
         document = chunk_with_score.document
         if chunk_with_score.max_score < docs_shown_min_score:
@@ -76,9 +76,9 @@ def format_bem_documents(
                 document.name,
             )
             continue
-        cards_html += format_to_accordion_html(document=document, score=chunk_with_score.max_score)
+        pdf_chunks += format_to_accordion_html(document=document, score=chunk_with_score.max_score)
 
-    return "<h3>Source(s)</h3>" + cards_html
+    return "<h3>Source(s)</h3>" + pdf_chunks
 
 
 def format_to_accordion_html(document: Document, score: float) -> str:
