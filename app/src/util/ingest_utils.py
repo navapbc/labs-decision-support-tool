@@ -1,16 +1,33 @@
 import getopt
 from logging import Logger
-from types import ModuleType
 from typing import Callable
 
+from sqlalchemy import delete, select
+
+from src.adapters import db
 from src.app_config import app_config
+from src.db.models.document import Document
 
 
-def process_and_ingest_sys_args(sys: ModuleType, logger: Logger, ingestion_call: Callable) -> None:
+def _drop_existing_dataset(db_session: db.Session, dataset: str) -> bool:
+    dataset_exists = db_session.execute(select(Document).where(Document.dataset == dataset)).first()
+    if dataset_exists:
+        db_session.execute(delete(Document).where(Document.dataset == dataset))
+    return dataset_exists is not None
+
+
+def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call: Callable) -> None:
     """Method that reads sys args and passes them into ingestion call"""
 
-    opts, args = getopt.getopt(
-        sys.argv[1:], shortopts="", longopts=["DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH)"]
+    if len(argv[1:]) != 4:
+        logger.warning(
+            "Expecting 4 arguments: DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH\n   but got: %s",
+            argv[1:],
+        )
+        return
+
+    _, args = getopt.getopt(
+        argv[1:], shortopts="", longopts=["DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH)"]
     )
 
     dataset_id = args[0]
@@ -29,6 +46,9 @@ def process_and_ingest_sys_args(sys: ModuleType, logger: Logger, ingestion_call:
     }
 
     with app_config.db_session() as db_session:
+        dropped = _drop_existing_dataset(db_session, dataset_id)
+        if dropped:
+            logger.warning("Dropped existing dataset %s", dataset_id)
         ingestion_call(db_session, pdf_file_dir, doc_attribs)
         db_session.commit()
 

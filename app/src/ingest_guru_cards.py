@@ -54,11 +54,4 @@ def _ingest_cards(
 
 
 def main() -> None:
-    if len(sys.argv) < 5:
-        logger.warning(
-            "Expecting 4 arguments: DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH\n   but got: %s",
-            sys.argv[1:],
-        )
-        return
-
-    process_and_ingest_sys_args(sys, logger, _ingest_cards)
+    process_and_ingest_sys_args(sys.argv, logger, _ingest_cards)
