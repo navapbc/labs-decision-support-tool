@@ -99,7 +99,7 @@ def format_to_accordion_html(document: Document, score: float) -> str:
             </button>
         </h4>
         <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-            <p>Summary: {document.content.strip() if document.content else document.content}</p>
+            <p>Summary: {document.content.strip() if document.content else ""}</p>
             {similarity_score}
         </div>
     </div>"""
