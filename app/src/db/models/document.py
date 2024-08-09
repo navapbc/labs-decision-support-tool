@@ -46,10 +46,3 @@ class Chunk(Base, IdMixin, TimestampMixin):
 class ChunkWithScore:
     chunk: Chunk
     score: float
-
-
-@dataclass
-class DocumentWithMaxScore:
-    document: Document
-    # The maxmium similarity score of all Chunks associated with that document
-    max_score: float

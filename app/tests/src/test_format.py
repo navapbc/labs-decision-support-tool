@@ -65,26 +65,37 @@ def test_format_guru_cards_given_docs_shown_max_num_and_min_score():
 
 
 def test_format_bem_documents():
-    docs = DocumentFactory.build_batch(4)
+    docs = (
+        DocumentFactory.build(name="BEM 100: INTRODUCTION"),
+        DocumentFactory.build(
+            name="BEM 230A: EMPLOYMENT AND/OR SELF-SUFFICIENCY RELATED ACTIVITIES: FIP"
+        ),
+        DocumentFactory.build(name="BEM 400: ASSETS"),
+    )
 
     chunks_with_scores = [
-        # This document is ignored because below docs_shown_min_score
-        ChunkWithScore(ChunkFactory.build(document=docs[0]), 0.90),
-        # This document is excluded because docs_shown_max_num = 2,
-        # and it has the lowest score of the three documents with chunks over
-        # the docs_shown_min_score threshold
+        # This document is ignored because the score is below docs_shown_min_score
+        ChunkWithScore(ChunkFactory.build(document=docs[0]), 0.89),
+        # Only the second chunk of this document is included
+        # because docs_shown_max_num is 3
         ChunkWithScore(ChunkFactory.build(document=docs[1]), 0.92),
-        # This document is included because a chunk puts
-        # it over the docs_shown_min_score threshold
-        ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.90),
-        ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.93),
-        # This document is included, but only once
-        # And it will be displayed first because it has the highest score
-        ChunkWithScore(ChunkFactory.build(document=docs[3]), 0.94),
-        ChunkWithScore(ChunkFactory.build(document=docs[3]), 0.95),
+        ChunkWithScore(ChunkFactory.build(document=docs[1]), 0.93),
+        # These are included, and this document is shown first
+        ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.94),
+        ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.95),
     ]
 
     html = format_bem_documents(
-        docs_shown_max_num=2, docs_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
+        docs_shown_max_num=3, docs_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
     )
-    assert html == f"<h3>Source(s)</h3><ul><li>{docs[3].name}</li><li>{docs[2].name}</li></ul>"
+    assert html == (
+        """<h3>Source(s)</h3><ul>
+<li><a href="https://dhhs.michigan.gov/olmweb/ex/BP/Public/BEM/400.pdf">BEM 400</a>: Assets<ol>
+<li>Citation #1 (score: 0.95)</li>
+<li>Citation #2 (score: 0.94)</li>
+</ol></li>
+<li><a href="https://dhhs.michigan.gov/olmweb/ex/BP/Public/BEM/230A.pdf">BEM 230A</a>: Employment And/Or Self-Sufficiency Related Activities: Fip<ol>
+<li>Citation #1 (score: 0.93)</li>
+</ol></li>
+</ul>"""
+    )
