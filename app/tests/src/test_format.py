@@ -3,7 +3,7 @@ import re
 from sqlalchemy import delete
 
 from src.db.models.document import ChunkWithScore, Document
-from src.format import format_bem_documents, format_guru_cards
+from src.format import _format_to_accordion_html, format_bem_documents, format_guru_cards
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 from tests.src.test_retrieve import _create_chunks
@@ -64,6 +64,17 @@ def test_format_guru_cards_given_docs_shown_max_num_and_min_score():
     assert len(_unique_accordion_ids(html)) == 1
 
 
+def test__format_to_accordion_html(app_config, db_session, enable_factory_create):
+    db_session.execute(delete(Document))
+    chunks_with_scores = _get_chunks_with_scores()
+    document = chunks_with_scores[0].chunk.document
+    score = 0.92
+    html = _format_to_accordion_html(document=document, score=score)
+    assert document.name in html
+    assert document.content in html
+    assert "<p>Similarity Score: 0.92</p>" in html
+
+
 def test_format_bem_documents():
     docs = DocumentFactory.build_batch(4)
 
@@ -87,4 +98,10 @@ def test_format_bem_documents():
     html = format_bem_documents(
         docs_shown_max_num=2, docs_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
     )
-    assert html == f"<h3>Source(s)</h3><ul><li>{docs[3].name}</li><li>{docs[2].name}</li></ul>"
+
+    assert docs[0].content not in html
+    assert docs[1].content not in html
+    assert docs[3].content in html
+    assert "Citation #2" in html
+    assert "Citation #3" not in html
+    assert "<p>Similarity Score: 0.95</p>" in html
