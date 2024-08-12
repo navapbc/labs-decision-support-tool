@@ -25,7 +25,7 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
     chunks_with_scores = _get_chunks_with_scores()
     html = format_guru_cards(
-        docs_shown_max_num=2, docs_shown_min_score=0.0, chunks_with_scores=chunks_with_scores
+        chunks_shown_max_num=2, chunks_shown_min_score=0.0, chunks_with_scores=chunks_with_scores
     )
     assert len(_unique_accordion_ids(html)) == len(chunks_with_scores)
     assert "Related Guru cards" in html
@@ -37,7 +37,7 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
     # Check that a second call doesn't re-use the IDs
     next_html = format_guru_cards(
-        docs_shown_max_num=2, docs_shown_min_score=0.0, chunks_with_scores=chunks_with_scores
+        chunks_shown_max_num=2, chunks_shown_min_score=0.0, chunks_with_scores=chunks_with_scores
     )
     assert len(_unique_accordion_ids(html + next_html)) == 2 * len(chunks_with_scores)
 
@@ -50,16 +50,18 @@ def _chunks_with_scores():
     ]
 
 
-def test_format_guru_cards_given_docs_shown_max_num():
+def test_format_guru_cards_given_chunks_shown_max_num():
     html = format_guru_cards(
-        docs_shown_max_num=2, docs_shown_min_score=0.8, chunks_with_scores=_chunks_with_scores()
+        chunks_shown_max_num=2, chunks_shown_min_score=0.8, chunks_with_scores=_chunks_with_scores()
     )
     assert len(_unique_accordion_ids(html)) == 2
 
 
-def test_format_guru_cards_given_docs_shown_max_num_and_min_score():
+def test_format_guru_cards_given_chunks_shown_max_num_and_min_score():
     html = format_guru_cards(
-        docs_shown_max_num=2, docs_shown_min_score=0.91, chunks_with_scores=_chunks_with_scores()
+        chunks_shown_max_num=2,
+        chunks_shown_min_score=0.91,
+        chunks_with_scores=_chunks_with_scores(),
     )
     assert len(_unique_accordion_ids(html)) == 1
 
@@ -79,14 +81,14 @@ def test_format_bem_documents():
     docs = DocumentFactory.build_batch(4)
 
     chunks_with_scores = [
-        # This document is ignored because below docs_shown_min_score
+        # This document is ignored because below chunks_shown_min_score
         ChunkWithScore(ChunkFactory.build(document=docs[0]), 0.90),
-        # This document is excluded because docs_shown_max_num = 2,
+        # This document is excluded because chunks_shown_max_num = 2,
         # and it has the lowest score of the three documents with chunks over
-        # the docs_shown_min_score threshold
+        # the chunks_shown_min_score threshold
         ChunkWithScore(ChunkFactory.build(document=docs[1]), 0.92),
         # This document is included because a chunk puts
-        # it over the docs_shown_min_score threshold
+        # it over the chunks_shown_min_score threshold
         ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.90),
         ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.93),
         # This document is included, but only once
@@ -96,7 +98,7 @@ def test_format_bem_documents():
     ]
 
     html = format_bem_documents(
-        docs_shown_max_num=2, docs_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
+        chunks_shown_max_num=2, chunks_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
     )
 
     assert docs[0].content not in html

@@ -26,8 +26,8 @@ class ChatEngineInterface(ABC):
     formatter: Callable
 
     # Thresholds that determine which retrieved documents are shown in the UI
-    docs_shown_max_num: int = 5
-    docs_shown_min_score: float = 0.65
+    chunks_shown_max_num: int = 5
+    chunks_shown_min_score: float = 0.65
 
     # List of engine-specific configuration settings that can be set by the user.
     # The string elements must match the attribute names for the configuration setting.
@@ -74,8 +74,8 @@ class BaseEngine(ChatEngineInterface):
         "llm",
         "retrieval_k",
         "retrieval_k_min_score",
-        "docs_shown_max_num",
-        "docs_shown_min_score",
+        "chunks_shown_max_num",
+        "chunks_shown_min_score",
     ]
 
     def on_message(self, question: str) -> OnMessageResult:

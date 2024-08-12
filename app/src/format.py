@@ -14,17 +14,17 @@ _accordion_id = random.randint(0, 1000000)
 
 
 def format_guru_cards(
-    docs_shown_max_num: int,
-    docs_shown_min_score: float,
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
 ) -> str:
     cards_html = ""
-    for chunk_with_score in chunks_with_scores[:docs_shown_max_num]:
+    for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
         document = chunk_with_score.chunk.document
-        if chunk_with_score.score < docs_shown_min_score:
+        if chunk_with_score.score < chunks_shown_min_score:
             logger.info(
                 "Skipping chunk with score less than %f: %s",
-                docs_shown_min_score,
+                chunks_shown_min_score,
                 document.name,
             )
             continue
@@ -33,8 +33,8 @@ def format_guru_cards(
 
 
 def _get_bem_documents_to_show(
-    docs_shown_max_num: int,
-    docs_shown_min_score: float,
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
     chunks_with_scores: list[ChunkWithScore],
 ) -> OrderedDict[Document, list[ChunkWithScore]]:
     chunks_with_scores.sort(key=lambda c: c.score, reverse=True)
@@ -42,12 +42,12 @@ def _get_bem_documents_to_show(
     # Build a dictionary of documents with their associated chunks,
     # Ordered by the highest score of each chunk associated with the document
     documents: OrderedDict[Document, list[ChunkWithScore]] = OrderedDict()
-    for chunk_with_score in chunks_with_scores[:docs_shown_max_num]:
+    for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
         document = chunk_with_score.chunk.document
-        if chunk_with_score.score < docs_shown_min_score:
+        if chunk_with_score.score < chunks_shown_min_score:
             logger.info(
                 "Skipping chunk with score less than %f: %s",
-                docs_shown_min_score,
+                chunks_shown_min_score,
                 chunk_with_score.chunk.document.name,
             )
             continue
@@ -61,12 +61,12 @@ def _get_bem_documents_to_show(
 
 
 def format_bem_documents(
-    docs_shown_max_num: int,
-    docs_shown_min_score: float,
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
     chunks_with_scores: list[ChunkWithScore],
 ) -> str:
     documents = _get_bem_documents_to_show(
-        docs_shown_max_num, docs_shown_min_score, chunks_with_scores
+        chunks_shown_max_num, chunks_shown_min_score, chunks_with_scores
     )
 
     return _format_to_accordion_group_html(documents)
