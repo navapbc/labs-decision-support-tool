@@ -75,7 +75,7 @@ def format_bem_documents(
 def _format_to_accordion_html(document: Document, score: float) -> str:
     global _accordion_id
     _accordion_id += 1
-    similarity_score = f"<p>Similarity Score: {score}</p>"
+    similarity_score = f"<p>Similarity Score: {str(score)}</p>"
 
     return f"""
     <div class="usa-accordion" id=accordion-{_accordion_id}>
@@ -105,8 +105,8 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
         for index, chunk in enumerate(documents[document], start=1):
             formatted_chunk = re.sub(r"\n+", "\n", chunk.chunk.content).strip()
             formatted_chunk = f"<p>{formatted_chunk} </p>" if formatted_chunk else ""
-            citation = f"<h4>Citation #{index} (score: {chunk.score})</h4>"
-            similarity_score = f"<p>Similarity Score: {chunk.score}</p>"
+            citation = f"<h4>Citation #{index} (score: {str(chunk.score)})</h4>"
+            similarity_score = f"<p>Similarity Score: {str(chunk.score)}</p>"
             internal_citation += f"""{citation}<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}{similarity_score}</div>"""
         html += f"""
             <div class="usa-accordion" id=accordion-{_accordion_id}>
