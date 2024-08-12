@@ -3,7 +3,7 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
-from src.db.models.document import ChunkWithScore, Document, DocumentWithMaxScore
+from src.db.models.document import ChunkWithScore, Document
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def _get_bem_documents_to_show(
 def format_bem_documents(
     docs_shown_max_num: int,
     docs_shown_min_score: float,
-    chunks_with_scores: Sequence[ChunkWithScore],
+    chunks_with_scores: list[ChunkWithScore],
 ) -> str:
     documents = _get_bem_documents_to_show(
         docs_shown_max_num, docs_shown_min_score, chunks_with_scores
@@ -100,17 +100,14 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
     global _accordion_id
     _accordion_id += 1
     html = "<h3>Source(s)</h3>"
+    internal_citation = ""
     for document in documents:
-        internal_citation = ""
         for index, chunk in enumerate(documents[document], start=1):
             formatted_chunk = re.sub(r"\n+", "\n", chunk.chunk.content).strip()
             formatted_chunk = f"<p>Summary: {formatted_chunk} </p>" if formatted_chunk else ""
             citation = f"<h4>Citation #{index} (score: {chunk.score})</h4>"
             similarity_score = f"<p>Similarity Score: {str(chunk.score)}</p>"
-            internal_citation += f"""<div id="a-{_accordion_id}" class="usa-accordion__content usa-prose margin-left-2 border-left-1 border-base-lighter" hidden>
-                    {citation}{formatted_chunk}{similarity_score}
-                </div>"""
-
+            internal_citation += f"""{citation}<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}{similarity_score}</div>"""
         html += f"""
             <div class="usa-accordion" id=accordion-{_accordion_id}>
                 <h4 class="usa-accordion__heading">
@@ -123,6 +120,8 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                         <a href='https://link'>{document.name}</a>
                     </button>
                 </h4>
+                <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
                 {internal_citation}
+                </div>
             </div>"""
     return html if html != "" else ""
