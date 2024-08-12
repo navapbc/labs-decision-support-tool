@@ -42,7 +42,7 @@ def _get_bem_documents_to_show(
     # Build a dictionary of documents with their associated chunks,
     # Ordered by the highest score of each chunk associated with the document
     documents: OrderedDict[Document, list[ChunkWithScore]] = OrderedDict()
-    for chunk_with_score in chunks_with_scores:
+    for chunk_with_score in chunks_with_scores[:docs_shown_max_num]:
         document = chunk_with_score.chunk.document
         if chunk_with_score.score < docs_shown_min_score:
             logger.info(
@@ -57,7 +57,7 @@ def _get_bem_documents_to_show(
         else:
             documents[document] = [chunk_with_score]
 
-    return documents[:docs_shown_max_num]
+    return documents
 
 
 def format_bem_documents(
@@ -124,4 +124,5 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                 {internal_citation}
                 </div>
             </div>"""
-    return "<h3>Source(s)</h3>" + html if not html else ""
+
+    return "<h3>Source(s)</h3>" + html if html else ""
