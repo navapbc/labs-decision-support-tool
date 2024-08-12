@@ -33,7 +33,6 @@ def format_guru_cards(
 
 
 def _get_bem_documents_to_show(
-
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: list[ChunkWithScore],
@@ -43,12 +42,12 @@ def _get_bem_documents_to_show(
     # Build a dictionary of documents with their associated chunks,
     # Ordered by the highest score of each chunk associated with the document
     documents: OrderedDict[Document, list[ChunkWithScore]] = OrderedDict()
-    for chunk_with_score in chunks_with_scores[:docs_shown_max_num]:
+    for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
         document = chunk_with_score.chunk.document
-        if chunk_with_score.score < docs_shown_min_score:
+        if chunk_with_score.score < chunks_shown_min_score:
             logger.info(
                 "Skipping chunk with score less than %f: %s",
-                docs_shown_min_score,
+                chunks_shown_min_score,
                 chunk_with_score.chunk.document.name,
             )
             continue
