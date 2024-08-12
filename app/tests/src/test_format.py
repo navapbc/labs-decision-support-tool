@@ -3,7 +3,7 @@ import re
 from sqlalchemy import delete
 
 from src.db.models.document import ChunkWithScore, Document
-from src.format import format_bem_documents, format_guru_cards, _format_to_accordion_html
+from src.format import _format_to_accordion_html, format_bem_documents, format_guru_cards
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 from tests.src.test_retrieve import _create_chunks

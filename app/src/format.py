@@ -1,5 +1,6 @@
 import logging
 import random
+import re
 from typing import OrderedDict, Sequence
 
 from src.db.models.document import ChunkWithScore, Document, DocumentWithMaxScore
@@ -98,18 +99,19 @@ def _format_to_accordion_html(document: Document, score: float) -> str:
 def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkWithScore]]) -> str:
     global _accordion_id
     _accordion_id += 1
-    print(documents)
     html = "<h3>Source(s)</h3>"
     for document in documents:
-        internal_citation=""
+        internal_citation = ""
         for index, chunk in enumerate(documents[document], start=1):
+            formatted_chunk = re.sub(r"\n+", "\n", chunk.chunk.content).strip()
+            formatted_chunk = f"<p>Summary: {formatted_chunk} </p>" if formatted_chunk else ""
+            citation = f"<h4>Citation #{index} (score: {chunk.score})</h4>"
+            similarity_score = f"<p>Similarity Score: {str(chunk.score)}</p>"
             internal_citation += f"""<div id="a-{_accordion_id}" class="usa-accordion__content usa-prose margin-left-2 border-left-1 border-base-lighter" hidden>
-                    <h4>Citation #{index} (score: {chunk.score})</h4>
-                    {f"<p>Summary: {chunk.chunk.content.strip()} </p>" if chunk.chunk.content else ""}
-                    <p>Similarity Score: {str(chunk.score)}</p>
+                    {citation}{formatted_chunk}{similarity_score}
                 </div>"""
-        
-        html+= f"""
+
+        html += f"""
             <div class="usa-accordion" id=accordion-{_accordion_id}>
                 <h4 class="usa-accordion__heading">
                     <button
@@ -123,4 +125,4 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                 </h4>
                 {internal_citation}
             </div>"""
-    return html
+    return html if html != "" else ""
