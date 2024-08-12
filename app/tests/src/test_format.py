@@ -98,7 +98,7 @@ def test_format_bem_documents():
     html = format_bem_documents(
         docs_shown_max_num=2, docs_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
     )
-    print(html)
+
     assert docs[0].name not in html
     assert docs[1].name not in html
     assert docs[3].name in html
