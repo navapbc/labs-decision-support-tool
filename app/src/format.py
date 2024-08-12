@@ -13,17 +13,17 @@ _accordion_id = random.randint(0, 1000000)
 
 
 def format_guru_cards(
-    docs_shown_max_num: int,
-    docs_shown_min_score: float,
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
 ) -> str:
     cards_html = ""
-    for chunk_with_score in chunks_with_scores[:docs_shown_max_num]:
+    for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
         document = chunk_with_score.chunk.document
-        if chunk_with_score.score < docs_shown_min_score:
+        if chunk_with_score.score < chunks_shown_min_score:
             logger.info(
                 "Skipping chunk with score less than %f: %s",
-                docs_shown_min_score,
+                chunks_shown_min_score,
                 document.name,
             )
             continue
@@ -52,15 +52,15 @@ def format_guru_cards(
 
 
 def _get_bem_documents_to_show(
-    docs_shown_max_num: int,
-    docs_shown_min_score: float,
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
 ) -> Sequence[Document]:
     # Build a deduplicated list of documents with the max score
     # of all chunks associated with the document.
     documents_with_scores: list[DocumentWithMaxScore] = []
     for chunk_with_score in chunks_with_scores:
-        if chunk_with_score.score >= docs_shown_min_score:
+        if chunk_with_score.score >= chunks_shown_min_score:
             document = chunk_with_score.chunk.document
             existing_doc = next(
                 (d for d in documents_with_scores if d.document == document),
@@ -74,17 +74,17 @@ def _get_bem_documents_to_show(
     # Sort the list by score
     documents_with_scores.sort(key=lambda d: d.max_score, reverse=True)
 
-    # Only return the top docs_shown_max_num documents
-    return [d.document for d in documents_with_scores[:docs_shown_max_num]]
+    # Only return the top chunks_shown_max_num documents
+    return [d.document for d in documents_with_scores[:chunks_shown_max_num]]
 
 
 def format_bem_documents(
-    docs_shown_max_num: int,
-    docs_shown_min_score: float,
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
 ) -> str:
     documents = _get_bem_documents_to_show(
-        docs_shown_max_num, docs_shown_min_score, chunks_with_scores
+        chunks_shown_max_num, chunks_shown_min_score, chunks_with_scores
     )
     formatted_documents = "".join([f"<li>{document.name}</li>" for document in documents])
     return f"<h3>Source(s)</h3><ul>{formatted_documents}</ul>"

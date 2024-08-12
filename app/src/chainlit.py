@@ -102,7 +102,7 @@ _WIDGET_FACTORIES = {
     ),
     "retrieval_k": lambda default_value: Slider(
         id="retrieval_k",
-        label="Number of documents to retrieve for generating LLM response",
+        label="Number of citations to retrieve for generating LLM response",
         initial=default_value,
         min=0,
         max=10,
@@ -110,23 +110,23 @@ _WIDGET_FACTORIES = {
     ),
     "retrieval_k_min_score": lambda initial_value: Slider(
         id="retrieval_k_min_score",
-        label="Minimum document score required for generating LLM response",
+        label="Minimum citation score required for generating LLM response",
         initial=initial_value,
         min=-1,
         max=1,
         step=0.25,
     ),
-    "docs_shown_max_num": lambda initial_value: Slider(
-        id="docs_shown_max_num",
-        label="Maximum number of retrieved documents to show in the UI",
+    "chunks_shown_max_num": lambda initial_value: Slider(
+        id="chunks_shown_max_num",
+        label="Maximum number of retrieved citations to show in the UI",
         initial=initial_value,
         min=0,
         max=10,
         step=1,
     ),
-    "docs_shown_min_score": lambda initial_value: Slider(
-        id="docs_shown_min_score",
-        label="Minimum document score required to show document in the UI",
+    "chunks_shown_min_score": lambda initial_value: Slider(
+        id="chunks_shown_min_score",
+        label="Minimum citation score required to show citation in the UI",
         initial=initial_value,
         min=-1,
         max=1,
@@ -144,8 +144,8 @@ async def on_message(message: cl.Message) -> None:
         result = await cl.make_async(lambda: engine.on_message(question=message.content))()
 
         msg_content = result.response + engine.formatter(
-            docs_shown_max_num=engine.docs_shown_max_num,
-            docs_shown_min_score=engine.docs_shown_min_score,
+            chunks_shown_max_num=engine.chunks_shown_max_num,
+            chunks_shown_min_score=engine.chunks_shown_min_score,
             chunks_with_scores=result.chunks_with_scores,
         )
 
