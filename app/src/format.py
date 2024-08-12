@@ -42,7 +42,7 @@ def _get_bem_documents_to_show(
     # Build a dictionary of documents with their associated chunks,
     # Ordered by the highest score of each chunk associated with the document
     documents: OrderedDict[Document, list[ChunkWithScore]] = OrderedDict()
-    for chunk_with_score in chunks_with_scores[:docs_shown_max_num]:
+    for chunk_with_score in chunks_with_scores:
         document = chunk_with_score.chunk.document
         if chunk_with_score.score < docs_shown_min_score:
             logger.info(
@@ -57,7 +57,7 @@ def _get_bem_documents_to_show(
         else:
             documents[document] = [chunk_with_score]
 
-    return documents
+    return documents[:docs_shown_max_num]
 
 
 def format_bem_documents(
@@ -75,7 +75,7 @@ def format_bem_documents(
 def _format_to_accordion_html(document: Document, score: float) -> str:
     global _accordion_id
     _accordion_id += 1
-    similarity_score = f"<p>Similarity Score: {str(score)}</p>"
+    similarity_score = f"<p>Similarity Score: {score}</p>"
 
     return f"""
     <div class="usa-accordion" id=accordion-{_accordion_id}>
@@ -90,7 +90,7 @@ def _format_to_accordion_html(document: Document, score: float) -> str:
             </button>
         </h4>
         <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-            {"<p>Summary: " + document.content.strip() if document.content else ""}</p>
+            {"<p>" + document.content.strip() if document.content else ""}</p>
             {similarity_score}
         </div>
     </div>"""
@@ -104,9 +104,9 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
         _accordion_id += 1
         for index, chunk in enumerate(documents[document], start=1):
             formatted_chunk = re.sub(r"\n+", "\n", chunk.chunk.content).strip()
-            formatted_chunk = f"<p>Summary: {formatted_chunk} </p>" if formatted_chunk else ""
+            formatted_chunk = f"<p>{formatted_chunk} </p>" if formatted_chunk else ""
             citation = f"<h4>Citation #{index} (score: {chunk.score})</h4>"
-            similarity_score = f"<p>Similarity Score: {str(chunk.score)}</p>"
+            similarity_score = f"<p>Similarity Score: {chunk.score}</p>"
             internal_citation += f"""{citation}<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}{similarity_score}</div>"""
         html += f"""
             <div class="usa-accordion" id=accordion-{_accordion_id}>
@@ -124,4 +124,4 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                 {internal_citation}
                 </div>
             </div>"""
-    return "<h3>Source(s)</h3>" + html if html != "" else ""
+    return "<h3>Source(s)</h3>" + html if not html else ""
