@@ -98,10 +98,10 @@ def _format_to_accordion_html(document: Document, score: float) -> str:
 
 def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkWithScore]]) -> str:
     global _accordion_id
-    _accordion_id += 1
-    html = "<h3>Source(s)</h3>"
+    html = ""
     internal_citation = ""
     for document in documents:
+        _accordion_id += 1
         for index, chunk in enumerate(documents[document], start=1):
             formatted_chunk = re.sub(r"\n+", "\n", chunk.chunk.content).strip()
             formatted_chunk = f"<p>Summary: {formatted_chunk} </p>" if formatted_chunk else ""
@@ -124,4 +124,4 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                 {internal_citation}
                 </div>
             </div>"""
-    return html if html != "" else ""
+    return "<h3>Source(s)</h3>" + html if html != "" else ""
