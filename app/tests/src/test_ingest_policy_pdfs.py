@@ -6,13 +6,13 @@ from smart_open import open
 from sqlalchemy import delete, select
 
 from src.db.models.document import Document
-from src.ingest_policy_pdfs import _ingest_policy_pdfs
+from src.ingest_policy_pdfs import _get_bem_title, _ingest_policy_pdfs
 
 
 @pytest.fixture
 def policy_s3_file(mock_s3_bucket_resource):
-    data = open("/app/tests/docs/bem_policy_pdf.pdf", "rb")
-    mock_s3_bucket_resource.put_object(Body=data, Key="bem_policy_pdf.pdf")
+    data = open("/app/tests/docs/100.pdf", "rb")
+    mock_s3_bucket_resource.put_object(Body=data, Key="100.pdf")
     return "s3://test_bucket/"
 
 
@@ -21,6 +21,12 @@ doc_attribs = {
     "program": "test_benefit_program",
     "region": "Michigan",
 }
+
+
+@pytest.mark.parametrize("file_location", ["local", "s3"])
+def test__get_bem_title(file_location, policy_s3_file):
+    file_path = policy_s3_file + "100.pdf" if file_location == "s3" else "/app/tests/docs/100.pdf"
+    assert _get_bem_title(file_path) == "BEM 100: Introduction"
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
@@ -39,7 +45,7 @@ def test__ingest_policy_pdfs(caplog, app_config, db_session, policy_s3_file, fil
         assert document.program == "test_benefit_program"
         assert document.region == "Michigan"
 
-        assert document.name == "BEM 100: INTRODUCTION"
+        assert document.name == "BEM 100: Introduction"
 
         # Document.content should be the full text
         assert "Temporary Assistance to Needy Families" in document.content
