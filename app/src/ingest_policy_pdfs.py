@@ -66,7 +66,7 @@ def parse_pdf_and_add_to_db(
             text_contents, start_new_section
         )
         # Check if we need to start a new section
-        if not (is_header and start_new_section and body_content != ""):
+        if not is_header or not start_new_section or not body_content:
             body_content += f"{contents}\n"
 
     document = Document(content=body_content, **doc_attribs)
