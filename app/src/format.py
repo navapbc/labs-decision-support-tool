@@ -103,8 +103,8 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
         internal_citation = ""
         _accordion_id += 1
         for index, chunk in enumerate(documents[document], start=1):
-            formatted_chunk = chunk.chunk.content.splitlines()
-            formatted_chunk = " ".join(formatted_chunk)
+            chunk_lines = chunk.chunk.content.splitlines()
+            formatted_chunk = " ".join(chunk_lines)
             formatted_chunk = re.sub(r"\t+", "", formatted_chunk).strip()
             formatted_chunk = f"<p>{formatted_chunk} </p>" if formatted_chunk else ""
             citation = f"<h4>Citation #{index} (score: {str(chunk.score)})</h4>"

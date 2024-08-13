@@ -169,7 +169,7 @@ def _get_retrieval_metadata(chunks_with_scores: Sequence[ChunkWithScore]) -> dic
         "chunks": [
             {
                 "document.name": chunk_with_score.chunk.document.name,
-                "chunk.id": chunk_with_score.chunk.id,
+                "chunk.id": str(chunk_with_score.chunk.id),
                 "score": chunk_with_score.score,
             }
             for chunk_with_score in chunks_with_scores

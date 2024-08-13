@@ -93,9 +93,10 @@ def test_format_bem_documents():
         chunks_shown_max_num=2, chunks_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
     )
 
-    assert docs[0].content not in html
-    assert docs[1].content not in html
-    assert docs[3].content in html
+    print(html)
+    assert docs[0].content.replace("\n", " ") not in html
+    assert docs[1].content.replace("\n", " ") not in html
+    assert docs[3].content.replace("\n", " ") in html
     assert "Citation #2" in html
     assert "Citation #3" not in html
     assert "<p>Similarity Score: 0.95</p>" in html
