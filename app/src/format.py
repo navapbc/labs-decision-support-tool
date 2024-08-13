@@ -99,11 +99,13 @@ def _format_to_accordion_html(document: Document, score: float) -> str:
 def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkWithScore]]) -> str:
     global _accordion_id
     html = ""
-    internal_citation = ""
     for document in documents:
+        internal_citation = ""
         _accordion_id += 1
         for index, chunk in enumerate(documents[document], start=1):
-            formatted_chunk = re.sub(r"\n+", "\n", chunk.chunk.content).strip()
+            chunk_lines = chunk.chunk.content.splitlines()
+            formatted_chunk = " ".join(chunk_lines)
+            formatted_chunk = re.sub(r"\t+", "", formatted_chunk).strip()
             formatted_chunk = f"<p>{formatted_chunk} </p>" if formatted_chunk else ""
             citation = f"<h4>Citation #{index} (score: {str(chunk.score)})</h4>"
             similarity_score = f"<p>Similarity Score: {str(chunk.score)}</p>"
