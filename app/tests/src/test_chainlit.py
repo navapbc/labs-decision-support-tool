@@ -1,4 +1,5 @@
 from src import chainlit, chat_engine
+from src.chainlit import _get_retrieval_metadata
 
 
 def test_url_query_values(monkeypatch):
@@ -16,3 +17,25 @@ def test_url_query_values(monkeypatch):
     # Only 1 query parameter remains
     assert len(query_values) == 1
     assert query_values["someunknownparam"] == "42"
+
+
+def test__get_retrieval_metadata(chunks_with_scores):
+    assert _get_retrieval_metadata(chunks_with_scores) == {
+        "chunks": [
+            {
+                "document.name": chunks_with_scores[0].chunk.document.name,
+                "chunk.id": chunks_with_scores[0].chunk.id,
+                "score": chunks_with_scores[0].score,
+            },
+            {
+                "document.name": chunks_with_scores[1].chunk.document.name,
+                "chunk.id": chunks_with_scores[1].chunk.id,
+                "score": chunks_with_scores[1].score,
+            },
+            {
+                "document.name": chunks_with_scores[2].chunk.document.name,
+                "chunk.id": chunks_with_scores[2].chunk.id,
+                "score": chunks_with_scores[2].score,
+            },
+        ]
+    }

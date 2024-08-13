@@ -1,6 +1,6 @@
 import logging
 import pprint
-from typing import Any
+from typing import Any, Sequence
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
@@ -8,6 +8,7 @@ from chainlit.input_widget import InputWidget, Select, Slider
 from src import chat_engine
 from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface
+from src.db.models.document import ChunkWithScore
 from src.generate import get_models
 from src.login import require_login
 
@@ -47,7 +48,7 @@ async def start() -> None:
 
     await cl.Message(
         author="backend",
-        metadata={"engine": engine_id, "settings": str(settings)},
+        metadata={"engine": engine_id, "settings": settings},
         content=f"{engine.name} started with settings:\n{pprint.pformat(settings, indent=3)}",
     ).send()
 
@@ -149,14 +150,9 @@ async def on_message(message: cl.Message) -> None:
             chunks_with_scores=result.chunks_with_scores,
         )
 
-        chunk_titles_and_scores: dict[str, float] = {}
-        for chunk_with_score in result.chunks_with_scores:
-            title = chunk_with_score.chunk.document.name
-            chunk_titles_and_scores |= {title: chunk_with_score.score}
-
         await cl.Message(
             content=msg_content,
-            metadata=chunk_titles_and_scores,
+            metadata=_get_retrieval_metadata(result.chunks_with_scores),
         ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
@@ -166,3 +162,16 @@ async def on_message(message: cl.Message) -> None:
         ).send()
         # Re-raise error to have it in the logs
         raise err
+
+
+def _get_retrieval_metadata(chunks_with_scores: Sequence[ChunkWithScore]) -> dict:
+    return {
+        "chunks": [
+            {
+                "document.name": chunk_with_score.chunk.document.name,
+                "chunk.id": chunk_with_score.chunk.id,
+                "score": chunk_with_score.score,
+            }
+            for chunk_with_score in chunks_with_scores
+        ]
+    }
