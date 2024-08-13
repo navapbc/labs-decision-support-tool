@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 # during local development
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+HEADER_PATTERN = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
+
 
 def _get_bem_title(file_path: str) -> str:
     """
@@ -57,8 +59,7 @@ def parse_pdf_and_add_to_db(
     contents: str, doc_attribs: dict[str, str], db_session: db.Session
 ) -> None:
     # Match header in BEM manual
-    header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
-    text_split_by_header = re.split(header_pattern, contents)
+    text_split_by_header = re.split(HEADER_PATTERN, contents)
     body_content = ""
     start_new_section = True
     for text_contents in text_split_by_header:
