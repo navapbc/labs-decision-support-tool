@@ -9,6 +9,7 @@ import src.adapters.db as db
 import tests.src.db.models.factories as factories
 from src.app_config import AppConfig
 from src.db import models
+from src.db.models.document import ChunkWithScore
 from src.util.local import load_local_env_vars
 from tests.lib import db_testing
 from tests.mock.mock_sentence_transformer import MockSentenceTransformer
@@ -156,3 +157,12 @@ def mock_s3_bucket_resource(mock_s3):
 @pytest.fixture
 def mock_s3_bucket(mock_s3_bucket_resource):
     yield mock_s3_bucket_resource.name
+
+
+@pytest.fixture
+def chunks_with_scores():
+    return [
+        ChunkWithScore(factories.ChunkFactory.build(), 0.99),
+        ChunkWithScore(factories.ChunkFactory.build(), 0.90),
+        ChunkWithScore(factories.ChunkFactory.build(), 0.85),
+    ]

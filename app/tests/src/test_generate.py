@@ -2,10 +2,8 @@ import os
 
 import ollama
 
-from src.db.models.document import ChunkWithScore
 from src.generate import PROMPT, generate, get_models
 from tests.mock import mock_completion
-from tests.src.db.models.factories import ChunkFactory
 
 
 def ollama_model_list():
@@ -113,13 +111,13 @@ def test_generate(monkeypatch):
     assert generate("gpt-4o", "some query") == expected_response
 
 
-def test_generate_with_context_with_score(monkeypatch):
+def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
-    context = [
-        ChunkWithScore(ChunkFactory.build(), 0.2000),
-        ChunkWithScore(ChunkFactory.build(), -0.3000),
-    ]
-    context_text = f"{context[0].chunk.document.name}\n{context[0].chunk.content}\n\n{context[1].chunk.document.name}\n{context[1].chunk.content}"
+    context_text = (
+        f"{chunks_with_scores[0].chunk.document.name}\n{chunks_with_scores[0].chunk.content}\n\n"
+        + f"{chunks_with_scores[1].chunk.document.name}\n{chunks_with_scores[1].chunk.content}\n\n"
+        + f"{chunks_with_scores[2].chunk.document.name}\n{chunks_with_scores[2].chunk.content}"
+    )
     expected_response = (
         'Called gpt-4o with [{"content": "'
         + PROMPT
@@ -127,4 +125,4 @@ def test_generate_with_context_with_score(monkeypatch):
         + context_text
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
-    assert generate("gpt-4o", "some query", context=context) == expected_response
+    assert generate("gpt-4o", "some query", context=chunks_with_scores) == expected_response
