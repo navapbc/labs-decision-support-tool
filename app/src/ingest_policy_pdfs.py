@@ -3,7 +3,8 @@ import re
 import sys
 
 from pdfminer.high_level import extract_text
-from pdfminer.layout import LAParams
+from pdfminer.pdfdocument import PDFDocument
+from pdfminer.pdfparser import PDFParser
 from smart_open import open as smart_open_file
 
 from src.adapters import db
@@ -19,6 +20,19 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
+def _get_bem_title(file_path: str) -> str:
+    """
+    Get the BEM number from the file path (e.g., 100.pdf) and the
+    document title from the PDF meta data, then put the document
+    title in title case (e.g., INTRODUCTION EXAMPLE -> Introduction Example)
+    and combine: "BEM 100: Introduction Example"
+    """
+    with smart_open_file(file_path, "rb") as file:
+        pdf_title = PDFDocument(PDFParser(file)).info[0]["Title"].decode().title()
+    bem_num = file_path.split("/")[-1].rsplit(".", 1)[0]
+    return f"BEM {bem_num}: {pdf_title}"
+
+
 def _ingest_policy_pdfs(
     db_session: db.Session,
     pdf_file_dir: str,
@@ -28,12 +42,12 @@ def _ingest_policy_pdfs(
     embedding_model = app_config.sentence_transformer
 
     logger.info(f"Processing pdfs {pdf_file_dir} using {embedding_model} with {doc_attribs}")
-    for file in file_list:
-        if file.endswith(".pdf"):
-            logger.info(f"Processing pdf file: {file}")
-            with smart_open_file(file, "rb") as fin:
-                output_string = extract_text(fin, laparams=LAParams())
-
+    for file_path in file_list:
+        if file_path.endswith(".pdf"):
+            logger.info(f"Processing pdf file: {file_path}")
+            with smart_open_file(file_path, "rb") as file:
+                output_string = extract_text(file)
+                doc_attribs["name"] = _get_bem_title(file_path)
                 parse_pdf_and_add_to_db(
                     contents=output_string, doc_attribs=doc_attribs, db_session=db_session
                 )
@@ -45,7 +59,6 @@ def parse_pdf_and_add_to_db(
     # Match header in BEM manual
     header_pattern = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
     text_split_by_header = re.split(header_pattern, contents)
-    current_title = ""
     body_content = ""
     start_new_section = True
     for text_contents in text_split_by_header:
@@ -53,12 +66,10 @@ def parse_pdf_and_add_to_db(
             text_contents, start_new_section
         )
         # Check if we need to start a new section
-        if is_header and start_new_section and body_content != "":
-            current_title = contents
-        else:
+        if not (is_header and start_new_section and body_content != ""):
             body_content += f"{contents}\n"
 
-    document = Document(name=current_title, content=body_content, **doc_attribs)
+    document = Document(content=body_content, **doc_attribs)
     db_session.add(document)
 
     process_chunk(body_content, document, db_session)
