@@ -42,26 +42,18 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
     assert len(_unique_accordion_ids(html + next_html)) == 2 * len(chunks_with_scores)
 
 
-def _chunks_with_scores():
-    return [
-        ChunkWithScore(ChunkFactory.build(), 0.99),
-        ChunkWithScore(ChunkFactory.build(), 0.90),
-        ChunkWithScore(ChunkFactory.build(), 0.85),
-    ]
-
-
-def test_format_guru_cards_given_chunks_shown_max_num():
+def test_format_guru_cards_given_chunks_shown_max_num(chunks_with_scores):
     html = format_guru_cards(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.8, chunks_with_scores=_chunks_with_scores()
+        chunks_shown_max_num=2, chunks_shown_min_score=0.8, chunks_with_scores=chunks_with_scores
     )
     assert len(_unique_accordion_ids(html)) == 2
 
 
-def test_format_guru_cards_given_chunks_shown_max_num_and_min_score():
+def test_format_guru_cards_given_chunks_shown_max_num_and_min_score(chunks_with_scores):
     html = format_guru_cards(
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.91,
-        chunks_with_scores=_chunks_with_scores(),
+        chunks_with_scores=chunks_with_scores,
     )
     assert len(_unique_accordion_ids(html)) == 1
 
