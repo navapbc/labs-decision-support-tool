@@ -1,9 +1,16 @@
 import re
 
+import pytest
 from sqlalchemy import delete
 
 from src.db.models.document import ChunkWithScore, Document
-from src.format import _format_to_accordion_html, format_bem_documents, format_guru_cards
+from src.format import (
+    _format_to_accordion_html,
+    _get_bem_url,
+    _replace_bem_with_link,
+    format_bem_documents,
+    format_guru_cards,
+)
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 from tests.src.test_retrieve import _create_chunks
@@ -71,6 +78,8 @@ def test__format_to_accordion_html(app_config, db_session, enable_factory_create
 
 def test_format_bem_documents():
     docs = DocumentFactory.build_batch(4)
+    for doc in docs:
+        doc.name += "BEM 123"
 
     chunks_with_scores = [
         # This document is ignored because below chunks_shown_min_score
@@ -99,3 +108,39 @@ def test_format_bem_documents():
     assert "Citation #2" in html
     assert "Citation #3" not in html
     assert "<p>Similarity Score: 0.95</p>" in html
+
+
+def test__get_bem_url():
+    assert (
+        _get_bem_url("Please review BEM 123.")
+        == "https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123.pdf"
+    )
+    assert (
+        _get_bem_url("The policy in BEM 123A has been updated.")
+        == "https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123A.pdf"
+    )
+    with pytest.raises(ValueError):
+        _get_bem_url("This is not a valid case: BEM123.")
+
+
+def test__replace_bem_with_link():
+    assert (
+        _replace_bem_with_link("Please review BEM 123.")
+        == 'Please review <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123.pdf">BEM 123</a>.'
+    )
+    assert (
+        _replace_bem_with_link("The policy in BEM 123A has been updated.")
+        == 'The policy in <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123A.pdf">BEM 123A</a> has been updated.'
+    )
+    assert (
+        _replace_bem_with_link("Check both BEM 123 and BEM 500C.")
+        == 'Check both <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123.pdf">BEM 123</a> and <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/500C.pdf">BEM 500C</a>.'
+    )
+    assert (
+        _replace_bem_with_link("There is no matching pattern here.")
+        == "There is no matching pattern here."
+    )
+    assert (
+        _replace_bem_with_link("This is not a valid case: BEM123.")
+        == "This is not a valid case: BEM123."
+    )
