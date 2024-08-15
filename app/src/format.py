@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 # Choose a random number to avoid id collisions when hotloading the app during development.
 _accordion_id = random.randint(0, 1000000)
 
+# Regular expression to match BEM followed by 3 digits, optionally followed by a letter
+BEM_PATTERN = r"(BEM\s(\d{3}[A-Z]?))"
+
 
 def format_guru_cards(
     chunks_shown_max_num: int,
@@ -106,7 +109,9 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
             chunk_lines = chunk.chunk.content.splitlines()
             formatted_chunk = " ".join(chunk_lines)
             formatted_chunk = re.sub(r"\t+", "", formatted_chunk).strip()
-            formatted_chunk = f"<p>{formatted_chunk} </p>" if formatted_chunk else ""
+            formatted_chunk = (
+                f"<p>{_replace_bem_with_link(formatted_chunk)} </p>" if formatted_chunk else ""
+            )
             citation = f"<h4>Citation #{index} (score: {str(chunk.score)})</h4>"
             similarity_score = f"<p>Similarity Score: {str(chunk.score)}</p>"
             internal_citation += f"""{citation}<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}{similarity_score}</div>"""
@@ -119,12 +124,27 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                         aria-expanded="false"
                         aria-controls="a-{_accordion_id}"
                         >
-                        <a href='https://link'>{document.name}</a>
+                        <a href="{_get_bem_url(document.name)}">{document.name}</a>
                     </button>
                 </h4>
                 <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
                 {internal_citation}
                 </div>
-            </div>"""
+            </div>"""  # noqa: B907
 
     return "<h3>Source(s)</h3>" + html if html else ""
+
+
+def _get_bem_url(text: str) -> str:
+    bem = re.search(BEM_PATTERN, text)
+    if not bem:
+        raise ValueError(f"No BEM number found in text: {text}")
+    return f"https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/{bem.group(2)}.pdf"
+
+
+def _replace_bem_with_link(text: str) -> str:
+    return re.sub(
+        BEM_PATTERN,
+        r'<a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/\2.pdf">\1</a>',
+        text,
+    )
