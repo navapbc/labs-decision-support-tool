@@ -1,5 +1,6 @@
 import re
 
+import pytest
 from sqlalchemy import delete
 
 from src.db.models.document import ChunkWithScore, Document
@@ -118,6 +119,8 @@ def test__get_bem_url():
         _get_bem_url("The policy in BEM 123A has been updated.")
         == "https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123A.pdf"
     )
+    with pytest.raises(ValueError):
+        _get_bem_url("This is not a valid case: BEM123.")
 
 
 def test__replace_bem_with_link():
