@@ -4,7 +4,6 @@ import ollama
 
 from src.generate import PROMPT, generate, get_models
 from tests.mock import mock_completion
-from tests.src.db.models.factories import ChunkFactory
 
 
 def ollama_model_list():
@@ -84,6 +83,9 @@ def test_get_models(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
     assert get_models() == {"OpenAI GPT-4o": "gpt-4o"}
 
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "mock_key")
+    assert get_models()["Anthropic Claude 3.5 Sonnet"] == "claude-3-5-sonnet-20240620"
+
 
 def test_get_models_ollama(monkeypatch):
     if "OPENAI_API_KEY" in os.environ:
@@ -106,13 +108,16 @@ def test_generate(monkeypatch):
         + PROMPT
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
-    assert generate("some query") == expected_response
+    assert generate("gpt-4o", "some query") == expected_response
 
 
-def test_generate_with_context(monkeypatch):
+def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
-    context = [ChunkFactory.build(), ChunkFactory.build()]
-    context_text = f"{context[0].document.name}\n{context[0].content}\n\n{context[1].document.name}\n{context[1].content}"
+    context_text = (
+        f"{chunks_with_scores[0].chunk.document.name}\n{chunks_with_scores[0].chunk.content}\n\n"
+        + f"{chunks_with_scores[1].chunk.document.name}\n{chunks_with_scores[1].chunk.content}\n\n"
+        + f"{chunks_with_scores[2].chunk.document.name}\n{chunks_with_scores[2].chunk.content}"
+    )
     expected_response = (
         'Called gpt-4o with [{"content": "'
         + PROMPT
@@ -120,4 +125,4 @@ def test_generate_with_context(monkeypatch):
         + context_text
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
-    assert generate("some query", context=context) == expected_response
+    assert generate("gpt-4o", "some query", context=chunks_with_scores) == expected_response

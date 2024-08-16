@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from uuid import UUID
 
 import numpy as np
@@ -39,3 +40,16 @@ class Chunk(Base, IdMixin, TimestampMixin):
 
     document_id: Mapped[UUID] = mapped_column(ForeignKey("document.id", ondelete="CASCADE"))
     document: Mapped[Document] = relationship(Document)
+
+
+@dataclass
+class ChunkWithScore:
+    chunk: Chunk
+    score: float
+
+
+@dataclass
+class DocumentWithMaxScore:
+    document: Document
+    # The maxmium similarity score of all Chunks associated with that document
+    max_score: float

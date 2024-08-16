@@ -6,7 +6,6 @@ from sqlalchemy import delete, select
 
 from src.db.models.document import Document
 from src.ingest_guru_cards import _ingest_cards
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 
 
 @pytest.fixture
@@ -47,14 +46,13 @@ doc_attribs = {
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
-def test__ingest_cards(db_session, guru_local_file, guru_s3_file, file_location):
+def test__ingest_cards(app_config, db_session, guru_local_file, guru_s3_file, file_location):
     db_session.execute(delete(Document))
-    mock_embedding = MockSentenceTransformer()
 
     if file_location == "local":
-        _ingest_cards(db_session, mock_embedding, guru_local_file, doc_attribs)
+        _ingest_cards(db_session, guru_local_file, doc_attribs)
     else:
-        _ingest_cards(db_session, mock_embedding, guru_s3_file, doc_attribs)
+        _ingest_cards(db_session, guru_s3_file, doc_attribs)
 
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 3
@@ -81,9 +79,7 @@ def test__ingest_cards(db_session, guru_local_file, guru_s3_file, file_location)
     assert documents[2].chunks[0].content == "This is a test content for card 2.\nWith extra HTML."
 
 
-def test__ingest_cards_warns_on_max_seq_length(caplog, db_session, guru_local_file):
-    mock_embedding = MockSentenceTransformer()
-
+def test__ingest_cards_warns_on_max_seq_length(caplog, app_config, db_session, guru_local_file):
     with caplog.at_level(logging.WARNING):
-        _ingest_cards(db_session, mock_embedding, guru_local_file, doc_attribs)
+        _ingest_cards(db_session, guru_local_file, doc_attribs)
         assert "exceeds the embedding model's max sequence length" in caplog.messages[0]
