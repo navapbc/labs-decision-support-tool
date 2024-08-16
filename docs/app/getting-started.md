@@ -35,3 +35,19 @@ A very simple [docker-compose.yml](/docker-compose.yml) has been included to sup
 ## Next steps
 
 Now that you're up and running, read the [application docs](README.md) to familiarize yourself with the application.
+
+### Installing Ollama
+
+You can install ollama on macOSX by calling `brew install ollama`, for other operating systems or the desktop app see the [Ollama repository](https://github.com/ollama/ollama).
+
+To download a model run `ollama pull <model_name>`
+
+Ex: `ollama pull llama2:7b`
+
+To start Ollama without the desktop app run `ollama serve`
+
+To configure a local secret to enable Ollama locally add `OLLAMA_HOST=http://host.docker.internal:11434` to your `.env` file.
+
+### Start a Jupyter notebook
+
+We use Jupyter notebooks for saving and sharing exploratory code. You can open and run these notebooks (and make a new one) with `make notebook`.
