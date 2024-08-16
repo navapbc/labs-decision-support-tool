@@ -22,12 +22,11 @@ pydantic-settings = "^2.0.3"
 chainlit = "^1.1.304"
 sentence-transformers = "^3.0.1"
 litellm = "^1.40.25"
-
 pgvector = "^0.2.5"
 torch = "2.2.2"
 gunicorn = "^22.0.0"
-
 pdfminer-six = "^20240706"
+
 [tool.poetry.group.dev.dependencies]
 black = "^23.9.1"
 flake8 = "^6.1.0"
@@ -48,6 +47,7 @@ types-pyyaml = "^6.0.12.11"
 setuptools = "^68.2.2"
 debugpy = "^1.8.1"
 ollama = "^0.2.1"
+jupyter = "^1.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

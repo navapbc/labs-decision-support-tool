@@ -38,6 +38,7 @@ services:
     env_file: ./app/local.env
     ports:
       - 8000:8000
+      - 8888:8888
     volumes:
       - ./app:/app
     depends_on:

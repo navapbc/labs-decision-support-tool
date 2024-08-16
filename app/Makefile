@@ -216,6 +216,9 @@ lint-security: # https://bandit.readthedocs.io/en/latest/index.html
 login: start ## Start shell in running container
 	docker exec -it $(APP_NAME) bash
 
+notebook: start
+	docker exec -it main-app sh -c "poetry run jupyter notebook --ip 0.0.0.0 --no-browser --allow-root"
+
 # Pauses for 5 seconds
 sleep-5:
 	sleep 5
