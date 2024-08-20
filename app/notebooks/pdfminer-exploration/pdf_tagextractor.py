@@ -139,7 +139,7 @@ class BemTagExtractor(PDFDevice):
         """
         font = textstate.font
         assert font is not None
-        print(">>>>>>>> ", font, graphicstate.scolor, self._stack)
+        print("render_string ", font, graphicstate.scolor, self._stack)
 
         color = None
         if isinstance(graphicstate.scolor, float):  # greyscale
@@ -147,24 +147,19 @@ class BemTagExtractor(PDFDevice):
         elif isinstance(graphicstate.scolor, tuple):
             if len(graphicstate.scolor) == 3:  # RGB
                 color = str(graphicstate.scolor)
-                print("   >>>>>C ", graphicstate.scolor)
             elif len(graphicstate.scolor) == 4:  # CMYK
                 pass
 
         last_fontname = self._last_fontname_stack[-1]
         if last_fontname != font.fontname:
             if "Bold" in font.fontname and (not last_fontname or "Bold" not in last_fontname):
-                # print(">>>>>>>>B ", font.fontname)
+                # print("<BOLD>", font.fontname)
                 if color:
                     self._write(f'<BOLD color="{color}">')
                 else:
                     self._write("<BOLD>")
-            elif "Bold" in font.fontname and last_fontname and "Bold" in last_fontname:
-                # print("<<<<<>>>>>B ", font.fontname)
-                # self._write("\n")
-                pass
-            elif last_fontname and "Bold" in last_fontname:
-                # print("<<<<<<<<B ", font.fontname)
+            elif "Bold" in last_fontname and "Bold" not in font.fontname:
+                # print("</BOLD>", font.fontname)
                 self._write("</BOLD>")
         self._last_fontname_stack[-1] = font.fontname
 
@@ -182,11 +177,11 @@ class BemTagExtractor(PDFDevice):
                 except PDFUnicodeNotDefined as e:
                     print("   !!! ", e)
                     pass
-        print("   >>>>>T ", text)
+        print("text: ", text)
         self._write(utils.enc(text))
 
     def begin_tag(self, tag: PSLiteral, props: Optional[PDFStackT] = None) -> None:
-        print(">>>>> begin_tag", tag, props, self._stack)
+        print("<<< begin_tag", tag, props, self._stack)
 
         # Don't allow nested Span tags
         # Workaround for Span tags that are not closed properly
@@ -212,7 +207,7 @@ class BemTagExtractor(PDFDevice):
     def end_tag(self) -> None:
         # Workaround: End bold tag if needed, even if `not self._stack` (e.g., BEM 210.pdf, 230A.pdf, 554.pdf)
         if "Bold" in self._last_fontname_stack[-1]:
-            print("<<<<<<<<B ")
+            print("Workaround: </BOLD>")
             self._write("</BOLD>")
         self._last_fontname_stack.pop(-1)
 
@@ -221,7 +216,7 @@ class BemTagExtractor(PDFDevice):
             return
         assert self._stack, str(self.pageno)
         tag = self._stack.pop(-1)
-        print("<<<<<< end_tag", tag, self._stack)
+        print(">>> end_tag", tag, self._stack)
 
         out_s = "</%s>" % utils.enc(cast(str, tag.name))
         self._write(out_s)
