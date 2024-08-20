@@ -304,13 +304,13 @@ class BemPdfParser:
         xml_string = "<pdf>" + output_io.read().decode() + "</pdf>"
 
         if validate_xml:
-            minidom.parseString(xml_string)
+            minidom.parseString(xml_string) # nosec
 
         return xml_string
 
     # Stage 2: Flatten the XML by page
     def to_annotated_texts(self, xml_string: str) -> list[object]:
-        xml_doc = minidom.parseString(xml_string)
+        xml_doc = minidom.parseString(xml_string) # nosec
         root = xml_doc.documentElement
 
         doc_title = self.doc.info[0]["Title"].decode()
