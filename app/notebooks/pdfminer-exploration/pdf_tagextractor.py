@@ -247,9 +247,9 @@ class BemTagExtractor(PDFDevice):
         return
 
     def end_page(self, page: PDFPage) -> None:
+        # print("=====^^^^^^ end_page", page.pageid, self._stack)
         assert not self._stack, str(len(self._stack))
         # assert isinstance(self.cur_item, LTPage), str(type(self.cur_item))
-        # print("=====^^^^^^ end_page", page.pageid, self._stack)
         self._write("</page>\n")
         self.pageno += 1
         return
