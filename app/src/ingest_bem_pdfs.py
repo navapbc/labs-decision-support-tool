@@ -1,7 +1,7 @@
 import logging
 import sys
 from dataclasses import dataclass
-from io import BufferedReader
+from typing import BinaryIO
 import uuid
 
 from smart_open import open as smart_open_file
@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 HEADER_PATTERN = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
 
 
-def _get_bem_title(file: BufferedReader, file_path: str) -> str:
+def _get_bem_title(file: BinaryIO, file_path: str) -> str:
     """
     Get the BEM number from the file path (e.g., 100.pdf) and the
     document title from the PDF meta data, then put the document
@@ -64,10 +64,9 @@ def _ingest_bem_pdfs(
                 _add_chunk(db_session, chunk.content, chunk.document, chunk.tokens)
 
 def _parse_pdf(file):
-    outline = pdf_utils.extract_outline(file)
     # Instead of passing in outline, get_enriched_texts could call get_outline
     # This is just to illustrate the dependency chain
-    enriched_texts = enrich_texts(file, outline)
+    enriched_texts = enrich_texts(file)
     markdown_texts = to_markdown_texts(enriched_texts)
     grouped_texts = get_grouped_texts(markdown_texts)
 
@@ -78,8 +77,11 @@ def _parse_pdf(file):
     return grouped_texts
 
 
-def enrich_texts(file: BufferedReader, outline: list[Heading]) -> list[EnrichedText]:
+def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
     "Placeholder function. Will be implemented for DST-414, probably in a different file."
+    outline: list[Heading] = pdf_utils.extract_outline(file)
+    for _heading in outline:
+        pass
     return []
 
 

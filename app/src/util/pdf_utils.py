@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from io import BufferedReader
-from typing import Any
+from typing import Any, BinaryIO
 
 from pdfminer.pdfdocument import PDFDocument, PDFNoOutlines
 from pdfminer.pdfpage import PDFPage
@@ -9,25 +8,35 @@ from pdfminer.pdftypes import PDFObjRef, resolve1
 from pdfminer.psparser import PSLiteral
 
 
-def as_pdf_doc(pdf: BufferedReader | PDFDocument):
-    if isinstance(pdf, BufferedReader):
-        doc = PDFDocument(PDFParser(pdf))
+def as_pdf_doc(pdf: BinaryIO | PDFDocument):
+    if isinstance(pdf, PDFDocument):
+        return pdf
     else:
-        doc = pdf
-    return doc
+        return PDFDocument(PDFParser(pdf))
 
 
-def get_pdf_info(pdf: BufferedReader | PDFDocument) -> dict[str, Any]:
+def get_pdf_info(pdf: BinaryIO | PDFDocument, count_pages: bool = False) -> dict[str, Any]:
     doc = as_pdf_doc(pdf)
     assert len(doc.info) == 1
     doc_info = doc.info[0]
-    return {
-        "title": doc_info["Title"].decode(),
-        "creation_date": doc_info["CreationDate"].decode(),
-        "mod_date": doc_info["ModDate"].decode(),
-        "producer": doc_info["Producer"].decode("utf16"),
-        # "page_count": len(map_pages(doc)),
-    }
+    pdf_info = {}
+
+    if "Title" in doc_info:
+        pdf_info["title"] = doc_info["Title"].decode()
+
+    if "CreationDate" in doc_info:
+        pdf_info["creation_date"] = doc_info["CreationDate"].decode()
+
+    if "ModDate" in doc_info:
+        pdf_info["mod_date"] = doc_info["ModDate"].decode()
+
+    if "Producer" in doc_info:
+        pdf_info["producer"] = doc_info["Producer"].decode("utf16")
+
+    if count_pages:
+        pdf_info["page_count"] = len(map_pages(doc))
+
+    return pdf_info
 
 
 def map_pages(doc: PDFDocument) -> dict[object, int]:
@@ -43,7 +52,7 @@ class Heading:
     pageno: int | None = None
 
 
-def extract_outline(pdf: BufferedReader | PDFDocument) -> list[Heading]:
+def extract_outline(pdf: BinaryIO | PDFDocument) -> list[Heading]:
     """
     Adapted from dumppdf.py:dumpoutline()
     Extracts the heading hierarchy from a PDF's catalog dictionary entry with key "Outlines".
