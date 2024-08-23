@@ -3,7 +3,7 @@ from src.util.pdf_utils import Heading, extract_outline
 
 def test_extract_outline():
     # Create a PDF with a heading hierarchy
-    with open("/app/tests/docs/707.pdf", "rb") as fp:
+    with open("/app/tests/src/util/707.pdf", "rb") as fp:
         outline = extract_outline(fp)
 
         expected_headings = [
