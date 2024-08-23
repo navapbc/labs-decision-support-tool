@@ -1,6 +1,6 @@
 import logging
 
-from src.ingestion.elements import EnrichedText, TextType
+from src.ingestion.pdf_elements import EnrichedText, TextType
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ def get_grouped_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
 
             # Headings should match for list items
             if current_text.headings != previous_text.headings:
-                logger.warning("Warning: Headings or page numbers do not match for list items.")
+                logger.warning("Warning: Headings don't match for list items.")
 
         else:
             # If it's not a list item, just add it as a new element

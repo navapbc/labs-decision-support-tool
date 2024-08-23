@@ -10,20 +10,10 @@ class TextType(Enum):
 
 
 @dataclass
-class Page:
-    # The actual page in the document
-    pdf_page_number: int
-
-    # The label of the page in the document
-    # E.g., "i", "ii", "1", "2", etc.
-    document_page_number: str
-
-
-@dataclass
 class Heading:
     title: str
     level: int
-    page: Page
+    page_number: int | None = None
 
 
 @dataclass
@@ -31,4 +21,4 @@ class EnrichedText:
     text: str
     type: TextType
     headings: List[Heading]
-    page: Page
+    page_number: int | None = None
