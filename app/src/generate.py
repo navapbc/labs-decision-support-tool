@@ -10,7 +10,12 @@ logger = logging.getLogger(__name__)
 
 PROMPT = """Provide answers in plain language written at the average American reading level.
 Use bullet points. Keep your answers brief, max of 5 sentences.
-Keep your answers as similar to your knowledge text as you can"""
+Keep your answers as similar to your knowledge text as you can
+
+Do not quote the context directly, but instead cite when you are drawing from the context using the provided example citation numbers in parenthesis, e.g., (chunk-0), etc.
+Do not add bold formatting to the citations -- write them exactly as shown e.g., (chunk-0).
+Do not add additional text to the citations like (Citation: chunk-0).
+"""
 
 
 def get_models() -> dict[str, str]:
@@ -75,6 +80,7 @@ def generate(
 
     logger.info("Calling %s for query: %s", llm, query)
     response = completion(model=llm, messages=messages, **completion_args(llm))
+
     return response["choices"][0]["message"]["content"]
 
 
