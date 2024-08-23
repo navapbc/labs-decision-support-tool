@@ -15,7 +15,7 @@ class Heading:
     # Heading level starting from 1
     level: int
     # Page number where the heading first appears
-    pageno: int | None
+    pageno: int | None = None
 
 
 def extract_outline(pdf: BufferedReader | PDFDocument) -> list[Heading]:

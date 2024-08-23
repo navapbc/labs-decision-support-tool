@@ -2,18 +2,13 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
+from src.util.pdf_utils import Heading
+
 
 class TextType(Enum):
     NARRATIVE_TEXT = "NarrativeText"
     LIST_ITEM = "ListItem"
     LIST = "List"
-
-
-@dataclass
-class Heading:
-    title: str
-    level: int
-    page_number: int | None = None
 
 
 @dataclass
