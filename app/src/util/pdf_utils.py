@@ -51,11 +51,13 @@ def extract_outline(pdf: BufferedReader | PDFDocument) -> list[Heading]:
         if dest:
             dest = resolve_dest(dest)
             return pages[dest[0].objid]
-        elif action and isinstance(action, dict):
+
+        if action and isinstance(action, dict):
             subtype = action.get("S")
             if subtype and repr(subtype) == "/'GoTo'" and action.get("D"):
                 dest = resolve_dest(action["D"])
                 return pages[dest[0].objid]
+
         return None
 
     outline = []
