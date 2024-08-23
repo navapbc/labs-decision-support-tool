@@ -42,7 +42,7 @@ def test_concatenate_list_items():
             headings=[Heading(title="Overview", level=1)],
         ),
         EnrichedText(
-            text="Narrative starting a new list.",
+            text="Narrative starting a new list: ",  # ending space is intentional
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="Overview", level=1)],
         ),
@@ -51,14 +51,23 @@ def test_concatenate_list_items():
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Overview", level=1)],
         ),
+        EnrichedText(
+            text="Second item in new list.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Overview", level=1)],
+        ),
     ]
 
     result = get_grouped_texts(texts)
 
-    assert len(result) == 3
     assert result == [
         EnrichedText(
-            text="Introduction.\nFirst item.\nSecond item.",
+            text="Introduction.",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[Heading(title="Overview", level=1)],
+        ),
+        EnrichedText(
+            text="First item.\nSecond item.",
             type=TextType.LIST,
             headings=[Heading(title="Overview", level=1)],
         ),
@@ -68,7 +77,7 @@ def test_concatenate_list_items():
             headings=[Heading(title="Overview", level=1)],
         ),
         EnrichedText(
-            text="Narrative starting a new list.\nFirst item in new list.",
+            text="Narrative starting a new list: \nFirst item in new list.\nSecond item in new list.",
             type=TextType.LIST,
             headings=[Heading(title="Overview", level=1)],
         ),
