@@ -9,6 +9,31 @@ from pdfminer.pdftypes import PDFObjRef, resolve1
 from pdfminer.psparser import PSLiteral
 
 
+def as_pdf_doc(pdf: BufferedReader | PDFDocument):
+    if isinstance(pdf, BufferedReader):
+        doc = PDFDocument(PDFParser(pdf))
+    else:
+        doc = pdf
+    return doc
+
+
+def get_pdf_info(pdf: BufferedReader | PDFDocument) -> dict[str, Any]:
+    doc = as_pdf_doc(pdf)
+    assert len(doc.info) == 1
+    doc_info = doc.info[0]
+    return {
+        "title": doc_info["Title"].decode(),
+        "creation_date": doc_info["CreationDate"].decode(),
+        "mod_date": doc_info["ModDate"].decode(),
+        "producer": doc_info["Producer"].decode("utf16"),
+        # "page_count": len(map_pages(doc)),
+    }
+
+
+def map_pages(doc: PDFDocument) -> dict[object, int]:
+    return {page.pageid: pageno for (pageno, page) in enumerate(PDFPage.create_pages(doc), start=1)}
+
+
 @dataclass
 class Heading:
     title: str
@@ -27,10 +52,8 @@ def extract_outline(pdf: BufferedReader | PDFDocument) -> list[Heading]:
         with open("707.pdf", "rb") as fp:
             outline = extract_outline(fp)
     """
-    if isinstance(pdf, BufferedReader):
-        doc = PDFDocument(PDFParser(pdf))
-    else:
-        doc = pdf
+    doc = as_pdf_doc(pdf)
+    pages = map_pages(doc)
 
     def resolve_dest(dest: object) -> Any:
         if isinstance(dest, (str, bytes)):
@@ -42,10 +65,6 @@ def extract_outline(pdf: BufferedReader | PDFDocument) -> list[Heading]:
         if isinstance(dest, PDFObjRef):
             dest = dest.resolve()
         return dest
-
-    pages = {
-        page.pageid: pageno for (pageno, page) in enumerate(PDFPage.create_pages(doc), start=1)
-    }
 
     def resolve_page_number(dest: Any, action: Any) -> int | None:
         if dest:
