@@ -1,5 +1,5 @@
-from src.ingestion.pdf_postprocess import group_texts
 from src.ingestion.pdf_elements import EnrichedText, Heading, TextType
+from src.ingestion.pdf_postprocess import group_texts
 
 
 def test_empty_list():
