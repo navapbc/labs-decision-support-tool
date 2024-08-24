@@ -1,5 +1,35 @@
 from src.ingestion.pdf_elements import EnrichedText, Heading, TextType
-from src.ingestion.pdf_postprocess import group_texts
+from src.ingestion.pdf_postprocess import group_texts, to_markdown_texts
+
+
+def test_to_markdown_texts():
+    enriched_texts = [
+        EnrichedText(
+            text="Following is a list:",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[Heading(title="Section 3", level=1)],
+        ),
+        EnrichedText(
+            text="First item.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1)],
+        ),
+    ]
+
+    result = to_markdown_texts(enriched_texts)
+
+    assert result == [
+        EnrichedText(
+            text="Following is a list:",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[Heading(title="Section 3", level=1)],
+        ),
+        EnrichedText(
+            text="    - First item.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1)],
+        ),
+    ]
 
 
 def test_empty_list():
