@@ -1,4 +1,4 @@
-from src.ingestion.get_grouped_texts import get_grouped_texts
+from src.ingestion.pdf_postprocess import group_texts
 from src.ingestion.pdf_elements import EnrichedText, Heading, TextType
 
 
