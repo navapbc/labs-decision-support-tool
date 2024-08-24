@@ -67,7 +67,7 @@ def _ingest_bem_pdfs(
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     enriched_texts = enrich_texts(file)
     markdown_texts = to_markdown_texts(enriched_texts)
-    grouped_texts = get_grouped_texts(markdown_texts)
+    grouped_texts = group_texts(markdown_texts)
 
     # Assign unique ids to each grouped text before they get split into chunks
     for text in grouped_texts:
