@@ -5,6 +5,17 @@ from src.ingestion.pdf_elements import EnrichedText, TextType
 logger = logging.getLogger(__name__)
 
 
+def to_markdown_texts(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
+    for enriched_text in enriched_texts:
+        # Note that the links and stylings should be applied [TASK 2.a and 2.b] to the text before
+        # the "    - " is prepended to ListItem elements so that positional data like
+        # link.start_index can be used without having to account for text transformations.
+
+        if enriched_text.type == TextType.LIST_ITEM:
+            enriched_text.text = "    - " + enriched_text.text
+    return enriched_texts
+
+
 def should_merge_list_text(text: EnrichedText, next_text: EnrichedText) -> bool:
     if next_text.type != TextType.LIST_ITEM:
         return False

@@ -10,7 +10,7 @@ from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.pdf_elements import EnrichedText
-from src.ingestion.pdf_postprocess import group_texts
+from src.ingestion.pdf_postprocess import group_texts, to_markdown_texts
 from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
@@ -82,11 +82,6 @@ def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
     for _heading in outline:
         pass
     return []
-
-
-def to_markdown_texts(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
-    "Placeholder function. Will be implemented for DST-415, probably in a different file."
-    return enriched_texts
 
 
 @dataclass
