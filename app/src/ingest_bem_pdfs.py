@@ -1,10 +1,10 @@
 import logging
 import sys
+import uuid
 from dataclasses import dataclass
 from typing import BinaryIO
-import uuid
 
-from smart_open import open as smart_open_file
+from smart_open import open as smart_open
 
 from src.adapters import db
 from src.app_config import app_config
@@ -53,7 +53,7 @@ def _ingest_bem_pdfs(
             return
 
         logger.info("Processing file: %s", file_path)
-        with smart_open_file(file_path, "rb") as file:
+        with smart_open(file_path, "rb") as file:
             grouped_texts = _parse_pdf(file)
 
             doc_attribs["name"] = _get_bem_title(file, file_path)
@@ -63,14 +63,13 @@ def _ingest_bem_pdfs(
             for chunk in chunks:
                 _add_chunk(db_session, chunk.content, chunk.document, chunk.tokens)
 
-def _parse_pdf(file):
-    # Instead of passing in outline, get_enriched_texts could call get_outline
-    # This is just to illustrate the dependency chain
+
+def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     enriched_texts = enrich_texts(file)
     markdown_texts = to_markdown_texts(enriched_texts)
     grouped_texts = get_grouped_texts(markdown_texts)
 
-    # Assign unique ids to each grouped text
+    # Assign unique ids to each grouped text before they get split into chunks
     for text in grouped_texts:
         text.id = str(uuid.uuid1())
     assert len(set(text.id for text in grouped_texts)) == len(grouped_texts)
@@ -126,6 +125,7 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
     """
     chunks: list[ChunkTemp] = []
     for paragraph in grouped_texts:
+        assert paragraph.id is not None
         assert paragraph.page_number is not None
 
         # For iteration 1, log warning for overly long text

@@ -8,7 +8,7 @@ from pdfminer.pdftypes import PDFObjRef, resolve1
 from pdfminer.psparser import PSLiteral
 
 
-def as_pdf_doc(pdf: BinaryIO | PDFDocument):
+def as_pdf_doc(pdf: BinaryIO | PDFDocument) -> PDFDocument:
     if isinstance(pdf, PDFDocument):
         return pdf
     else:

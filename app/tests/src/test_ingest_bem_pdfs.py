@@ -1,17 +1,17 @@
 import logging
-import math
 
 import pytest
-from smart_open import open
+from smart_open import open as smart_open
 from sqlalchemy import delete, select
 
 from src.db.models.document import Document
 from src.ingest_bem_pdfs import _get_bem_title, _ingest_bem_pdfs
 from tests.src.test_ingest_policy_pdfs import doc_attribs
 
+
 @pytest.fixture
 def policy_s3_file(mock_s3_bucket_resource):
-    data = open("/app/tests/docs/100.pdf", "rb")
+    data = smart_open("/app/tests/docs/100.pdf", "rb")
     mock_s3_bucket_resource.put_object(Body=data, Key="100.pdf")
     return "s3://test_bucket/"
 
@@ -19,7 +19,7 @@ def policy_s3_file(mock_s3_bucket_resource):
 @pytest.mark.parametrize("file_location", ["local", "s3"])
 def test__get_bem_title(file_location, policy_s3_file):
     file_path = policy_s3_file + "100.pdf" if file_location == "s3" else "/app/tests/docs/100.pdf"
-    with open(file_path, "rb") as file:
+    with smart_open(file_path, "rb") as file:
         assert _get_bem_title(file, file_path) == "BEM 100: INTRODUCTION"
 
 
