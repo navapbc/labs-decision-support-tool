@@ -4,13 +4,21 @@ from typing import Any, Sequence
 
 from litellm import completion
 
+from src.citations import get_context_for_prompt
 from src.db.models.document import ChunkWithScore
 
 logger = logging.getLogger(__name__)
 
 PROMPT = """Provide answers in plain language written at the average American reading level.
 Use bullet points. Keep your answers brief, max of 5 sentences.
-Keep your answers as similar to your knowledge text as you can"""
+Keep your answers as similar to your knowledge text as you can
+
+When referencing the context, do not quote directly. Use the provided citation numbers (e.g., (chunk-0)) to indicate when you are drawing from the context.
+
+Example Answer:
+If the client and their roommate purchase and prepare food separately, they can be considered different SNAP (FAP) groups. For instance:
+- They can be classified as different SNAP (FAP) groups if they purchase and prepare food separately (chunk-0).
+"""
 
 
 def get_models() -> dict[str, str]:
@@ -46,12 +54,7 @@ def generate(
     """
 
     if context:
-        context_text = "\n\n".join(
-            [
-                chunk_with_score.chunk.document.name + "\n" + chunk_with_score.chunk.content
-                for chunk_with_score in context
-            ]
-        )
+        context_text = get_context_for_prompt(context)
         messages = [
             {
                 "content": PROMPT,
@@ -75,6 +78,7 @@ def generate(
 
     logger.info("Calling %s for query: %s", llm, query)
     response = completion(model=llm, messages=messages, **completion_args(llm))
+
     return response["choices"][0]["message"]["content"]
 
 
