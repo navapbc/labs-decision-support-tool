@@ -1,5 +1,19 @@
-from src.citations import add_citations
+from src.citations import add_citations, get_context_for_prompt
+from src.db.models.document import ChunkWithScore
 from tests.src.db.models.factories import ChunkFactory
+
+
+def test_get_context_for_prompt():
+    assert get_context_for_prompt([]) == ""
+
+    chunks_with_score = [
+        ChunkWithScore(ChunkFactory.build(), 0.90),
+        ChunkWithScore(ChunkFactory.build(), 0.90),
+    ]
+    assert (
+        get_context_for_prompt(chunks_with_score)
+        == f"Citation: chunk-0 \nContent: {chunks_with_score[0].chunk.content}\n\nCitation: chunk-1 \nContent: {chunks_with_score[1].chunk.content}"
+    )
 
 
 def test_add_citations():

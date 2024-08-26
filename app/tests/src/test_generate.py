@@ -114,9 +114,9 @@ def test_generate(monkeypatch):
 def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
     context_text = (
-        f"{chunks_with_scores[0].chunk.document.name}\n{chunks_with_scores[0].chunk.content}\n\n"
-        + f"{chunks_with_scores[1].chunk.document.name}\n{chunks_with_scores[1].chunk.content}\n\n"
-        + f"{chunks_with_scores[2].chunk.document.name}\n{chunks_with_scores[2].chunk.content}"
+        f"Citation: chunk-0 \nContent: {chunks_with_scores[0].chunk.content}\n\n"
+        + f"Citation: chunk-1 \nContent: {chunks_with_scores[1].chunk.content}\n\n"
+        + f"Citation: chunk-2 \nContent: {chunks_with_scores[2].chunk.content}"
     )
     expected_response = (
         'Called gpt-4o with [{"content": "'
