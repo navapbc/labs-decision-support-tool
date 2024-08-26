@@ -1,4 +1,19 @@
-from src.util.pdf_utils import Heading, extract_outline
+from src.util.pdf_utils import Heading, extract_outline, get_pdf_info
+import pytest
+
+@pytest.mark.parametrize("count_pages", [False, True])
+def test_get_pdf_info(count_pages):
+    with open("/app/tests/src/util/707.pdf", "rb") as fp:
+        pdf_info = get_pdf_info(fp, count_pages=count_pages)
+
+        assert pdf_info.title == "TIME AND ATTENDANCE REVIEWS"
+        assert pdf_info.creation_date == "D:20200106133617-05'00'"
+        assert pdf_info.mod_date == "D:20200106133617-05'00'"
+        assert pdf_info.producer == "Microsoft® Word for Office 365"
+        if count_pages:
+            assert pdf_info.page_count == 4
+        else:
+            assert pdf_info.page_count is None
 
 
 def test_extract_outline():
