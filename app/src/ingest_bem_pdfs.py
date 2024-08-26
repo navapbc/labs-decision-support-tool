@@ -10,7 +10,7 @@ from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.pdf_elements import EnrichedText
-from src.ingestion.pdf_postprocess import group_texts, to_markdown_texts
+from src.ingestion.pdf_postprocess import group_texts, add_markdown
 from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 # during local development
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-HEADER_PATTERN = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
-
 
 def _get_bem_title(file: BinaryIO, file_path: str) -> str:
     """
@@ -32,7 +30,8 @@ def _get_bem_title(file: BinaryIO, file_path: str) -> str:
     title in title case (e.g., INTRODUCTION EXAMPLE -> Introduction Example)
     and combine: "BEM 100: Introduction Example"
     """
-    pdf_title = pdf_utils.get_pdf_info(file)["title"]
+    pdf_info = pdf_utils.get_pdf_info(file)
+    pdf_title = pdf_info.title or file_path
     bem_num = file_path.split("/")[-1].rsplit(".", 1)[0]
     return f"BEM {bem_num}: {pdf_title}"
 
@@ -43,21 +42,23 @@ def _ingest_bem_pdfs(
     doc_attribs: dict[str, str],
 ) -> None:
     file_list = get_files(pdf_file_dir)
-    embedding_model = app_config.sentence_transformer
 
     logger.info(
-        "Processing PDFs in %s using %s with %s", pdf_file_dir, embedding_model, doc_attribs
+        "Processing PDFs in %s using %s with %s",
+        pdf_file_dir,
+        app_config.embedding_model,
+        doc_attribs,
     )
     for file_path in file_list:
         if not file_path.endswith(".pdf"):
-            return
+            continue
 
         logger.info("Processing file: %s", file_path)
         with smart_open(file_path, "rb") as file:
             grouped_texts = _parse_pdf(file)
 
             doc_attribs["name"] = _get_bem_title(file, file_path)
-            document = Document(content=str(grouped_texts), **doc_attribs)
+            document = Document(content="\n".join(g.text for g in grouped_texts), **doc_attribs)
             db_session.add(document)
             chunks = split_into_chunks(document, grouped_texts)
             for chunk in chunks:
@@ -66,7 +67,7 @@ def _ingest_bem_pdfs(
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     enriched_texts = enrich_texts(file)
-    markdown_texts = to_markdown_texts(enriched_texts)
+    markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
 
     # Assign unique ids to each grouped text before they get split into chunks

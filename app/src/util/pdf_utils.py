@@ -15,26 +15,35 @@ def as_pdf_doc(pdf: BinaryIO | PDFDocument) -> PDFDocument:
         return PDFDocument(PDFParser(pdf))
 
 
-def get_pdf_info(pdf: BinaryIO | PDFDocument, count_pages: bool = False) -> dict[str, Any]:
+@dataclass
+class PdfInfo:
+    title: str | None = None
+    creation_date: str | None = None
+    mod_date: str | None = None
+    producer: str | None = None
+    page_count: int | None = None
+
+
+def get_pdf_info(pdf: BinaryIO | PDFDocument, count_pages: bool = False) -> PdfInfo:
     doc = as_pdf_doc(pdf)
-    assert len(doc.info) == 1
+    assert len(doc.info) == 1, "Expected only 1 info dictionary in PDF document"
     doc_info = doc.info[0]
-    pdf_info = {}
+    pdf_info = PdfInfo()
 
     if "Title" in doc_info:
-        pdf_info["title"] = doc_info["Title"].decode()
+        pdf_info.title = doc_info["Title"].decode()
 
     if "CreationDate" in doc_info:
-        pdf_info["creation_date"] = doc_info["CreationDate"].decode()
+        pdf_info.creation_date = doc_info["CreationDate"].decode()
 
     if "ModDate" in doc_info:
-        pdf_info["mod_date"] = doc_info["ModDate"].decode()
+        pdf_info.mod_date = doc_info["ModDate"].decode()
 
     if "Producer" in doc_info:
-        pdf_info["producer"] = doc_info["Producer"].decode("utf16")
+        pdf_info.producer = doc_info["Producer"].decode("utf16")
 
     if count_pages:
-        pdf_info["page_count"] = len(map_pages(doc))
+        pdf_info.page_count = len(map_pages(doc))
 
     return pdf_info
 
