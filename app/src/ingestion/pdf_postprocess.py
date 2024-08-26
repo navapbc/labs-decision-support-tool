@@ -6,6 +6,9 @@ logger = logging.getLogger(__name__)
 
 
 def should_merge_list_text(text: EnrichedText, next_text: EnrichedText) -> bool:
+    if text.headings != next_text.headings:
+        return False
+
     if next_text.type != TextType.LIST_ITEM:
         return False
 
@@ -33,14 +36,6 @@ def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
             # Append the current text to the previous one
             previous_text.text += "\n" + current_text.text
             previous_text.type = TextType.LIST
-
-            # Headings should match for list items
-            if current_text.headings != previous_text.headings:
-                logger.warning(
-                    "Warning: Headings don't match for list items: %s %s",
-                    previous_text.text,
-                    current_text.text,
-                )
         else:
             # If it's not merged, just add it as a new element
             grouped_texts.append(current_text)
