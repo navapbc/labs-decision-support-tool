@@ -1,5 +1,7 @@
-from src.util.pdf_utils import Heading, extract_outline, get_pdf_info
 import pytest
+
+from src.util.pdf_utils import Heading, extract_outline, get_pdf_info
+
 
 @pytest.mark.parametrize("count_pages", [False, True])
 def test_get_pdf_info(count_pages):
