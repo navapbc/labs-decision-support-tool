@@ -17,3 +17,4 @@ class EnrichedText:
     type: TextType
     headings: List[Heading]
     page_number: int | None = None
+    id: str | None = None

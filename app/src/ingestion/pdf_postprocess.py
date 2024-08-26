@@ -18,7 +18,7 @@ def should_merge_list_text(text: EnrichedText, next_text: EnrichedText) -> bool:
     return text.type == TextType.NARRATIVE_TEXT and text.text.rstrip().endswith(":")
 
 
-def get_grouped_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
+def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     """
     Given EnrichedTexts, concatenate list tems together
     with each other and with the preceeding NarrativeText.

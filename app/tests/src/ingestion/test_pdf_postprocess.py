@@ -1,9 +1,9 @@
-from src.ingestion.get_grouped_texts import get_grouped_texts
 from src.ingestion.pdf_elements import EnrichedText, Heading, TextType
+from src.ingestion.pdf_postprocess import group_texts
 
 
 def test_empty_list():
-    assert get_grouped_texts([]) == []
+    assert group_texts([]) == []
 
 
 def test_single_narrative_text():
@@ -14,7 +14,7 @@ def test_single_narrative_text():
             headings=[Heading(title="Overview", level=1)],
         )
     ]
-    result = get_grouped_texts(texts)
+    result = group_texts(texts)
     # No change
     assert result == texts
 
@@ -63,7 +63,7 @@ def test_concatenate_list_items():
         ),
     ]
 
-    result = get_grouped_texts(texts)
+    result = group_texts(texts)
 
     assert result == [
         EnrichedText(
