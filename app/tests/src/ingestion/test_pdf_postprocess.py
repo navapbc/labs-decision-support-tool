@@ -86,6 +86,11 @@ def test_concatenate_list_items():
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Overview", level=1)],
         ),
+        EnrichedText(
+            text="New list item in new section.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 1", level=1)],
+        ),
     ]
 
     result = group_texts(texts)
@@ -110,5 +115,10 @@ def test_concatenate_list_items():
             text="Narrative starting a new list: \nFirst item in new list.\nSecond item in new list.",
             type=TextType.LIST,
             headings=[Heading(title="Overview", level=1)],
+        ),
+        EnrichedText(
+            text="New list item in new section.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 1", level=1)],
         ),
     ]
