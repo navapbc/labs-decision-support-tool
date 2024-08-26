@@ -16,7 +16,7 @@ def to_markdown_texts(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
     return enriched_texts
 
 
-def should_merge_list_text(text: EnrichedText, next_text: EnrichedText) -> bool:
+def _should_merge_list_text(text: EnrichedText, next_text: EnrichedText) -> bool:
     if next_text.type != TextType.LIST_ITEM:
         return False
 
@@ -40,7 +40,7 @@ def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     for current_text in markdown_texts[1:]:
         previous_text = grouped_texts[-1]
 
-        if should_merge_list_text(previous_text, current_text):
+        if _should_merge_list_text(previous_text, current_text):
             # Append the current text to the previous one
             previous_text.text += "\n" + current_text.text
             previous_text.type = TextType.LIST
