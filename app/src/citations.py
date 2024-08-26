@@ -1,15 +1,24 @@
 import logging
 import random
 import re
-from typing import Match
+from typing import Match, Sequence
 
-from src.db.models.document import Chunk
+from src.db.models.document import Chunk, ChunkWithScore
 from src.format import _get_bem_url
 
 logger = logging.getLogger(__name__)
 
 _footnote_id = random.randint(0, 1000000)
 _footnote_index = 0
+
+
+def get_context_for_prompt(chunks: Sequence[ChunkWithScore]) -> str:
+    return "\n\n".join(
+        [
+            f"Citation: chunk-{index} \nContent: {chunk.chunk.content}"
+            for index, chunk in enumerate(chunks)
+        ]
+    )
 
 
 def add_citations(response: str, chunks: list[Chunk]) -> str:
