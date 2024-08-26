@@ -41,6 +41,14 @@ class Chunk(Base, IdMixin, TimestampMixin):
     document_id: Mapped[UUID] = mapped_column(ForeignKey("document.id", ondelete="CASCADE"))
     document: Mapped[Document] = relationship(Document)
 
+    page_number: Mapped[int]
+    # Flattened 'headings' data from grouped_texts
+    headings: Mapped[list[str]]
+    # Number of splits (or chunks) the text was split into, = 1 (if not split)
+    num_splits: Mapped[int] = 1
+    # If not complete (num_splits > 1), specify the index starting from 0
+    split_index: Mapped[int] = 0
+
 
 @dataclass
 class ChunkWithScore:
