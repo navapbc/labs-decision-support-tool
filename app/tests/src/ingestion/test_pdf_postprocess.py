@@ -1,8 +1,8 @@
 from src.ingestion.pdf_elements import EnrichedText, Heading, TextType
-from src.ingestion.pdf_postprocess import group_texts, to_markdown_texts
+from src.ingestion.pdf_postprocess import add_markdown, group_texts
 
 
-def test_to_markdown_texts():
+def test_add_markdown():
     enriched_texts = [
         EnrichedText(
             text="Following is a list:",
@@ -16,7 +16,7 @@ def test_to_markdown_texts():
         ),
     ]
 
-    result = to_markdown_texts(enriched_texts)
+    result = add_markdown(enriched_texts)
 
     assert result == [
         EnrichedText(

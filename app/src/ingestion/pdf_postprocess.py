@@ -5,7 +5,7 @@ from src.ingestion.pdf_elements import EnrichedText, TextType
 logger = logging.getLogger(__name__)
 
 
-def to_markdown_texts(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
+def add_markdown(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
     for enriched_text in enriched_texts:
         # Note that the links and stylings should be applied [TASK 2.a and 2.b] to the text before
         # the "    - " is prepended to ListItem elements so that positional data like
