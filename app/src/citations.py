@@ -15,7 +15,7 @@ _footnote_index = 0
 def get_context_for_prompt(chunks: Sequence[ChunkWithScore]) -> str:
     return "\n\n".join(
         [
-            f"Citation: chunk-{index} \nContent: {chunk.chunk.content}"
+            f"Citation: chunk-{index}\nDocument name: {chunk.chunk.document.name}\nContent: {chunk.chunk.content}"
             for index, chunk in enumerate(chunks)
         ]
     )
@@ -42,7 +42,7 @@ def add_citations(response: str, chunks: list[Chunk]) -> str:
         bem_link = _get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
         citation = f".<sup><a href={bem_link!r} id={_footnote_id!r}>{_footnote_index}</a></sup>"
         footnote_list.append(
-            f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. [{chunk.document.name}]</sup></a>"
+            f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
         )
         return citation
 
