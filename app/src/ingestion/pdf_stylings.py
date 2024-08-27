@@ -1,10 +1,14 @@
+"""
+Extracts text styling from PDFs using pdfminer.
+"""
+
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from io import BytesIO
 from pprint import pprint
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Iterator, Optional
 from xml.dom import minidom
 from xml.dom.minidom import Element, Text
 
@@ -44,31 +48,25 @@ class Styling:
 
 def extract_stylings(pdf: BinaryIO | PDFDocument) -> list[Styling]:
     parser = OutlineAwarePdfParser(pdf, BemTagExtractor)
-    xml_string = parser.extract_xml()
-    # len(xml_string.splitlines())
-    annotated_texts = parser.flatten_xml(xml_string)
+    extracted_texts = parser.flatten_xml(parser.extract_xml())
 
     stylings: list[Styling] = []
-    for _i, an_text in enumerate(annotated_texts):
-        # if an_text.pageno not in [2, 9]:
-        #     continue
+    for text_obj in extracted_texts:
+        if text_obj.zone != PageZone.MAIN or text_obj.is_heading():
+            continue
 
-        join_phrases = " ".join([p.text for p in an_text.phrases])
-        wider_text = "_______________" if an_text.is_heading() else join_phrases
-        print(an_text, wider_text[:100])
-        for _phrase in an_text.phrases:
-            styling = Styling(
-                text=_phrase.text,
-                pageno=an_text.pageno,
-                headings=an_text.headings,
-                wider_text=wider_text,
-                bold=_phrase.bold,
-            )
-
+        wider_text = "".join([p.text for p in text_obj.phrases])
+        logger.debug(text_obj, wider_text[:100])
+        for _phrase in text_obj.phrases:
             if _phrase.bold:
+                styling = Styling(
+                    text=_phrase.text,
+                    pageno=text_obj.pageno,
+                    headings=text_obj.headings,
+                    wider_text=wider_text,
+                    bold=_phrase.bold,
+                )
                 stylings.append(styling)
-            # if _phrase.span:
-            #     stylings.append(styling)
     return stylings
 
 
@@ -83,7 +81,6 @@ class Phrase:
     "Phrase is a piece of text with optional styling. It is a part of a paragraph (ExtractedText)."
     text: str
     bold: bool = False
-    span: bool = False
 
 
 @dataclass
@@ -169,7 +166,7 @@ class ParsingContext:
         self.parano = 0
 
     @contextmanager
-    def page_zone_context(self, zone: PageZone):
+    def zone_context(self, zone: PageZone) -> Iterator[None]:
         self._zone = zone
         yield
         self._zone = None
@@ -186,9 +183,12 @@ class ParsingContext:
 
 
 class OutlineAwarePdfParser:
-    """"""
+    """
+    PDF parser that extracts text from a PDF using the PDF's outline metadata
+    and flattens the resulting XML into ExtractedText objects
+    """
 
-    def __init__(self, pdf: BinaryIO | PDFDocument, tag_extractor_class):
+    def __init__(self, pdf: BinaryIO | PDFDocument, tag_extractor_class: type):
         self.tag_extractor_class = tag_extractor_class
         self.disable_caching: bool = False
         self.doc = as_pdf_doc(pdf)
@@ -243,7 +243,7 @@ class OutlineAwarePdfParser:
                     elif isinstance(page_elem, Text):
                         # A Text represents text content of an XML tag
                         # When text is not wrapped in a <P> tag (eg, 210.pdf)
-                        with self.parsing_context.page_zone_context(PageZone.MAIN):
+                        with self.parsing_context.zone_context(PageZone.MAIN):
                             if phrase := self._create_phrase(None, page_elem):
                                 self.parsing_context.parano += 1
                                 result.append(self.parsing_context.create_extracted_text([phrase]))
@@ -280,7 +280,7 @@ class OutlineAwarePdfParser:
 
     def _extract_text_in_zone(self, elem: Element, zone: PageZone) -> ExtractedText | None:
         "Create ExtractedTExt from top-level element on a page"
-        with self.parsing_context.page_zone_context(zone):
+        with self.parsing_context.zone_context(zone):
             phrases: list[Phrase] = self._extract_phrases(elem)
 
             if zone == PageZone.MAIN:
@@ -312,22 +312,18 @@ class OutlineAwarePdfParser:
             return None
 
         bolded = bool(parent_node and parent_node.tagName == "BOLD")
-        spanned = bool(parent_node and parent_node.tagName == "Span")
-        # <Span> usually reflect a hyperlink; the child.data string is the hyperlinked words
-        # Refer to "Exploring hyperlink identification" section of https://github.com/navapbc/labs-decision-support-tool/blob/main/app/notebooks/pdfminer-exploration/pdfminer_extract_json.ipynb
-
-        return Phrase(text=child.data, bold=bolded, span=spanned)
+        return Phrase(text=child.data, bold=bolded)
 
 
 class BemTagExtractor(TagExtractor):
     """
+    This class will write XML to the specified outfp, and is customized for BEM PDF files:
+    - detects bold text
+    - addresses Span tags that are not closed properly
+
     Methods in this class are called by the PDFPageInterpreter as it reads the PDF.
-    Adapted from pdfminer.pdfdevice.TagExtractor used by
+    This class is adapted from pdfminer.pdfdevice.TagExtractor used by
         pdfminer.high_level.py:extract_text_to_fp(), which is used in pdf2txt.py.
-    This class will write XML to the specified outfp.
-
-    do_*() methods refer to PDF Operators: https://pdfa.org/wp-content/uploads/2023/08/PDF-Operators-CheatSheet.pdf
-
     """
 
     def __init__(self, rsrcmgr: PDFResourceManager, outfp: BinaryIO, codec: str = "utf-8") -> None:
@@ -384,12 +380,3 @@ class BemTagExtractor(TagExtractor):
             return
 
         super().end_tag()
-
-
-if __name__ == "__main__":
-    # logging.basicConfig(level=logging.DEBUG)
-    pdf_filename = "notebooks/bem_pdfs/100.pdf"
-    with open(pdf_filename, "rb") as fp:
-        _stylings = extract_stylings(fp)
-    print("===============")
-    # pprint(_stylings)
