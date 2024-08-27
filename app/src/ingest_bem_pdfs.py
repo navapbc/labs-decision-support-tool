@@ -1,7 +1,6 @@
 import logging
 import sys
 import uuid
-from dataclasses import dataclass
 from typing import BinaryIO
 
 from smart_open import open as smart_open
@@ -62,7 +61,16 @@ def _ingest_bem_pdfs(
             db_session.add(document)
             chunks = split_into_chunks(document, grouped_texts)
             for chunk in chunks:
-                _add_chunk(db_session, chunk.content, chunk.document, chunk.tokens)
+                _add_chunk(
+                    db_session,
+                    chunk.content,
+                    chunk.document,
+                    chunk.tokens,
+                    chunk.page_number,
+                    chunk.headings,
+                    chunk.num_splits,
+                    chunk.split_index,
+                )
 
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
@@ -99,7 +107,6 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
         token_count = len(embedding_model.tokenizer.tokenize(paragraph))
         if token_count > embedding_model.max_seq_length:
             logger.warning("Text too long for embedding model: %s", paragraph.text[:100])
-
         text_chunks = [
             # For iteration 1, don't split the text -- just create 1 chunk.
             # TODO: TASK 3.a will split a paragraph into multiple chunks.
@@ -118,15 +125,28 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
 
 
 def _add_chunk(
-    db_session: db.Session, chunk_text: str, document: Document, current_token_count: int
+    db_session: db.Session,
+    chunk_text: str,
+    document: Document,
+    current_token_count: int,
+    page_number: int,
+    headings: list[str],
+    num_splits: int,
+    split_index: int,
 ) -> None:
     embedding_model = app_config.sentence_transformer
     chunk_embedding = embedding_model.encode(chunk_text, show_progress_bar=False)
+    print("INSERT")
+    print(page_number, document)
     chunk = Chunk(
         document=document,
         content=chunk_text,
         tokens=current_token_count,
         mpnet_embedding=chunk_embedding,
+        page_number=page_number,
+        headings=headings,
+        num_splits=num_splits,
+        split_index=split_index,
     )
     db_session.add(chunk)
 

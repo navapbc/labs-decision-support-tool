@@ -250,3 +250,6 @@ ingest-guru-cards: check-ingest-arguments
 
 ingest-policy-pdfs: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-policy-pdfs $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+
+ingest-bem-pdfs: check-ingest-arguments
+	$(PY_RUN_CMD) ingest-bem-pdfs $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
