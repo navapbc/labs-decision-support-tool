@@ -61,16 +61,7 @@ def _ingest_bem_pdfs(
             db_session.add(document)
             chunks = split_into_chunks(document, grouped_texts)
             for chunk in chunks:
-                _add_chunk(
-                    db_session,
-                    chunk.content,
-                    chunk.document,
-                    chunk.tokens,
-                    chunk.page_number,
-                    chunk.headings,
-                    chunk.num_splits,
-                    chunk.split_index,
-                )
+                _add_chunk(db_session, chunk)
 
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
@@ -126,25 +117,19 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
 
 def _add_chunk(
     db_session: db.Session,
-    chunk_text: str,
-    document: Document,
-    current_token_count: int | None,
-    page_number: int | None,
-    headings: list[str] | None,
-    num_splits: int,
-    split_index: int,
+    chunk: Chunk,
 ) -> None:
     embedding_model = app_config.sentence_transformer
-    chunk_embedding = embedding_model.encode(chunk_text, show_progress_bar=False)
+    chunk_embedding = embedding_model.encode(chunk.content, show_progress_bar=False)
     chunk = Chunk(
-        document=document,
-        content=chunk_text,
-        tokens=current_token_count,
+        document=chunk.document,
+        content=chunk.content,
+        tokens=chunk.tokens,
         mpnet_embedding=chunk_embedding,
-        page_number=page_number,
-        headings=headings,
-        num_splits=num_splits,
-        split_index=split_index,
+        page_number=chunk.page_number,
+        headings=chunk.headings,
+        num_splits=chunk.num_splits,
+        split_index=chunk.split_index,
     )
     db_session.add(chunk)
 
