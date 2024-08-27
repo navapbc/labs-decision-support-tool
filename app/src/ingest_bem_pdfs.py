@@ -128,16 +128,14 @@ def _add_chunk(
     db_session: db.Session,
     chunk_text: str,
     document: Document,
-    current_token_count: int,
-    page_number: int,
-    headings: list[str],
+    current_token_count: int | None,
+    page_number: int | None,
+    headings: list[str] | None,
     num_splits: int,
     split_index: int,
 ) -> None:
     embedding_model = app_config.sentence_transformer
     chunk_embedding = embedding_model.encode(chunk_text, show_progress_bar=False)
-    print("INSERT")
-    print(page_number, document)
     chunk = Chunk(
         document=document,
         content=chunk_text,

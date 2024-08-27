@@ -45,9 +45,9 @@ class Chunk(Base, IdMixin, TimestampMixin):
     # Flattened 'headings' data from grouped_texts
     headings: Mapped[list[str] | None]
     # Number of splits (or chunks) the text was split into, = 1 (if not split)
-    num_splits: Mapped[int] = 1
+    num_splits: int = 1
     # If not complete (num_splits > 1), specify the index starting from 0
-    split_index: Mapped[int] = 0
+    split_index: int = 0
 
 
 @dataclass
