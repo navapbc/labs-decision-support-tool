@@ -48,6 +48,7 @@ class Base(DeclarativeBase):
         str: Text,
         # Always use the Postgres UUID column type
         uuid.UUID: postgresql.UUID(as_uuid=True),
+        list[str]: postgresql.ARRAY(Text),
     }
 
     def _dict(self) -> dict:
