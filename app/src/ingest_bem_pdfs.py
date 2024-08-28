@@ -9,7 +9,8 @@ from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.pdf_elements import EnrichedText
-from src.ingestion.pdf_postprocess import add_markdown, group_texts
+from src.ingestion.pdf_postprocess import add_markdown, associate_stylings, group_texts
+from src.ingestion.pdf_stylings import extract_stylings
 from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
@@ -66,6 +67,8 @@ def _ingest_bem_pdfs(
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     enriched_texts = enrich_texts(file)
+    stylings = extract_stylings(file)
+    associate_stylings(enriched_texts, stylings)
     markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
 

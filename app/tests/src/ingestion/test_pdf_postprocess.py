@@ -5,7 +5,7 @@ from src.ingestion.pdf_postprocess import (
     associate_stylings,
     group_texts,
 )
-from tests.src.ingestion.test_pdf_stylings import all_expected_stylings
+from tests.src.ingestion.test_pdf_stylings import Styling, all_expected_stylings
 
 
 def test_add_markdown():
@@ -19,6 +19,21 @@ def test_add_markdown():
             text="First item.",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
+        ),
+        EnrichedText(
+            text="Second item.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1)],
+            page_number=2,
+            stylings=[
+                Styling(
+                    text="Second item",
+                    pageno=2,
+                    headings=[Heading(title="Section 3", level=1)],
+                    wider_text="Second item.",
+                    bold=True,
+                )
+            ],
         ),
     ]
 
@@ -34,6 +49,12 @@ def test_add_markdown():
             text="    - First item.",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
+        ),
+        EnrichedText(
+            text="    - **Second item**.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1)],
+            page_number=2,
         ),
     ]
 
@@ -194,7 +215,9 @@ def test_associated_stylings():
 
 def test_apply_stylings():
     texts = texts_for_stylings()
-    assert apply_stylings(text_with_stylings()) == [
+    applied = [apply_stylings(enriched_text) for enriched_text in text_with_stylings()]
+
+    assert applied == [
         texts[0],
         EnrichedText(  # Substring should be bolded
             text="First occurrence - six month disqualification. The "

@@ -34,32 +34,34 @@ def styling_matches_text(styling: Styling, e_text: EnrichedText) -> bool:
     )
 
 
-def apply_stylings(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
+def apply_stylings(e_text: EnrichedText) -> EnrichedText:
     "Given EnrichedTexts with stylings field, apply stylings to the text in markdown format"
-    for e_text in enriched_texts:
-        if e_text.stylings:
-            applied = []
-            for styling in e_text.stylings:
-                markdown_text = e_text.text.replace(styling.text, f"**{styling.text}**")
-                if e_text.text != markdown_text:
-                    applied.append(styling)
-                    e_text.text = markdown_text
+    if e_text.stylings:
+        applied = []
+        for styling in e_text.stylings:
+            markdown_text = e_text.text.replace(styling.text, f"**{styling.text}**")
+            if e_text.text != markdown_text:
+                applied.append(styling)
+                e_text.text = markdown_text
 
-            if applied == e_text.stylings:
-                e_text.stylings = None
-            else:
-                e_text.stylings = [s for s in e_text.stylings if s not in applied]
-    return enriched_texts
+        if applied == e_text.stylings:
+            e_text.stylings = None
+        else:
+            e_text.stylings = [s for s in e_text.stylings if s not in applied]
+    return e_text
 
 
 def add_markdown(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
+    markdown_texts = []
     for enriched_text in enriched_texts:
         # Note that the links and stylings should be applied [TASK 2.a and 2.b] to the text before
         # the "    - " is prepended to ListItem elements so that positional data like
         # link.start_index can be used without having to account for text transformations.
+        markdown_text = apply_stylings(enriched_text)
 
-        if enriched_text.type == TextType.LIST_ITEM:
-            enriched_text.text = "    - " + enriched_text.text
+        if markdown_text.type == TextType.LIST_ITEM:
+            markdown_text.text = "    - " + markdown_text.text
+        markdown_texts.append(markdown_text)
     return enriched_texts
 
 
