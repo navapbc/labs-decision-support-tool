@@ -12,3 +12,8 @@ def join_list(joining_list: Optional[list], join_txt: str = "\n") -> str:
         return ""
 
     return join_txt.join(joining_list)
+
+
+def basic_ascii(text: str) -> str:
+    # See https://www.ascii-code.com/
+    return "".join([c if 32 <= ord(c) <= 126 else " " for c in text])
