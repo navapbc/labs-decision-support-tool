@@ -261,7 +261,7 @@ class OutlineAwarePdfParser:
             raise e
 
     def _create_extracted_text(self, elem: Element) -> ExtractedText | None:
-        assert self.parsing_context.pageno, "pageno should be set at this point"
+        assert self.parsing_context.parano, "parano should be set at this point"
         if elem.tagName == "Artifact":
             if elem.getAttribute("Type") == "/'Pagination'":
                 subtype = elem.getAttribute("Subtype")
