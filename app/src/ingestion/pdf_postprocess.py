@@ -56,6 +56,7 @@ def _apply_stylings(e_text: EnrichedText) -> EnrichedText:
         e_text.stylings = None
     else:
         e_text.stylings = [s for s in e_text.stylings if s not in applied]
+        logger.warning("Stylings were not applied: %s", e_text.stylings, extra={"e_text": e_text})
     return e_text
 
 
@@ -104,10 +105,18 @@ def _add_link_markdown(e_text: EnrichedText) -> EnrichedText:
 def add_markdown(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
     markdown_texts = []
     for enriched_text in enriched_texts:
-        # Note that the links and stylings should be applied [TASK 2.a and 2.b] to the text before
-        # the "    - " is prepended to ListItem elements so that positional data like
+        # Link markdown should be applied to the text before applying stylings and
+        # prepending "    - " to ListItem elements so that positional data like
         # link.start_index can be used without having to account for text transformations.
-        markdown_text = _apply_stylings(enriched_text)
+        markdown_text = _add_link_markdown(enriched_text)
+
+        # Apply stylings before adding list item markdown since stylings rely on matching
+        # style.wider_text to the original text.
+        # If _add_link_markdown() modifies the styled text, the styling will not be applied
+        # if styling.text crosses the link boundaries -- a warning is logged.
+        # E.g., if styling.text="CDC means" and link.text="CDC", then the styling will not be applied
+        # b/c markdown_text will look like "[CDC](url) means" and styling.text no longer matches.
+        markdown_text = _apply_stylings(markdown_text)
 
         if markdown_text.type == TextType.LIST_ITEM:
             markdown_text.text = "    - " + markdown_text.text

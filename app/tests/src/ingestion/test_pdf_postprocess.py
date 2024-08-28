@@ -1,4 +1,5 @@
 import logging
+
 from src.ingestion.pdf_elements import EnrichedText, Heading, Link, TextType
 from src.ingestion.pdf_postprocess import (
     _add_link_markdown,
@@ -21,6 +22,7 @@ def test_add_markdown():
             text="First item.",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
+            links=[Link(start_index=6, text="item", url="http://www.michigan.gov")],
         ),
         EnrichedText(
             text="Second item.",
@@ -48,7 +50,7 @@ def test_add_markdown():
             headings=[Heading(title="Section 3", level=1)],
         ),
         EnrichedText(
-            text="    - First item.",
+            text="    - First [item](http://www.michigan.gov).",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
         ),
@@ -291,9 +293,6 @@ def text_with_links():
 
 
 def test__add_link_markdown(caplog):
-    texts = text_with_links()
-    print(">>>> ", texts[0].text.index("http://www.michigan.gov"))
-    print(">>>> ", texts[1].text.index("MDHHS Policy Manuals"))
     with caplog.at_level(logging.WARNING):
         markdown_texts = [_add_link_markdown(enriched_text) for enriched_text in text_with_links()]
 
