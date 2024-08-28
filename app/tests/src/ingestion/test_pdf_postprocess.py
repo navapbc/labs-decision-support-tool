@@ -1,7 +1,7 @@
 from src.ingestion.pdf_elements import EnrichedText, Heading, TextType
 from src.ingestion.pdf_postprocess import (
+    _apply_stylings,
     add_markdown,
-    apply_stylings,
     associate_stylings,
     group_texts,
 )
@@ -213,9 +213,9 @@ def test_associated_stylings():
     assert associate_stylings(texts.copy(), all_expected_stylings) == text_with_stylings()
 
 
-def test_apply_stylings():
+def test__apply_stylings():
     texts = texts_for_stylings()
-    applied = [apply_stylings(enriched_text) for enriched_text in text_with_stylings()]
+    applied = [_apply_stylings(enriched_text) for enriched_text in text_with_stylings()]
 
     assert applied == [
         texts[0],
