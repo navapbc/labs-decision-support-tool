@@ -234,7 +234,7 @@ class OutlineAwarePdfParser:
         try:
             for page_node in root.getElementsByTagName("page"):
                 self.parsing_context.pageno = int(page_node.getAttribute("id")) + 1
-                assert self.parsing_context.parano
+                assert self.parsing_context.pageno
                 logger.info("Processing page %i", self.parsing_context.pageno)
 
                 for page_elem in page_node.childNodes:
@@ -261,7 +261,7 @@ class OutlineAwarePdfParser:
             raise e
 
     def _create_extracted_text(self, elem: Element) -> ExtractedText | None:
-        assert self.parsing_context.parano, "parano should be set at this point"
+        assert self.parsing_context.pageno, "pageno should be set at this point"
         if elem.tagName == "Artifact":
             if elem.getAttribute("Type") == "/'Pagination'":
                 subtype = elem.getAttribute("Subtype")
