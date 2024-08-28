@@ -46,21 +46,7 @@ def apply_stylings(e_text: EnrichedText) -> EnrichedText:
     if e_text.stylings:
         applied = []
         for styling in e_text.stylings:
-            if styling.bold:
-                # Replace only the first occurrence of the styling text
-                markdown_text = e_text.text.replace(styling.text, f"**{styling.text}**", 1)
-                if markdown_text == e_text.text:
-                    continue
-
-                # Warn if the styling text occurs multiple times
-                replaced_all = e_text.text.replace(styling.text, f"**{styling.text}**")
-                if replaced_all != e_text.text:
-                    logger.warning(
-                        "Styling text %s occurs multiple times; only applied to the first occurrence: '%s'",
-                        styling.text,
-                        e_text.text,
-                    )
-
+            if styling.bold and (markdown_text := apply_bold_styling(e_text.text, styling)):
                 applied.append(styling)
                 e_text.text = markdown_text
 
@@ -69,6 +55,23 @@ def apply_stylings(e_text: EnrichedText) -> EnrichedText:
         else:
             e_text.stylings = [s for s in e_text.stylings if s not in applied]
     return e_text
+
+
+def apply_bold_styling(text: str, styling: Styling) -> str | None:
+    # Replace only the first occurrence of the styling text
+    markdown_text = text.replace(styling.text, f"**{styling.text}**", 1)
+    if markdown_text == text:
+        return None
+
+    # Warn if the styling text occurs multiple times
+    replaced_all = text.replace(styling.text, f"**{styling.text}**")
+    if replaced_all != text:
+        logger.warning(
+            "Styling text %s occurs multiple times; only applied to the first occurrence: '%s'",
+            styling.text,
+            text,
+        )
+    return markdown_text
 
 
 def add_markdown(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
