@@ -20,6 +20,13 @@ def associate_stylings(
     return enriched_texts
 
 
+# The maximum difference in length between the Styling.wider_text and the text in the enriched text
+# There could be several paragraphs on the same page and under the same heading that have a bolded word,
+# e.g., "CDC" (single-word paragraph) and "CDC is the center for disease control".
+# A styling.text="CDC" would match both paragraphs without this check.
+STYLING_MATCH_MAX_LENGTH_DIFF = 10
+
+
 def styling_matches_text(styling: Styling, e_text: EnrichedText) -> bool:
     # Quick checks
     if styling.pageno != e_text.page_number or styling.headings != e_text.headings:
@@ -30,7 +37,7 @@ def styling_matches_text(styling: Styling, e_text: EnrichedText) -> bool:
     stripped_e_text = basic_ascii(e_text.text).strip()
     return (
         stripped_wider_text in stripped_e_text
-        and abs(len(stripped_wider_text) - len(stripped_e_text)) < 10
+        and abs(len(stripped_wider_text) - len(stripped_e_text)) < STYLING_MATCH_MAX_LENGTH_DIFF
     )
 
 
@@ -39,8 +46,21 @@ def apply_stylings(e_text: EnrichedText) -> EnrichedText:
     if e_text.stylings:
         applied = []
         for styling in e_text.stylings:
-            markdown_text = e_text.text.replace(styling.text, f"**{styling.text}**")
-            if e_text.text != markdown_text:
+            if styling.bold:
+                # Replace only the first occurrence of the styling text
+                markdown_text = e_text.text.replace(styling.text, f"**{styling.text}**", 1)
+                if markdown_text == e_text.text:
+                    continue
+
+                # Warn if the styling text occurs multiple times
+                replaced_all = e_text.text.replace(styling.text, f"**{styling.text}**")
+                if replaced_all != e_text.text:
+                    logger.warning(
+                        "Styling text %s occurs multiple times; only applied to the first occurrence: '%s'",
+                        styling.text,
+                        e_text.text,
+                    )
+
                 applied.append(styling)
                 e_text.text = markdown_text
 
