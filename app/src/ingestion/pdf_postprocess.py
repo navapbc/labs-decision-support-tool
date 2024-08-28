@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def associate_stylings(
     enriched_texts: list[EnrichedText], stylings: list[Styling]
 ) -> list[EnrichedText]:
-    "Given EnrichedTexts and Stylings, assocate stylings to the corresponding text item"
+    "Given EnrichedTexts and Stylings, associate stylings to the corresponding text item"
     for e_text in enriched_texts:
         matched_stylings = [
             styling for styling in stylings if styling_matches_text(styling, e_text)
