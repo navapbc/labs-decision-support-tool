@@ -38,11 +38,11 @@ all_expected_stylings = [
         bold=True,
     ),
     Styling(
-        text="CDC penalty period has ended. See BEM 704 for re-enroll-ment " "requirements.",
+        text="CDC penalty period has ended. See BEM 704 for re-enroll-ment requirements.",
         pageno=4,
         headings=[
             Heading(
-                title="Enrollment of a Provider after the Penalty " "Period has ended",
+                title="Enrollment of a Provider after the Penalty Period has ended",
                 level=1,
                 pageno=4,
             )
