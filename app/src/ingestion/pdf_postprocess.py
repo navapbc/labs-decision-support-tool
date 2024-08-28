@@ -1,8 +1,40 @@
 import logging
 
 from src.ingestion.pdf_elements import EnrichedText, TextType
+from src.ingestion.pdf_stylings import Styling
 
 logger = logging.getLogger(__name__)
+
+
+def associate_stylings(
+    enriched_texts: list[EnrichedText], stylings: list[Styling]
+) -> list[EnrichedText]:
+    "Given EnrichedTexts and Stylings, assocate stylings to the corresponding text item"
+    for e_text in enriched_texts:
+        print("-------")
+        e_text.stylings = [styling for styling in stylings if styling_matches_text(styling, e_text)]
+    return enriched_texts
+
+
+def styling_matches_text(styling: Styling, e_text: EnrichedText) -> bool:
+    stripped_wider_text = styling.wider_text.replace("• ", "").strip()
+    print("S: ", styling.wider_text.replace("• ", ""))
+    print("T: ", e_text.text)
+    print(stripped_wider_text in e_text.text.strip())
+    print(abs(len(stripped_wider_text) - len(e_text.text.strip()))<10)
+    return (
+        styling.pageno == e_text.page_number
+        and styling.headings == e_text.headings
+        and stripped_wider_text in e_text.text.strip()
+        and abs(len(stripped_wider_text) - len(e_text.text.strip()))<10
+    )
+
+
+def apply_stylings(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
+    """
+    Given EnrichedTexts, apply stylings to the text in markdown format.
+    """
+    return enriched_texts
 
 
 def add_markdown(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
