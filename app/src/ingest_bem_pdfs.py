@@ -1,8 +1,11 @@
 import logging
+import re
 import sys
 import uuid
-from typing import BinaryIO
+from pprint import pp
+from typing import Any, BinaryIO
 
+import nltk
 from smart_open import open as smart_open
 
 from src.adapters import db
@@ -14,6 +17,7 @@ from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
 from src.util.pdf_utils import Heading
+from src.util.unstructured_utils import get_json_from_file
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,8 @@ def _ingest_bem_pdfs(
     doc_attribs: dict[str, str],
 ) -> None:
     file_list = get_files(pdf_file_dir)
+    nltk.download("punkt_tab")
+    nltk.download("averaged_perceptron_tagger_eng")
 
     logger.info(
         "Processing PDFs in %s using %s with %s",
@@ -54,7 +60,7 @@ def _ingest_bem_pdfs(
 
         logger.info("Processing file: %s", file_path)
         with smart_open(file_path, "rb") as file:
-            grouped_texts = _parse_pdf(file)
+            grouped_texts = _parse_pdf(file, file_path)
 
             doc_attribs["name"] = _get_bem_title(file, file_path)
             document = Document(content="\n".join(g.text for g in grouped_texts), **doc_attribs)
@@ -64,8 +70,9 @@ def _ingest_bem_pdfs(
                 _add_chunk(db_session, chunk)
 
 
-def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
-    enriched_texts = enrich_texts(file)
+def _parse_pdf(file: BinaryIO, file_path: str) -> list[EnrichedText]:
+    unstructured_json = get_json_from_file(file_path)
+    enriched_texts = enrich_texts(file, unstructured_json)
     markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
 
@@ -73,15 +80,60 @@ def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     for text in grouped_texts:
         text.id = str(uuid.uuid1())
     assert len(set(text.id for text in grouped_texts)) == len(grouped_texts)
+
     return grouped_texts
 
 
-def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
+def enrich_texts(file: BinaryIO, unstructured_json: list[dict[str, Any]]) -> list[EnrichedText]:
+    enrich_text_list = []
     "Placeholder function. Will be implemented for DST-414, probably in a different file."
     outline: list[Heading] = pdf_utils.extract_outline(file)
-    for _heading in outline:
-        pass
-    return []
+    current_header = []
+    current_header_level = 1
+    for element in unstructured_json:
+        if element["type"] == "Header" or element["type"] == "Footer":
+            continue
+        if element["type"] == "Title":
+            header = match_heading(outline, element["text"], element["metadata"]["page_number"])
+            if header:
+                if header.level == 1:
+                    current_header = [header]
+                    current_header_level = 1
+                else:
+                    if header.title != current_header[-1]:
+                        if current_header_level == header.level:
+                            current_header = current_header[:-1]
+                            current_header.append(header)
+                        if header.level > current_header_level:
+                            current_header.append(header)
+                            current_header_level = header.level
+
+        # Unstructured fails to categorize the date strings in the header,
+        # so manually check for that and ignore those too
+        if element["type"] == "UncategorizedText" and re.match(
+            r"^\d{1,2}-\d{1,2}-\d{4}$", element["text"]
+        ):
+            continue
+
+        enriched_text_item = EnrichedText(
+            text=element["text"],
+            type=element["type"],
+            page_number=element["metadata"]["page_number"],
+            headings=current_header,
+            id=element["element_id"],
+        )
+
+        enrich_text_list.append(enriched_text_item)
+    return enrich_text_list
+
+
+def match_heading(
+    heading_list: list[Heading], heading_name: str, page_number: int
+) -> Heading | None:
+    for heading in heading_list:
+        if heading_name.lower() in heading.title.lower() and heading.pageno == page_number:
+            return heading
+    return None
 
 
 def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> list[Chunk]:
