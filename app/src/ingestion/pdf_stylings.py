@@ -173,7 +173,7 @@ class ParsingContext:
 
     def create_extracted_text(self, phrases: list[Phrase]) -> ExtractedText:
         assert self._zone, "zone is not set"
-        assert self.parano, "parano should be set at this point"
+        assert self.parano is not None, "parano should be set at this point"
         return ExtractedText(
             pageno=self.pageno,
             zone=self._zone,
@@ -236,6 +236,7 @@ class OutlineAwarePdfParser:
                 self.parsing_context.pageno = int(page_node.getAttribute("id")) + 1
                 assert self.parsing_context.pageno
                 logger.info("Processing page %i", self.parsing_context.pageno)
+                self.parsing_context.parano = 0
 
                 for page_elem in page_node.childNodes:
                     if isinstance(page_elem, Element):
@@ -261,7 +262,7 @@ class OutlineAwarePdfParser:
             raise e
 
     def _create_extracted_text(self, elem: Element) -> ExtractedText | None:
-        assert self.parsing_context.parano, "parano should be set at this point"
+        assert self.parsing_context.parano is not None, "parano should be set at this point"
         if elem.tagName == "Artifact":
             if elem.getAttribute("Type") == "/'Pagination'":
                 subtype = elem.getAttribute("Subtype")
