@@ -179,11 +179,8 @@ def texts_for_stylings() -> list[EnrichedText]:
 
 def text_with_stylings():
     expected_text_with_stylings = texts_for_stylings()
-    expected_text_with_stylings[0].stylings = []
     expected_text_with_stylings[1].stylings = [all_expected_stylings[0]]
     expected_text_with_stylings[2].stylings = [all_expected_stylings[1]]
-    expected_text_with_stylings[3].stylings = []
-    expected_text_with_stylings[4].stylings = []
     expected_text_with_stylings[5].stylings = [all_expected_stylings[4]]
     return expected_text_with_stylings
 
@@ -192,7 +189,7 @@ def test_associated_stylings():
     texts = texts_for_stylings()
 
     assert len(all_expected_stylings) == 5
-    assert associate_stylings(texts, all_expected_stylings) == text_with_stylings()
+    assert associate_stylings(texts.copy(), all_expected_stylings) == text_with_stylings()
 
 
 def test_apply_stylings():
@@ -217,8 +214,9 @@ def test_apply_stylings():
         ),
         # Text string matches but different page
         texts[3],
+        texts[4],
         EnrichedText(  # Multiple substrings match
-            text="**CDC** - CDC",
+            text="**CDC **- CDC",
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="legal base", level=1, pageno=4)],
             page_number=4,

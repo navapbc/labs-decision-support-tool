@@ -2,6 +2,7 @@ import logging
 
 from src.ingestion.pdf_elements import EnrichedText, TextType
 from src.ingestion.pdf_stylings import Styling
+from src.util.string_utils import basic_ascii
 
 logger = logging.getLogger(__name__)
 
@@ -11,29 +12,43 @@ def associate_stylings(
 ) -> list[EnrichedText]:
     "Given EnrichedTexts and Stylings, assocate stylings to the corresponding text item"
     for e_text in enriched_texts:
-        print("-------")
-        e_text.stylings = [styling for styling in stylings if styling_matches_text(styling, e_text)]
+        matched_stylings = [
+            styling for styling in stylings if styling_matches_text(styling, e_text)
+        ]
+        if matched_stylings:
+            e_text.stylings = matched_stylings
     return enriched_texts
 
 
 def styling_matches_text(styling: Styling, e_text: EnrichedText) -> bool:
-    stripped_wider_text = styling.wider_text.replace("• ", "").strip()
-    print("S: ", styling.wider_text.replace("• ", ""))
-    print("T: ", e_text.text)
-    print(stripped_wider_text in e_text.text.strip())
-    print(abs(len(stripped_wider_text) - len(e_text.text.strip()))<10)
+    # Quick checks
+    if styling.pageno != e_text.page_number or styling.headings != e_text.headings:
+        return False
+
+    # Slower checks
+    stripped_wider_text = basic_ascii(styling.wider_text).strip()
+    stripped_e_text = basic_ascii(e_text.text).strip()
     return (
-        styling.pageno == e_text.page_number
-        and styling.headings == e_text.headings
-        and stripped_wider_text in e_text.text.strip()
-        and abs(len(stripped_wider_text) - len(e_text.text.strip()))<10
+        stripped_wider_text in stripped_e_text
+        and abs(len(stripped_wider_text) - len(stripped_e_text)) < 10
     )
 
 
 def apply_stylings(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
-    """
-    Given EnrichedTexts, apply stylings to the text in markdown format.
-    """
+    "Given EnrichedTexts with stylings field, apply stylings to the text in markdown format"
+    for e_text in enriched_texts:
+        if e_text.stylings:
+            applied = []
+            for styling in e_text.stylings:
+                markdown_text = e_text.text.replace(styling.text, f"**{styling.text}**")
+                if e_text.text != markdown_text:
+                    applied.append(styling)
+                    e_text.text = markdown_text
+
+            if applied == e_text.stylings:
+                e_text.stylings = None
+            else:
+                e_text.stylings = [s for s in e_text.stylings if s not in applied]
     return enriched_texts
 
 
