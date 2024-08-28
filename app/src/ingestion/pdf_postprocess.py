@@ -43,17 +43,19 @@ def _styling_matches_text(styling: Styling, e_text: EnrichedText) -> bool:
 
 def _apply_stylings(e_text: EnrichedText) -> EnrichedText:
     "Given EnrichedTexts with stylings field, apply stylings to the text in markdown format"
-    if e_text.stylings:
-        applied = []
-        for styling in e_text.stylings:
-            if styling.bold and (markdown_text := _apply_bold_styling(e_text.text, styling)):
-                applied.append(styling)
-                e_text.text = markdown_text
+    if not e_text.stylings:
+        return e_text
 
-        if applied == e_text.stylings:
-            e_text.stylings = None
-        else:
-            e_text.stylings = [s for s in e_text.stylings if s not in applied]
+    applied = []
+    for styling in e_text.stylings:
+        if styling.bold and (markdown_text := _apply_bold_styling(e_text.text, styling)):
+            applied.append(styling)
+            e_text.text = markdown_text
+
+    if applied == e_text.stylings:
+        e_text.stylings = None
+    else:
+        e_text.stylings = [s for s in e_text.stylings if s not in applied]
     return e_text
 
 
@@ -72,6 +74,31 @@ def _apply_bold_styling(text: str, styling: Styling) -> str | None:
             text,
         )
     return markdown_text
+
+
+def _add_link_markdown(e_text: EnrichedText) -> EnrichedText:
+    "Given EnrichedTexts with links field, apply links to the text in markdown format"
+    if not e_text.links:
+        return e_text
+
+    applied = []
+    for link in e_text.links:
+        try:
+            index = e_text.text.index(link.text, link.start_index)
+            e_text.text = (
+                e_text.text[:index]
+                + f"[{link.text}]({link.url})"
+                + e_text.text[index + len(link.text) :]
+            )
+            applied.append(link)
+        except ValueError:
+            logger.warning("Link text '%s' not found in: %s", link.text, e_text.text)
+
+    if applied == e_text.links:
+        e_text.links = None
+    else:
+        e_text.links = [s for s in e_text.links if s not in applied]
+    return e_text
 
 
 def add_markdown(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:

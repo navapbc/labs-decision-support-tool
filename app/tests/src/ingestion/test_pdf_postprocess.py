@@ -1,5 +1,7 @@
-from src.ingestion.pdf_elements import EnrichedText, Heading, TextType
+import logging
+from src.ingestion.pdf_elements import EnrichedText, Heading, Link, TextType
 from src.ingestion.pdf_postprocess import (
+    _add_link_markdown,
     _apply_stylings,
     add_markdown,
     associate_stylings,
@@ -243,5 +245,81 @@ def test__apply_stylings():
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="legal base", level=1, pageno=4)],
             page_number=4,
+        ),
+    ]
+
+
+def text_with_links():
+    return [
+        EnrichedText(
+            text="Each state must submit a state plan for FIP. State plans are located at http://www.michigan.gov.",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[Heading(title="Family Independence Program (FIP)", level=2, pageno=1)],
+            links=[
+                Link(start_index=72, text="http://www.michigan.gov", url="http://www.michigan.gov"),
+                Link(
+                    start_index=0,
+                    text="A substring that is not in the text",
+                    url="http://www.michigan.gov",
+                ),
+            ],
+        ),
+        EnrichedText(
+            text="The MDHHS policy manuals are available to the public at the Michigan "
+            "Department of Health and Human Services internet site under MDHHS "
+            "Policy Manuals; see BAM 310, Confidentiality, regarding the release "
+            "of specific information pertaining to clients.",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[
+                Heading(title="Revisions", level=1, pageno=7),
+                Heading(title="Public Access to Manuals", level=2, pageno=7),
+            ],
+            links=[
+                Link(
+                    start_index=4,
+                    text="MDHHS policy manuals",
+                    url="http://www.michigan.gov/mdhhs",
+                ),
+                Link(
+                    start_index=129,
+                    text="MDHHS Policy Manuals",
+                    url="http://www.michigan.gov/mdhhs",
+                ),
+            ],
+        ),
+    ]
+
+
+def test__add_link_markdown(caplog):
+    texts = text_with_links()
+    print(">>>> ", texts[0].text.index("http://www.michigan.gov"))
+    print(">>>> ", texts[1].text.index("MDHHS Policy Manuals"))
+    with caplog.at_level(logging.WARNING):
+        markdown_texts = [_add_link_markdown(enriched_text) for enriched_text in text_with_links()]
+
+    assert "Link text 'A substring that is not in the text' not found in:" in caplog.messages[0]
+    assert markdown_texts == [
+        EnrichedText(
+            text="Each state must submit a state plan for FIP. State plans are located at [http://www.michigan.gov](http://www.michigan.gov).",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[Heading(title="Family Independence Program (FIP)", level=2, pageno=1)],
+            links=[
+                Link(
+                    start_index=0,
+                    text="A substring that is not in the text",
+                    url="http://www.michigan.gov",
+                ),
+            ],
+        ),
+        EnrichedText(
+            text="The [MDHHS policy manuals](http://www.michigan.gov/mdhhs) are available to the public at the Michigan "
+            "Department of Health and Human Services internet site under [MDHHS "
+            "Policy Manuals](http://www.michigan.gov/mdhhs); see BAM 310, Confidentiality, regarding the release "
+            "of specific information pertaining to clients.",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[
+                Heading(title="Revisions", level=1, pageno=7),
+                Heading(title="Public Access to Manuals", level=2, pageno=7),
+            ],
         ),
     ]
