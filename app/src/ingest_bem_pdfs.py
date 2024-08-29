@@ -2,10 +2,10 @@ import logging
 import re
 import sys
 import uuid
-from typing import Any, BinaryIO
+from typing import BinaryIO
 
-import nltk
 from smart_open import open as smart_open
+from unstructured.documents.elements import Element
 
 from src.adapters import db
 from src.app_config import app_config
@@ -84,23 +84,23 @@ def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     return grouped_texts
 
 
-def enrich_texts(file: BinaryIO, unstructured_json: list[dict[str, Any]]) -> list[EnrichedText]:
+def enrich_texts(file: BinaryIO, unstructured_json: list[Element]) -> list[EnrichedText]:
     enrich_text_list = []
     "Placeholder function. Will be implemented for DST-414, probably in a different file."
     outline: list[Heading] = pdf_utils.extract_outline(file)
     current_header = []
     current_header_level = 1
     for element in unstructured_json:
-        if element["category"] == "Header" or element["category"] == "Footer":
+        if element.category == "Footer":
             continue
-        if element["category"] == "Title":
-            header = match_heading(outline, element["text"], element["metadata"]["page_number"])
+        if element.category == "Header":
+            header = match_heading(outline, element.text, element.metadata.page_number)
         if header:
             if header.level == 1:
                 current_header = [header]
                 current_header_level = 1
             else:
-                if header.title != current_header[-1]:
+                if header.title != current_header[-1].title:
                     if current_header_level == header.level:
                         current_header = current_header[:-1]
                     if header.level > current_header_level:
@@ -109,17 +109,17 @@ def enrich_texts(file: BinaryIO, unstructured_json: list[dict[str, Any]]) -> lis
 
         # Unstructured fails to categorize the date strings in the header,
         # so manually check for that and ignore those too
-        if element["category"] == "UncategorizedText" and re.match(
-            r"^\d{1,2}-\d{1,2}-\d{4}$", element["text"]
+        if element.category == "UncategorizedText" and re.match(
+            r"^\d{1,2}-\d{1,2}-\d{4}$", element.text
         ):
             continue
 
         enriched_text_item = EnrichedText(
-            text=element["text"],
-            type=element["category"],
-            page_number=element["metadata"]["page_number"],
+            text=element.text,
+            type=element.category,
+            page_number=element.metadata.page_number,
             headings=current_header,
-            id=element["element_id"],
+            id=element._element_id,
         )
 
         enrich_text_list.append(enriched_text_item)
@@ -127,7 +127,7 @@ def enrich_texts(file: BinaryIO, unstructured_json: list[dict[str, Any]]) -> lis
 
 
 def match_heading(
-    heading_list: list[Heading], heading_name: str, page_number: int
+    heading_list: list[Heading], heading_name: str, page_number: int | None
 ) -> Heading | None:
     for heading in heading_list:
         if heading_name.lower() in heading.title.lower() and heading.pageno == page_number:

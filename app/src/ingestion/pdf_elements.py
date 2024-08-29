@@ -15,7 +15,7 @@ class TextType(Enum):
 @dataclass
 class EnrichedText:
     text: str
-    type: TextType
+    type: TextType | str
     headings: List[Heading]
     page_number: int | None = None
     id: str | None = None
