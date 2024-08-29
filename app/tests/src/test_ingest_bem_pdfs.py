@@ -24,7 +24,7 @@ def test__get_bem_title(file_location, policy_s3_file):
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
-def test__ingest_policy_pdfs(caplog, app_config, db_session, policy_s3_file, file_location):
+def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_location):
     db_session.execute(delete(Document))
 
     with caplog.at_level(logging.INFO):
@@ -42,8 +42,8 @@ def test__ingest_policy_pdfs(caplog, app_config, db_session, policy_s3_file, fil
         assert document.name == "BEM 100: INTRODUCTION"
 
         # TODO: Test Document.content
-        # assert "Temporary Assistance to Needy Families" in document.content
-        # assert "The Food Assistance Program" in document.content
+        assert "BEM 100" in document.content
+        assert "The Food Assistance Program" in document.content
 
         # TODO: Test: The document should be broken into two chunks, which
         # have different content and different embeddings

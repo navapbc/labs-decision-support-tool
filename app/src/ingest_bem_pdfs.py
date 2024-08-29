@@ -16,7 +16,7 @@ from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
 from src.util.pdf_utils import Heading
-from src.util.unstructured_utils import get_json_from_file
+from src.util.unstructured_utils import get_json_from_file, get_json_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,10 @@ def _ingest_bem_pdfs(
 
 
 def _parse_pdf(file: BinaryIO, file_path: str) -> list[EnrichedText]:
-    unstructured_json = get_json_from_file(file_path)
+    if "s3" in file_path:
+        unstructured_json = get_json_from_url(file_path)
+    else:
+        unstructured_json = get_json_from_file(file_path)
     enriched_texts = enrich_texts(file, unstructured_json)
     markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
@@ -145,7 +148,7 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
 
         # For iteration 1, log warning for overly long text
         embedding_model = app_config.sentence_transformer
-        token_count = len(embedding_model.tokenizer.tokenize(paragraph))
+        token_count = len(embedding_model.tokenizer.tokenize(paragraph.text))
         if token_count > embedding_model.max_seq_length:
             logger.warning("Text too long for embedding model: %s", paragraph.text[:100])
         text_chunks = [
@@ -155,7 +158,6 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
                 content=paragraph.text,
                 tokens=len(paragraph.text.split()),
                 document=document,
-                text_type=paragraph.type.name,
                 page_number=paragraph.page_number,
                 headings=[h.title for h in paragraph.headings],
                 num_splits=1,
