@@ -2,7 +2,6 @@ import logging
 import re
 import sys
 import uuid
-from pprint import pp
 from typing import Any, BinaryIO
 
 import nltk
@@ -103,10 +102,9 @@ def enrich_texts(file: BinaryIO, unstructured_json: list[dict[str, Any]]) -> lis
                     if header.title != current_header[-1]:
                         if current_header_level == header.level:
                             current_header = current_header[:-1]
-                            current_header.append(header)
                         if header.level > current_header_level:
-                            current_header.append(header)
                             current_header_level = header.level
+                        current_header.append(header)
 
         # Unstructured fails to categorize the date strings in the header,
         # so manually check for that and ignore those too
