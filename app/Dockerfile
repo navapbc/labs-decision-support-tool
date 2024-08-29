@@ -14,7 +14,7 @@ RUN apt-get update \
     # Install security updates
     # https://pythonspeed.com/articles/security-updates-in-docker/
     && apt-get upgrade --yes \
-    && apt-get install --no-install-recommends --yes \
+    && apt-get install python3-opencv --no-install-recommends --yes \
     build-essential \
     libpq-dev \
     postgresql \

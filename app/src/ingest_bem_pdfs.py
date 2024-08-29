@@ -45,8 +45,6 @@ def _ingest_bem_pdfs(
     doc_attribs: dict[str, str],
 ) -> None:
     file_list = get_files(pdf_file_dir)
-    nltk.download("punkt_tab")
-    nltk.download("averaged_perceptron_tagger_eng")
 
     logger.info(
         "Processing PDFs in %s using %s with %s",
@@ -93,32 +91,32 @@ def enrich_texts(file: BinaryIO, unstructured_json: list[dict[str, Any]]) -> lis
     current_header = []
     current_header_level = 1
     for element in unstructured_json:
-        if element["type"] == "Header" or element["type"] == "Footer":
+        if element["category"] == "Header" or element["category"] == "Footer":
             continue
-        if element["type"] == "Title":
+        if element["category"] == "Title":
             header = match_heading(outline, element["text"], element["metadata"]["page_number"])
-            if header:
-                if header.level == 1:
-                    current_header = [header]
-                    current_header_level = 1
-                else:
-                    if header.title != current_header[-1]:
-                        if current_header_level == header.level:
-                            current_header = current_header[:-1]
-                        if header.level > current_header_level:
-                            current_header_level = header.level
-                        current_header.append(header)
+        if header:
+            if header.level == 1:
+                current_header = [header]
+                current_header_level = 1
+            else:
+                if header.title != current_header[-1]:
+                    if current_header_level == header.level:
+                        current_header = current_header[:-1]
+                    if header.level > current_header_level:
+                        current_header_level = header.level
+                    current_header.append(header)
 
         # Unstructured fails to categorize the date strings in the header,
         # so manually check for that and ignore those too
-        if element["type"] == "UncategorizedText" and re.match(
+        if element["category"] == "UncategorizedText" and re.match(
             r"^\d{1,2}-\d{1,2}-\d{4}$", element["text"]
         ):
             continue
 
         enriched_text_item = EnrichedText(
             text=element["text"],
-            type=element["type"],
+            type=element["category"],
             page_number=element["metadata"]["page_number"],
             headings=current_header,
             id=element["element_id"],
