@@ -60,7 +60,7 @@ def _ingest_bem_pdfs(
 
         logger.info("Processing file: %s", file_path)
         with smart_open(file_path, "rb") as file:
-            grouped_texts = _parse_pdf(file, file_path)
+            grouped_texts = _parse_pdf(file)
 
             doc_attribs["name"] = _get_bem_title(file, file_path)
             document = Document(content="\n".join(g.text for g in grouped_texts), **doc_attribs)
