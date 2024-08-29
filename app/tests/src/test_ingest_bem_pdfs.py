@@ -42,8 +42,8 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         assert document.name == "BEM 100: INTRODUCTION"
 
         # TODO: Test Document.content
-        assert "BEM 100" in document.content
-        assert "The Food Assistance Program" in document.content
+        assert "Family Independence Program " in document.content
+        assert "MDHHS policy manuals" not in document.content
 
         # TODO: Test: The document should be broken into two chunks, which
         # have different content and different embeddings
