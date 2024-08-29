@@ -17,7 +17,7 @@ from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
 from src.util.pdf_utils import Heading
-from src.util.unstructured_utils import get_json_from_file, get_json_from_url
+from src.util.unstructured_utils import get_json_from_file
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +70,8 @@ def _ingest_bem_pdfs(
                 _add_chunk(db_session, chunk)
 
 
-def _parse_pdf(file: BinaryIO, file_path: str) -> list[EnrichedText]:
-    if "s3" in file_path:
-        unstructured_json = get_json_from_url(file_path)
-    else:
-        unstructured_json = get_json_from_file(file_path)
+def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
+    unstructured_json = get_json_from_file(file)
     enriched_texts = enrich_texts(file, unstructured_json)
     stylings = extract_stylings(file)
     associate_stylings(enriched_texts, stylings)
