@@ -91,21 +91,21 @@ def enrich_texts(file: BinaryIO, unstructured_json: list[Element]) -> list[Enric
     current_header = []
     current_header_level = 1
     for element in unstructured_json:
-        if element.category == "Footer":
+        if element.category == "Footer" or element.category == "Header":
             continue
-        if element.category == "Header":
+        if element.category == "Title":
             header = match_heading(outline, element.text, element.metadata.page_number)
-        if header:
-            if header.level == 1:
-                current_header = [header]
-                current_header_level = 1
-            else:
-                if header.title != current_header[-1].title:
-                    if current_header_level == header.level:
-                        current_header = current_header[:-1]
-                    if header.level > current_header_level:
-                        current_header_level = header.level
-                    current_header.append(header)
+            if header:
+                if header.level == 1:
+                    current_header = [header]
+                    current_header_level = 1
+                else:
+                    if header.title != current_header[-1].title:
+                        if current_header_level == header.level:
+                            current_header = current_header[:-1]
+                        if header.level > current_header_level:
+                            current_header_level = header.level
+                        current_header.append(header)
 
         # Unstructured fails to categorize the date strings in the header,
         # so manually check for that and ignore those too
