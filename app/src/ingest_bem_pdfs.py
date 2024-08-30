@@ -69,8 +69,7 @@ def _ingest_bem_pdfs(
 
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
-    unstructured_json = partition_pdf(file=file, strategy="fast")
-    enriched_texts = enrich_texts(file, unstructured_json)
+    enriched_texts = enrich_texts(file)
     stylings = extract_stylings(file)
     associate_stylings(enriched_texts, stylings)
     markdown_texts = add_markdown(enriched_texts)
@@ -84,15 +83,24 @@ def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     return grouped_texts
 
 
-def enrich_texts(file: BinaryIO, unstructured_json: list[Element]) -> list[EnrichedText]:
+def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
+    unstuctured_elem_list = partition_pdf(file=file, strategy="fast")
     enrich_text_list = []
     "Placeholder function. Will be implemented for DST-414, probably in a different file."
     outline: list[Heading] = pdf_utils.extract_outline(file)
     current_header = []
     current_header_level = 1
-    for element in unstructured_json:
+    for element in unstuctured_elem_list:
         if element.category == "Footer" or element.category == "Header":
             continue
+
+        # Unstructured fails to categorize the date strings in the header,
+        # so manually check for that and ignore those too
+        if element.category == "UncategorizedText" and re.match(
+            r"^\d{1,2}-\d{1,2}-\d{4}$", element.text
+        ):
+            continue
+
         if element.category == "Title":
             header = match_heading(outline, element.text, element.metadata.page_number)
             if header:
@@ -106,13 +114,6 @@ def enrich_texts(file: BinaryIO, unstructured_json: list[Element]) -> list[Enric
                         if header.level > current_header_level:
                             current_header_level = header.level
                         current_header.append(header)
-
-        # Unstructured fails to categorize the date strings in the header,
-        # so manually check for that and ignore those too
-        if element.category == "UncategorizedText" and re.match(
-            r"^\d{1,2}-\d{1,2}-\d{4}$", element.text
-        ):
-            continue
 
         enriched_text_item = EnrichedText(
             text=element.text,
