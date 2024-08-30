@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import List
 
 from src.ingestion.pdf_stylings import Styling
 from src.util.pdf_utils import Heading
 
 
-class TextType(Enum):
+class TextType(StrEnum):
     NARRATIVE_TEXT = "NarrativeText"
     LIST_ITEM = "ListItem"
     LIST = "List"
