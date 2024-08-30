@@ -118,7 +118,7 @@ def match_heading(
     outline: list[Heading], heading_name: str, page_number: int | None
 ) -> Heading | None:
     for heading in outline:
-        if heading_name.lower() in heading.title.lower() and heading.pageno == page_number:
+        if heading_name.casefold() in heading.title.casefold() and heading.pageno == page_number:
             return heading
     return None
 
