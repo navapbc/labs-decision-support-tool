@@ -88,8 +88,7 @@ def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
     enrich_text_list = []
     "Placeholder function. Will be implemented for DST-414, probably in a different file."
     outline: list[Heading] = pdf_utils.extract_outline(file)
-    current_header = []
-    current_header_level = 1
+    current_headings = []
     for element in unstuctured_elem_list:
         if element.category == "Footer" or element.category == "Header":
             continue
@@ -102,24 +101,12 @@ def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
             continue
 
         if element.category == "Title":
-            header = match_heading(outline, element.text, element.metadata.page_number)
-            if header:
-                if header.level == 1:
-                    current_header = [header]
-                    current_header_level = 1
-                else:
-                    if header.title != current_header[-1].title:
-                        if current_header_level == header.level:
-                            current_header = current_header[:-1]
-                        if header.level > current_header_level:
-                            current_header_level = header.level
-                        current_header.append(header)
-
+            current_headings = _get_current_heading(outline, element, current_headings)
         enriched_text_item = EnrichedText(
             text=element.text,
             type=element.category,
             page_number=element.metadata.page_number,
-            headings=current_header,
+            headings=current_headings,
             id=element._element_id,
         )
 
@@ -128,12 +115,26 @@ def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
 
 
 def match_heading(
-    heading_list: list[Heading], heading_name: str, page_number: int | None
+    outline: list[Heading], heading_name: str, page_number: int | None
 ) -> Heading | None:
-    for heading in heading_list:
+    for heading in outline:
         if heading_name.lower() in heading.title.lower() and heading.pageno == page_number:
             return heading
     return None
+
+
+def _get_current_heading(outline, element, current_headings):
+    if heading := match_heading(outline, element.text, element.metadata.page_number):
+        if heading.level == 1:
+            current_headings = [heading]
+        else:
+            if heading.title != current_headings[-1].title:
+                if len(current_headings) == heading.level:
+                    current_headings = current_headings[:-1]
+                current_headings.append(heading)
+    else:
+        logger.warning(f"Unable to match header: {element.text}, {element.metadata.page_number}")
+    return current_headings
 
 
 def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> list[Chunk]:
