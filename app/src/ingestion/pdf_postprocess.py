@@ -137,9 +137,9 @@ def _should_merge_list_text(text: EnrichedText, next_text: EnrichedText) -> bool
     return text.type == TextType.NARRATIVE_TEXT and text.text.rstrip().endswith(":")
 
 
-def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
+def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     """
-    Given EnrichedTexts, concatenate list tems together
+    Given EnrichedTexts, concatenate list items together
     with each other and with the preceeding NarrativeText.
     """
 
@@ -158,5 +158,37 @@ def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
         else:
             # If it's not merged, just add it as a new element
             grouped_texts.append(current_text)
+
+    return grouped_texts
+
+
+def _should_merge_text(text: EnrichedText, next_text: EnrichedText) -> bool:
+    "Merges texts that are split across consecutive pages"
+    if text.headings != next_text.headings:
+        return False
+
+    assert text.page_number is not None
+    assert next_text.page_number is not None
+    # Check if next_text is on the next page
+    if text.page_number != (next_text.page_number - 1):
+        return False
+
+    return next_text.text.strip()[0].islower()
+
+
+def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
+    lists_merged = _group_list_texts(markdown_texts)
+
+    if not lists_merged:
+        return []
+
+    grouped_texts = [lists_merged[0]]
+    for e_text in lists_merged[1:]:
+        prev_text = grouped_texts[-1]
+
+        if _should_merge_text(prev_text, e_text):
+            prev_text.text += " " + e_text.text
+        else:
+            grouped_texts.append(e_text)
 
     return grouped_texts
