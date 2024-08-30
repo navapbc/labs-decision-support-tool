@@ -6,6 +6,7 @@ from typing import BinaryIO
 
 from smart_open import open as smart_open
 from unstructured.documents.elements import Element
+from unstructured.partition.pdf import partition_pdf
 
 from src.adapters import db
 from src.app_config import app_config
@@ -17,7 +18,6 @@ from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
 from src.util.pdf_utils import Heading
-from src.util.unstructured_utils import get_json_from_file
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def _ingest_bem_pdfs(
 
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
-    unstructured_json = get_json_from_file(file)
+    unstructured_json = partition_pdf(file=file, strategy="fast")
     enriched_texts = enrich_texts(file, unstructured_json)
     stylings = extract_stylings(file)
     associate_stylings(enriched_texts, stylings)
