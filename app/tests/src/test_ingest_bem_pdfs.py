@@ -3,9 +3,17 @@ import logging
 import pytest
 from smart_open import open as smart_open
 from sqlalchemy import delete, select
+from unstructured.documents.elements import ElementMetadata, Text
 
 from src.db.models.document import Document
-from src.ingest_bem_pdfs import _get_bem_title, _ingest_bem_pdfs
+from src.ingest_bem_pdfs import (
+    _enrich_texts,
+    _get_bem_title,
+    _get_current_heading,
+    _ingest_bem_pdfs,
+)
+from src.ingestion.pdf_elements import EnrichedText
+from src.util.pdf_utils import Heading
 from tests.src.test_ingest_policy_pdfs import doc_attribs
 
 
@@ -21,6 +29,26 @@ def test__get_bem_title(file_location, policy_s3_file):
     file_path = policy_s3_file + "100.pdf" if file_location == "s3" else "/app/tests/docs/100.pdf"
     with smart_open(file_path, "rb") as file:
         assert _get_bem_title(file, file_path) == "BEM 100: INTRODUCTION"
+
+
+@pytest.fixture
+def mock_outline():
+    return [
+        Heading(title="Overview", level=1, pageno=1),
+        Heading(title="Family Independence Program (FIP)", level=2, pageno=1),
+        Heading(title="Program Goal", level=2, pageno=1),
+        Heading(title="Medical Assistance Program", level=2, pageno=2),
+        Heading(title="Program Goal", level=2, pageno=2),
+    ]
+
+
+@pytest.fixture
+def mock_elements():
+    return [
+        Text(text="OVERVIEW", metadata=ElementMetadata(page_number=1)),
+        Text(text="Family Independence Program (FIP)", metadata=ElementMetadata(page_number=1)),
+        Text(text="Program Goal", metadata=ElementMetadata(page_number=1)),
+    ]
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
@@ -55,3 +83,31 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         # assert "Temporary Assistance to Needy Families" not in second_chunk.content
         # assert "The Food Assistance Program" in second_chunk.content
         # assert math.isclose(second_chunk.mpnet_embedding[0], -0.82242084, rel_tol=1e-3)
+
+
+def test__enrich_text():
+    with smart_open("/app/tests/docs/100.pdf", "rb") as file:
+        enriched_text_list = _enrich_texts(file)
+
+        assert len(enriched_text_list) == 15
+        enriched_text_item = enriched_text_list[0]
+        assert isinstance(enriched_text_item, EnrichedText)
+        assert enriched_text_item.text == "OVERVIEW"
+
+
+def test__get_current_heading(mock_outline, mock_elements):
+    second_level_heading = _get_current_heading(
+        mock_outline,
+        mock_elements[1],
+        mock_outline[:2],
+    )
+    assert second_level_heading == [
+        Heading(title="Overview", level=1, pageno=1),
+        Heading(title="Family Independence Program (FIP)", level=2, pageno=1),
+    ]
+
+    replaced_second_level = _get_current_heading(mock_outline, mock_elements[2], mock_outline[:2])
+    assert replaced_second_level == [
+        Heading(title="Overview", level=1, pageno=1),
+        Heading(title="Program Goal", level=2, pageno=1),
+    ]

@@ -59,7 +59,6 @@ def _ingest_bem_pdfs(
         logger.info("Processing file: %s", file_path)
         with smart_open(file_path, "rb") as file:
             grouped_texts = _parse_pdf(file)
-
             doc_attribs["name"] = _get_bem_title(file, file_path)
             document = Document(content="\n".join(g.text for g in grouped_texts), **doc_attribs)
             db_session.add(document)
@@ -69,7 +68,7 @@ def _ingest_bem_pdfs(
 
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
-    enriched_texts = enrich_texts(file)
+    enriched_texts = _enrich_texts(file)
     stylings = extract_stylings(file)
     associate_stylings(enriched_texts, stylings)
     markdown_texts = add_markdown(enriched_texts)
@@ -83,12 +82,12 @@ def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     return grouped_texts
 
 
-def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
+def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
     unstuctured_elem_list = partition_pdf(file=file, strategy="fast")
     enrich_text_list = []
-    "Placeholder function. Will be implemented for DST-414, probably in a different file."
+
     outline: list[Heading] = pdf_utils.extract_outline(file)
-    current_headings = []
+    current_headings: list[Heading] = []
     for element in unstuctured_elem_list:
         if element.category == "Footer" or element.category == "Header":
             continue
@@ -111,6 +110,7 @@ def enrich_texts(file: BinaryIO) -> list[EnrichedText]:
         )
 
         enrich_text_list.append(enriched_text_item)
+    print(enrich_text_list)
     return enrich_text_list
 
 
@@ -123,7 +123,9 @@ def match_heading(
     return None
 
 
-def _get_current_heading(outline, element, current_headings):
+def _get_current_heading(
+    outline: list[Heading], element: Element, current_headings: list[Heading]
+) -> list[Heading]:
     if heading := match_heading(outline, element.text, element.metadata.page_number):
         if heading.level == 1:
             current_headings = [heading]
