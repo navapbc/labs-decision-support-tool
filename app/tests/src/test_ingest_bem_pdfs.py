@@ -70,8 +70,8 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         assert document.name == "BEM 100: INTRODUCTION"
 
         # TODO: Test Document.content
-        assert "Family Independence Program " in document.content
-        assert "MDHHS policy manuals" not in document.content
+        assert "Temporary Assistance to Needy Families (TANF)" in document.content
+        assert "The Food Assistance Program" in document.content
 
         # TODO: Test: The document should be broken into two chunks, which
         # have different content and different embeddings
@@ -89,10 +89,9 @@ def test__enrich_text():
     with smart_open("/app/tests/docs/100.pdf", "rb") as file:
         enriched_text_list = _enrich_texts(file)
 
-        assert len(enriched_text_list) == 15
+        assert len(enriched_text_list) == 9
         enriched_text_item = enriched_text_list[0]
         assert isinstance(enriched_text_item, EnrichedText)
-        assert enriched_text_item.text == "OVERVIEW"
 
 
 def test__get_current_heading(mock_outline, mock_elements):

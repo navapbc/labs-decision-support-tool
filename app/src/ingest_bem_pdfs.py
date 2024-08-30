@@ -101,7 +101,7 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
 
         if element.category == "Title":
             current_headings = _get_current_heading(outline, element, current_headings)
-        if isinstance(element.category, TextType):
+        if element.category in TextType:
             enriched_text_item = EnrichedText(
                 text=element.text,
                 type=element.category,
@@ -109,12 +109,11 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
                 headings=current_headings,
                 id=element._element_id,
             )
+            enrich_text_list.append(enriched_text_item)
         else:
             logger.warning(
                 f"{element.category} is not an accepted TextType, {element.text}, {element.metadata.page_number}"
             )
-
-        enrich_text_list.append(enriched_text_item)
     return enrich_text_list
 
 
