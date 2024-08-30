@@ -11,7 +11,7 @@ from unstructured.partition.pdf import partition_pdf
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.ingestion.pdf_elements import EnrichedText
+from src.ingestion.pdf_elements import EnrichedText, TextType
 from src.ingestion.pdf_postprocess import add_markdown, associate_stylings, group_texts
 from src.ingestion.pdf_stylings import extract_stylings
 from src.util import pdf_utils
@@ -101,16 +101,20 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
 
         if element.category == "Title":
             current_headings = _get_current_heading(outline, element, current_headings)
-        enriched_text_item = EnrichedText(
-            text=element.text,
-            type=element.category,
-            page_number=element.metadata.page_number,
-            headings=current_headings,
-            id=element._element_id,
-        )
+        if isinstance(element.category, TextType):
+            enriched_text_item = EnrichedText(
+                text=element.text,
+                type=element.category,
+                page_number=element.metadata.page_number,
+                headings=current_headings,
+                id=element._element_id,
+            )
+        else:
+            logger.warning(
+                f"{element.category} is not an accepted TextType, {element.text}, {element.metadata.page_number}"
+            )
 
         enrich_text_list.append(enriched_text_item)
-    print(enrich_text_list)
     return enrich_text_list
 
 
