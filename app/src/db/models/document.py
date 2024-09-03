@@ -16,38 +16,42 @@ class Document(Base, IdMixin, TimestampMixin):
     __tablename__ = "document"
 
     name: Mapped[str]
-    content: Mapped[str | None]
+    content: Mapped[str | None] = mapped_column(comment="Content of the document")
 
     chunks: Mapped[list["Chunk"]] = relationship(
         "Chunk", back_populates="document", cascade="all, delete"
     )
 
     # Domain-specific columns follow
-    # dataset in which the document belongs
-    dataset: Mapped[str]
-    # benefit program
-    program: Mapped[str]
-    # geographical region of the benefit program
-    region: Mapped[str]
+    dataset: Mapped[str] = mapped_column(comment="dataset in which the document belongs")
+    program: Mapped[str] = mapped_column(comment="benefit program")
+    region: Mapped[str] = mapped_column(comment="geographical region of the benefit program")
 
 
 class Chunk(Base, IdMixin, TimestampMixin):
     __tablename__ = "chunk"
 
-    content: Mapped[str]
-    tokens: Mapped[int | None]
-    mpnet_embedding: Mapped[np.ndarray] = mapped_column(Vector(768))
+    content: Mapped[str] = mapped_column(comment="Content of the chunk")
+    tokens: Mapped[int | None] = mapped_column(comment="Number of tokens in the content")
+    mpnet_embedding: Mapped[np.ndarray] = mapped_column(
+        Vector(768), comment="MPNet embedding of the content"
+    )
 
     document_id: Mapped[UUID] = mapped_column(ForeignKey("document.id", ondelete="CASCADE"))
     document: Mapped[Document] = relationship(Document)
 
-    page_number: Mapped[int | None]
-    # Flattened 'headings' data from grouped_texts
-    headings: Mapped[list[str] | None]
-    # Number of splits (or chunks) the text was split into, = 1 (if not split)
-    num_splits: Mapped[int] = mapped_column(default=1)
-    # If not complete (num_splits > 1), specify the index starting from 0
-    split_index: Mapped[int] = mapped_column(default=0)
+    page_number: Mapped[int | None] = mapped_column(
+        comment="Page number of the chunk in the original document"
+    )
+    headings: Mapped[list[str] | None] = mapped_column(
+        comment="Flattened 'headings' data from grouped_texts"
+    )
+    num_splits: Mapped[int] = mapped_column(
+        default=1, comment="Number of chunks the original text was split into"
+    )
+    split_index: Mapped[int] = mapped_column(
+        default=0, comment="Index of this chunk within splits (0-based)"
+    )
 
     def to_json(self) -> dict[str, str | int | list[str]]:
         as_json: dict[str, str | int | list[str]] = {
