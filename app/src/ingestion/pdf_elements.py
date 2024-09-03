@@ -13,6 +13,13 @@ class TextType(StrEnum):
 
 
 @dataclass
+class Link:
+    start_index: int
+    text: str
+    url: str
+
+
+@dataclass
 class EnrichedText:
     text: str
     type: TextType
@@ -20,3 +27,4 @@ class EnrichedText:
     page_number: int | None = None
     id: str | None = None
     stylings: List[Styling] | None = None
+    links: List[Link] | None = None
