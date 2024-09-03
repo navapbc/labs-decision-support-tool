@@ -153,7 +153,7 @@ def downgrade():
     op.alter_column(
         "chunk",
         "mpnet_embedding",
-        existing_type=pgvector.sqlalchemy.Vector(dim=768),
+        existing_type=Vector(dim=768),
         comment=None,
         existing_comment="MPNet embedding of the content",
         existing_nullable=False,
