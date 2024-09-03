@@ -43,6 +43,7 @@ def _ingest_bem_pdfs(
     db_session: db.Session,
     pdf_file_dir: str,
     doc_attribs: dict[str, str],
+    save_json: bool = True,
 ) -> None:
     file_list = get_files(pdf_file_dir)
 
@@ -67,7 +68,8 @@ def _ingest_bem_pdfs(
             _add_embeddings(chunks)
             db_session.add_all(chunks)
 
-            _save_json(file_path, chunks)
+            if save_json:
+                _save_json(file_path, chunks)
 
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
@@ -176,9 +178,7 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
     return chunks
 
 
-def _add_embeddings(
-    chunks: list[Chunk],
-) -> None:
+def _add_embeddings(chunks: list[Chunk]) -> None:
     embedding_model = app_config.sentence_transformer
 
     # Generate all the embeddings in parallel for speed
@@ -198,6 +198,7 @@ def _save_json(file_path: str, chunks: list[Chunk]) -> None:
     chunks_as_json = [chunk.to_json() for chunk in chunks]
 
     with smart_open(file_path + ".json", "w") as file:
+        print(json.dumps(chunks_as_json))
         file.write(json.dumps(chunks_as_json))
 
 

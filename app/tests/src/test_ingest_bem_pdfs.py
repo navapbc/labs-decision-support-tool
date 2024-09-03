@@ -24,19 +24,19 @@ from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_ingest_policy_pdfs import doc_attribs
 
+_707_PDF_PATH = "/app/tests/src/util/707.pdf"
+
 
 @pytest.fixture
 def policy_s3_file(mock_s3_bucket_resource):
-    data = smart_open("/app/tests/src/util/707.pdf", "rb")
+    data = smart_open(_707_PDF_PATH, "rb")
     mock_s3_bucket_resource.put_object(Body=data, Key="707.pdf")
     return "s3://test_bucket/"
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
 def test__get_bem_title(file_location, policy_s3_file):
-    file_path = (
-        policy_s3_file + "707.pdf" if file_location == "s3" else "/app/tests/src/util/707.pdf"
-    )
+    file_path = policy_s3_file + "707.pdf" if file_location == "s3" else _707_PDF_PATH
     with smart_open(file_path, "rb") as file:
         assert _get_bem_title(file, file_path) == "BEM 707: TIME AND ATTENDANCE REVIEWS"
 
@@ -72,9 +72,9 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
     with caplog.at_level(logging.INFO):
         if file_location == "local":
-            _ingest_bem_pdfs(db_session, "/app/tests/src/util/", doc_attribs)
+            _ingest_bem_pdfs(db_session, "/app/tests/src/util/", doc_attribs, save_json=False)
         else:
-            _ingest_bem_pdfs(db_session, policy_s3_file, doc_attribs)
+            _ingest_bem_pdfs(db_session, policy_s3_file, doc_attribs, save_json=False)
 
         assert any(text.startswith("Processing file: ") for text in caplog.messages)
         document = db_session.execute(select(Document)).one()[0]
@@ -84,29 +84,30 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
         assert document.name == "BEM 707: TIME AND ATTENDANCE REVIEWS"
 
-        # TODO: Test Document.content
-        assert (
-            "In order to be eligible to bill and receive payments, child care providers are required to comply with"
-            in document.content
+        assert "In order to be eligible to bill and receive payments, child " in document.content
+
+        first_chunk = document.chunks[0]
+        assert first_chunk.content.startswith(
+            "In order to be eligible to bill and receive payments, child"
         )
-        assert "The Food Assistance Program" not in document.content
+        assert first_chunk.headings == ["Overview"]
+        assert first_chunk.page_number == 1
 
-        # TODO: Test: The document should be broken into two chunks, which
-        # have different content and different embeddings
-        # first_chunk, second_chunk = document.chunks
-        # assert "Temporary Assistance to Needy Families" in first_chunk.content
-        # assert "The Food Assistance Program" not in first_chunk.content
-        # assert math.isclose(first_chunk.mpnet_embedding[0], -0.7016304, rel_tol=1e-5)
+        second_chunk = document.chunks[1]
+        assert second_chunk.content.startswith(
+            "Rule violations include, but are not limited to:\n    -"
+        )
+        assert second_chunk.headings == ["Rule Violations"]
+        assert second_chunk.page_number == 1
 
-        # assert "Temporary Assistance to Needy Families" not in second_chunk.content
-        # assert "The Food Assistance Program" in second_chunk.content
-        # assert math.isclose(second_chunk.mpnet_embedding[0], -0.82242084, rel_tol=1e-3)
-    if file_location == "local":
-        os.remove("/app/tests/src/util/707.pdf.json")
+        third_chunk = document.chunks[2]
+        assert third_chunk.content.startswith("Failure to maintain time and attendance records.")
+        assert third_chunk.headings == ["Rule Violations"]
+        assert third_chunk.page_number == 1
 
 
 def test__enrich_text():
-    with smart_open("/app/tests/src/util/707.pdf", "rb") as file:
+    with smart_open(_707_PDF_PATH, "rb") as file:
         enriched_text_list = _enrich_texts(file)
 
         assert len(enriched_text_list) == 45
