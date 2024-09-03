@@ -138,7 +138,7 @@ def _get_current_heading(
             current_headings = [heading]
         else:
             if heading.title != current_headings[-1].title:
-                current_headings = current_headings[: -(len(current_headings) - 1 - heading.level)]
+                current_headings = current_headings[: -(heading.level - 1)]
                 current_headings.append(heading)
     else:
         logger.warning(f"Unable to match header: {element.text}, {element.metadata.page_number}")
