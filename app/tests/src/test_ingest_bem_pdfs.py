@@ -105,6 +105,22 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         assert third_chunk.headings == ["Rule Violations"]
         assert third_chunk.page_number == 1
 
+        list_type_chunk = document.chunks[10]
+        assert list_type_chunk.content == (
+            "The following are examples of IPVs:\n"
+            "    - Billing for children while they are in school.\n"
+            "    - Two instances of failing to respond to requests for records.\n"
+            "    - Two instances of providing care in the wrong location.\n"
+            "    - Billing for children no longer in care.\n"
+            "    - Knowingly billing for children not in care or more hours than children were in care.\n"
+            "    - Maintaining records that do not accurately reflect the time children were in care."
+        )
+        assert list_type_chunk.headings == [
+            "Time and Attendance Review  Process",
+            "Intentional Program Violations",
+        ]
+        assert list_type_chunk.page_number == 2
+
 
 def test__enrich_text():
     with smart_open(_707_PDF_PATH, "rb") as file:

@@ -151,6 +151,16 @@ def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     for current_text in markdown_texts[1:]:
         previous_text = grouped_texts[-1]
 
+        # Unstructured text sometimes splits a bullet from it's text
+        # https://nava.slack.com/archives/C06DP498D1D/p1725396917417349?thread_ts=1725395128.529479&cid=C06DP498D1D
+        if (
+            previous_text.text.endswith("    - ")
+            and previous_text.type in [TextType.LIST_ITEM, TextType.LIST]
+            and current_text.type == TextType.NARRATIVE_TEXT
+        ):
+            previous_text.text += current_text.text
+            continue
+
         if _should_merge_list_text(previous_text, current_text):
             # Append the current text to the previous one
             previous_text.text += "\n" + current_text.text
