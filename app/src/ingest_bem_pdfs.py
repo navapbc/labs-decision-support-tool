@@ -1,3 +1,4 @@
+import json
 import logging
 import sys
 import uuid
@@ -26,9 +27,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 def _get_bem_title(file: BinaryIO, file_path: str) -> str:
     """
     Get the BEM number from the file path (e.g., 100.pdf) and the
-    document title from the PDF meta data, then put the document
-    title in title case (e.g., INTRODUCTION EXAMPLE -> Introduction Example)
-    and combine: "BEM 100: Introduction Example"
+    document title from the PDF meta data and combine, e.g.,:
+    "BEM 100: Introduction Example"
     """
     pdf_info = pdf_utils.get_pdf_info(file)
     pdf_title = pdf_info.title or file_path
@@ -60,9 +60,12 @@ def _ingest_bem_pdfs(
             doc_attribs["name"] = _get_bem_title(file, file_path)
             document = Document(content="\n".join(g.text for g in grouped_texts), **doc_attribs)
             db_session.add(document)
+
             chunks = split_into_chunks(document, grouped_texts)
-            for chunk in chunks:
-                _add_chunk(db_session, chunk)
+            _add_embeddings(chunks)
+            db_session.add_all(chunks)
+
+            _save_json(file_path, chunks)
 
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
@@ -96,45 +99,44 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
         assert paragraph.id is not None
         assert paragraph.page_number is not None
 
-        # For iteration 1, log warning for overly long text
-        embedding_model = app_config.sentence_transformer
-        token_count = len(embedding_model.tokenizer.tokenize(paragraph))
-        if token_count > embedding_model.max_seq_length:
-            logger.warning("Text too long for embedding model: %s", paragraph.text[:100])
         text_chunks = [
             # For iteration 1, don't split the text -- just create 1 chunk.
             # TODO: TASK 3.a will split a paragraph into multiple chunks.
             Chunk(
                 content=paragraph.text,
-                tokens=len(paragraph.text.split()),
                 document=document,
                 text_type=paragraph.type.name,
                 page_number=paragraph.page_number,
                 headings=[h.title for h in paragraph.headings],
-                num_splits=1,
             )
         ]
         chunks += text_chunks
     return chunks
 
 
-def _add_chunk(
-    db_session: db.Session,
-    chunk: Chunk,
+def _add_embeddings(
+    chunks: list[Chunk],
 ) -> None:
     embedding_model = app_config.sentence_transformer
-    chunk_embedding = embedding_model.encode(chunk.content, show_progress_bar=False)
-    chunk = Chunk(
-        document=chunk.document,
-        content=chunk.content,
-        tokens=chunk.tokens,
-        mpnet_embedding=chunk_embedding,
-        page_number=chunk.page_number,
-        headings=chunk.headings,
-        num_splits=chunk.num_splits,
-        split_index=chunk.split_index,
+
+    # Generate all the embeddings in parallel for speed
+    embeddings = embedding_model.encode(
+        [chunk.content for chunk in chunks],
+        show_progress_bar=False,
     )
-    db_session.add(chunk)
+
+    for i, chunk in enumerate(chunks):
+        chunk.mpnet_embedding = embeddings[i]  # type: ignore
+        chunk.tokens = len(embedding_model.tokenizer.tokenize(chunk.content))
+        if chunk.tokens > embedding_model.max_seq_length:
+            logger.warning("Text too long for embedding model: %s", chunk.content[:100])
+
+
+def _save_json(file_path: str, chunks: list[Chunk]) -> None:
+    chunks_as_json = [chunk.to_json() for chunk in chunks]
+
+    with smart_open(file_path + ".json", "w") as file:
+        file.write(json.dumps(chunks_as_json))
 
 
 def main() -> None:

@@ -1,11 +1,16 @@
+import json
 import logging
+import os
+import tempfile
 
 import pytest
 from smart_open import open as smart_open
 from sqlalchemy import delete, select
 
 from src.db.models.document import Document
-from src.ingest_bem_pdfs import _get_bem_title, _ingest_bem_pdfs
+from src.ingest_bem_pdfs import _add_embeddings, _get_bem_title, _ingest_bem_pdfs, _save_json
+from tests.mock.mock_sentence_transformer import MockSentenceTransformer
+from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_ingest_policy_pdfs import doc_attribs
 
 
@@ -57,3 +62,46 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         # assert "Temporary Assistance to Needy Families" not in second_chunk.content
         # assert "The Food Assistance Program" in second_chunk.content
         # assert math.isclose(second_chunk.mpnet_embedding[0], -0.82242084, rel_tol=1e-3)
+
+    # Clean up the temporary file
+    if file_location == "local":
+        os.remove("/app/tests/src/util/707.pdf.json")
+
+
+def test__add_embeddings(app_config):
+    embedding_model = MockSentenceTransformer()
+    chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)
+    _add_embeddings(chunks)
+    for chunk in chunks:
+        assert chunk.tokens == len(embedding_model.tokenizer.tokenize(chunk.content))
+        assert chunk.mpnet_embedding == embedding_model.encode(chunk.content)
+
+
+@pytest.mark.parametrize("file_location", ["local", "s3"])
+def test__save_json(file_location, mock_s3_bucket_resource):
+    chunks = ChunkFactory.build_batch(2)
+    file_path = (
+        "s3://test_bucket/test.pdf"
+        if file_location == "s3"
+        else os.path.join(tempfile.mkdtemp(), "test.pdf")
+    )
+    _save_json(file_path, chunks)
+    saved_json = json.loads(smart_open(file_path + ".json", "r").read())
+    assert saved_json == [
+        {
+            "id": str(chunks[0].id),
+            "content": chunks[0].content,
+            "document_id": str(chunks[0].document_id),
+            "headings": chunks[0].headings if chunks[0].headings else [],
+            "num_splits": chunks[0].num_splits,
+            "split_index": chunks[0].split_index,
+        },
+        {
+            "id": str(chunks[1].id),
+            "content": chunks[1].content,
+            "document_id": str(chunks[1].document_id),
+            "headings": chunks[1].headings if chunks[1].headings else [],
+            "num_splits": chunks[1].num_splits,
+            "split_index": chunks[1].split_index,
+        },
+    ]
