@@ -13,7 +13,7 @@ from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.pdf_elements import EnrichedText, TextType
 from src.ingestion.pdf_postprocess import add_markdown, associate_stylings, group_texts
-from src.ingestion.pdf_stylings import ParsingContext, extract_stylings
+from src.ingestion.pdf_stylings import extract_stylings
 from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
