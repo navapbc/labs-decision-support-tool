@@ -39,6 +39,8 @@ def mock_outline():
         Heading(title="Program Goal", level=2, pageno=1),
         Heading(title="Medical Assistance Program", level=2, pageno=2),
         Heading(title="Program Goal", level=2, pageno=2),
+        Heading(title="Tertiary Program Goal", level=3, pageno=2),
+        Heading(title="Test Level 1", level=1, pageno=2),
     ]
 
 
@@ -48,6 +50,8 @@ def mock_elements():
         Text(text="OVERVIEW", metadata=ElementMetadata(page_number=1)),
         Text(text="Family Independence Program (FIP)", metadata=ElementMetadata(page_number=1)),
         Text(text="Program Goal", metadata=ElementMetadata(page_number=1)),
+        Text(text="Tertiary Program Goal", metadata=ElementMetadata(page_number=2)),
+        Text(text="Test Level 1", metadata=ElementMetadata(page_number=2)),
     ]
 
 
@@ -109,4 +113,9 @@ def test__get_current_heading(mock_outline, mock_elements):
     assert replaced_second_level == [
         Heading(title="Overview", level=1, pageno=1),
         Heading(title="Program Goal", level=2, pageno=1),
+    ]
+
+    dropped_level = _get_current_heading(mock_outline, mock_elements[4], mock_outline)
+    assert dropped_level == [
+        Heading(title="Test Level 1", level=1, pageno=2),
     ]
