@@ -65,7 +65,7 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
     # Clean up the temporary file
     if file_location == "local":
-        os.remove("/app/tests/docs/100.pdf.json")
+        os.remove("/app/tests/src/util/707.pdf.json")
 
 
 def test__add_embeddings(app_config):
