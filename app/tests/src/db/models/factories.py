@@ -84,3 +84,6 @@ class ChunkFactory(BaseFactory):
         lambda o: len(MockSentenceTransformer().tokenizer.tokenize(o.content))
     )
     mpnet_embedding = factory.LazyAttribute(lambda o: MockSentenceTransformer().encode(o.content))
+
+    num_splits = 1
+    split_index = 0
