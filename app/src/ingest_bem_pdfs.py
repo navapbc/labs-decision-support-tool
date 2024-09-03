@@ -113,13 +113,15 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
 
         if element.category == "Title":
             current_headings = _get_current_heading(outline, element, current_headings)
+            continue
+
         try:
             enriched_text_item = EnrichedText(
                 text=element.text,
                 type=TextType(element.category),
                 page_number=element.metadata.page_number,
                 headings=current_headings,
-                id=element._element_id,
+                id=element.id,
             )
             enrich_text_list.append(enriched_text_item)
         except ValueError:
