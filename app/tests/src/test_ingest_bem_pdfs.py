@@ -50,7 +50,8 @@ def mock_outline():
         Heading(title="Medical Assistance Program", level=2, pageno=2),
         Heading(title="Program Goal", level=2, pageno=2),
         Heading(title="Tertiary Program Goal", level=3, pageno=2),
-        Heading(title="Test Level 1", level=1, pageno=2),
+        Heading(title="4th Program Goal", level=4, pageno=2),
+        Heading(title="Test Level 2", level=2, pageno=2),
     ]
 
 
@@ -149,9 +150,18 @@ def test__get_current_heading(mock_outline, mock_elements):
         Heading(title="Program Goal", level=2, pageno=1),
     ]
 
-    dropped_level = _get_current_heading(mock_outline, mock_elements[4], mock_outline)
-    assert dropped_level == [Heading(title="Test Level 1", level=1, pageno=2)]
-    # Clean up the temporary file
+    current_headings = [
+        Heading(title="Overview", level=1, pageno=1),
+        Heading(title="Program Goal", level=2, pageno=1),
+        Heading(title="Tertiary Program Goal", level=3, pageno=2),
+        Heading(title="4th Program Goal", level=4, pageno=2),
+    ]
+    element = Text(text="Test Level 2", metadata=ElementMetadata(page_number=2))
+    dropped_level = _get_current_heading(mock_outline, element, current_headings)
+    assert dropped_level == [
+        Heading(title="Overview", level=1, pageno=1),
+        Heading(title="Test Level 2", level=2, pageno=2),
+    ]
 
 
 def test__add_embeddings(app_config):
