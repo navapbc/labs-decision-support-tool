@@ -117,19 +117,23 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
     return enrich_text_list
 
 
-def match_heading(
+def _match_heading(
     outline: list[Heading], heading_name: str, page_number: int | None
 ) -> Heading | None:
     for heading in outline:
-        if heading_name.casefold() in heading.title.casefold() and heading.pageno == page_number:
-            return heading
+        if heading.pageno == page_number:
+            # account for spacing differences in unstructured and pdfminer parsing
+            heading_words = [word for word in heading.title.casefold() if not word.isspace()]
+            element_words = [word for word in heading_name.casefold() if not word.isspace()]
+            if heading_words == element_words:
+                return heading
     return None
 
 
 def _get_current_heading(
     outline: list[Heading], element: Element, current_headings: list[Heading]
 ) -> list[Heading]:
-    if heading := match_heading(outline, element.text, element.metadata.page_number):
+    if heading := _match_heading(outline, element.text, element.metadata.page_number):
         if heading.level == 1:
             current_headings = [heading]
         else:

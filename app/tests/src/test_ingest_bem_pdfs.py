@@ -11,6 +11,7 @@ from src.ingest_bem_pdfs import (
     _get_bem_title,
     _get_current_heading,
     _ingest_bem_pdfs,
+    _match_heading,
 )
 from src.ingestion.pdf_elements import EnrichedText
 from src.util.pdf_utils import Heading
@@ -90,12 +91,31 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
 
 def test__enrich_text():
-    with smart_open("/app/tests/docs/100.pdf", "rb") as file:
+    with smart_open("/app/tests/src/util/707.pdf", "rb") as file:
         enriched_text_list = _enrich_texts(file)
 
-        assert len(enriched_text_list) == 9
-        enriched_text_item = enriched_text_list[0]
-        assert isinstance(enriched_text_item, EnrichedText)
+        assert len(enriched_text_list) == 45
+        first_enriched_text_item = enriched_text_list[0]
+        assert isinstance(first_enriched_text_item, EnrichedText)
+        assert first_enriched_text_item.headings == [Heading(title="Overview", level=1, pageno=1)]
+        assert first_enriched_text_item.type == "NarrativeText"
+        assert first_enriched_text_item.page_number == 1
+
+        other_enriched_text_item = enriched_text_list[13]
+        assert other_enriched_text_item.headings == [
+            Heading(title="Time and Attendance Review  Process", level=1, pageno=1),
+            Heading(title="Provider Errors", level=2, pageno=1),
+        ]
+        assert other_enriched_text_item.type == "NarrativeText"
+        assert other_enriched_text_item.page_number == 2
+
+
+def test__match_heading(mock_outline):
+    heading_with_extra_space = _match_heading(mock_outline, "Family Independence  Program (FIP)", 1)
+    assert heading_with_extra_space
+
+    heading_on_wrong_page = _match_heading(mock_outline, "Family Independence  Program (FIP)", 5)
+    assert heading_on_wrong_page is None
 
 
 def test__get_current_heading(mock_outline, mock_elements):
