@@ -4,6 +4,7 @@ import re
 import sys
 import uuid
 from typing import BinaryIO
+from pprint import pprint
 
 from smart_open import open as smart_open
 from unstructured.documents.elements import Element
@@ -74,10 +75,14 @@ def _ingest_bem_pdfs(
 
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     enriched_texts = _enrich_texts(file)
+    with open("enriched_texts.log", "w") as log_file:
+        pprint(enriched_texts, log_file, width=200)
     stylings = extract_stylings(file)
     associate_stylings(enriched_texts, stylings)
     markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
+    with open("grouped_texts.log", "w") as log_file:
+        pprint(list(enumerate(grouped_texts)), log_file, width=200)
 
     # Assign unique ids to each grouped text before they get split into chunks
     for text in grouped_texts:
@@ -198,7 +203,6 @@ def _save_json(file_path: str, chunks: list[Chunk]) -> None:
     chunks_as_json = [chunk.to_json() for chunk in chunks]
 
     with smart_open(file_path + ".json", "w") as file:
-        print(json.dumps(chunks_as_json))
         file.write(json.dumps(chunks_as_json))
 
 
