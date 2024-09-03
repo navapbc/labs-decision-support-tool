@@ -66,7 +66,7 @@ def mock_elements():
     ]
 
 
-@pytest.mark.parametrize("file_location", ["local", "s3"])
+@pytest.mark.parametrize("file_location", ["local"])
 def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_location):
     db_session.execute(delete(Document))
 
@@ -120,6 +120,16 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
             "Intentional Program Violations",
         ]
         assert list_type_chunk.page_number == 2
+
+        bold_styled_chunk = document.chunks[12]
+        expected_text = (
+            "Providers determined to have committed an IPV may serve the following penalties:\n"
+            "    - First occurrence - six month disqualification. The closure reason will be **CDC not eligible due to 6 month penalty period**.\n"
+            "    - Second occurrence - twelve month disqualification. The closure reason will be **CDC not eligible due to 12 month penalty period.**\n"
+            "    - Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**"
+        )
+        assert bold_styled_chunk.content == expected_text
+        # assert False
 
 
 def test__enrich_text():

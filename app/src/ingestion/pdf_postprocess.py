@@ -62,16 +62,21 @@ def _apply_stylings(e_text: EnrichedText) -> EnrichedText:
 
 def _apply_bold_styling(text: str, styling: Styling) -> str | None:
     # Replace only the first occurrence of the styling text
-    markdown_text = text.replace(styling.text, f"**{styling.text}**", 1)
+    # Unstructured will strip() texts, so we need to strip the styling text as well
+    styled_text = styling.text.strip()
+    markdown_text = text.replace(styled_text, f"**{styled_text}**", 1)
     if markdown_text == text:
         return None
 
     # Warn if the styling text occurs multiple times
-    replaced_all = text.replace(styling.text, f"**{styling.text}**")
-    if replaced_all != text:
+    replaced_all = text.replace(styled_text, f"**{styled_text}**")
+
+    if replaced_all != markdown_text:
+        print("A:", styled_text)
+        print("B:", replaced_all)
         logger.warning(
-            "Styling text %s occurs multiple times; only applied to the first occurrence: '%s'",
-            styling.text,
+            "Styling text '%s' occurs multiple times; only applied to the first occurrence: '%s'",
+            styled_text,
             text,
         )
     return markdown_text

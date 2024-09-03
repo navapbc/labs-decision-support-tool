@@ -3,8 +3,8 @@ import logging
 import re
 import sys
 import uuid
-from typing import BinaryIO
 from pprint import pprint
+from typing import BinaryIO
 
 from smart_open import open as smart_open
 from unstructured.documents.elements import Element
@@ -79,6 +79,8 @@ def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
         pprint(enriched_texts, log_file, width=200)
     stylings = extract_stylings(file)
     associate_stylings(enriched_texts, stylings)
+    with open("styled_enriched_texts.log", "w") as log_file:
+        pprint(enriched_texts, log_file, width=200)
     markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
     with open("grouped_texts.log", "w") as log_file:
