@@ -45,9 +45,22 @@ class Chunk(Base, IdMixin, TimestampMixin):
     # Flattened 'headings' data from grouped_texts
     headings: Mapped[list[str] | None]
     # Number of splits (or chunks) the text was split into, = 1 (if not split)
-    num_splits: int = 1
+    num_splits: Mapped[int] = mapped_column(default=1)
     # If not complete (num_splits > 1), specify the index starting from 0
-    split_index: int = 0
+    split_index: Mapped[int] = mapped_column(default=0)
+
+    def to_json(self) -> dict[str, str | int | list[str]]:
+        as_json: dict[str, str | int | list[str]] = {
+            "id": str(self.id),
+            "content": self.content,
+            "document_id": str(self.document_id),
+            "headings": self.headings if self.headings else [],
+            "num_splits": self.num_splits,
+            "split_index": self.split_index,
+        }
+        if self.page_number:
+            as_json["page_number"] = self.page_number
+        return as_json
 
 
 @dataclass

@@ -7,12 +7,7 @@ class MockSentenceTransformer:
         self.max_seq_length = 512
         self.tokenizer = MockTokenizer()
 
-    def encode(self, text, **kwargs):
-        """
-        Encode text into a 768-dimensional embedding that allows for similarity comparison via the dot product.
-        The direction of the vector maps to the average word length of the text.
-        """
-
+    def _encode_one(self, text):
         tokens = self.tokenizer.tokenize(text)
         average_token_length = sum(len(token) for token in tokens) / len(tokens)
 
@@ -22,6 +17,16 @@ class MockSentenceTransformer:
             math.cos(math.pi / 2 * average_token_length),
             math.sin(math.pi / 2 * average_token_length),
         ] + [0] * 766
+
+    def encode(self, texts, **kwargs):
+        """
+        Encode text into a 768-dimensional embedding that allows for similarity comparison via the dot product.
+        The direction of the vector maps to the average word length of the text.
+        """
+
+        if isinstance(texts, str):
+            return self._encode_one(texts)
+        return [self._encode_one(text) for text in texts]
 
 
 class MockTokenizer:
