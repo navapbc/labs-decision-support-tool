@@ -13,9 +13,9 @@ from src.ingest_bem_pdfs import (
     _add_embeddings,
     _enrich_texts,
     _get_bem_title,
-    _get_current_heading,
     _ingest_bem_pdfs,
     _match_heading,
+    _next_heading,
     _save_json,
 )
 from src.ingestion.pdf_elements import EnrichedText
@@ -129,6 +129,12 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
             "    - Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**"
         )
         assert bold_styled_chunk.content == expected_text
+
+        title_chunk = document.chunks[22]
+        assert title_chunk.content == "**CDC**"
+        assert title_chunk.headings == ["legal base"]
+        assert title_chunk.page_number == 4
+
         # assert False
 
 
@@ -136,7 +142,7 @@ def test__enrich_text():
     with smart_open(_707_PDF_PATH, "rb") as file:
         enriched_text_list = _enrich_texts(file)
 
-        assert len(enriched_text_list) == 45
+        assert len(enriched_text_list) == 46
         first_enriched_text_item = enriched_text_list[0]
         assert isinstance(first_enriched_text_item, EnrichedText)
         assert first_enriched_text_item.headings == [Heading(title="Overview", level=1, pageno=1)]
@@ -160,8 +166,8 @@ def test__match_heading(mock_outline):
     assert heading_on_wrong_page is None
 
 
-def test__get_current_heading(mock_outline, mock_elements):
-    second_level_heading = _get_current_heading(
+def test__next_heading(mock_outline, mock_elements):
+    second_level_heading = _next_heading(
         mock_outline,
         mock_elements[1],
         mock_outline[:2],
@@ -171,7 +177,7 @@ def test__get_current_heading(mock_outline, mock_elements):
         Heading(title="Family Independence Program (FIP)", level=2, pageno=1),
     ]
 
-    replaced_second_level = _get_current_heading(mock_outline, mock_elements[2], mock_outline[:2])
+    replaced_second_level = _next_heading(mock_outline, mock_elements[2], mock_outline[:2])
     assert replaced_second_level == [
         Heading(title="Overview", level=1, pageno=1),
         Heading(title="Program Goal", level=2, pageno=1),
@@ -184,7 +190,7 @@ def test__get_current_heading(mock_outline, mock_elements):
         Heading(title="4th Program Goal", level=4, pageno=2),
     ]
     element = Text(text="Test Level 2", metadata=ElementMetadata(page_number=2))
-    dropped_level = _get_current_heading(mock_outline, element, current_headings)
+    dropped_level = _next_heading(mock_outline, element, current_headings)
     assert dropped_level == [
         Heading(title="Overview", level=1, pageno=1),
         Heading(title="Test Level 2", level=2, pageno=2),

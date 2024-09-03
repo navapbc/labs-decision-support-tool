@@ -112,8 +112,9 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
             continue
 
         if element.category == "Title":
-            current_headings = _get_current_heading(outline, element, current_headings)
-            continue
+            if next_heading := _next_heading(outline, element, current_headings):
+                current_headings = next_heading
+                continue
 
         try:
             enriched_text_item = EnrichedText(
@@ -144,9 +145,9 @@ def _match_heading(
     return None
 
 
-def _get_current_heading(
+def _next_heading(
     outline: list[Heading], element: Element, current_headings: list[Heading]
-) -> list[Heading]:
+) -> list[Heading] | None:
     if heading := _match_heading(outline, element.text, element.metadata.page_number):
         if heading.level == 1:
             current_headings = [heading]
@@ -156,6 +157,9 @@ def _get_current_heading(
                 current_headings.append(heading)
     else:
         logger.warning(f"Unable to match header: {element.text}, {element.metadata.page_number}")
+        # for heading in outline:
+        #     logger.warning(f"Available header: {heading.title}, {heading.pageno}")
+        return None
     return current_headings
 
 
