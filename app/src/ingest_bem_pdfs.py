@@ -119,8 +119,8 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
                 continue
 
         # Sometimes Unstructured splits a ListItem into an empty ListItem
-        # and then either a NarrativeText,  UncategorizedText, or Title --
-        # for example, BEM 100 page 8 or page 13
+        # and then either a NarrativeText, UncategorizedText, or Title
+        # For example, BEM 100 page 8 or page 13
         if element.category == "ListItem" and not element.text:
             prev_element_was_empty_list_item = True
             continue
@@ -136,7 +136,7 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
 
         # UncategorizedText is frequently just NarrativeText that looks strange,
         # e.g., "45 CFR 400.45 - 400.69 and 400.90 - 400.107"
-        # 167.pdf -- unstructured recognizes an Address
+        # In 167.pdf, Unstructured recognizes an Address.
         if element.category in ["UncategorizedText", "Address"]:
             element.category = "NarrativeText"
 
