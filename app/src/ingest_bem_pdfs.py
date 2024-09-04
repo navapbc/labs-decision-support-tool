@@ -100,6 +100,9 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
 
     outline: list[Heading] = pdf_utils.extract_outline(file)
     current_headings: list[Heading] = []
+
+    prev_element_was_empty_list_item = False
+
     for element in unstuctured_elem_list:
         if element.category == "Footer" or element.category == "Header":
             continue
@@ -115,6 +118,19 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
             if next_heading := _next_heading(outline, element, current_headings):
                 current_headings = next_heading
                 continue
+
+        # Sometimes Unstructured splits a ListItem into an empty ListItem
+        # and then either a NarrativeText,  UncategorizedText, or Title --
+        # for example, BEM 100 page 8 or page 13
+        if element.category == "ListItem" and not element.text:
+            prev_element_was_empty_list_item = True
+            continue
+        if prev_element_was_empty_list_item:
+            if element.category in ("NarrativeText", "UncategorizedText", "Title"):
+                element.category = "ListItem"
+            else:
+                logger.warning(f"Empty list item not followed by NarrativeText, UncategorizedText, or Title, {element.metadata.page_number}")
+            prev_element_was_empty_list_item = False
 
         try:
             enriched_text_item = EnrichedText(
