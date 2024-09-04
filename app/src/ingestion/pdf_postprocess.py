@@ -11,12 +11,18 @@ def associate_stylings(
     enriched_texts: list[EnrichedText], stylings: list[Styling]
 ) -> list[EnrichedText]:
     "Given EnrichedTexts and Stylings, associate stylings to the corresponding text item"
+    all_matched_stylings = []
     for e_text in enriched_texts:
         matched_stylings = [
             styling for styling in stylings if _styling_matches_text(styling, e_text)
         ]
         if matched_stylings:
             e_text.stylings = matched_stylings
+            all_matched_stylings.extend(matched_stylings)
+
+    unmatched_stylings = [s for s in stylings if s not in all_matched_stylings]
+    for styling in unmatched_stylings:
+        logger.warning("Styling not associated: %s", styling)
     return enriched_texts
 
 
@@ -33,8 +39,9 @@ def _styling_matches_text(styling: Styling, e_text: EnrichedText) -> bool:
         return False
 
     # Slower checks
-    stripped_wider_text = basic_ascii(styling.wider_text).strip()
-    stripped_e_text = basic_ascii(e_text.text).strip()
+    # Ignore spaces when matching
+    stripped_wider_text = basic_ascii(styling.wider_text).replace(" ", "")
+    stripped_e_text = basic_ascii(e_text.text).replace(" ", "")
     return (
         stripped_wider_text in stripped_e_text
         and abs(len(stripped_wider_text) - len(stripped_e_text)) < _STYLING_MATCH_MAX_LENGTH_DIFF
@@ -56,7 +63,9 @@ def _apply_stylings(e_text: EnrichedText) -> EnrichedText:
         e_text.stylings = None
     else:
         e_text.stylings = [s for s in e_text.stylings if s not in applied]
-        logger.warning("Stylings were not applied: %s", e_text.stylings, extra={"e_text": e_text})
+        logger.warning(
+            "Associated stylings were not applied: %s", e_text.stylings, extra={"e_text": e_text}
+        )
     return e_text
 
 
@@ -72,8 +81,6 @@ def _apply_bold_styling(text: str, styling: Styling) -> str | None:
     replaced_all = text.replace(styled_text, f"**{styled_text}**")
 
     if replaced_all != markdown_text:
-        print("A:", styled_text)
-        print("B:", replaced_all)
         logger.warning(
             "Styling text '%s' occurs multiple times; only applied to the first occurrence: '%s'",
             styled_text,
