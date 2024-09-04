@@ -66,7 +66,7 @@ def mock_elements():
     ]
 
 
-@pytest.mark.parametrize("file_location", ["local"])
+@pytest.mark.parametrize("file_location", ["local", "s3"])
 def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_location):
     db_session.execute(delete(Document))
 
@@ -134,8 +134,6 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         assert title_chunk.content.startswith("**CDC**\n\nThe Child Care and Development Block")
         assert title_chunk.headings == ["legal base"]
         assert title_chunk.page_number == 4
-
-        # assert False
 
 
 def test__enrich_text():
