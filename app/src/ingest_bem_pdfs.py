@@ -132,6 +132,11 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
                 logger.warning(f"Empty list item not followed by NarrativeText, UncategorizedText, or Title, {element.metadata.page_number}")
             prev_element_was_empty_list_item = False
 
+        # UncategorizedText is frequently just NarrativeText that looks strange,
+        # e.g., "45 CFR 400.45 - 400.69 and 400.90 - 400.107"
+        if element.category == "UncategorizedText":
+            element.category = "NarrativeText"
+
         try:
             enriched_text_item = EnrichedText(
                 text=element.text,
@@ -172,9 +177,10 @@ def _next_heading(
                 current_headings = current_headings[: heading.level - 1]
                 current_headings.append(heading)
     else:
-        logger.warning(f"Unable to match header: {element.text}, {element.metadata.page_number}")
+        # This is no longer a warning because it's expected for single-line bold body text
+        # logger.warning(f"Unable to match heading: {element.text}, {element.metadata.page_number}")
         # for heading in outline:
-        #     logger.warning(f"Available header: {heading.title}, {heading.pageno}")
+        #     logger.warning(f"Available heading: {heading.title}, {heading.pageno}")
         return None
     return current_headings
 
