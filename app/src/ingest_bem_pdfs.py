@@ -20,7 +20,7 @@ from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
 from src.util.pdf_utils import Heading
-from src.util.string_utils import split_paragraph
+from src.util.string_utils import split_list, split_paragraph
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +203,12 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
         token_count = len(embedding_model.tokenizer.tokenize(paragraph.text))
         if token_count > embedding_model.max_seq_length:
             num_of_splits = math.ceil(token_count / embedding_model.max_seq_length)
-            splits = split_paragraph(paragraph.text, round(len(paragraph.text) / num_of_splits))
+            if paragraph.type == TextType.LIST:
+                splits = split_list(paragraph.text, round(len(paragraph.text) / num_of_splits))
+            elif paragraph.type == TextType.NARRATIVE_TEXT:
+                splits = split_paragraph(paragraph.text, round(len(paragraph.text) / num_of_splits))
+            else:
+                raise ValueError(f"Unexpected element type: {paragraph.type}")
             logger.info("Split long text into %i chunks: %s", len(splits), splits[0][:120])
         else:
             splits = [paragraph.text]

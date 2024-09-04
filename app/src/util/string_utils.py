@@ -33,17 +33,41 @@ nltk.data.path.clear()
 nltk.data.path.append(_nltk_data_path)
 
 
-def split_paragraph(text: str, char_limit: int) -> list[str]:
+def _prep_nltk_tokenizer() -> None:
     try:
         # https://stackoverflow.com/questions/44857382/change-nltk-download-path-directory-from-default-ntlk-data
         nltk.data.find("tokenizers/punkt_tab")
     except LookupError:
         nltk.download("punkt_tab", download_dir=_nltk_data_path)
 
+
+def split_paragraph(text: str, char_limit: int) -> list[str]:
+    _prep_nltk_tokenizer()
+
     # Use the nltk sentence tokenizer to split the text into sentences
     # Could use spacy instead for more customization
     sents = sent_tokenize(text)
     return _join_up_to(sents, char_limit)
+
+
+def split_list(text: str, char_limit: int) -> list[str]:
+    _prep_nltk_tokenizer()
+
+    lines = text.split("\n")
+    intro_sentence = lines[0]
+    list_items = lines[1:]
+    # print("\n>S ", intro_sentence)
+    # for i in list_items:
+    #     print(">I ", i)
+
+    # len(lines) accounts for the number of newline characters
+    list_items_char_limit = char_limit - len(intro_sentence) - len(lines)
+    chunks = [
+        f"{intro_sentence}\n{chunk}"
+        for chunk in _join_up_to(list_items, list_items_char_limit, delimiter="\n")
+    ]
+    assert all(len(chunk) <= char_limit for chunk in chunks)
+    return chunks
 
 
 def _join_up_to(lines: list[str], char_limit: int, delimiter: str = " ") -> list[str]:
@@ -70,4 +94,6 @@ def _join_up_to(lines: list[str], char_limit: int, delimiter: str = " ") -> list
 
     # Add the last chunk
     chunks.append(chunk)
+
+    assert all(len(chunk) <= char_limit for chunk in chunks)
     return chunks
