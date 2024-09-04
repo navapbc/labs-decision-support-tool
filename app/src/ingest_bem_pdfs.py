@@ -133,7 +133,10 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
             if element.category in ("NarrativeText", "UncategorizedText", "Title"):
                 element.category = "ListItem"
             else:
-                logger.warning(f"Empty list item not followed by NarrativeText, UncategorizedText, or Title, {element.metadata.page_number}")
+                logger.warning(
+                    "Empty list item not followed by NarrativeText, UncategorizedText, or Title; page %i",
+                    element.metadata.page_number,
+                )
             prev_element_was_empty_list_item = False
 
         # UncategorizedText is frequently just NarrativeText that looks strange,
@@ -152,7 +155,10 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
             enrich_text_list.append(enriched_text_item)
         except ValueError:
             logger.warning(
-                f"{element.category} is not an accepted TextType, {element.text}, {element.metadata.page_number}"
+                "%s is not an accepted TextType; page %i: '%s'",
+                element.category,
+                element.metadata.page_number,
+                element.text,
             )
     return enrich_text_list
 
