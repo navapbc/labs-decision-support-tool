@@ -77,10 +77,14 @@ def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     enriched_texts = _enrich_texts(file)
     with open("enriched_texts.log", "w") as log_file:
         pprint(enriched_texts, log_file, width=200)
-    stylings = extract_stylings(file)
-    associate_stylings(enriched_texts, stylings)
-    with open("styled_enriched_texts.log", "w") as log_file:
-        pprint(enriched_texts, log_file, width=200)
+    try:
+        stylings = extract_stylings(file)
+        associate_stylings(enriched_texts, stylings)
+        with open("styled_enriched_texts.log", "w") as log_file:
+            pprint(enriched_texts, log_file, width=200)
+    except Exception as e:
+        # 101.pdf is a large collection of tables that's hard to parse
+        logger.warning("Failed to extract and associate stylings: %s", e)
     markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
     with open("grouped_texts.log", "w") as log_file:
