@@ -271,7 +271,7 @@ class OutlineAwarePdfParser:
                 if subtype == "/'Footer'":
                     return self._extract_text_in_zone(elem, PageZone.FOOTER)
 
-            logger.info("Ignoring Artifact: %s", elem.toxml())
+            logger.debug("Ignoring Artifact: %s", elem.toxml())
             return None
 
         if elem.tagName == "P":

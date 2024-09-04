@@ -46,7 +46,7 @@ def _ingest_bem_pdfs(
     doc_attribs: dict[str, str],
     save_json: bool = True,
 ) -> None:
-    file_list = get_files(pdf_file_dir)
+    file_list = sorted(get_files(pdf_file_dir))
 
     logger.info(
         "Processing PDFs in %s using %s with %s",
