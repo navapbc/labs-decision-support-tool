@@ -177,8 +177,8 @@ def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     return grouped_texts
 
 
-def _should_merge_text(text: EnrichedText, next_text: EnrichedText) -> bool:
-    "Merges texts that are split across consecutive pages"
+def _should_merge_text_split_across_pages(text: EnrichedText, next_text: EnrichedText) -> bool:
+    "Check for texts that are split across consecutive pages"
     if text.headings != next_text.headings:
         return False
 
@@ -201,9 +201,15 @@ def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     for e_text in lists_merged[1:]:
         prev_text = grouped_texts[-1]
 
-        if _should_merge_text(prev_text, e_text):
+        if _should_merge_text_split_across_pages(prev_text, e_text):
             prev_text.text += " " + e_text.text
-        else:
-            grouped_texts.append(e_text)
+            continue
+
+        if prev_text.type == TextType.TITLE:
+            prev_text.text += "\n\n" + e_text.text
+            prev_text.type = e_text.type
+            continue
+
+        grouped_texts.append(e_text)
 
     return grouped_texts

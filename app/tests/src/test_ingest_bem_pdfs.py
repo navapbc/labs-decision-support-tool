@@ -131,7 +131,7 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         assert bold_styled_chunk.content == expected_text
 
         title_chunk = document.chunks[22]
-        assert title_chunk.content == "**CDC**"
+        assert title_chunk.content.startswith("**CDC**\n\nThe Child Care and Development Block")
         assert title_chunk.headings == ["legal base"]
         assert title_chunk.page_number == 4
 
