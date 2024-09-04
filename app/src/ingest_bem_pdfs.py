@@ -141,7 +141,8 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
 
         # UncategorizedText is frequently just NarrativeText that looks strange,
         # e.g., "45 CFR 400.45 - 400.69 and 400.90 - 400.107"
-        if element.category == "UncategorizedText":
+        # 167.pdf -- unstructured recognizes an Address
+        if element.category in ["UncategorizedText", "Address"]:
             element.category = "NarrativeText"
 
         try:
