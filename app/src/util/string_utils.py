@@ -56,9 +56,6 @@ def split_list(text: str, char_limit: int) -> list[str]:
     lines = text.split("\n")
     intro_sentence = lines[0]
     list_items = lines[1:]
-    # print("\n>S ", intro_sentence)
-    # for i in list_items:
-    #     print(">I ", i)
 
     # len(lines) accounts for the number of newline characters
     list_items_char_limit = char_limit - len(intro_sentence) - len(lines)

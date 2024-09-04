@@ -27,7 +27,6 @@ def test_split_list():
         "    - This is another sentence.\n"
         "    - This is a third sentence."
     )
-    print(">T", string_utils.split_list(text, 90))
     assert string_utils.split_list(text, 90) == [
         (
             "Following are list items:\n"
