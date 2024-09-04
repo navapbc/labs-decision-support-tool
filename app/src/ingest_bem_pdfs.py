@@ -3,7 +3,6 @@ import logging
 import re
 import sys
 import uuid
-from pprint import pprint
 from typing import BinaryIO
 
 from smart_open import open as smart_open
@@ -60,7 +59,7 @@ def _ingest_bem_pdfs(
 
         logger.info("Processing file: %s", file_path)
         with smart_open(file_path, "rb") as file:
-            grouped_texts = _parse_pdf(file)
+            grouped_texts = _parse_pdf(file, file_path)
             doc_attribs["name"] = _get_bem_title(file, file_path)
             document = Document(content="\n".join(g.text for g in grouped_texts), **doc_attribs)
             db_session.add(document)
@@ -70,25 +69,21 @@ def _ingest_bem_pdfs(
             db_session.add_all(chunks)
 
             if save_json:
+                # Note that chunks are being added to the DB before saving the JSON.
+                # Originally, we thought about reviewing the JSON manually before adding chunks to the DB.
                 _save_json(file_path, chunks)
 
 
-def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
+def _parse_pdf(file: BinaryIO, file_path: str) -> list[EnrichedText]:
     enriched_texts = _enrich_texts(file)
-    with open("enriched_texts.log", "w") as log_file:
-        pprint(list(enumerate(enriched_texts)), log_file, width=200)
     try:
         stylings = extract_stylings(file)
         associate_stylings(enriched_texts, stylings)
-        with open("styled_enriched_texts.log", "w") as log_file:
-            pprint(enriched_texts, log_file, width=200)
     except Exception as e:
         # 101.pdf is a large collection of tables that's hard to parse
-        logger.warning("Failed to extract and associate stylings: %s", e)
+        logger.warning("%s: Failed to extract and associate stylings: %s", file_path, e)
     markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
-    with open("grouped_texts.log", "w") as log_file:
-        pprint(list(enumerate(grouped_texts)), log_file, width=200)
 
     # Assign unique ids to each grouped text before they get split into chunks
     for text in grouped_texts:
@@ -188,10 +183,7 @@ def _next_heading(
                 current_headings = current_headings[: heading.level - 1]
                 current_headings.append(heading)
     else:
-        # This is no longer a warning because it's expected for single-line bold body text
-        # logger.warning(f"Unable to match heading: {element.text}, {element.metadata.page_number}")
-        # for heading in outline:
-        #     logger.warning(f"Available heading: {heading.title}, {heading.pageno}")
+        # TODO: Should warn of unmatched headings that weren't found after processing all elements
         return None
     return current_headings
 
