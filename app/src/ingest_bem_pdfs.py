@@ -99,7 +99,7 @@ def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
 
 
 def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
-    unstuctured_elem_list = partition_pdf(file=file, strategy="fast")
+    unstuctured_elem_list = partition_pdf(file=file, strategy="hi_res")
     enrich_text_list = []
 
     outline: list[Heading] = pdf_utils.extract_outline(file)
