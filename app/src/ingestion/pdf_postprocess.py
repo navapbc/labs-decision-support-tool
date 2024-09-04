@@ -163,7 +163,7 @@ def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     for current_text in markdown_texts[1:]:
         previous_text = grouped_texts[-1]
 
-        # Unstructured text sometimes splits a bullet from it's text;
+        # Unstructured text sometimes splits a bullet from its text;
         # merge them back together
         if (
             previous_text.text.endswith("    - ")
