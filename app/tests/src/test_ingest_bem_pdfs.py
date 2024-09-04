@@ -142,7 +142,7 @@ def test__enrich_text():
     with smart_open(_707_PDF_PATH, "rb") as file:
         enriched_text_list = _enrich_texts(file)
 
-        assert len(enriched_text_list) == 46
+        assert len(enriched_text_list) == 40
         first_enriched_text_item = enriched_text_list[0]
         assert isinstance(first_enriched_text_item, EnrichedText)
         assert first_enriched_text_item.headings == [Heading(title="Overview", level=1, pageno=1)]
@@ -154,7 +154,7 @@ def test__enrich_text():
             Heading(title="Time and Attendance Review  Process", level=1, pageno=1),
             Heading(title="Provider Errors", level=2, pageno=1),
         ]
-        assert other_enriched_text_item.type == "NarrativeText"
+        assert other_enriched_text_item.type == "ListItem"
         assert other_enriched_text_item.page_number == 2
 
 

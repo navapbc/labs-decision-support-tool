@@ -76,7 +76,7 @@ def _ingest_bem_pdfs(
 def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
     enriched_texts = _enrich_texts(file)
     with open("enriched_texts.log", "w") as log_file:
-        pprint(enriched_texts, log_file, width=200)
+        pprint(list(enumerate(enriched_texts)), log_file, width=200)
     try:
         stylings = extract_stylings(file)
         associate_stylings(enriched_texts, stylings)
