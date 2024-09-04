@@ -10,6 +10,8 @@ class TextType(StrEnum):
     NARRATIVE_TEXT = "NarrativeText"
     LIST_ITEM = "ListItem"
     LIST = "List"
+    # For Title elements that cannot be found as a heading in the outline
+    TITLE = "Title"
 
 
 @dataclass

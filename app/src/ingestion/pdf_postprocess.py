@@ -11,12 +11,18 @@ def associate_stylings(
     enriched_texts: list[EnrichedText], stylings: list[Styling]
 ) -> list[EnrichedText]:
     "Given EnrichedTexts and Stylings, associate stylings to the corresponding text item"
+    all_matched_stylings = []
     for e_text in enriched_texts:
         matched_stylings = [
             styling for styling in stylings if _styling_matches_text(styling, e_text)
         ]
         if matched_stylings:
             e_text.stylings = matched_stylings
+            all_matched_stylings.extend(matched_stylings)
+
+    unmatched_stylings = [s for s in stylings if s not in all_matched_stylings]
+    for styling in unmatched_stylings:
+        logger.warning("Styling not associated: %s", styling)
     return enriched_texts
 
 
@@ -33,8 +39,9 @@ def _styling_matches_text(styling: Styling, e_text: EnrichedText) -> bool:
         return False
 
     # Slower checks
-    stripped_wider_text = basic_ascii(styling.wider_text).strip()
-    stripped_e_text = basic_ascii(e_text.text).strip()
+    # Ignore spaces when matching
+    stripped_wider_text = basic_ascii(styling.wider_text).replace(" ", "")
+    stripped_e_text = basic_ascii(e_text.text).replace(" ", "")
     return (
         stripped_wider_text in stripped_e_text
         and abs(len(stripped_wider_text) - len(stripped_e_text)) < _STYLING_MATCH_MAX_LENGTH_DIFF
@@ -56,22 +63,27 @@ def _apply_stylings(e_text: EnrichedText) -> EnrichedText:
         e_text.stylings = None
     else:
         e_text.stylings = [s for s in e_text.stylings if s not in applied]
-        logger.warning("Stylings were not applied: %s", e_text.stylings, extra={"e_text": e_text})
+        logger.warning(
+            "Associated stylings were not applied: %s", e_text.stylings, extra={"e_text": e_text}
+        )
     return e_text
 
 
 def _apply_bold_styling(text: str, styling: Styling) -> str | None:
     # Replace only the first occurrence of the styling text
-    markdown_text = text.replace(styling.text, f"**{styling.text}**", 1)
+    # Unstructured will strip() texts, so we need to strip the styling text as well
+    styled_text = styling.text.strip()
+    markdown_text = text.replace(styled_text, f"**{styled_text}**", 1)
     if markdown_text == text:
         return None
 
     # Warn if the styling text occurs multiple times
-    replaced_all = text.replace(styling.text, f"**{styling.text}**")
-    if replaced_all != text:
+    replaced_all = text.replace(styled_text, f"**{styled_text}**")
+
+    if replaced_all != markdown_text:
         logger.warning(
-            "Styling text %s occurs multiple times; only applied to the first occurrence: '%s'",
-            styling.text,
+            "Styling text '%s' occurs multiple times; only applied to the first occurrence: '%s'",
+            styled_text,
             text,
         )
     return markdown_text
@@ -151,6 +163,16 @@ def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     for current_text in markdown_texts[1:]:
         previous_text = grouped_texts[-1]
 
+        # Unstructured text sometimes splits a bullet from its text;
+        # merge them back together
+        if (
+            previous_text.text.endswith("    - ")
+            and previous_text.type in [TextType.LIST_ITEM, TextType.LIST]
+            and current_text.type == TextType.NARRATIVE_TEXT
+        ):
+            previous_text.text += current_text.text
+            continue
+
         if _should_merge_list_text(previous_text, current_text):
             # Append the current text to the previous one
             previous_text.text += "\n" + current_text.text
@@ -162,8 +184,8 @@ def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     return grouped_texts
 
 
-def _should_merge_text(text: EnrichedText, next_text: EnrichedText) -> bool:
-    "Merges texts that are split across consecutive pages"
+def _should_merge_text_split_across_pages(text: EnrichedText, next_text: EnrichedText) -> bool:
+    "Check for texts that are split across consecutive pages"
     if text.headings != next_text.headings:
         return False
 
@@ -186,9 +208,15 @@ def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     for e_text in lists_merged[1:]:
         prev_text = grouped_texts[-1]
 
-        if _should_merge_text(prev_text, e_text):
+        if _should_merge_text_split_across_pages(prev_text, e_text):
             prev_text.text += " " + e_text.text
-        else:
-            grouped_texts.append(e_text)
+            continue
+
+        if prev_text.type == TextType.TITLE:
+            prev_text.text += "\n\n" + e_text.text
+            prev_text.type = e_text.type
+            continue
+
+        grouped_texts.append(e_text)
 
     return grouped_texts

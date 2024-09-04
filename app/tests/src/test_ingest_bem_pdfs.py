@@ -13,9 +13,9 @@ from src.ingest_bem_pdfs import (
     _add_embeddings,
     _enrich_texts,
     _get_bem_title,
-    _get_current_heading,
     _ingest_bem_pdfs,
     _match_heading,
+    _next_heading,
     _save_json,
 )
 from src.ingestion.pdf_elements import EnrichedText
@@ -24,19 +24,19 @@ from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_ingest_policy_pdfs import doc_attribs
 
+_707_PDF_PATH = "/app/tests/src/util/707.pdf"
+
 
 @pytest.fixture
 def policy_s3_file(mock_s3_bucket_resource):
-    data = smart_open("/app/tests/src/util/707.pdf", "rb")
+    data = smart_open(_707_PDF_PATH, "rb")
     mock_s3_bucket_resource.put_object(Body=data, Key="707.pdf")
     return "s3://test_bucket/"
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
 def test__get_bem_title(file_location, policy_s3_file):
-    file_path = (
-        policy_s3_file + "707.pdf" if file_location == "s3" else "/app/tests/src/util/707.pdf"
-    )
+    file_path = policy_s3_file + "707.pdf" if file_location == "s3" else _707_PDF_PATH
     with smart_open(file_path, "rb") as file:
         assert _get_bem_title(file, file_path) == "BEM 707: TIME AND ATTENDANCE REVIEWS"
 
@@ -72,9 +72,9 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
     with caplog.at_level(logging.INFO):
         if file_location == "local":
-            _ingest_bem_pdfs(db_session, "/app/tests/src/util/", doc_attribs)
+            _ingest_bem_pdfs(db_session, "/app/tests/src/util/", doc_attribs, save_json=False)
         else:
-            _ingest_bem_pdfs(db_session, policy_s3_file, doc_attribs)
+            _ingest_bem_pdfs(db_session, policy_s3_file, doc_attribs, save_json=False)
 
         assert any(text.startswith("Processing file: ") for text in caplog.messages)
         document = db_session.execute(select(Document)).one()[0]
@@ -84,32 +84,63 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
         assert document.name == "BEM 707: TIME AND ATTENDANCE REVIEWS"
 
-        # TODO: Test Document.content
-        assert (
-            "In order to be eligible to bill and receive payments, child care providers are required to comply with"
-            in document.content
+        assert "In order to be eligible to bill and receive payments, child " in document.content
+
+        first_chunk = document.chunks[0]
+        assert first_chunk.content.startswith(
+            "In order to be eligible to bill and receive payments, child"
         )
-        assert "The Food Assistance Program" not in document.content
+        assert first_chunk.headings == ["Overview"]
+        assert first_chunk.page_number == 1
 
-        # TODO: Test: The document should be broken into two chunks, which
-        # have different content and different embeddings
-        # first_chunk, second_chunk = document.chunks
-        # assert "Temporary Assistance to Needy Families" in first_chunk.content
-        # assert "The Food Assistance Program" not in first_chunk.content
-        # assert math.isclose(first_chunk.mpnet_embedding[0], -0.7016304, rel_tol=1e-5)
+        second_chunk = document.chunks[1]
+        assert second_chunk.content.startswith(
+            "Rule violations include, but are not limited to:\n    -"
+        )
+        assert second_chunk.headings == ["Rule Violations"]
+        assert second_chunk.page_number == 1
 
-        # assert "Temporary Assistance to Needy Families" not in second_chunk.content
-        # assert "The Food Assistance Program" in second_chunk.content
-        # assert math.isclose(second_chunk.mpnet_embedding[0], -0.82242084, rel_tol=1e-3)
-    if file_location == "local":
-        os.remove("/app/tests/src/util/707.pdf.json")
+        third_chunk = document.chunks[2]
+        assert third_chunk.content.startswith("Failure to maintain time and attendance records.")
+        assert third_chunk.headings == ["Rule Violations"]
+        assert third_chunk.page_number == 1
+
+        list_type_chunk = document.chunks[10]
+        assert list_type_chunk.content == (
+            "The following are examples of IPVs:\n"
+            "    - Billing for children while they are in school.\n"
+            "    - Two instances of failing to respond to requests for records.\n"
+            "    - Two instances of providing care in the wrong location.\n"
+            "    - Billing for children no longer in care.\n"
+            "    - Knowingly billing for children not in care or more hours than children were in care.\n"
+            "    - Maintaining records that do not accurately reflect the time children were in care."
+        )
+        assert list_type_chunk.headings == [
+            "Time and Attendance Review  Process",
+            "Intentional Program Violations",
+        ]
+        assert list_type_chunk.page_number == 2
+
+        bold_styled_chunk = document.chunks[12]
+        expected_text = (
+            "Providers determined to have committed an IPV may serve the following penalties:\n"
+            "    - First occurrence - six month disqualification. The closure reason will be **CDC not eligible due to 6 month penalty period**.\n"
+            "    - Second occurrence - twelve month disqualification. The closure reason will be **CDC not eligible due to 12 month penalty period.**\n"
+            "    - Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**"
+        )
+        assert bold_styled_chunk.content == expected_text
+
+        title_chunk = document.chunks[22]
+        assert title_chunk.content.startswith("**CDC**\n\nThe Child Care and Development Block")
+        assert title_chunk.headings == ["legal base"]
+        assert title_chunk.page_number == 4
 
 
 def test__enrich_text():
-    with smart_open("/app/tests/src/util/707.pdf", "rb") as file:
+    with smart_open(_707_PDF_PATH, "rb") as file:
         enriched_text_list = _enrich_texts(file)
 
-        assert len(enriched_text_list) == 45
+        assert len(enriched_text_list) == 40
         first_enriched_text_item = enriched_text_list[0]
         assert isinstance(first_enriched_text_item, EnrichedText)
         assert first_enriched_text_item.headings == [Heading(title="Overview", level=1, pageno=1)]
@@ -121,7 +152,7 @@ def test__enrich_text():
             Heading(title="Time and Attendance Review  Process", level=1, pageno=1),
             Heading(title="Provider Errors", level=2, pageno=1),
         ]
-        assert other_enriched_text_item.type == "NarrativeText"
+        assert other_enriched_text_item.type == "ListItem"
         assert other_enriched_text_item.page_number == 2
 
 
@@ -133,8 +164,8 @@ def test__match_heading(mock_outline):
     assert heading_on_wrong_page is None
 
 
-def test__get_current_heading(mock_outline, mock_elements):
-    second_level_heading = _get_current_heading(
+def test__next_heading(mock_outline, mock_elements):
+    second_level_heading = _next_heading(
         mock_outline,
         mock_elements[1],
         mock_outline[:2],
@@ -144,7 +175,7 @@ def test__get_current_heading(mock_outline, mock_elements):
         Heading(title="Family Independence Program (FIP)", level=2, pageno=1),
     ]
 
-    replaced_second_level = _get_current_heading(mock_outline, mock_elements[2], mock_outline[:2])
+    replaced_second_level = _next_heading(mock_outline, mock_elements[2], mock_outline[:2])
     assert replaced_second_level == [
         Heading(title="Overview", level=1, pageno=1),
         Heading(title="Program Goal", level=2, pageno=1),
@@ -157,7 +188,7 @@ def test__get_current_heading(mock_outline, mock_elements):
         Heading(title="4th Program Goal", level=4, pageno=2),
     ]
     element = Text(text="Test Level 2", metadata=ElementMetadata(page_number=2))
-    dropped_level = _get_current_heading(mock_outline, element, current_headings)
+    dropped_level = _next_heading(mock_outline, element, current_headings)
     assert dropped_level == [
         Heading(title="Overview", level=1, pageno=1),
         Heading(title="Test Level 2", level=2, pageno=2),

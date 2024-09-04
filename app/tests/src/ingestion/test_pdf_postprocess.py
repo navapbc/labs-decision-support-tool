@@ -253,7 +253,7 @@ def test__apply_stylings():
         EnrichedText(  # Substring with ending space should be bolded
             text="Second occurrence - twelve month disqualification. The "
             "closure reason will be **CDC not eligible due to 12 month "
-            "penalty period. **",  # ending space is intentional
+            "penalty period.** ",  # ending space is intentional
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="Disqualifications", level=1, pageno=2)],
             page_number=3,
@@ -262,7 +262,7 @@ def test__apply_stylings():
         texts[3],
         texts[4],
         EnrichedText(  # Multiple substrings match
-            text="**CDC **- CDC",
+            text="**CDC** - CDC",
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="legal base", level=1, pageno=4)],
             page_number=4,

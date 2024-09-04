@@ -43,8 +43,9 @@ def _ingest_bem_pdfs(
     db_session: db.Session,
     pdf_file_dir: str,
     doc_attribs: dict[str, str],
+    save_json: bool = True,
 ) -> None:
-    file_list = get_files(pdf_file_dir)
+    file_list = sorted(get_files(pdf_file_dir))
 
     logger.info(
         "Processing PDFs in %s using %s with %s",
@@ -58,7 +59,7 @@ def _ingest_bem_pdfs(
 
         logger.info("Processing file: %s", file_path)
         with smart_open(file_path, "rb") as file:
-            grouped_texts = _parse_pdf(file)
+            grouped_texts = _parse_pdf(file, file_path)
             doc_attribs["name"] = _get_bem_title(file, file_path)
             document = Document(content="\n".join(g.text for g in grouped_texts), **doc_attribs)
             db_session.add(document)
@@ -67,13 +68,20 @@ def _ingest_bem_pdfs(
             _add_embeddings(chunks)
             db_session.add_all(chunks)
 
-            _save_json(file_path, chunks)
+            if save_json:
+                # Note that chunks are being added to the DB before saving the JSON.
+                # Originally, we thought about reviewing the JSON manually before adding chunks to the DB.
+                _save_json(file_path, chunks)
 
 
-def _parse_pdf(file: BinaryIO) -> list[EnrichedText]:
+def _parse_pdf(file: BinaryIO, file_path: str) -> list[EnrichedText]:
     enriched_texts = _enrich_texts(file)
-    stylings = extract_stylings(file)
-    associate_stylings(enriched_texts, stylings)
+    try:
+        stylings = extract_stylings(file)
+        associate_stylings(enriched_texts, stylings)
+    except Exception as e:
+        # 101.pdf is a large collection of tables that's hard to parse
+        logger.warning("%s: Failed to extract and associate stylings: %s", file_path, e)
     markdown_texts = add_markdown(enriched_texts)
     grouped_texts = group_texts(markdown_texts)
 
@@ -91,6 +99,9 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
 
     outline: list[Heading] = pdf_utils.extract_outline(file)
     current_headings: list[Heading] = []
+
+    prev_element_was_empty_list_item = False
+
     for element in unstuctured_elem_list:
         if element.category == "Footer" or element.category == "Header":
             continue
@@ -103,19 +114,47 @@ def _enrich_texts(file: BinaryIO) -> list[EnrichedText]:
             continue
 
         if element.category == "Title":
-            current_headings = _get_current_heading(outline, element, current_headings)
+            if next_heading := _next_heading(outline, element, current_headings):
+                current_headings = next_heading
+                continue
+
+        # Sometimes Unstructured splits a ListItem into an empty ListItem
+        # and then either a NarrativeText, UncategorizedText, or Title
+        # For example, BEM 100 page 8 or page 13
+        if element.category == "ListItem" and not element.text:
+            prev_element_was_empty_list_item = True
+            continue
+        if prev_element_was_empty_list_item:
+            if element.category in ("NarrativeText", "UncategorizedText", "Title"):
+                element.category = "ListItem"
+            else:
+                logger.warning(
+                    "Empty list item not followed by NarrativeText, UncategorizedText, or Title; page %i",
+                    element.metadata.page_number,
+                )
+            prev_element_was_empty_list_item = False
+
+        # UncategorizedText is frequently just NarrativeText that looks strange,
+        # e.g., "45 CFR 400.45 - 400.69 and 400.90 - 400.107"
+        # In 167.pdf, Unstructured recognizes an Address.
+        if element.category in ["UncategorizedText", "Address"]:
+            element.category = "NarrativeText"
+
         try:
             enriched_text_item = EnrichedText(
                 text=element.text,
                 type=TextType(element.category),
                 page_number=element.metadata.page_number,
                 headings=current_headings,
-                id=element._element_id,
+                id=element.id,
             )
             enrich_text_list.append(enriched_text_item)
         except ValueError:
             logger.warning(
-                f"{element.category} is not an accepted TextType, {element.text}, {element.metadata.page_number}"
+                "%s is not an accepted TextType; page %i: '%s'",
+                element.category,
+                element.metadata.page_number,
+                element.text,
             )
     return enrich_text_list
 
@@ -133,9 +172,9 @@ def _match_heading(
     return None
 
 
-def _get_current_heading(
+def _next_heading(
     outline: list[Heading], element: Element, current_headings: list[Heading]
-) -> list[Heading]:
+) -> list[Heading] | None:
     if heading := _match_heading(outline, element.text, element.metadata.page_number):
         if heading.level == 1:
             current_headings = [heading]
@@ -144,7 +183,8 @@ def _get_current_heading(
                 current_headings = current_headings[: heading.level - 1]
                 current_headings.append(heading)
     else:
-        logger.warning(f"Unable to match header: {element.text}, {element.metadata.page_number}")
+        # TODO: Should warn of unmatched headings that weren't found after processing all elements
+        return None
     return current_headings
 
 
@@ -176,9 +216,7 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
     return chunks
 
 
-def _add_embeddings(
-    chunks: list[Chunk],
-) -> None:
+def _add_embeddings(chunks: list[Chunk]) -> None:
     embedding_model = app_config.sentence_transformer
 
     # Generate all the embeddings in parallel for speed
