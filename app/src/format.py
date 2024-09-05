@@ -152,7 +152,7 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                 </div>
             </div>"""  # noqa: B907
 
-    return "<h3>Source(s)</h3>" + html if html else ""
+    return "\n<h3>Source(s)</h3>" + html if html else ""
 
 
 def _get_bem_url(text: str) -> str:
