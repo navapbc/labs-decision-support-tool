@@ -55,13 +55,13 @@ def markdown_output() -> list[EnrichedText]:
             headings=[Heading(title="Section 3", level=1)],
         ),
         EnrichedText(
-            text="  -First [item](http://www.michigan.gov).",
+            text="- First [item](http://www.michigan.gov).",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
             links=None,
         ),
         EnrichedText(
-            text="**Second item**.",
+            text="- **Second item**.",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
             page_number=2,
