@@ -108,6 +108,10 @@ class GuruSnapEngine(BaseEngine):
 
 
 class BridgesEligibilityManualEngine(BaseEngine):
+    retrieval_k_min_score: float = -1
+    chunks_shown_min_score: float = -1
+    chunks_shown_max_num: int = 8
+
     engine_id: str = "bridges-eligibility-manual"
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
     datasets = ["bridges-eligibility-manual"]

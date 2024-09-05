@@ -13,11 +13,15 @@ PROMPT = """Provide answers in plain language written at the average American re
 Use bullet points. Keep your answers brief, max of 5 sentences.
 Keep your answers as similar to your knowledge text as you can
 
-When referencing the context, do not quote directly. Use the provided citation numbers (e.g., (chunk-0)) to indicate when you are drawing from the context.
+When referencing the context, do not quote directly.
+Use the provided citation numbers (e.g., (chunk-0)) to indicate when you are drawing from the context.
+Do cite multiple sources at once, you can append citations like so: (chunk-0)(chunk-1), etc.
+Place the citations after any closing punctation for the sentence. 
+For example: "This is a sentence that draws on information from the context.(chunk-0)"
 
 Example Answer:
 If the client and their roommate purchase and prepare food separately, they can be considered different SNAP (FAP) groups. For instance:
-- They can be classified as different SNAP (FAP) groups if they purchase and prepare food separately (chunk-0).
+- They can be classified as different SNAP (FAP) groups if they purchase and prepare food separately.(chunk-1)(chunk-3)
 """
 
 
