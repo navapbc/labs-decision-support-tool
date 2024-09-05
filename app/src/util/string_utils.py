@@ -29,7 +29,6 @@ def basic_ascii(text: str) -> str:
 
 # Set the nltk.data.path to a relative directory so that it's available in the Docker environment
 _nltk_data_path = os.path.abspath("./nltk_data")
-nltk.data.path.clear()
 nltk.data.path.append(_nltk_data_path)
 
 
