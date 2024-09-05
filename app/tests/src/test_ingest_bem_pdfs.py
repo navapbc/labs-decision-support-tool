@@ -95,7 +95,7 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
         second_chunk = document.chunks[1]
         assert second_chunk.content.startswith(
-            "Rule violations include, but are not limited to:\n    -"
+            "Rule violations include, but are not limited to:\n- "
         )
         assert second_chunk.headings == ["Rule Violations"]
         assert second_chunk.page_number == 1
@@ -108,12 +108,12 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         list_type_chunk = document.chunks[10]
         assert list_type_chunk.content == (
             "The following are examples of IPVs:\n"
-            "    - Billing for children while they are in school.\n"
-            "    - Two instances of failing to respond to requests for records.\n"
-            "    - Two instances of providing care in the wrong location.\n"
-            "    - Billing for children no longer in care.\n"
-            "    - Knowingly billing for children not in care or more hours than children were in care.\n"
-            "    - Maintaining records that do not accurately reflect the time children were in care."
+            "- Billing for children while they are in school.\n"
+            "- Two instances of failing to respond to requests for records.\n"
+            "- Two instances of providing care in the wrong location.\n"
+            "- Billing for children no longer in care.\n"
+            "- Knowingly billing for children not in care or more hours than children were in care.\n"
+            "- Maintaining records that do not accurately reflect the time children were in care."
         )
         assert list_type_chunk.headings == [
             "Time and Attendance Review  Process",
@@ -124,9 +124,9 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         bold_styled_chunk = document.chunks[12]
         expected_text = (
             "Providers determined to have committed an IPV may serve the following penalties:\n"
-            "    - First occurrence - six month disqualification. The closure reason will be **CDC not eligible due to 6 month penalty period**.\n"
-            "    - Second occurrence - twelve month disqualification. The closure reason will be **CDC not eligible due to 12 month penalty period.**\n"
-            "    - Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**"
+            "- First occurrence - six month disqualification. The closure reason will be **CDC not eligible due to 6 month penalty period**.\n"
+            "- Second occurrence - twelve month disqualification. The closure reason will be **CDC not eligible due to 12 month penalty period.**\n"
+            "- Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**"
         )
         assert bold_styled_chunk.content == expected_text
 

@@ -1,8 +1,11 @@
 import logging
 
+import pytest
+
 from src.ingestion.pdf_elements import EnrichedText, Heading, Link, TextType
 from src.ingestion.pdf_postprocess import (
     _add_link_markdown,
+    _add_list_markdown,
     _apply_stylings,
     add_markdown,
     associate_stylings,
@@ -11,8 +14,9 @@ from src.ingestion.pdf_postprocess import (
 from tests.src.ingestion.test_pdf_stylings import Styling, all_expected_stylings
 
 
-def test_add_markdown():
-    enriched_texts = [
+@pytest.fixture
+def enriched_texts() -> list[EnrichedText]:
+    return [
         EnrichedText(
             text="Following is a list:",
             type=TextType.NARRATIVE_TEXT,
@@ -41,26 +45,35 @@ def test_add_markdown():
         ),
     ]
 
-    result = add_markdown(enriched_texts)
 
-    assert result == [
+@pytest.fixture
+def markdown_output() -> list[EnrichedText]:
+    return [
         EnrichedText(
             text="Following is a list:",
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="Section 3", level=1)],
         ),
         EnrichedText(
-            text="    - First [item](http://www.michigan.gov).",
+            text="  -First [item](http://www.michigan.gov).",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
+            links=None,
         ),
         EnrichedText(
-            text="    - **Second item**.",
+            text="**Second item**.",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
             page_number=2,
+            stylings=None,
         ),
     ]
+
+
+def test_add_markdown(enriched_texts, markdown_output):
+    result = add_markdown(enriched_texts)
+
+    assert result == markdown_output
 
 
 def test_empty_list():
@@ -341,3 +354,36 @@ def test__add_link_markdown(caplog):
             ],
         ),
     ]
+
+
+def test_add_list_markdown(enriched_texts):
+    enriched_texts.append(
+        EnrichedText(
+            text="• Sub nested item.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 1", level=1)],
+            page_number=2,
+            stylings=[
+                Styling(
+                    text="• Sub nested item.",
+                    pageno=2,
+                    headings=[Heading(title="Section 1", level=1)],
+                    wider_text="Sub nested item.",
+                    bold=False,
+                )
+            ],
+        )
+    )
+
+    prev_enriched_text_val = None
+    markdown_text = []
+    for enriched_text in enriched_texts:
+        if prev_enriched_text_val is not None:
+            markdown_text.append(_add_list_markdown(prev_enriched_text_val, enriched_text))
+        prev_enriched_text_val = enriched_text
+
+    first_list_level = markdown_text[1]
+    assert "  - " not in first_list_level.text
+    assert "- " in first_list_level.text
+    second_list_level = markdown_text[2]
+    assert "  - " in second_list_level.text
