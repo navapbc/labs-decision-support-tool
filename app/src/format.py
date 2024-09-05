@@ -104,20 +104,26 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
     html = ""
     citation_number = 1
     for document in documents:
-        internal_citation = ""
+        citations = ""
         _accordion_id += 1
 
         citation_number_start = citation_number
 
         for chunk_with_score in documents[document]:
             chunk = chunk_with_score.chunk
-            formatted_chunk = f"<p>{_replace_bem_with_link(chunk.content)} </p>"
+            formatted_chunk = _replace_bem_with_link(chunk.content)
 
-            citation = f"<h4>Citation {citation_number}:</h4>"
-            internal_citation += f"""{citation}<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}</div>"""
+            # Adjust markdown for lists so Chainlit renders correctly
+            formatted_chunk = formatted_chunk.replace("    - ", "- ")
+            if formatted_chunk.startswith("- "):
+                formatted_chunk = "\n" + formatted_chunk
+
             bem_url_for_page = _get_bem_url(document.name) + "#page=" + str(chunk.page_number)
-            internal_citation += (
-                f"<p><a href='{bem_url_for_page}'>Open document to page {chunk.page_number}</a></p>"
+
+            citation_heading = f"<h4>Citation {citation_number}:</h4>"
+            citations += f"""{citation_heading}<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}</div>"""
+            citations += (
+                f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
             )
 
             citation_number += 1
@@ -142,7 +148,7 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                     </button>
                 </h4>
                 <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-                {internal_citation}
+                {citations}
                 </div>
             </div>"""  # noqa: B907
 

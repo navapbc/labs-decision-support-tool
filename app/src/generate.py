@@ -16,8 +16,8 @@ Keep your answers as similar to your knowledge text as you can
 When referencing the context, do not quote directly.
 Use the provided citation numbers (e.g., (chunk-0)) to indicate when you are drawing from the context.
 Do cite multiple sources at once, you can append citations like so: (chunk-0)(chunk-1), etc.
-Place the citations after any closing punctation for the sentence. 
-For example: "This is a sentence that draws on information from the context.(chunk-0)"
+Place the citations after any closing punctuation for the sentence.
+For example: 'This is a sentence that draws on information from the context.(chunk-0)'
 
 Example Answer:
 If the client and their roommate purchase and prepare food separately, they can be considered different SNAP (FAP) groups. For instance:

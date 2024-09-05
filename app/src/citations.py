@@ -41,7 +41,7 @@ def add_citations(response: str, chunks: list[Chunk]) -> str:
         chunk = chunks[index]
         bem_link = _get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
         bem_link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
-        citation = f"<sup><a href={bem_link!r} id={_footnote_id!r}>{index + 1}</a>&nbsp;</sup>"
+        citation = f"<sup><a href={bem_link!r}>{index + 1}</a>&nbsp;</sup>"
         footnote_list.append(
             f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
         )
