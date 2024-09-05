@@ -186,7 +186,7 @@ def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
         # Unstructured text sometimes splits a bullet from its text;
         # merge them back together
         if (
-            previous_text.text.endswith("    - ")
+            previous_text.text.endswith("  - ")
             and previous_text.type in [TextType.LIST_ITEM, TextType.LIST]
             and current_text.type == TextType.NARRATIVE_TEXT
         ):
