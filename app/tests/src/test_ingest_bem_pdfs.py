@@ -79,65 +79,67 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
             _ingest_bem_pdfs(db_session, "/app/tests/src/util/", doc_attribs, save_json=False)
         else:
             _ingest_bem_pdfs(db_session, policy_s3_file, doc_attribs, save_json=False)
+        db_session.commit()
 
         assert any(text.startswith("Processing file: ") for text in caplog.messages)
-        document = db_session.execute(select(Document)).one()[0]
-        assert document.dataset == "test_dataset"
-        assert document.program == "test_benefit_program"
-        assert document.region == "Michigan"
 
-        assert document.name == "BEM 707: TIME AND ATTENDANCE REVIEWS"
+    document = db_session.execute(select(Document)).one()[0]
+    assert document.dataset == "test_dataset"
+    assert document.program == "test_benefit_program"
+    assert document.region == "Michigan"
 
-        assert "In order to be eligible to bill and receive payments, child " in document.content
+    assert document.name == "BEM 707: TIME AND ATTENDANCE REVIEWS"
 
-        first_chunk = chunk_starting_with(
-            document.chunks, "In order to be eligible to bill and receive payments, child"
-        )
-        assert first_chunk.headings == ["Overview"]
-        assert first_chunk.page_number == 1
+    assert "In order to be eligible to bill and receive payments, child " in document.content
 
-        second_chunk = chunk_starting_with(
-            document.chunks, "Rule violations include, but are not limited to:\n    -"
-        )
-        assert second_chunk.headings == ["Rule Violations"]
-        assert second_chunk.page_number == 1
+    first_chunk = chunk_starting_with(
+        document.chunks, "In order to be eligible to bill and receive payments, child"
+    )
+    assert first_chunk.headings == ["Overview"]
+    assert first_chunk.page_number == 1
 
-        third_chunk = chunk_starting_with(
-            document.chunks, "Failure to maintain time and attendance records."
-        )
-        assert third_chunk.headings == ["Rule Violations"]
-        assert third_chunk.page_number == 1
+    second_chunk = chunk_starting_with(
+        document.chunks, "Rule violations include, but are not limited to:\n    -"
+    )
+    assert second_chunk.headings == ["Rule Violations"]
+    assert second_chunk.page_number == 1
 
-        list_type_chunk = chunk_starting_with(
-            document.chunks,
-            "The following are examples of IPVs:\n"
-            "    - Billing for children while they are in school.\n"
-            "    - Two instances of failing to respond to requests for records.\n"
-            "    - Two instances of providing care in the wrong location.\n"
-            "    - Billing for children no longer in care.\n"
-            "    - Knowingly billing for children not in care or more hours than children were in care.\n"
-            "    - Maintaining records that do not accurately reflect the time children were in care.",
-        )
-        assert list_type_chunk.headings == [
-            "Time and Attendance Review  Process",
-            "Intentional Program Violations",
-        ]
-        assert list_type_chunk.page_number == 2
+    third_chunk = chunk_starting_with(
+        document.chunks, "Failure to maintain time and attendance records."
+    )
+    assert third_chunk.headings == ["Rule Violations"]
+    assert third_chunk.page_number == 1
 
-        bold_styled_chunk = chunk_starting_with(
-            document.chunks,
-            "Providers determined to have committed an IPV may serve the following penalties:\n"
-            "    - First occurrence - six month disqualification. The closure reason will be **CDC not eligible due to 6 month penalty period**.\n"
-            "    - Second occurrence - twelve month disqualification. The closure reason will be **CDC not eligible due to 12 month penalty period.**\n"
-            "    - Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**",
-        )
-        assert bold_styled_chunk
+    list_type_chunk = chunk_starting_with(
+        document.chunks,
+        "The following are examples of IPVs:\n"
+        "    - Billing for children while they are in school.\n"
+        "    - Two instances of failing to respond to requests for records.\n"
+        "    - Two instances of providing care in the wrong location.\n"
+        "    - Billing for children no longer in care.\n"
+        "    - Knowingly billing for children not in care or more hours than children were in care.\n"
+        "    - Maintaining records that do not accurately reflect the time children were in care.",
+    )
+    assert list_type_chunk.headings == [
+        "Time and Attendance Review  Process",
+        "Intentional Program Violations",
+    ]
+    assert list_type_chunk.page_number == 2
 
-        title_chunk = chunk_starting_with(
-            document.chunks, "**CDC**\n\nThe Child Care and Development Block"
-        )
-        assert title_chunk.headings == ["legal base"]
-        assert title_chunk.page_number == 4
+    bold_styled_chunk = chunk_starting_with(
+        document.chunks,
+        "Providers determined to have committed an IPV may serve the following penalties:\n"
+        "    - First occurrence - six month disqualification. The closure reason will be **CDC not eligible due to 6 month penalty period**.\n"
+        "    - Second occurrence - twelve month disqualification. The closure reason will be **CDC not eligible due to 12 month penalty period.**\n"
+        "    - Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**",
+    )
+    assert bold_styled_chunk
+
+    title_chunk = chunk_starting_with(
+        document.chunks, "**CDC**\n\nThe Child Care and Development Block"
+    )
+    assert title_chunk.headings == ["legal base"]
+    assert title_chunk.page_number == 4
 
 
 def test__enrich_text():
