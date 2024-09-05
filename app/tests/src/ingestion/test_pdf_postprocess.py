@@ -152,32 +152,47 @@ def test_concatenate_list_items():
         EnrichedText(
             text="Introduction.",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=None)],
             page_number=1,
+            id=None,
+            stylings=None,
+            links=None,
         ),
         EnrichedText(
             text="First item.\nSecond item.",
             type=TextType.LIST,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=None)],
             page_number=1,
+            id=None,
+            stylings=None,
+            links=None,
         ),
         EnrichedText(
             text="Another narrative text.",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=None)],
             page_number=1,
+            id=None,
+            stylings=None,
+            links=None,
         ),
         EnrichedText(
             text="Narrative starting a new list: \nFirst item in new list.\nSecond item in new list.",
             type=TextType.LIST,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=None)],
             page_number=1,
+            id=None,
+            stylings=None,
+            links=None,
         ),
         EnrichedText(
             text="New list item in new section with continuing sentence on next page",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Section 1", level=1)],
+            headings=[Heading(title="Section 1", level=1, pageno=None)],
             page_number=1,
+            id=None,
+            stylings=None,
+            links=None,
         ),
     ]
 
@@ -352,21 +367,40 @@ def test__add_link_markdown(caplog):
 
 
 def test_add_list_markdown(enriched_texts):
-    enriched_texts.append(
+    prev_enriched_text_val = None
+    first_list_level = _add_list_markdown(prev_enriched_text_val, enriched_texts[1])
+
+    second_list_level = _add_list_markdown(
+        enriched_texts[2],
         EnrichedText(
             text="• Sub nested item.",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 1", level=1)],
             page_number=2,
             stylings=None,
-        )
+        ),
     )
-
-    prev_enriched_text_val = None
-    first_list_level = _add_list_markdown(prev_enriched_text_val, enriched_texts[1])
-
-    second_list_level = _add_list_markdown(enriched_texts[2], enriched_texts[3])
 
     assert "  - " not in first_list_level.text
     assert "- " in first_list_level.text
     assert "  - " in second_list_level.text
+
+    list_with_multiple_bullets = _add_list_markdown(
+        enriched_texts[2],
+        EnrichedText(
+            text="Parent/provider certifications. • Day/date. • Children's names. In/out times.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 1", level=1)],
+            page_number=2,
+            stylings=None,
+        ),
+    )
+    assert list_with_multiple_bullets == EnrichedText(
+        text="  - Parent/provider certifications. \n  -  Day/date. \n  -  Children's names. In/out times.",
+        type=TextType.LIST_ITEM,
+        headings=[Heading(title="Section 1", level=1, pageno=None)],
+        page_number=2,
+        id=None,
+        stylings=None,
+        links=None,
+    )

@@ -125,6 +125,7 @@ def _add_list_markdown(
         # if sublist, indent 2 spaces
         if "\u2022" in current_e_text.text:
             current_e_text.text = "  - " + current_e_text.text
+            current_e_text.text = current_e_text.text.replace("\u2022", "\n  - ")
         else:
             current_e_text.text = "- " + current_e_text.text
     elif current_e_text.type == TextType.LIST_ITEM:
@@ -185,8 +186,9 @@ def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
 
         # Unstructured text sometimes splits a bullet from its text;
         # merge them back together
+        # account for instances where text is separated by "-"
         if (
-            previous_text.text.endswith("  - ")
+            previous_text.text.endswith("\n- ")
             and previous_text.type in [TextType.LIST_ITEM, TextType.LIST]
             and current_text.type == TextType.NARRATIVE_TEXT
         ):
