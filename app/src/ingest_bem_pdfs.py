@@ -202,11 +202,14 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
         embedding_model = app_config.sentence_transformer
         token_count = len(embedding_model.tokenizer.tokenize(paragraph.text))
         if token_count > embedding_model.max_seq_length:
+            # Split the text into chunks of approximately equal length by characters,
+            # which doesn't necessarily mean equal number of tokens, but close enough
             num_of_splits = math.ceil(token_count / embedding_model.max_seq_length)
+            char_limit_per_split = math.ceil(len(paragraph.text) / num_of_splits)
             if paragraph.type == TextType.LIST:
-                splits = split_list(paragraph.text, round(len(paragraph.text) / num_of_splits))
+                splits = split_list(paragraph.text, char_limit_per_split)
             elif paragraph.type == TextType.NARRATIVE_TEXT:
-                splits = split_paragraph(paragraph.text, round(len(paragraph.text) / num_of_splits))
+                splits = split_paragraph(paragraph.text, char_limit_per_split)
             else:
                 raise ValueError(f"Unexpected element type: {paragraph.type}")
             logger.info("Split long text into %i chunks: %s", len(splits), splits[0][:120])
