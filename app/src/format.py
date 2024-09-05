@@ -121,10 +121,12 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
             bem_url_for_page = _get_bem_url(document.name) + "#page=" + str(chunk.page_number)
 
             citation_heading = f"<h4>Citation {citation_number}:</h4>"
-            citations += f"""{citation_heading}<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}</div>"""
-            citations += (
+            chunk_headings = "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
+            citation_body = f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}</div>'
+            citation_link = (
                 f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
             )
+            citations += citation_heading + chunk_headings + citation_body + citation_link
 
             citation_number += 1
 
