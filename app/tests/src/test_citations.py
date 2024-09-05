@@ -17,9 +17,14 @@ def test_get_context_for_prompt():
 
 
 def test_add_citations():
-    assert add_citations("This is a citation (chunk-0)", []) == "This is a citation (chunk-0)</br>"
+    assert add_citations("This is a citation (chunk-0)", []) == "This is a citation (chunk-0)"
 
     chunks = ChunkFactory.build_batch(2)
+    assert (
+        add_citations("This is a citation (chunk-0) and another (chunk-1).", chunks)
+        == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
+    )
+    """"
     assert all(
         text in add_citations("This is a citation (chunk-0) and another (chunk-1).", chunks)
         for text in [
@@ -29,3 +34,4 @@ def test_add_citations():
             chunks[1].document.name,
         ]
     )
+    """
