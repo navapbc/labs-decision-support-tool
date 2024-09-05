@@ -46,9 +46,10 @@ def enriched_texts() -> list[EnrichedText]:
     ]
 
 
-@pytest.fixture
-def markdown_output() -> list[EnrichedText]:
-    return [
+def test_add_markdown(enriched_texts):
+    result = add_markdown(enriched_texts)
+
+    assert result == [
         EnrichedText(
             text="Following is a list:",
             type=TextType.NARRATIVE_TEXT,
@@ -68,12 +69,6 @@ def markdown_output() -> list[EnrichedText]:
             stylings=None,
         ),
     ]
-
-
-def test_add_markdown(enriched_texts, markdown_output):
-    result = add_markdown(enriched_texts)
-
-    assert result == markdown_output
 
 
 def test_empty_list():
@@ -363,27 +358,15 @@ def test_add_list_markdown(enriched_texts):
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 1", level=1)],
             page_number=2,
-            stylings=[
-                Styling(
-                    text="• Sub nested item.",
-                    pageno=2,
-                    headings=[Heading(title="Section 1", level=1)],
-                    wider_text="Sub nested item.",
-                    bold=False,
-                )
-            ],
+            stylings=None,
         )
     )
 
     prev_enriched_text_val = None
-    markdown_text = []
-    for enriched_text in enriched_texts:
-        if prev_enriched_text_val is not None:
-            markdown_text.append(_add_list_markdown(prev_enriched_text_val, enriched_text))
-        prev_enriched_text_val = enriched_text
+    first_list_level = _add_list_markdown(prev_enriched_text_val, enriched_texts[1])
 
-    first_list_level = markdown_text[1]
+    second_list_level = _add_list_markdown(enriched_texts[2], enriched_texts[3])
+
     assert "  - " not in first_list_level.text
     assert "- " in first_list_level.text
-    second_list_level = markdown_text[2]
     assert "  - " in second_list_level.text
