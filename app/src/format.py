@@ -118,7 +118,9 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
             if formatted_chunk.startswith("- "):
                 formatted_chunk = "\n" + formatted_chunk
 
-            bem_url_for_page = _get_bem_url(document.name) + "#page=" + str(chunk.page_number)
+            bem_url_for_page = _get_bem_url(document.name)
+            if chunk.page_number:
+                bem_url_for_page += "#page=" + str(chunk.page_number)
 
             citation_heading = f"<h4>Citation {citation_number}:</h4>"
             chunk_headings = "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
