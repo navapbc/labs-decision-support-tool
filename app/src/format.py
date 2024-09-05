@@ -114,7 +114,7 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
             formatted_chunk = _replace_bem_with_link(chunk.content)
 
             # Adjust markdown for lists so Chainlit renders correctly
-            formatted_chunk = formatted_chunk.replace(r"^    - ", "- ")
+            formatted_chunk = re.sub('^    - ', "- ", formatted_chunk, flags=re.MULTILINE)
             if formatted_chunk.startswith("- "):
                 formatted_chunk = "\n" + formatted_chunk
 
