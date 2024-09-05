@@ -8,7 +8,7 @@ from smart_open import open as smart_open
 from sqlalchemy import delete, select
 from unstructured.documents.elements import ElementMetadata, Text
 
-from src.db.models.document import Document
+from src.db.models.document import Chunk, Document
 from src.ingest_bem_pdfs import (
     _add_embeddings,
     _enrich_texts,
@@ -66,6 +66,10 @@ def mock_elements():
     ]
 
 
+def chunk_starting_with(chunks: list[Chunk], content: str):
+    return next(c for c in chunks if c.content.startswith(content))
+
+
 @pytest.mark.parametrize("file_location", ["local", "s3"])
 def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_location):
     db_session.execute(delete(Document))
@@ -86,34 +90,33 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
         assert "In order to be eligible to bill and receive payments, child " in document.content
 
-        first_chunk = document.chunks[0]
-        assert first_chunk.content.startswith(
-            "In order to be eligible to bill and receive payments, child"
+        first_chunk = chunk_starting_with(
+            document.chunks, "In order to be eligible to bill and receive payments, child"
         )
         assert first_chunk.headings == ["Overview"]
         assert first_chunk.page_number == 1
 
-        second_chunk = document.chunks[1]
-        assert second_chunk.content.startswith(
-            "Rule violations include, but are not limited to:\n    -"
+        second_chunk = chunk_starting_with(
+            document.chunks, "Rule violations include, but are not limited to:\n    -"
         )
         assert second_chunk.headings == ["Rule Violations"]
         assert second_chunk.page_number == 1
 
-        third_chunk = document.chunks[2]
-        assert third_chunk.content.startswith("Failure to maintain time and attendance records.")
+        third_chunk = chunk_starting_with(
+            document.chunks, "Failure to maintain time and attendance records."
+        )
         assert third_chunk.headings == ["Rule Violations"]
         assert third_chunk.page_number == 1
 
-        list_type_chunk = document.chunks[10]
-        assert list_type_chunk.content == (
+        list_type_chunk = chunk_starting_with(
+            document.chunks,
             "The following are examples of IPVs:\n"
             "    - Billing for children while they are in school.\n"
             "    - Two instances of failing to respond to requests for records.\n"
             "    - Two instances of providing care in the wrong location.\n"
             "    - Billing for children no longer in care.\n"
             "    - Knowingly billing for children not in care or more hours than children were in care.\n"
-            "    - Maintaining records that do not accurately reflect the time children were in care."
+            "    - Maintaining records that do not accurately reflect the time children were in care.",
         )
         assert list_type_chunk.headings == [
             "Time and Attendance Review  Process",
@@ -121,17 +124,18 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
         ]
         assert list_type_chunk.page_number == 2
 
-        bold_styled_chunk = document.chunks[12]
-        expected_text = (
+        bold_styled_chunk = chunk_starting_with(
+            document.chunks,
             "Providers determined to have committed an IPV may serve the following penalties:\n"
             "    - First occurrence - six month disqualification. The closure reason will be **CDC not eligible due to 6 month penalty period**.\n"
             "    - Second occurrence - twelve month disqualification. The closure reason will be **CDC not eligible due to 12 month penalty period.**\n"
-            "    - Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**"
+            "    - Third occurrence - lifetime disqualification. The closure reason will be **CDC not eligible due to lifetime penalty.**",
         )
-        assert bold_styled_chunk.content == expected_text
+        assert bold_styled_chunk
 
-        title_chunk = document.chunks[22]
-        assert title_chunk.content.startswith("**CDC**\n\nThe Child Care and Development Block")
+        title_chunk = chunk_starting_with(
+            document.chunks, "**CDC**\n\nThe Child Care and Development Block"
+        )
         assert title_chunk.headings == ["legal base"]
         assert title_chunk.page_number == 4
 

@@ -213,6 +213,8 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
         else:
             splits = [paragraph.text]
 
+        # Ignore empty splits
+        splits = [s for s in splits if s.strip()]
         text_chunks = [
             Chunk(
                 document=document,
@@ -222,8 +224,7 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
                 num_splits=len(splits),
                 split_index=index,
             )
-            # Ignore empty splits
-            for index, chunk_text in enumerate([s for s in splits if s.strip()])
+            for index, chunk_text in enumerate(splits)
         ]
         chunks += text_chunks
     return chunks
