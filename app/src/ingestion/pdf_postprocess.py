@@ -127,10 +127,8 @@ def _add_list_markdown(
             current_e_text.text = "  - " + current_e_text.text
             current_e_text.text = current_e_text.text.replace("\u2022", "\n  - ")
             list_items = current_e_text.text.split("\n")
-            nonempty_items = [
-                item for item in list_items if item.strip() and item.strip() != "-"
-            ]
-            current_e_text.text = "\n".join(filtered_dup_bullets)
+            nonempty_items = [item for item in list_items if item.strip() and item.strip() != "-"]
+            current_e_text.text = "\n".join(nonempty_items)
         else:
             current_e_text.text = "- " + current_e_text.text
     elif current_e_text.type == TextType.LIST_ITEM:
