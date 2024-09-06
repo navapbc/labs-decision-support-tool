@@ -389,7 +389,7 @@ def test_add_list_markdown(enriched_texts):
         EnrichedText(
             text="Parent/provider certifications. • Day/date. • Children's names. In/out times.",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Section 1", level=1)],
+            headings=[Heading(title="Section 1", level=1, pageno=1)],
             page_number=2,
             stylings=None,
         ),
@@ -397,7 +397,7 @@ def test_add_list_markdown(enriched_texts):
     assert list_with_multiple_bullets == EnrichedText(
         text="  - Parent/provider certifications. \n  -  Day/date. \n  -  Children's names. In/out times.",
         type=TextType.LIST_ITEM,
-        headings=[Heading(title="Section 1", level=1, pageno=None)],
+        headings=[Heading(title="Section 1", level=1, pageno=1)],
         page_number=2,
         id=None,
         stylings=None,
