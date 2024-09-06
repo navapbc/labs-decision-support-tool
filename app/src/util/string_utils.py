@@ -29,10 +29,11 @@ def basic_ascii(text: str) -> str:
 
 # Set the nltk.data.path to a relative directory so that it's available in the Docker environment
 _nltk_data_path = os.path.abspath("./nltk_data")
-nltk.data.path.append(_nltk_data_path)
 
 
 def _prep_nltk_tokenizer() -> None:
+    if _nltk_data_path not in nltk.data.path:
+        nltk.data.path.append(_nltk_data_path)
     try:
         # https://stackoverflow.com/questions/44857382/change-nltk-download-path-directory-from-default-ntlk-data
         nltk.data.find("tokenizers/punkt_tab")
