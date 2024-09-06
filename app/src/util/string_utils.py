@@ -51,6 +51,11 @@ def split_paragraph(text: str, char_limit: int) -> list[str]:
 
 
 def split_list(text: str, char_limit: int) -> list[str]:
+    """
+    Split text containing a list of items into chunks having up to a character limit each.
+    The first line is treated as an introductory sentence, which will be repeated as the first line of each chunk.
+    The first line and each list item should be separated by a newline character.
+    """
     _prep_nltk_tokenizer()
 
     lines = text.split("\n")
