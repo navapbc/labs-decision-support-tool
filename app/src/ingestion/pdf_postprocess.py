@@ -114,8 +114,31 @@ def _add_link_markdown(e_text: EnrichedText) -> EnrichedText:
     return e_text
 
 
+def _add_list_markdown(
+    prev_e_text: EnrichedText | None, current_e_text: EnrichedText
+) -> EnrichedText:
+    if (
+        prev_e_text
+        and prev_e_text.type == TextType.LIST_ITEM
+        and current_e_text.type == TextType.LIST_ITEM
+    ):
+        # if sublist, indent 2 spaces
+        if "\u2022" in current_e_text.text:
+            current_e_text.text = "  - " + current_e_text.text
+            current_e_text.text = current_e_text.text.replace("\u2022", "\n  - ")
+            list_items = current_e_text.text.split("\n")
+            nonempty_items = [item for item in list_items if item.strip() and item.strip() != "-"]
+            current_e_text.text = "\n".join(nonempty_items)
+        else:
+            current_e_text.text = "- " + current_e_text.text
+    elif current_e_text.type == TextType.LIST_ITEM:
+        current_e_text.text = "- " + current_e_text.text
+    return current_e_text
+
+
 def add_markdown(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
     markdown_texts = []
+    prev_markdown_val = None
     for enriched_text in enriched_texts:
         # Link markdown should be applied to the text before applying stylings and
         # prepending "    - " to ListItem elements so that positional data like
@@ -130,8 +153,9 @@ def add_markdown(enriched_texts: list[EnrichedText]) -> list[EnrichedText]:
         # b/c markdown_text will look like "[CDC](url) means" and styling.text no longer matches.
         markdown_text = _apply_stylings(markdown_text)
 
-        if markdown_text.type == TextType.LIST_ITEM:
-            markdown_text.text = "    - " + markdown_text.text
+        markdown_text = _add_list_markdown(prev_markdown_val, markdown_text)
+        prev_markdown_val = markdown_text
+
         markdown_texts.append(markdown_text)
     return enriched_texts
 
@@ -165,8 +189,9 @@ def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
 
         # Unstructured text sometimes splits a bullet from its text;
         # merge them back together
+        # account for instances where text is separated by "-"
         if (
-            previous_text.text.endswith("    - ")
+            previous_text.text.endswith("\n- ")
             and previous_text.type in [TextType.LIST_ITEM, TextType.LIST]
             and current_text.type == TextType.NARRATIVE_TEXT
         ):
