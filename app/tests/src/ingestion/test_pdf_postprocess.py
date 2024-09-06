@@ -80,7 +80,10 @@ def test_single_narrative_text():
         EnrichedText(
             text="A single narrative text.",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[
+                Heading(title="Overview", level=1, pageno=1),
+            ],
+            page_number=1,
         )
     ]
     result = group_texts(texts)
@@ -93,55 +96,55 @@ def test_concatenate_list_items():
         EnrichedText(
             text="Introduction.",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
         ),
         EnrichedText(
             text="First item.",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
         ),
         EnrichedText(
             text="Second item.",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
         ),
         EnrichedText(
             text="Another narrative text.",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
         ),
         EnrichedText(
             text="Narrative starting a new list: ",  # ending space is intentional
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
         ),
         EnrichedText(
             text="First item in new list.",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
         ),
         EnrichedText(
             text="Second item in new list.",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Overview", level=1)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
         ),
         EnrichedText(
             text="New list item in new section",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Section 1", level=1)],
+            headings=[Heading(title="Section 1", level=1, pageno=1)],
             page_number=1,
         ),
         EnrichedText(
             text="with continuing sentence on next page",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Section 1", level=1)],
+            headings=[Heading(title="Section 1", level=1, pageno=1)],
             page_number=2,
         ),
     ]
@@ -152,7 +155,7 @@ def test_concatenate_list_items():
         EnrichedText(
             text="Introduction.",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1, pageno=None)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
             id=None,
             stylings=None,
@@ -161,7 +164,7 @@ def test_concatenate_list_items():
         EnrichedText(
             text="First item.\nSecond item.",
             type=TextType.LIST,
-            headings=[Heading(title="Overview", level=1, pageno=None)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
             id=None,
             stylings=None,
@@ -170,7 +173,7 @@ def test_concatenate_list_items():
         EnrichedText(
             text="Another narrative text.",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1, pageno=None)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
             id=None,
             stylings=None,
@@ -179,7 +182,7 @@ def test_concatenate_list_items():
         EnrichedText(
             text="Narrative starting a new list: \nFirst item in new list.\nSecond item in new list.",
             type=TextType.LIST,
-            headings=[Heading(title="Overview", level=1, pageno=None)],
+            headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
             id=None,
             stylings=None,
@@ -188,7 +191,7 @@ def test_concatenate_list_items():
         EnrichedText(
             text="New list item in new section with continuing sentence on next page",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Section 1", level=1, pageno=None)],
+            headings=[Heading(title="Section 1", level=1, pageno=1)],
             page_number=1,
             id=None,
             stylings=None,
