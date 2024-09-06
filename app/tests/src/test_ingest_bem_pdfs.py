@@ -79,7 +79,6 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
             _ingest_bem_pdfs(db_session, "/app/tests/src/util/", doc_attribs, save_json=False)
         else:
             _ingest_bem_pdfs(db_session, policy_s3_file, doc_attribs, save_json=False)
-        db_session.commit()
 
         assert any(text.startswith("Processing file: ") for text in caplog.messages)
 
