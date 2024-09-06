@@ -381,9 +381,8 @@ def test_add_list_markdown(enriched_texts):
         ),
     )
 
-    assert "  - " not in first_list_level.text
-    assert "- " in first_list_level.text
-    assert "  - " in second_list_level.text
+    assert first_list_level.text == "- First item."
+    assert second_list_level.text == "  - \n  -  Sub nested item."
 
     list_with_multiple_bullets = _add_list_markdown(
         enriched_texts[2],
