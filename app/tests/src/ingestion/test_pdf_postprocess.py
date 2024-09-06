@@ -373,7 +373,7 @@ def test_add_list_markdown(enriched_texts):
     second_list_level = _add_list_markdown(
         enriched_texts[2],
         EnrichedText(
-            text="• Sub nested item.",
+            text="• Sub nested item.  • second test message • • ",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 1", level=1)],
             page_number=2,
@@ -382,7 +382,7 @@ def test_add_list_markdown(enriched_texts):
     )
 
     assert first_list_level.text == "- First item."
-    assert second_list_level.text == "  - \n  -  Sub nested item."
+    assert second_list_level.text == "  -  Sub nested item.  \n  -  second test message "
 
     list_with_multiple_bullets = _add_list_markdown(
         enriched_texts[2],
