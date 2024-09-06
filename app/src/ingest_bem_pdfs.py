@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import re
 import sys
 import uuid
@@ -19,6 +20,7 @@ from src.util import pdf_utils
 from src.util.file_util import get_files
 from src.util.ingest_utils import process_and_ingest_sys_args
 from src.util.pdf_utils import Heading
+from src.util.string_utils import split_list, split_paragraph
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +66,7 @@ def _ingest_bem_pdfs(
             document = Document(content="\n".join(g.text for g in grouped_texts), **doc_attribs)
             db_session.add(document)
 
-            chunks = split_into_chunks(document, grouped_texts)
+            chunks = _split_into_chunks(document, grouped_texts)
             _add_embeddings(chunks)
             db_session.add_all(chunks)
 
@@ -188,7 +190,7 @@ def _next_heading(
     return current_headings
 
 
-def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> list[Chunk]:
+def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> list[Chunk]:
     """
     Given EnrichedTexts, convert the text to chunks and add them to the database.
     """
@@ -197,20 +199,35 @@ def split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) -> 
         assert paragraph.id is not None
         assert paragraph.page_number is not None
 
-        # For iteration 1, log warning for overly long text
         embedding_model = app_config.sentence_transformer
         token_count = len(embedding_model.tokenizer.tokenize(paragraph.text))
         if token_count > embedding_model.max_seq_length:
-            logger.warning("Text too long for embedding model: %s", paragraph.text[:100])
+            # Split the text into chunks of approximately equal length by characters,
+            # which doesn't necessarily mean equal number of tokens, but close enough
+            num_of_splits = math.ceil(token_count / embedding_model.max_seq_length)
+            char_limit_per_split = math.ceil(len(paragraph.text) / num_of_splits)
+            if paragraph.type == TextType.LIST:
+                splits = split_list(paragraph.text, char_limit_per_split)
+            elif paragraph.type == TextType.NARRATIVE_TEXT:
+                splits = split_paragraph(paragraph.text, char_limit_per_split)
+            else:
+                raise ValueError(f"Unexpected element type: {paragraph.type}")
+            logger.info("Split long text into %i chunks: %s", len(splits), splits[0][:120])
+        else:
+            splits = [paragraph.text]
+
+        # Ignore empty splits
+        splits = [s for s in splits if s.strip()]
         text_chunks = [
-            # For iteration 1, don't split the text -- just create 1 chunk.
-            # TODO: TASK 3.a will split a paragraph into multiple chunks.
             Chunk(
-                content=paragraph.text,
                 document=document,
+                content=chunk_text,
                 page_number=paragraph.page_number,
                 headings=[h.title for h in paragraph.headings],
+                num_splits=len(splits),
+                split_index=index,
             )
+            for index, chunk_text in enumerate(splits)
         ]
         chunks += text_chunks
     return chunks
@@ -228,8 +245,9 @@ def _add_embeddings(chunks: list[Chunk]) -> None:
     for i, chunk in enumerate(chunks):
         chunk.mpnet_embedding = embeddings[i]  # type: ignore
         chunk.tokens = len(embedding_model.tokenizer.tokenize(chunk.content))
-        if chunk.tokens > embedding_model.max_seq_length:
-            logger.warning("Text too long for embedding model: %s", chunk.content[:100])
+        assert (
+            chunk.tokens <= embedding_model.max_seq_length
+        ), "Text too long for embedding model: {chunk.content[:100]}"
 
 
 def _save_json(file_path: str, chunks: list[Chunk]) -> None:
