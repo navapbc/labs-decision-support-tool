@@ -40,12 +40,15 @@ def add_citations(response: str, chunks: list[Chunk]) -> str:
 
         chunk = chunks[index]
         bem_link = _get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
-        citation = f".<sup><a href={bem_link!r} id={_footnote_id!r}>{_footnote_index}</a></sup>"
+        bem_link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
+        citation = f"<sup><a href={bem_link!r}>{index + 1}</a>&nbsp;</sup>"
         footnote_list.append(
             f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
         )
         return citation
 
     # Replace all instances of (chunk-<index>), where <index> is a number
-    added_citations = re.sub(r"\(chunk-(\d+)\).", replace_citation, response)
-    return added_citations + "</br>" + "</br>".join(footnote_list)
+    added_citations = re.sub(r"\(chunk-(\d+)\)", replace_citation, response)
+
+    # For now, don't show footnote list
+    return added_citations  # + "</br>" + "</br>".join(footnote_list)

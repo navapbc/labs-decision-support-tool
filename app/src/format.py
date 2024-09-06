@@ -102,19 +102,47 @@ def _format_to_accordion_html(document: Document, score: float) -> str:
 def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkWithScore]]) -> str:
     global _accordion_id
     html = ""
+    citation_number = 1
     for document in documents:
-        internal_citation = ""
+        citations = ""
         _accordion_id += 1
-        for index, chunk in enumerate(documents[document], start=1):
-            chunk_lines = chunk.chunk.content.splitlines()
-            formatted_chunk = " ".join(chunk_lines)
-            formatted_chunk = re.sub(r"\t+", "", formatted_chunk).strip()
-            formatted_chunk = (
-                f"<p>{_replace_bem_with_link(formatted_chunk)} </p>" if formatted_chunk else ""
+
+        citation_number_start = citation_number
+
+        for chunk_with_score in documents[document]:
+            chunk = chunk_with_score.chunk
+            formatted_chunk = _replace_bem_with_link(chunk.content)
+
+            # Adjust markdown for lists so Chainlit renders correctly
+            formatted_chunk = re.sub("^    - ", "- ", formatted_chunk, flags=re.MULTILINE)
+            if formatted_chunk.startswith("- "):
+                formatted_chunk = "\n" + formatted_chunk
+
+            bem_url_for_page = _get_bem_url(document.name)
+            if chunk.page_number:
+                bem_url_for_page += "#page=" + str(chunk.page_number)
+
+            citation_heading = f"<h4>Citation {citation_number}:</h4>"
+            chunk_headings = "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
+            citation_body = f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}</div>'
+            citation_link = (
+                (
+                    f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
+                )
+                if chunk.page_number
+                else ""
             )
-            citation = f"<h4>Citation #{index} (score: {str(chunk.score)})</h4>"
-            similarity_score = f"<p>Similarity Score: {str(chunk.score)}</p>"
-            internal_citation += f"""{citation}<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_chunk}{similarity_score}</div>"""
+            citations += citation_heading + chunk_headings + citation_body + citation_link
+
+            citation_number += 1
+
+        citation_number_end = citation_number - 1
+        citation_range = (
+            f"Citation {citation_number_start}"
+            if citation_number_start == citation_number_end
+            else f"Citations {citation_number_start} - {citation_number_end}"
+        )
+
         html += f"""
             <div class="usa-accordion" id=accordion-{_accordion_id}>
                 <h4 class="usa-accordion__heading">
@@ -124,15 +152,15 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                         aria-expanded="false"
                         aria-controls="a-{_accordion_id}"
                         >
-                        <a href="{_get_bem_url(document.name)}">{document.name}</a>
+                        <a href="{_get_bem_url(document.name)}">{document.name}</a> ({citation_range})
                     </button>
                 </h4>
                 <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-                {internal_citation}
+                {citations}
                 </div>
             </div>"""  # noqa: B907
 
-    return "<h3>Source(s)</h3>" + html if html else ""
+    return "\n<h3>Source(s)</h3>" + html if html else ""
 
 
 def _get_bem_url(text: str) -> str:
