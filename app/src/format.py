@@ -46,7 +46,6 @@ def _get_bem_documents_to_show(
     # Ordered by the highest score of each chunk associated with the document
     documents: OrderedDict[Document, list[ChunkWithScore]] = OrderedDict()
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
-        chunk_with_score.chunk = _add_ellipses(chunk_with_score.chunk)
         document = chunk_with_score.chunk.document
         if chunk_with_score.score < chunks_shown_min_score:
             logger.info(
@@ -112,7 +111,9 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
 
         for chunk_with_score in documents[document]:
             chunk = chunk_with_score.chunk
-            formatted_chunk = _replace_bem_with_link(chunk.content)
+
+            formatted_chunk = _add_ellipses(chunk)
+            formatted_chunk = _replace_bem_with_link(formatted_chunk)
 
             # Adjust markdown for lists so Chainlit renders correctly
             formatted_chunk = re.sub("^ - ", "- ", formatted_chunk, flags=re.MULTILINE)
@@ -179,13 +180,14 @@ def _replace_bem_with_link(text: str) -> str:
     )
 
 
-def _add_ellipses(chunk: Chunk) -> Chunk:
+def _add_ellipses(chunk: Chunk) -> str:
+    chunk_content = chunk.content
     if chunk.num_splits != 0:
         if chunk.split_index == 0:
-            chunk.content = f"{chunk.content}..."
+            chunk_content = f"{chunk_content}..."
         elif chunk.split_index == chunk.num_splits:
-            chunk.content = f"...{chunk.content}"
+            chunk_content = f"...{chunk_content}"
         else:
-            chunk.content = f"...{chunk.content}..."
-        chunk.content = re.sub(r"\.{4,}", "...", chunk.content)
-    return chunk
+            chunk_content = f"...{chunk_content}..."
+        chunk_content = re.sub(r"\.{4,}", "...", chunk_content)
+    return chunk_content

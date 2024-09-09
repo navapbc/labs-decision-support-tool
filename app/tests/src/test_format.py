@@ -155,3 +155,8 @@ def test__add_ellipses():
 
     last_chunk = Chunk(num_splits=3, split_index=3, content="This is the last chunk.")
     assert _add_ellipses(last_chunk).content == "...This is the last chunk."
+
+    multiple_ellipses = Chunk(
+        num_splits=3, split_index=0, content="This is a chunk with multiple ellipses......"
+    )
+    assert _add_ellipses(multiple_ellipses).content == "This is a chunk with multiple ellipses..."
