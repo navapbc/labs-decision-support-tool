@@ -184,10 +184,9 @@ def _add_ellipses(chunk: Chunk) -> str:
     chunk_content = chunk.content
     if chunk.num_splits != 0:
         if chunk.split_index == 0:
-            chunk_content = f"{chunk_content}..."
+            return f"{chunk_content} ..."
         elif chunk.split_index == chunk.num_splits:
-            chunk_content = f"...{chunk_content}"
+            return f"... {chunk_content}"
         else:
-            chunk_content = f"...{chunk_content}..."
-        chunk_content = re.sub(r"\.{4,}", "...", chunk_content)
+            return f"... {chunk_content} ..."
     return chunk_content

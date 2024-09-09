@@ -147,16 +147,19 @@ def test__replace_bem_with_link():
 
 
 def test__add_ellipses():
+    one_chunk = Chunk(num_splits=0, split_index=0, content="This is the only chunk.")
+    assert _add_ellipses(one_chunk) == "This is the only chunk."
+
     first_chunk = Chunk(num_splits=3, split_index=0, content="This is the first chunk of 3.")
-    assert _add_ellipses(first_chunk).content == "This is the first chunk of 3..."
+    assert _add_ellipses(first_chunk) == "This is the first chunk of 3. ..."
 
     middle_chunk = Chunk(num_splits=3, split_index=2, content="This is a chunk in between.")
-    assert _add_ellipses(middle_chunk).content == "...This is a chunk in between..."
+    assert _add_ellipses(middle_chunk) == "... This is a chunk in between. ..."
 
     last_chunk = Chunk(num_splits=3, split_index=3, content="This is the last chunk.")
-    assert _add_ellipses(last_chunk).content == "...This is the last chunk."
+    assert _add_ellipses(last_chunk) == "... This is the last chunk."
 
     multiple_ellipses = Chunk(
         num_splits=3, split_index=0, content="This is a chunk with multiple ellipses......"
     )
-    assert _add_ellipses(multiple_ellipses).content == "This is a chunk with multiple ellipses..."
+    assert _add_ellipses(multiple_ellipses) == "This is a chunk with multiple ellipses...... ..."
