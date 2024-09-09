@@ -3,8 +3,9 @@ import re
 import pytest
 from sqlalchemy import delete
 
-from src.db.models.document import ChunkWithScore, Document
+from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.format import (
+    _add_ellipses,
     _format_to_accordion_html,
     _get_bem_url,
     _replace_bem_with_link,
@@ -143,3 +144,14 @@ def test__replace_bem_with_link():
         _replace_bem_with_link("This is not a valid case: BEM123.")
         == "This is not a valid case: BEM123."
     )
+
+
+def test__add_ellipses():
+    first_chunk = Chunk(num_splits=3, split_index=0, content="This is the first chunk of 3.")
+    assert _add_ellipses(first_chunk).content == "This is the first chunk of 3..."
+
+    middle_chunk = Chunk(num_splits=3, split_index=2, content="This is a chunk in between.")
+    assert _add_ellipses(middle_chunk).content == "...This is a chunk in between..."
+
+    last_chunk = Chunk(num_splits=3, split_index=3, content="This is the last chunk.")
+    assert _add_ellipses(last_chunk).content == "...This is the last chunk."

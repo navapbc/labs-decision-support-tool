@@ -3,7 +3,7 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
-from src.db.models.document import ChunkWithScore, Document
+from src.db.models.document import Chunk, ChunkWithScore, Document
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ def _get_bem_documents_to_show(
     # Ordered by the highest score of each chunk associated with the document
     documents: OrderedDict[Document, list[ChunkWithScore]] = OrderedDict()
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
+        chunk_with_score.chunk = _add_ellipses(chunk_with_score.chunk)
         document = chunk_with_score.chunk.document
         if chunk_with_score.score < chunks_shown_min_score:
             logger.info(
@@ -176,3 +177,15 @@ def _replace_bem_with_link(text: str) -> str:
         r'<a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/\2.pdf">\1</a>',
         text,
     )
+
+
+def _add_ellipses(chunk: Chunk) -> Chunk:
+    if chunk.num_splits != 0:
+        if chunk.split_index == 0:
+            chunk.content = f"{chunk.content}..."
+        elif chunk.split_index == chunk.num_splits:
+            chunk.content = f"...{chunk.content}"
+        else:
+            chunk.content = f"...{chunk.content}..."
+        chunk.content = re.sub(r"\.{4,}", "...", chunk.content)
+    return chunk
