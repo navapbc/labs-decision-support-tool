@@ -3,7 +3,7 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
-from src.db.models.document import ChunkWithScore, Document
+from src.db.models.document import Chunk, ChunkWithScore, Document
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,9 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
 
         for chunk_with_score in documents[document]:
             chunk = chunk_with_score.chunk
-            formatted_chunk = _replace_bem_with_link(chunk.content)
+
+            formatted_chunk = _add_ellipses(chunk)
+            formatted_chunk = _replace_bem_with_link(formatted_chunk)
 
             # Adjust markdown for lists so Chainlit renders correctly
             formatted_chunk = re.sub("^ - ", "- ", formatted_chunk, flags=re.MULTILINE)
@@ -176,3 +178,15 @@ def _replace_bem_with_link(text: str) -> str:
         r'<a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/\2.pdf">\1</a>',
         text,
     )
+
+
+def _add_ellipses(chunk: Chunk) -> str:
+    chunk_content = chunk.content
+    if chunk.num_splits != 0:
+        if chunk.split_index == 0:
+            return f"{chunk_content} ..."
+        elif chunk.split_index == chunk.num_splits:
+            return f"... {chunk_content}"
+        else:
+            return f"... {chunk_content} ..."
+    return chunk_content
