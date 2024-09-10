@@ -114,9 +114,9 @@ def test_generate(monkeypatch):
 def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
     context_text = (
-        f"Citation: chunk-0\nDocument name: {chunks_with_scores[0].chunk.document.name}\nContent: {chunks_with_scores[0].chunk.content}\n\n"
-        + f"Citation: chunk-1\nDocument name: {chunks_with_scores[1].chunk.document.name}\nContent: {chunks_with_scores[1].chunk.content}\n\n"
-        + f"Citation: chunk-2\nDocument name: {chunks_with_scores[2].chunk.document.name}\nContent: {chunks_with_scores[2].chunk.content}"
+        f"Citation: chunk-0\nDocument name: {chunks_with_scores[0].chunk.document.name}\nHeadings: {" > ".join(chunks_with_scores[0].chunk.headings)}\nContent: {chunks_with_scores[0].chunk.content}\n\n"
+        + f"Citation: chunk-1\nDocument name: {chunks_with_scores[1].chunk.document.name}\nHeadings: {" > ".join(chunks_with_scores[1].chunk.headings)}\nContent: {chunks_with_scores[1].chunk.content}\n\n"
+        + f"Citation: chunk-2\nDocument name: {chunks_with_scores[2].chunk.document.name}\nHeadings: {" > ".join(chunks_with_scores[2].chunk.headings)}\nContent: {chunks_with_scores[2].chunk.content}"
     )
     expected_response = (
         'Called gpt-4o with [{"content": "'

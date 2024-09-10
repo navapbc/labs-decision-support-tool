@@ -15,7 +15,7 @@ _footnote_index = 0
 def get_context_for_prompt(chunks: Sequence[ChunkWithScore]) -> str:
     return "\n\n".join(
         [
-            f"Citation: chunk-{index}\nDocument name: {chunk.chunk.document.name}\nContent: {chunk.chunk.content}"
+            f"Citation: chunk-{index}\nDocument name: {chunk.chunk.document.name}{"\nHeadings: " + " > ".join(chunk.chunk.headings) if chunk.chunk.headings else ""}\nContent: {chunk.chunk.content}"
             for index, chunk in enumerate(chunks)
         ]
     )
