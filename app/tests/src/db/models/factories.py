@@ -7,6 +7,7 @@ that are persisted to the database.
 The factories are based on the `factory_boy` library. See
 https://factoryboy.readthedocs.io/en/latest/ for more information.
 """
+
 from datetime import datetime
 from typing import Optional
 
@@ -84,6 +85,6 @@ class ChunkFactory(BaseFactory):
         lambda o: len(MockSentenceTransformer().tokenizer.tokenize(o.content))
     )
     mpnet_embedding = factory.LazyAttribute(lambda o: MockSentenceTransformer().encode(o.content))
-
+    headings = factory.Faker("text")
     num_splits = 1
     split_index = 0
