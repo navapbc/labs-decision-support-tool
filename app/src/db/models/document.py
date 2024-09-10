@@ -44,7 +44,7 @@ class Chunk(Base, IdMixin, TimestampMixin):
         comment="Page number of the chunk in the original document"
     )
     headings: Mapped[list[str] | None] = mapped_column(
-        comment="Flattened 'headings' data from grouped_texts"
+        comment="List of 'headings' from grouped_texts"
     )
     num_splits: Mapped[int] = mapped_column(
         default=1, comment="Number of chunks the original text was split into"

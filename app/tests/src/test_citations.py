@@ -12,7 +12,7 @@ def test_get_context_for_prompt():
     ]
     assert (
         get_context_for_prompt(chunks_with_score)
-        == f"Citation: chunk-0\nDocument name: {chunks_with_score[0].chunk.document.name}\nContent: {chunks_with_score[0].chunk.content}\nHeadings: {chunks_with_score[0].chunk.headings}\n\nCitation: chunk-1\nDocument name: {chunks_with_score[1].chunk.document.name}\nContent: {chunks_with_score[1].chunk.content}\nHeadings: {chunks_with_score[1].chunk.headings}"
+        == f"Citation: chunk-0\nDocument name: {chunks_with_score[0].chunk.document.name}\nHeadings: {" > ".join(chunks_with_score[0].chunk.headings)}\nContent: {chunks_with_score[0].chunk.content}\n\nCitation: chunk-1\nDocument name: {chunks_with_score[1].chunk.document.name}\nHeadings: {" > ".join(chunks_with_score[1].chunk.headings)}\nContent: {chunks_with_score[1].chunk.content}"
     )
 
 
