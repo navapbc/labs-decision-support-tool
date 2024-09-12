@@ -66,8 +66,8 @@ def mock_elements():
     ]
 
 
-def chunk_starting_with(chunks: list[Chunk], content: str):
-    return next(c for c in chunks if c.content.startswith(content))
+def chunk_matched(chunks: list[Chunk], content: str):
+    return next(c for c in chunks if content in c.content)
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
@@ -91,25 +91,27 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
     assert "In order to be eligible to bill and receive payments, child " in document.content
 
-    first_chunk = chunk_starting_with(
+    first_chunk = chunk_matched(
         document.chunks, "In order to be eligible to bill and receive payments, child"
     )
     assert first_chunk.headings == ["Overview"]
     assert first_chunk.page_number == 1
 
-    second_chunk = chunk_starting_with(
+    second_chunk = chunk_matched(
         document.chunks, "Rule violations include, but are not limited to:\n-"
     )
     assert second_chunk.headings == ["Rule Violations"]
     assert second_chunk.page_number == 1
 
-    third_chunk = chunk_starting_with(
+    in_second_chunk = chunk_matched(
         document.chunks, "Failure to maintain time and attendance records."
     )
-    assert third_chunk.headings == ["Rule Violations"]
-    assert third_chunk.page_number == 1
+    assert in_second_chunk.headings == ["Rule Violations"]
+    assert in_second_chunk.page_number == 1
 
-    list_type_chunk = chunk_starting_with(
+    assert second_chunk.content == in_second_chunk.content
+
+    list_type_chunk = chunk_matched(
         document.chunks,
         "The following are examples of IPVs:\n"
         "- Billing for children while they are in school.\n"
@@ -125,7 +127,7 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
     ]
     assert list_type_chunk.page_number == 2
 
-    bold_styled_chunk = chunk_starting_with(
+    bold_styled_chunk = chunk_matched(
         document.chunks,
         "Providers determined to have committed an IPV may serve the following penalties:\n"
         "- First occurrence - six month disqualification. The closure reason will be **CDC not eligible due to 6 month penalty period**.\n"
@@ -134,9 +136,7 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
     )
     assert bold_styled_chunk
 
-    title_chunk = chunk_starting_with(
-        document.chunks, "**CDC**\n\nThe Child Care and Development Block"
-    )
+    title_chunk = chunk_matched(document.chunks, "**CDC**\n\nThe Child Care and Development Block")
     assert title_chunk.headings == ["legal base"]
     assert title_chunk.page_number == 4
 
