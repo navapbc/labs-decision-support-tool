@@ -183,6 +183,9 @@ test-coverage-report: ## Open HTML test coverage report
 	$(PY_RUN_CMD) coverage html --directory .coverage_report
 	open .coverage_report/index.html
 
+test-coverage-xml-report: ## Generate test coverage report for adding to PR
+	$(PY_RUN_CMD) coverage xml -o coverage_report.xml
+
 ##################################################
 # Formatting and linting
 ##################################################
