@@ -3,6 +3,7 @@ import logging
 from src.ingestion.pdf_elements import EnrichedText, TextType
 from src.ingestion.pdf_stylings import Styling
 from src.util.string_utils import basic_ascii
+from copy import copy
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,35 @@ def _should_merge_text_split_across_pages(text: EnrichedText, next_text: Enriche
     return next_text.text.strip()[0].islower()
 
 
+def group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
+    grouped_texts_by_headings = []
+    first_paragraph = markdown_texts[0]
+    combined_text = ""
+    current_heading = first_paragraph.headings
+    page_num = first_paragraph.page_number
+    elem_type = first_paragraph.type
+    for ind, markdown_text in enumerate(markdown_texts):
+        flat_heading = " ".join([h.title for h in current_heading])
+        current_flat_heading = " ".join([h.title for h in markdown_texts[ind].headings])
+        if flat_heading == current_flat_heading:
+            combined_text += f"\n{markdown_texts[ind].text}"
+        else:
+            combined_enriched_text = copy(markdown_text)
+            combined_enriched_text.headings = current_heading
+            combined_enriched_text.page_number = page_num
+            combined_enriched_text.text = combined_text.strip()
+            combined_enriched_text.type = elem_type
+            grouped_texts_by_headings.append(combined_enriched_text)
+
+            combined_text = markdown_text.text
+            page_num = markdown_text.page_number
+            current_heading = markdown_text.headings
+            elem_type = markdown_text.type
+        if ind == (len(markdown_texts) - 1):
+            grouped_texts_by_headings.append(markdown_text)
+    return grouped_texts_by_headings
+
+
 def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     lists_merged = _group_list_texts(markdown_texts)
 
@@ -244,4 +274,5 @@ def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
 
         grouped_texts.append(e_text)
 
+    grouped_texts = group_headings_text(grouped_texts)
     return grouped_texts

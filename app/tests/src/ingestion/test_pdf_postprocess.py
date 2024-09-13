@@ -153,35 +153,8 @@ def test_concatenate_list_items():
 
     assert result == [
         EnrichedText(
-            text="Introduction.",
+            text="Introduction.\nFirst item.\nSecond item.\nAnother narrative text.\nNarrative starting a new list: \nFirst item in new list.\nSecond item in new list.",
             type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1, pageno=1)],
-            page_number=1,
-            id=None,
-            stylings=None,
-            links=None,
-        ),
-        EnrichedText(
-            text="First item.\nSecond item.",
-            type=TextType.LIST,
-            headings=[Heading(title="Overview", level=1, pageno=1)],
-            page_number=1,
-            id=None,
-            stylings=None,
-            links=None,
-        ),
-        EnrichedText(
-            text="Another narrative text.",
-            type=TextType.NARRATIVE_TEXT,
-            headings=[Heading(title="Overview", level=1, pageno=1)],
-            page_number=1,
-            id=None,
-            stylings=None,
-            links=None,
-        ),
-        EnrichedText(
-            text="Narrative starting a new list: \nFirst item in new list.\nSecond item in new list.",
-            type=TextType.LIST,
             headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,
             id=None,

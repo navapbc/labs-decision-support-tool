@@ -195,75 +195,42 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
     Given EnrichedTexts, convert the text to chunks and add them to the database.
     """
     chunks: list[Chunk] = []
-    first_paragraph = grouped_texts[0]
-    chunk_text = ""
-    current_heading = first_paragraph.headings
-    page_num = first_paragraph.page_number
-
-    for ind, paragraph in enumerate(grouped_texts):
+    for paragraph in grouped_texts:
         assert paragraph.id is not None
         assert paragraph.page_number is not None
-        flat_heading = " ".join([h.title for h in current_heading])
-        current_flat_heading = " ".join([h.title for h in grouped_texts[ind].headings])
-        if flat_heading == current_flat_heading:
-            chunk_text += f"\n{grouped_texts[ind].text}"
-        else:
-            splits = _calculate_splits(paragraph, chunk_text)
-            text_chunks = [
-                Chunk(
-                    document=document,
-                    content=chunk_text.strip(),
-                    page_number=page_num,
-                    headings=[h.title for h in current_heading],
-                    num_splits=len(splits),
-                    split_index=index,
-                )
-                for index, chunk_text in enumerate(splits)
-            ]
-            chunks += text_chunks
 
-            chunk_text = paragraph.text
-            page_num = grouped_texts[ind].page_number
-            current_heading = grouped_texts[ind].headings
-        if ind == (len(grouped_texts) - 1):
-            splits = _calculate_splits(paragraph, chunk_text)
-            final_text_chunk = [
-                Chunk(
-                    document=document,
-                    content=chunk_text.strip(),
-                    page_number=page_num,
-                    headings=[h.title for h in current_heading],
-                    num_splits=len(splits),
-                    split_index=index,
-                )
-                for index, chunk_text in enumerate(splits)
-            ]
-            chunks += final_text_chunk
+        embedding_model = app_config.sentence_transformer
+        token_count = len(embedding_model.tokenizer.tokenize(paragraph.text))
+        if token_count > embedding_model.max_seq_length:
+            # Split the text into chunks of approximately equal length by characters,
+            # which doesn't necessarily mean equal number of tokens, but close enough
+            num_of_splits = math.ceil(token_count / embedding_model.max_seq_length)
+            char_limit_per_split = math.ceil(len(paragraph.text) / num_of_splits)
+            if paragraph.type == TextType.LIST:
+                splits = split_list(paragraph.text, char_limit_per_split)
+            elif paragraph.type == TextType.NARRATIVE_TEXT:
+                splits = split_paragraph(paragraph.text, char_limit_per_split)
+            else:
+                raise ValueError(f"Unexpected element type: {paragraph.type}")
+            logger.info("Split long text into %i chunks: %s", len(splits), splits[0][:120])
+        else:
+            splits = [paragraph.text]
+
+        # Ignore empty splits
+        splits = [s for s in splits if s.strip()]
+        text_chunks = [
+            Chunk(
+                document=document,
+                content=chunk_text,
+                page_number=paragraph.page_number,
+                headings=[h.title for h in paragraph.headings],
+                num_splits=len(splits),
+                split_index=index,
+            )
+            for index, chunk_text in enumerate(splits)
+        ]
+        chunks += text_chunks
     return chunks
-
-
-def _calculate_splits(paragraph: EnrichedText, chunk_text: str) -> list[str]:
-    embedding_model = app_config.sentence_transformer
-    token_count = len(embedding_model.tokenizer.tokenize(chunk_text))
-
-    if token_count > embedding_model.max_seq_length:
-        # Split the text into chunks of approximately equal length by characters,
-        # which doesn't necessarily mean equal number of tokens, but close enough
-        num_of_splits = math.ceil(token_count / embedding_model.max_seq_length)
-        char_limit_per_split = math.ceil(len(chunk_text) / num_of_splits)
-        if paragraph.type == TextType.LIST:
-            splits = split_list(paragraph.text, char_limit_per_split)
-        elif paragraph.type == TextType.NARRATIVE_TEXT:
-            splits = split_paragraph(paragraph.text, char_limit_per_split)
-        else:
-            raise ValueError(f"Unexpected element type: {paragraph.type}")
-        logger.info("Split long text into %i chunks: %s", len(splits), splits[0][:120])
-    else:
-        splits = [chunk_text]
-
-    # Ignore empty splits
-    splits = [s for s in splits if s.strip()]
-    return splits
 
 
 def _add_embeddings(chunks: list[Chunk]) -> None:
