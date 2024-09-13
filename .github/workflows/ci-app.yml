@@ -48,4 +48,10 @@ jobs:
       - name: Start tests
         run: |
           make test-audit
-          make test-coverage
+          make test-coverage test-coverage-xml-report
+
+      - name: Post coverage report to PR
+        uses: orgoro/coverage@v3.2
+        with:
+            coverageFile: app/coverage_report.xml
+            token: ${{ secrets.GITHUB_TOKEN }}
