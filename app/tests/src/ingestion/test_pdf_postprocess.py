@@ -7,6 +7,7 @@ from src.ingestion.pdf_postprocess import (
     _add_link_markdown,
     _add_list_markdown,
     _apply_stylings,
+    _group_headings_text,
     add_markdown,
     associate_stylings,
     group_texts,
@@ -89,6 +90,79 @@ def test_single_narrative_text():
     result = group_texts(texts)
     # No change
     assert result == texts
+
+
+def test__group_headings_text():
+    texts = [
+        EnrichedText(
+            text="Following is a list:",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[Heading(title="Section 3", level=1)],
+            page_number=1,
+            links=None,
+        ),
+        EnrichedText(
+            text="- First [item](http://www.michigan.gov).",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1), Heading(title="Section 4", level=2)],
+            page_number=1,
+            links=None,
+        ),
+        EnrichedText(
+            text="- **Second item**.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1), Heading(title="Section 4", level=2)],
+            page_number=2,
+            stylings=None,
+        ),
+        EnrichedText(
+            text="- **First item in new section**.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1), Heading(title="Section 5", level=2)],
+            page_number=2,
+            stylings=None,
+        ),
+        EnrichedText(
+            text="Other list item in section 3.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1)],
+            page_number=1,
+            links=None,
+        ),
+    ]
+
+    assert _group_headings_text(texts) == [
+        EnrichedText(
+            text="Following is a list:\nOther list item in section 3.",
+            type=TextType.NARRATIVE_TEXT,
+            headings=[Heading(title="Section 3", level=1, pageno=None)],
+            page_number=1,
+            id=None,
+            stylings=None,
+            links=None,
+        ),
+        EnrichedText(
+            text="- First [item](http://www.michigan.gov).\n- **Second item**.",
+            type=TextType.LIST_ITEM,
+            headings=[
+                Heading(title="Section 3", level=1, pageno=None),
+                Heading(title="Section 4", level=2, pageno=None),
+            ],
+            page_number=1,
+            id=None,
+            stylings=None,
+            links=None,
+        ),
+        EnrichedText(
+            text="Other list item in section 3.",
+            type=TextType.LIST_ITEM,
+            headings=[Heading(title="Section 3", level=1, pageno=None)],
+            page_number=1,
+            id=None,
+            stylings=None,
+            links=None,
+        ),
+    ]
 
 
 def test_concatenate_list_items():
