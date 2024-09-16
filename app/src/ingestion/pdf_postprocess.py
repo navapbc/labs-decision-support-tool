@@ -239,16 +239,19 @@ def _group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedTex
     elem_type = first_paragraph.type
     headings_processed: list[str] = []
     for ind, markdown_text in enumerate(markdown_texts):
+        # checks if the heading names have appeared in previous enriched text items
         flat_heading = " ".join([h.title for h in current_heading])
         current_flat_heading = " ".join([h.title for h in markdown_texts[ind].headings])
-        found_prev_heading = _find_heading_index(headings_processed, current_flat_heading)
+        prev_heading_index = _find_heading_index(headings_processed, current_flat_heading)
+        # if the prev heading is the same as the next heading add the text to combined text
         if flat_heading == current_flat_heading:
             combined_text += f"\n{markdown_texts[ind].text}"
         else:
-            # only concat the first heading text found if there's a match
-            if found_prev_heading > -1:
+            # if a heading already exists in the processed list
+            # modify the original object with that heading
+            if prev_heading_index > -1:
                 grouped_texts_by_headings[
-                    found_prev_heading
+                    prev_heading_index
                 ].text += f"\n{markdown_texts[ind].text}"
             else:
                 grouped_texts_by_headings.append(
@@ -266,13 +269,15 @@ def _group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedTex
                 current_heading = markdown_text.headings
                 elem_type = markdown_text.type
                 headings_processed.append(flat_heading)
-        if ind == (len(markdown_texts) - 1):
-            if found_prev_heading > 0:
-                grouped_texts_by_headings[
-                    found_prev_heading
-                ].text += f"\n{markdown_texts[ind].text}"
-            else:
-                grouped_texts_by_headings.append(markdown_text)
+    # for the last index, check if the heading already exists
+    # since it could've passed the combined text condition
+    # which skips over the condition adding it to grouped_texts_by_headings
+    if prev_heading_index > 0:
+        grouped_texts_by_headings[
+            prev_heading_index
+        ].text += f"\n{markdown_texts[len(markdown_texts) - 1].text}"
+    else:
+        grouped_texts_by_headings.append(markdown_texts[len(markdown_texts) - 1])
     return grouped_texts_by_headings
 
 
