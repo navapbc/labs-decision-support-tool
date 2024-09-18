@@ -123,7 +123,7 @@ def test__group_headings_text():
             stylings=None,
         ),
         EnrichedText(
-            text="Other list item in section 3.",
+            text="- Other list item in section 3.",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1)],
             page_number=1,
@@ -133,7 +133,7 @@ def test__group_headings_text():
 
     assert _group_headings_text(texts) == [
         EnrichedText(
-            text="Following is a list:\nOther list item in section 3.",
+            text="Following is a list:\n- Other list item in section 3.",
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="Section 3", level=1, pageno=None)],
             page_number=1,
