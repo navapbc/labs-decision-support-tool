@@ -230,14 +230,16 @@ def _find_heading_index(heading_list: list[str], heading_text: str) -> int:
         return -1
 
 
+NestedHeadingTitles = list[str]
+
+
 def _group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     grouped_texts_by_headings: list[EnrichedText] = []
-    first_paragraph = markdown_texts[0]
     combined_text = ""
-    current_heading = first_paragraph.headings
-    page_num = first_paragraph.page_number
-    elem_type = first_paragraph.type
-    headings_processed: list[str] = []
+    current_heading = markdown_texts[0].headings
+    page_num = markdown_texts[0].page_number
+    elem_type = markdown_texts[0].type
+    headings_processed: list[NestedHeadingTitles] = []
     for ind, markdown_text in enumerate(markdown_texts):
         # checks if the heading names have appeared in previous enriched text items
         flat_heading = " ".join([h.title for h in current_heading])
