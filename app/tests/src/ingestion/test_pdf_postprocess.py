@@ -154,13 +154,11 @@ def test__group_headings_text():
             links=None,
         ),
         EnrichedText(
-            text="Other list item in section 3.",
+            text="- **First item in new section**.",
             type=TextType.LIST_ITEM,
-            headings=[Heading(title="Section 3", level=1, pageno=None)],
-            page_number=1,
-            id=None,
+            headings=[Heading(title="Section 3", level=1), Heading(title="Section 5", level=2)],
+            page_number=2,
             stylings=None,
-            links=None,
         ),
     ]
 

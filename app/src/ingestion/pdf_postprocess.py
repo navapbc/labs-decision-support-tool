@@ -223,64 +223,29 @@ def _should_merge_text_split_across_pages(text: EnrichedText, next_text: Enriche
     return next_text.text.strip()[0].islower()
 
 
-def _find_heading_index(heading_list: list[str], heading_text: str) -> int:
-    try:
-        return heading_list.index(heading_text)
-    except ValueError:
-        return -1
-
-
-NestedHeadingTitles = list[str]
+NestedHeadingTitles = tuple[str, ...]
 
 
 def _group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
-    grouped_texts_by_headings: list[EnrichedText] = []
-    combined_text = ""
-    current_heading = markdown_texts[0].headings
-    page_num = markdown_texts[0].page_number
-    elem_type = markdown_texts[0].type
-    headings_processed: list[NestedHeadingTitles] = []
+    grouped_texts_by_headings: dict[NestedHeadingTitles, EnrichedText] = {}
     for ind, markdown_text in enumerate(markdown_texts):
-        # checks if the heading names have appeared in previous enriched text items
-        flat_heading = " ".join([h.title for h in current_heading])
-        current_flat_heading = " ".join([h.title for h in markdown_texts[ind].headings])
-        prev_heading_index = _find_heading_index(headings_processed, current_flat_heading)
-        # if the prev heading is the same as the next heading add the text to combined text
-        if flat_heading == current_flat_heading:
-            combined_text += f"\n{markdown_texts[ind].text}"
+        text_nested_headings: NestedHeadingTitles = tuple(
+            [h.title for h in markdown_texts[ind].headings]
+        )
+        if text_nested_headings in grouped_texts_by_headings:
+            grouped_texts_by_headings[text_nested_headings].text += f"\n{markdown_texts[ind].text}"
         else:
-            # if a heading already exists in the processed list
-            # modify the original object with that heading
-            if prev_heading_index > -1:
-                grouped_texts_by_headings[
-                    prev_heading_index
-                ].text += f"\n{markdown_texts[ind].text}"
-            else:
-                grouped_texts_by_headings.append(
-                    EnrichedText(
-                        text=combined_text.strip(),
-                        type=elem_type,
-                        headings=current_heading,
-                        page_number=page_num,
-                        stylings=markdown_text.stylings,
-                        links=markdown_text.links,
-                    )
-                )
-                combined_text = markdown_text.text
-                page_num = markdown_text.page_number
-                current_heading = markdown_text.headings
-                elem_type = markdown_text.type
-                headings_processed.append(flat_heading)
-    # for the last index, check if the heading already exists
-    # since it could've passed the combined text condition
-    # which skips over the condition adding it to grouped_texts_by_headings
-    if prev_heading_index > 0:
-        grouped_texts_by_headings[
-            prev_heading_index
-        ].text += f"\n{markdown_texts[len(markdown_texts) - 1].text}"
-    else:
-        grouped_texts_by_headings.append(markdown_texts[len(markdown_texts) - 1])
-    return grouped_texts_by_headings
+            grouped_texts_by_headings[text_nested_headings] = EnrichedText(
+                text=markdown_text.text,
+                type=markdown_text.type,
+                headings=markdown_text.headings,
+                page_number=markdown_text.page_number,
+                stylings=markdown_text.stylings,
+                links=markdown_text.links,
+            )
+
+    # As of Python 3.7, dictionaries maintain insertion order
+    return list(grouped_texts_by_headings.values())
 
 
 def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
