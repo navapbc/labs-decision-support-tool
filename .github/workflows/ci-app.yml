@@ -53,5 +53,6 @@ jobs:
       - name: Post coverage report to PR
         uses: orgoro/coverage@v3.2
         with:
-            coverageFile: app/coverage_report.xml
-            token: ${{ secrets.GITHUB_TOKEN }}
+          sourceDir: app
+          coverageFile: app/coverage_report.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
