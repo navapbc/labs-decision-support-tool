@@ -102,18 +102,11 @@ def test__group_headings_text():
             links=None,
         ),
         EnrichedText(
-            text="- First [item](http://www.michigan.gov).",
+            text="- First [item](http://www.michigan.gov).\n- **Second item**.",
             type=TextType.LIST_ITEM,
             headings=[Heading(title="Section 3", level=1), Heading(title="Section 4", level=2)],
             page_number=1,
             links=None,
-        ),
-        EnrichedText(
-            text="- **Second item**.",
-            type=TextType.LIST_ITEM,
-            headings=[Heading(title="Section 3", level=1), Heading(title="Section 4", level=2)],
-            page_number=2,
-            stylings=None,
         ),
         EnrichedText(
             text="- **First item in new section**.",
@@ -133,7 +126,7 @@ def test__group_headings_text():
 
     assert _group_headings_text(texts) == [
         EnrichedText(
-            text="Following is a list:\n- Other list item in section 3.",
+            text="Following is a list:\n\n- Other list item in section 3.",
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="Section 3", level=1, pageno=None)],
             page_number=1,
@@ -225,7 +218,7 @@ def test_concatenate_list_items():
 
     assert result == [
         EnrichedText(
-            text="Introduction.\nFirst item.\nSecond item.\nAnother narrative text.\nNarrative starting a new list: \nFirst item in new list.\nSecond item in new list.",
+            text="Introduction.\n\nFirst item.\nSecond item.\n\nAnother narrative text.\n\nNarrative starting a new list: \nFirst item in new list.\nSecond item in new list.",
             type=TextType.NARRATIVE_TEXT,
             headings=[Heading(title="Overview", level=1, pageno=1)],
             page_number=1,

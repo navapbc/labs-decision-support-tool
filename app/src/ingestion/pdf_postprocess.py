@@ -233,7 +233,9 @@ def _group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedTex
             [h.title for h in markdown_texts[ind].headings]
         )
         if text_nested_headings in grouped_texts_by_headings:
-            grouped_texts_by_headings[text_nested_headings].text += f"\n{markdown_texts[ind].text}"
+            grouped_texts_by_headings[
+                text_nested_headings
+            ].text += f"\n\n{markdown_texts[ind].text}"
         else:
             grouped_texts_by_headings[text_nested_headings] = EnrichedText(
                 text=markdown_text.text,
