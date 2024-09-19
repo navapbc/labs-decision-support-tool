@@ -39,9 +39,10 @@ def get_context_for_prompt(chunks: Sequence[Chunk]) -> str:
 
 def get_citation_numbers(context: list[ChunkWithSubsection], response: str) -> list[ChunkWithSubsection]:
     """
-    Map (citation-<index>) in response, which the index in `context` to a user-friendly citation number.
+    Map (citation-<index>) in `response`, where index is the index in `context`, 
+    to a user-friendly citation number.
     The user friendly citation number is the index of the entry in the returned list, plus one.
-    E.g., if `context` is a list with five entries, and response is a string like
+    E.g., if `context` is a list with five entries, and `response` is a string like
     "Example (citation-3)(citation-1), another example (citation-1).", then this function will return
     [context[3], [context[1]]; citations referencing context[3] should be shown to the user as "1" and
     citations referencing context[1] should be shown as "2".
