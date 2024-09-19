@@ -5,7 +5,7 @@ from typing import Any, Sequence
 from litellm import completion
 
 from src.citations import get_context_for_prompt
-from src.db.models.document import ChunkWithScore
+from src.db.models.document import Chunk
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +14,14 @@ Use bullet points. Keep your answers brief, max of 5 sentences.
 Keep your answers as similar to your knowledge text as you can
 
 When referencing the context, do not quote directly.
-Use the provided citation numbers (e.g., (chunk-0)) to indicate when you are drawing from the context.
-Do cite multiple sources at once, you can append citations like so: (chunk-0)(chunk-1), etc.
+Use the provided citation numbers (e.g., (citation-0)) to indicate when you are drawing from the context.
+Do cite multiple sources at once, you can append citations like so: (citation-0)(citation-1), etc.
 Place the citations after any closing punctuation for the sentence.
-For example: 'This is a sentence that draws on information from the context.(chunk-0)'
+For example: 'This is a sentence that draws on information from the context.(citation-0)'
 
 Example Answer:
 If the client and their roommate purchase and prepare food separately, they can be considered different SNAP (FAP) groups. For instance:
-- They can be classified as different SNAP (FAP) groups if they purchase and prepare food separately.(chunk-1)(chunk-3)
+- They can be classified as different SNAP (FAP) groups if they purchase and prepare food separately.(citation-1)(citation-3)
 """
 
 
@@ -51,7 +51,7 @@ def get_models() -> dict[str, str]:
 def generate(
     llm: str,
     query: str,
-    context: Sequence[ChunkWithScore] | None = None,
+    context: Sequence[Chunk] | None = None,
 ) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
