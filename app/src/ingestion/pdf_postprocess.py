@@ -222,14 +222,14 @@ NestedHeadingTitles = tuple[str, ...]
 
 def _group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     grouped_texts_by_headings: dict[NestedHeadingTitles, EnrichedText] = {}
-    for ind, markdown_text in enumerate(markdown_texts):
-        text_nested_headings: NestedHeadingTitles = tuple(
-            [h.title for h in markdown_texts[ind].headings]
-        )
+    for markdown_text in markdown_texts:
+        text_nested_headings: NestedHeadingTitles = tuple([h.title for h in markdown_text.headings])
         if text_nested_headings in grouped_texts_by_headings:
-            grouped_texts_by_headings[
-                text_nested_headings
-            ].text += f"\n\n{markdown_texts[ind].text}"
+            grouped_texts_by_headings[text_nested_headings].text += f"\n\n{markdown_text.text}"
+
+            # Grouping any text with a NarrativeText type makes the whole group a NarrativeText type
+            if markdown_text.type == TextType.NARRATIVE_TEXT:
+                grouped_texts_by_headings[text_nested_headings].type = markdown_text.type
         else:
             grouped_texts_by_headings[text_nested_headings] = EnrichedText(
                 text=markdown_text.text,
