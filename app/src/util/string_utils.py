@@ -89,13 +89,14 @@ def _join_up_to(lines: list[str], char_limit: int, delimiter: str = " ") -> list
         test_chunk = delimiter.join([chunk, line]) if chunk else line
         if len(test_chunk) > char_limit:
             # Don't use test_chunk; start a new chunk
-            chunks.append(chunk)
+            if chunk:
+                chunks.append(chunk)
             if len(line) < char_limit:
                 chunk = line
             else:
                 # Split into phrases; could use spacy instead for more robust splitting
-                words = re.split(r"([,;])", line)
-                logger.warning("Splitting sentence: %s", line)
+                words = re.split(r"([,;\n])", line)
+                logger.warning("Splitting sentence: %s", line[:120])
 
                 chunks += _join_up_to(words, char_limit=char_limit, delimiter="")
                 # Start new empty chunk
