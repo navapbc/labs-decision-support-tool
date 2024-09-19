@@ -204,9 +204,9 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
         if token_count > embedding_model.max_seq_length:
             # Split the text into chunks of approximately equal length by characters,
             # which doesn't necessarily mean equal number of tokens, but close enough.
-            # The arbitrary 1.2 tolerance factor tries to account for higher token counts per chunk when text is split.
-            num_of_splits = math.ceil((token_count * 1.2) / embedding_model.max_seq_length)
-            char_limit_per_split = math.ceil((len(paragraph.text)) / num_of_splits)
+            # The arbitrary 1.5 tolerance factor tries to account for higher token counts per chunk when text is split.
+            num_of_splits = math.ceil((token_count * 1.5) / embedding_model.max_seq_length)
+            char_limit_per_split = math.ceil(len(paragraph.text) / num_of_splits)
             if paragraph.type == TextType.LIST:
                 splits = split_list(paragraph.text, char_limit_per_split)
             elif paragraph.type == TextType.NARRATIVE_TEXT:
@@ -217,12 +217,14 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
             else:
                 raise ValueError(f"Unexpected element type: {paragraph.type}: {paragraph.text}")
             logger.info(
-                "Split long text with length %i into %i chunks with %i char limit: %s ...",
+                "Split long text with length %i into %i chunks with %i char limit: [%s]: %s ...",
                 len(paragraph.text),
                 len(splits),
                 char_limit_per_split,
+                ",".join([str(len(split)) for split in splits]),
                 splits[0][:120],
             )
+
         else:
             splits = [paragraph.text]
 
@@ -257,7 +259,7 @@ def _add_embeddings(chunks: list[Chunk]) -> None:
         chunk.tokens = len(embedding_model.tokenizer.tokenize(chunk.content))
         assert (
             chunk.tokens <= embedding_model.max_seq_length
-        ), "Text too long for embedding model: {chunk.content[:100]}"
+        ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:100]} ..."
 
 
 def _save_json(file_path: str, chunks: list[Chunk]) -> None:
