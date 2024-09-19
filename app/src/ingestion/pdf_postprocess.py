@@ -164,13 +164,7 @@ def _should_merge_list_text(text: EnrichedText, next_text: EnrichedText) -> bool
     if text.headings != next_text.headings:
         return False
 
-    if next_text.type != TextType.LIST_ITEM:
-        return False
-
-    if text.type in [TextType.LIST_ITEM, TextType.LIST]:
-        return True
-
-    return text.type == TextType.NARRATIVE_TEXT and text.text.rstrip().endswith(":")
+    return next_text.type == TextType.LIST_ITEM
 
 
 def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:

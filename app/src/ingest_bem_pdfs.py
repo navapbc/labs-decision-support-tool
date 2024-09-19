@@ -203,16 +203,26 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
         token_count = len(embedding_model.tokenizer.tokenize(paragraph.text))
         if token_count > embedding_model.max_seq_length:
             # Split the text into chunks of approximately equal length by characters,
-            # which doesn't necessarily mean equal number of tokens, but close enough
-            num_of_splits = math.ceil(token_count / embedding_model.max_seq_length)
-            char_limit_per_split = math.ceil(len(paragraph.text) / num_of_splits)
+            # which doesn't necessarily mean equal number of tokens, but close enough.
+            # The arbitrary 1.2 tolerance factor tries to account for higher token counts per chunk when text is split.
+            num_of_splits = math.ceil((token_count * 1.2) / embedding_model.max_seq_length)
+            char_limit_per_split = math.ceil((len(paragraph.text)) / num_of_splits)
             if paragraph.type == TextType.LIST:
                 splits = split_list(paragraph.text, char_limit_per_split)
             elif paragraph.type == TextType.NARRATIVE_TEXT:
                 splits = split_paragraph(paragraph.text, char_limit_per_split)
+            elif paragraph.type == TextType.LIST_ITEM:
+                # 233B.pdf: bottom of page 7: list item has no introductory sentence
+                splits = split_list(paragraph.text, char_limit_per_split, has_intro_sentence=False)
             else:
-                raise ValueError(f"Unexpected element type: {paragraph.type}")
-            logger.info("Split long text into %i chunks: %s", len(splits), splits[0][:120])
+                raise ValueError(f"Unexpected element type: {paragraph.type}: {paragraph.text}")
+            logger.info(
+                "Split long text with length %i into %i chunks with %i char limit: %s ...",
+                len(paragraph.text),
+                len(splits),
+                char_limit_per_split,
+                splits[0][:120],
+            )
         else:
             splits = [paragraph.text]
 
