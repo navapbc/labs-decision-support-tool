@@ -223,6 +223,33 @@ def _should_merge_text_split_across_pages(text: EnrichedText, next_text: Enriche
     return next_text.text.strip()[0].islower()
 
 
+NestedHeadingTitles = tuple[str, ...]
+
+
+def _group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
+    grouped_texts_by_headings: dict[NestedHeadingTitles, EnrichedText] = {}
+    for ind, markdown_text in enumerate(markdown_texts):
+        text_nested_headings: NestedHeadingTitles = tuple(
+            [h.title for h in markdown_texts[ind].headings]
+        )
+        if text_nested_headings in grouped_texts_by_headings:
+            grouped_texts_by_headings[
+                text_nested_headings
+            ].text += f"\n\n{markdown_texts[ind].text}"
+        else:
+            grouped_texts_by_headings[text_nested_headings] = EnrichedText(
+                text=markdown_text.text,
+                type=markdown_text.type,
+                headings=markdown_text.headings,
+                page_number=markdown_text.page_number,
+                stylings=markdown_text.stylings,
+                links=markdown_text.links,
+            )
+
+    # As of Python 3.7, dictionaries maintain insertion order
+    return list(grouped_texts_by_headings.values())
+
+
 def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     lists_merged = _group_list_texts(markdown_texts)
 
@@ -244,4 +271,5 @@ def group_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
 
         grouped_texts.append(e_text)
 
+    grouped_texts = _group_headings_text(grouped_texts)
     return grouped_texts
