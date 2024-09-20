@@ -3,7 +3,7 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
-from src.citations import _get_context, add_citations, get_citation_numbers
+from src.citations import add_citations, get_citation_numbers, get_context
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
@@ -79,7 +79,7 @@ def format_bem_subsections(
     chunks = [c.chunk for c in chunks_with_scores]
     response_with_citations = add_citations(raw_response, chunks)
 
-    context = _get_context(chunks)
+    context = get_context(chunks)
     citation_numbers = get_citation_numbers(context, raw_response)
 
     citations_html = ""
@@ -107,8 +107,7 @@ def format_bem_subsections(
                     type="button"
                     class="usa-accordion__button"
                     aria-expanded="false"
-                    aria-controls="a-{_accordion_id}"
-                    >
+                    aria-controls="a-{_accordion_id}">
                     {citation_number}. {chunk.document.name}
                 </button>
             </h4>

@@ -14,26 +14,31 @@ _footnote_index = 0
 CITATION_PATTERN = r"\(citation-(\d+)\)"
 
 
-def _get_context(chunks: Sequence[Chunk]) -> Sequence[ChunkWithSubsection]:
+def get_context(chunks: Sequence[Chunk], delimiter: str = "\n\n") -> Sequence[ChunkWithSubsection]:
     # Given a list of chunks, split them into a flat list of subsections
     context_mapping = []
 
     for chunk in chunks:
-        for subsection in chunk.content.split("\n\n"):
+        for subsection in chunk.content.split(delimiter):
             context_mapping.append(ChunkWithSubsection(chunk, subsection))
 
     return context_mapping
 
 
 def get_context_for_prompt(chunks: Sequence[Chunk]) -> str:
-    context = _get_context(chunks)
+    context = get_context(chunks)
 
     context_list = []
     for index, chunk_with_subsection in enumerate(context):
 
+        if chunk_with_subsection.chunk.headings:
+            headings_text = "Headings: " + " > ".join(chunk_with_subsection.chunk.headings) + "\n"
+        else:
+            headings_text = ""
+
         context_text = "Citation: citation-" + str(index) + "\n"
         context_text += "Document name: " + chunk_with_subsection.chunk.document.name + "\n"
-        context_text += "Headings: " + " > ".join(chunk_with_subsection.chunk.headings) + "\n"
+        context_text += headings_text
         context_text += "Content: " + chunk_with_subsection.subsection
 
         context_list.append(context_text)
@@ -73,7 +78,7 @@ def add_citations(response: str, chunks: list[Chunk]) -> str:
     global _footnote_id
     _footnote_id += 1
 
-    context = _get_context(chunks)
+    context = get_context(chunks)
     citation_numbers = get_citation_numbers(context, response)
 
     footnote_list = []

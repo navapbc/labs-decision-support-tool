@@ -1,6 +1,5 @@
 import re
 
-import pytest
 from sqlalchemy import delete
 
 from src.db.models.document import Chunk, ChunkWithScore, Document
@@ -8,6 +7,7 @@ from src.format import (
     _add_ellipses,
     _format_to_accordion_html,
     format_bem_documents,
+    format_bem_subsections,
     format_guru_cards,
 )
 from src.retrieve import retrieve_with_scores
@@ -138,3 +138,18 @@ def test__add_ellipses():
         num_splits=3, split_index=0, content="This is a chunk with multiple ellipses......"
     )
     assert _add_ellipses(multiple_ellipses) == "This is a chunk with multiple ellipses...... ..."
+
+
+def test_format_bem_subsections(chunks_with_scores):
+    assert format_bem_subsections(0, 0, chunks_with_scores, "") == ""
+    assert (
+        format_bem_subsections(0, 0, [], "Non-existant citation: (citation-0)")
+        == "Non-existant citation: (citation-0)"
+    )
+
+    chunks_with_scores[0].chunk.document.name = "BEM 100: Intro"
+    chunks_with_scores[1].chunk.document.name = "BEM 101: Another"
+    html = format_bem_subsections(
+        0, 0, chunks_with_scores, "Some real citations: (citation-0) (citation-1)"
+    )
+    assert len(_unique_accordion_ids(html)) == 2
