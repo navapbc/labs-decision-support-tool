@@ -31,7 +31,10 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
     chunks_with_scores = _get_chunks_with_scores()
     html = format_guru_cards(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.0, chunks_with_scores=chunks_with_scores, raw_response=""
+        chunks_shown_max_num=2,
+        chunks_shown_min_score=0.0,
+        chunks_with_scores=chunks_with_scores,
+        raw_response="",
     )
     assert len(_unique_accordion_ids(html)) == len(chunks_with_scores)
     assert "Related Guru cards" in html
@@ -43,14 +46,20 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
     # Check that a second call doesn't re-use the IDs
     next_html = format_guru_cards(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.0, chunks_with_scores=chunks_with_scores, raw_response=""
+        chunks_shown_max_num=2,
+        chunks_shown_min_score=0.0,
+        chunks_with_scores=chunks_with_scores,
+        raw_response="",
     )
     assert len(_unique_accordion_ids(html + next_html)) == 2 * len(chunks_with_scores)
 
 
 def test_format_guru_cards_given_chunks_shown_max_num(chunks_with_scores):
     html = format_guru_cards(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.8, chunks_with_scores=chunks_with_scores, raw_response=""
+        chunks_shown_max_num=2,
+        chunks_shown_min_score=0.8,
+        chunks_with_scores=chunks_with_scores,
+        raw_response="",
     )
     assert len(_unique_accordion_ids(html)) == 2
 
@@ -59,7 +68,8 @@ def test_format_guru_cards_given_chunks_shown_max_num_and_min_score(chunks_with_
     html = format_guru_cards(
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.91,
-        chunks_with_scores=chunks_with_scores, raw_response=""
+        chunks_with_scores=chunks_with_scores,
+        raw_response="",
     )
     assert len(_unique_accordion_ids(html)) == 1
 
@@ -98,7 +108,10 @@ def test_format_bem_documents():
     ]
 
     html = format_bem_documents(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.91, chunks_with_scores=chunks_with_scores, raw_response=""
+        chunks_shown_max_num=2,
+        chunks_shown_min_score=0.91,
+        chunks_with_scores=chunks_with_scores,
+        raw_response="",
     )
 
     assert docs[0].content not in html

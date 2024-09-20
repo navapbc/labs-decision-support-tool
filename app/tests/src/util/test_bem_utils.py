@@ -1,4 +1,5 @@
 import pytest
+
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
 
