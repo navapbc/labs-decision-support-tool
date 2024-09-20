@@ -1,7 +1,6 @@
 # Regular expression to match BEM followed by 3 digits, optionally followed by a letter
 import re
 
-
 BEM_PATTERN = r"(BEM\s(\d{3}[A-Z]?))"
 
 

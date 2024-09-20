@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
-from src.citations import add_citations
 from src.db.models.document import ChunkWithScore
 from src.format import format_bem_subsections, format_guru_cards
 from src.generate import generate
@@ -89,8 +88,7 @@ class BaseEngine(ChatEngineInterface):
 
         chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
         response = generate(self.llm, question, context=chunks)
-        response_with_citations = add_citations(response, chunks)
-        return OnMessageResult(response_with_citations, chunks_with_scores)
+        return OnMessageResult(response, chunks_with_scores)
 
 
 class GuruMultiprogramEngine(BaseEngine):

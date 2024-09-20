@@ -3,9 +3,9 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
-from src.util.bem_util import get_bem_url, replace_bem_with_link
-from src.citations import _get_context, get_citation_numbers
+from src.citations import _get_context, add_citations, get_citation_numbers
 from src.db.models.document import Chunk, ChunkWithScore, Document
+from src.util.bem_util import get_bem_url, replace_bem_with_link
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +19,12 @@ def format_guru_cards(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
-    response: str,
+    raw_response: str,
 ) -> str:
+
+    chunks = [c.chunk for c in chunks_with_scores]
+    response_with_citations = add_citations(raw_response, chunks)
+
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
         document = chunk_with_score.chunk.document
@@ -32,7 +36,8 @@ def format_guru_cards(
             )
             continue
         cards_html += _format_to_accordion_html(document=document, score=chunk_with_score.score)
-    return "<h3>Related Guru cards</h3>" + cards_html
+
+    return response_with_citations + "<h3>Related Guru cards</h3>" + cards_html
 
 
 def _get_bem_documents_to_show(
@@ -67,15 +72,19 @@ def format_bem_subsections(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
-    response: str,
+    raw_response: str,
 ) -> str:
     global _accordion_id
-    _accordion_id += 1
 
-    context = _get_context([chunk for chunk, _ in chunks_with_scores])
-    citations = get_citation_numbers(context, response)
+    chunks = [c.chunk for c in chunks_with_scores]
+    response_with_citations = add_citations(raw_response, chunks)
+
+    context = _get_context(chunks)
+    citation_numbers = get_citation_numbers(context, raw_response)
+
     citations_html = ""
-    for citation_number, citation in enumerate(citations, start=1):
+    for citation_number, citation in enumerate(citation_numbers, start=1):
+        _accordion_id += 1
         chunk = citation.chunk
         subsection = citation.subsection
 
@@ -87,11 +96,10 @@ def format_bem_subsections(
         citation_headings = "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
         citation_body = f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>'
         citation_link = (
-            (
-                f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
-            )
+            (f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>")
             if chunk.page_number
-            else "")
+            else ""
+        )
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -111,19 +119,23 @@ def format_bem_subsections(
             </div>
         </div>"""
 
-    return citations_html
+    return response_with_citations + citations_html
+
 
 def format_bem_documents(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
-    response: str,
+    raw_response: str,
 ) -> str:
+    chunks = [c.chunk for c in chunks_with_scores]
+    response_with_citations = add_citations(raw_response, chunks)
+
     documents = _get_bem_documents_to_show(
-        chunks_shown_max_num, chunks_shown_min_score, chunks_with_scores
+        chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
     )
 
-    return _format_to_accordion_group_html(documents)
+    return response_with_citations + _format_to_accordion_group_html(documents)
 
 
 def _format_to_accordion_html(document: Document, score: float) -> str:
