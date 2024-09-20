@@ -7,8 +7,6 @@ from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.format import (
     _add_ellipses,
     _format_to_accordion_html,
-    _get_bem_url,
-    _replace_bem_with_link,
     format_bem_documents,
     format_guru_cards,
 )
@@ -33,7 +31,7 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
     chunks_with_scores = _get_chunks_with_scores()
     html = format_guru_cards(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.0, chunks_with_scores=chunks_with_scores
+        chunks_shown_max_num=2, chunks_shown_min_score=0.0, chunks_with_scores=chunks_with_scores, raw_response=""
     )
     assert len(_unique_accordion_ids(html)) == len(chunks_with_scores)
     assert "Related Guru cards" in html
@@ -45,14 +43,14 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
     # Check that a second call doesn't re-use the IDs
     next_html = format_guru_cards(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.0, chunks_with_scores=chunks_with_scores
+        chunks_shown_max_num=2, chunks_shown_min_score=0.0, chunks_with_scores=chunks_with_scores, raw_response=""
     )
     assert len(_unique_accordion_ids(html + next_html)) == 2 * len(chunks_with_scores)
 
 
 def test_format_guru_cards_given_chunks_shown_max_num(chunks_with_scores):
     html = format_guru_cards(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.8, chunks_with_scores=chunks_with_scores
+        chunks_shown_max_num=2, chunks_shown_min_score=0.8, chunks_with_scores=chunks_with_scores, raw_response=""
     )
     assert len(_unique_accordion_ids(html)) == 2
 
@@ -61,7 +59,7 @@ def test_format_guru_cards_given_chunks_shown_max_num_and_min_score(chunks_with_
     html = format_guru_cards(
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.91,
-        chunks_with_scores=chunks_with_scores,
+        chunks_with_scores=chunks_with_scores, raw_response=""
     )
     assert len(_unique_accordion_ids(html)) == 1
 
@@ -100,7 +98,7 @@ def test_format_bem_documents():
     ]
 
     html = format_bem_documents(
-        chunks_shown_max_num=2, chunks_shown_min_score=0.91, chunks_with_scores=chunks_with_scores
+        chunks_shown_max_num=2, chunks_shown_min_score=0.91, chunks_with_scores=chunks_with_scores, raw_response=""
     )
 
     assert docs[0].content not in html
@@ -108,42 +106,6 @@ def test_format_bem_documents():
     assert docs[3].content in html
     assert "Citation 2" in html
     assert "Citation 3" not in html
-
-
-def test__get_bem_url():
-    assert (
-        _get_bem_url("Please review BEM 123.")
-        == "https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123.pdf"
-    )
-    assert (
-        _get_bem_url("The policy in BEM 123A has been updated.")
-        == "https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123A.pdf"
-    )
-    with pytest.raises(ValueError):
-        _get_bem_url("This is not a valid case: BEM123.")
-
-
-def test__replace_bem_with_link():
-    assert (
-        _replace_bem_with_link("Please review BEM 123.")
-        == 'Please review <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123.pdf">BEM 123</a>.'
-    )
-    assert (
-        _replace_bem_with_link("The policy in BEM 123A has been updated.")
-        == 'The policy in <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123A.pdf">BEM 123A</a> has been updated.'
-    )
-    assert (
-        _replace_bem_with_link("Check both BEM 123 and BEM 500C.")
-        == 'Check both <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/123.pdf">BEM 123</a> and <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/500C.pdf">BEM 500C</a>.'
-    )
-    assert (
-        _replace_bem_with_link("There is no matching pattern here.")
-        == "There is no matching pattern here."
-    )
-    assert (
-        _replace_bem_with_link("This is not a valid case: BEM123.")
-        == "This is not a valid case: BEM123."
-    )
 
 
 def test__add_ellipses():

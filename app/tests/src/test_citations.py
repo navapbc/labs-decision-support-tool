@@ -6,32 +6,18 @@ from tests.src.db.models.factories import ChunkFactory
 def test_get_context_for_prompt():
     assert get_context_for_prompt([]) == ""
 
-    chunks_with_score = [
-        ChunkWithScore(ChunkFactory.build(), 0.90),
-        ChunkWithScore(ChunkFactory.build(), 0.90),
-    ]
+    chunks = ChunkFactory.build_batch(2)
     assert (
-        get_context_for_prompt(chunks_with_score)
-        == f"Citation: chunk-0\nDocument name: {chunks_with_score[0].chunk.document.name}\nHeadings: {" > ".join(chunks_with_score[0].chunk.headings)}\nContent: {chunks_with_score[0].chunk.content}\n\nCitation: chunk-1\nDocument name: {chunks_with_score[1].chunk.document.name}\nHeadings: {" > ".join(chunks_with_score[1].chunk.headings)}\nContent: {chunks_with_score[1].chunk.content}"
+        get_context_for_prompt(chunks)
+        == f"Citation: citation-0\nDocument name: {chunks[0].document.name}\nHeadings: {" > ".join(chunks[0].headings)}\nContent: {chunks[0].content}\n\nCitation: citation-1\nDocument name: {chunks[1].document.name}\nHeadings: {" > ".join(chunks[1].headings)}\nContent: {chunks[1].content}"
     )
 
 
 def test_add_citations():
-    assert add_citations("This is a citation (chunk-0)", []) == "This is a citation (chunk-0)"
+    assert add_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
 
     chunks = ChunkFactory.build_batch(2)
     assert (
-        add_citations("This is a citation (chunk-0) and another (chunk-1).", chunks)
+        add_citations("This is a citation (citation-0) and another (citation-1).", chunks)
         == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
     )
-    """"
-    assert all(
-        text in add_citations("This is a citation (chunk-0) and another (chunk-1).", chunks)
-        for text in [
-            "This is a citation",
-            chunks[0].document.name,
-            "and another",
-            chunks[1].document.name,
-        ]
-    )
-    """

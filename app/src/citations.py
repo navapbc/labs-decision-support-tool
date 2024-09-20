@@ -33,6 +33,7 @@ def get_context_for_prompt(chunks: Sequence[Chunk]) -> str:
 
         context_text = "Citation: citation-" + str(index) + "\n"
         context_text += "Document name: " + chunk_with_subsection.chunk.document.name + "\n"
+        context_text += "Headings: " + " > ".join(chunk_with_subsection.chunk.headings) + "\n"
         context_text += "Content: " + chunk_with_subsection.subsection
 
         context_list.append(context_text)
