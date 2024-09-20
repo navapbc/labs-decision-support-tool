@@ -47,10 +47,15 @@ def split_paragraph(text: str, char_limit: int) -> list[str]:
     # Use the nltk sentence tokenizer to split the text into sentences
     # Could use spacy instead for more customization
     sents = sent_tokenize(text)
+    if len(sents) == 1:
+        # 400.pdf page 73 has tables that result in large paragraphs
+        sents = text.split("\n\n")
+        return _join_up_to(sents, char_limit, delimiter="\n\n")
+
     return _join_up_to(sents, char_limit)
 
 
-def split_list(text: str, char_limit: int) -> list[str]:
+def split_list(text: str, char_limit: int, has_intro_sentence: bool = True) -> list[str]:
     """
     Split text containing a list of items into chunks having up to a character limit each.
     The first line is treated as an introductory sentence, which will be repeated as the first line of each chunk.
@@ -59,8 +64,12 @@ def split_list(text: str, char_limit: int) -> list[str]:
     _prep_nltk_tokenizer()
 
     lines = text.split("\n")
-    intro_sentence = lines[0]
-    list_items = lines[1:]
+    if has_intro_sentence:
+        intro_sentence = lines[0]
+        list_items = lines[1:]
+    else:
+        intro_sentence = ""
+        list_items = lines
 
     # len(lines) accounts for the number of newline characters
     list_items_char_limit = char_limit - len(intro_sentence) - len(lines)
@@ -80,13 +89,14 @@ def _join_up_to(lines: list[str], char_limit: int, delimiter: str = " ") -> list
         test_chunk = delimiter.join([chunk, line]) if chunk else line
         if len(test_chunk) > char_limit:
             # Don't use test_chunk; start a new chunk
-            chunks.append(chunk)
+            if chunk:
+                chunks.append(chunk)
             if len(line) < char_limit:
                 chunk = line
             else:
                 # Split into phrases; could use spacy instead for more robust splitting
-                words = re.split(r"([,;])", line)
-                logger.warning("Splitting sentence: %s", line)
+                words = re.split(r"([,;\n])", line)
+                logger.warning("Splitting sentence: %s", line[:120])
 
                 chunks += _join_up_to(words, char_limit=char_limit, delimiter="")
                 # Start new empty chunk

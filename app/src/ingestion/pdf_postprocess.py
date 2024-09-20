@@ -164,13 +164,7 @@ def _should_merge_list_text(text: EnrichedText, next_text: EnrichedText) -> bool
     if text.headings != next_text.headings:
         return False
 
-    if next_text.type != TextType.LIST_ITEM:
-        return False
-
-    if text.type in [TextType.LIST_ITEM, TextType.LIST]:
-        return True
-
-    return text.type == TextType.NARRATIVE_TEXT and text.text.rstrip().endswith(":")
+    return next_text.type == TextType.LIST_ITEM
 
 
 def _group_list_texts(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
@@ -228,14 +222,14 @@ NestedHeadingTitles = tuple[str, ...]
 
 def _group_headings_text(markdown_texts: list[EnrichedText]) -> list[EnrichedText]:
     grouped_texts_by_headings: dict[NestedHeadingTitles, EnrichedText] = {}
-    for ind, markdown_text in enumerate(markdown_texts):
-        text_nested_headings: NestedHeadingTitles = tuple(
-            [h.title for h in markdown_texts[ind].headings]
-        )
+    for markdown_text in markdown_texts:
+        text_nested_headings: NestedHeadingTitles = tuple([h.title for h in markdown_text.headings])
         if text_nested_headings in grouped_texts_by_headings:
-            grouped_texts_by_headings[
-                text_nested_headings
-            ].text += f"\n\n{markdown_texts[ind].text}"
+            grouped_texts_by_headings[text_nested_headings].text += f"\n\n{markdown_text.text}"
+
+            # Grouping any text with a NarrativeText type makes the whole group a NarrativeText type
+            if markdown_text.type == TextType.NARRATIVE_TEXT:
+                grouped_texts_by_headings[text_nested_headings].type = markdown_text.type
         else:
             grouped_texts_by_headings[text_nested_headings] = EnrichedText(
                 text=markdown_text.text,
