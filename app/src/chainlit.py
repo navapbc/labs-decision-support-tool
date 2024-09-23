@@ -144,10 +144,11 @@ async def on_message(message: cl.Message) -> None:
     try:
         result = await cl.make_async(lambda: engine.on_message(question=message.content))()
 
-        msg_content = result.response + engine.formatter(
+        msg_content = engine.formatter(
             chunks_shown_max_num=engine.chunks_shown_max_num,
             chunks_shown_min_score=engine.chunks_shown_min_score,
             chunks_with_scores=result.chunks_with_scores,
+            raw_response=result.response,
         )
 
         await cl.Message(

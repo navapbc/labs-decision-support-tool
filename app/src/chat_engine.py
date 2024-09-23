@@ -3,9 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
-from src.citations import add_citations
 from src.db.models.document import ChunkWithScore
-from src.format import format_bem_documents, format_guru_cards
+from src.format import format_bem_subsections, format_guru_cards
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
@@ -87,9 +86,8 @@ class BaseEngine(ChatEngineInterface):
             datasets=self.datasets,
         )
 
-        response = generate(self.llm, question, context=chunks_with_scores)
-        chunk_list = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-        response = add_citations(response, chunk_list)
+        chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+        response = generate(self.llm, question, context=chunks)
         return OnMessageResult(response, chunks_with_scores)
 
 
@@ -115,4 +113,4 @@ class BridgesEligibilityManualEngine(BaseEngine):
     engine_id: str = "bridges-eligibility-manual"
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
     datasets = ["bridges-eligibility-manual"]
-    formatter = staticmethod(format_bem_documents)
+    formatter = staticmethod(format_bem_subsections)

@@ -76,5 +76,12 @@ class ChunkWithScore:
 @dataclass
 class DocumentWithMaxScore:
     document: Document
-    # The maxmium similarity score of all Chunks associated with that document
+    # The maximium similarity score of all Chunks associated with that document
     max_score: float
+
+
+@dataclass(frozen=True)
+class ChunkWithSubsection:
+    chunk: Chunk
+    # specific substring within chunk.text
+    subsection: str
