@@ -235,9 +235,3 @@ def _add_ellipses(chunk: Chunk) -> str:
         else:
             return f"... {chunk_content} ..."
     return chunk_content
-
-
-def _get_chunks_from_chunks_with_scores(
-    chunks_with_scores: Sequence[ChunkWithScore],
-) -> list[Chunk]:
-    return [c.chunk for c in chunks_with_scores]
