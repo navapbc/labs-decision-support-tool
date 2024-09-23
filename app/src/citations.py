@@ -94,8 +94,7 @@ def reify_citations(response: str, chunks: list[Chunk]) -> str:
             logger.warning("LLM generated a citation for a reference ({index}) that doesn't exist.")
             return f"(citation-{index})"
 
-        # Find the matching ChunkWithSubsection in the user-friendly
-        # citation numbers and add 1 to get the citation number to display
+        # Get the user-friendly citation number matching ChunkWithSubsection
         citation_number = citation_to_numbers[context[index]]
 
         chunk = context[index].chunk
