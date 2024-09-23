@@ -5,7 +5,11 @@ from scrapy.linkextractors import LinkExtractor
 class EddSpiderSpider(CrawlSpider):
     name = "edd_spider"
     allowed_domains = ["edd.ca.gov"]
-    start_urls = ["https://edd.ca.gov/en/File_and_Manage_a_Claim"]
+    start_urls = [
+        "https://edd.ca.gov/en/disability/About_the_State_Disability_Insurance_SDI_Program",
+    #     "https://edd.ca.gov/en/Disability/Am_I_Eligible_for_DI_Benefits",
+    #     "https://edd.ca.gov/en/disability/how_to_file_a_di_claim_by_mail"
+    ]
 
     rules = (
         Rule(LinkExtractor(allow=r"en/"), callback="parse_item"),

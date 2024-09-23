@@ -51,9 +51,29 @@ ROBOTSTXT_OBEY = False
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
-#DOWNLOADER_MIDDLEWARES = {
+DOWNLOADER_MIDDLEWARES = {
 #    "edd.middlewares.EddDownloaderMiddleware": 543,
-#}
+
+    # YL: https://www.quora.com/Can-you-make-Scrapy-keep-all-the-HTML-it-downloads
+    # To make Scrapy keep all the HTML it downloads, you can use the HttpCompressionMiddleware and set the COMPRESS_RESPONSE setting to False in your Scrapy project.
+    # Scrapy will now keep the full HTML content of the downloaded pages in your project's data files, rather than discarding it after the data extraction is complete.
+    'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 543,
+}
+
+COMPRESS_RESPONSE = False
+
+# YL: https://stackoverflow.com/a/10897298
+# Enable and configure HTTP caching (disabled by default)
+# See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
+# YL: https://jerrynsh.com/5-useful-tips-while-working-with-python-scrapy/#tldr
+HTTPCACHE_ENABLED = True
+HTTPCACHE_EXPIRATION_SECS = 0
+# YL: https://stackoverflow.com/questions/51085665/mocking-the-requests-for-testing-in-scrapy-spider
+# YL: Relative to the .scrapy/ directory
+HTTPCACHE_DIR = "httpcache"
+#HTTPCACHE_IGNORE_HTTP_CODES = []
+# YL: https://doc.scrapy.org/en/latest/topics/downloader-middleware.html#module-scrapy.downloadermiddlewares.httpcache
+HTTPCACHE_STORAGE = "scrapy.extensions.httpcache.FilesystemCacheStorage"
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
@@ -79,14 +99,6 @@ ROBOTSTXT_OBEY = False
 #AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
 # Enable showing throttling stats for every response received:
 #AUTOTHROTTLE_DEBUG = False
-
-# Enable and configure HTTP caching (disabled by default)
-# See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
-#HTTPCACHE_ENABLED = True
-#HTTPCACHE_EXPIRATION_SECS = 0
-#HTTPCACHE_DIR = "httpcache"
-#HTTPCACHE_IGNORE_HTTP_CODES = []
-#HTTPCACHE_STORAGE = "scrapy.extensions.httpcache.FilesystemCacheStorage"
 
 # Set settings whose default value is deprecated to a future-proof value
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
