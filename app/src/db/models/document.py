@@ -83,4 +83,5 @@ class DocumentWithMaxScore:
 @dataclass(frozen=True)
 class ChunkWithSubsection:
     chunk: Chunk
+    # specific substring within chunk.text
     subsection: str
