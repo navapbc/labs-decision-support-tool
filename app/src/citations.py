@@ -3,7 +3,7 @@ import random
 import re
 from typing import Match, Sequence
 
-from src.db.models.document import Chunk, ChunkWithSubsection
+from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection
 from src.util.bem_util import get_bem_url
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,9 @@ _footnote_index = 0
 CITATION_PATTERN = r"\(citation-(\d+)\)"
 
 
-def get_context(chunks: Sequence[Chunk], delimiter: str = "\n\n") -> Sequence[ChunkWithSubsection]:
+def split_into_subsections(
+    chunks: Sequence[Chunk], delimiter: str = "\n\n"
+) -> Sequence[ChunkWithSubsection]:
     # Given a list of chunks, split them into a flat list of subsections
     context_mapping = []
 
@@ -25,20 +27,15 @@ def get_context(chunks: Sequence[Chunk], delimiter: str = "\n\n") -> Sequence[Ch
     return context_mapping
 
 
-def get_context_for_prompt(chunks: Sequence[Chunk]) -> str:
-    context = get_context(chunks)
+def create_prompt_context(chunks: Sequence[Chunk]) -> str:
+    context = split_into_subsections(chunks)
 
     context_list = []
     for index, chunk_with_subsection in enumerate(context):
-
-        if chunk_with_subsection.chunk.headings:
-            headings_text = "Headings: " + " > ".join(chunk_with_subsection.chunk.headings) + "\n"
-        else:
-            headings_text = ""
-
         context_text = "Citation: citation-" + str(index) + "\n"
         context_text += "Document name: " + chunk_with_subsection.chunk.document.name + "\n"
-        context_text += headings_text
+        if chunk_with_subsection.chunk.headings:
+            context_text += "Headings: " + " > ".join(chunk_with_subsection.chunk.headings) + "\n"
         context_text += "Content: " + chunk_with_subsection.subsection
 
         context_list.append(context_text)
@@ -51,8 +48,8 @@ def get_citation_numbers(
 ) -> Sequence[ChunkWithSubsection]:
     """
     Map (citation-<index>) in `response`, where index is the index in `context`,
-    to a user-friendly citation number.
-    The user friendly citation number is the index of the entry in the returned list, plus one.
+    to a sequence of ChunkWithSubsection, where the index of the entry in the sequence
+    is the user-friendly citation number (less one, because lists are zero-indexed.)
     E.g., if `context` is a list with five entries, and `response` is a string like
     "Example (citation-3)(citation-1), another example (citation-1).", then this function will return
     [context[3], [context[1]]; citations referencing context[3] should be shown to the user as "1" and
@@ -62,23 +59,21 @@ def get_citation_numbers(
     citation_indices = re.findall(CITATION_PATTERN, response)
 
     # Maintain order and avoid duplicates by using a list and tracking seen indices
-    seen = set()
     citations = []
 
     for index in citation_indices:
-        idx = int(index)  # Convert string to integer index
-        if 0 <= idx < len(context) and idx not in seen:
-            citations.append(context[idx])
-            seen.add(idx)
+        index = int(index)  # Convert string to integer index
+        if 0 <= index < len(context) and context[index] not in citations:
+            citations.append(context[index])
 
     return citations
 
 
-def add_citations(response: str, chunks: list[Chunk]) -> str:
+def reify_citations(response: str, chunks: list[Chunk]) -> str:
     global _footnote_id
     _footnote_id += 1
 
-    context = get_context(chunks)
+    context = split_into_subsections(chunks)
     citation_numbers = get_citation_numbers(context, response)
 
     footnote_list = []
@@ -111,3 +106,10 @@ def add_citations(response: str, chunks: list[Chunk]) -> str:
 
     # For now, don't show footnote list
     return added_citations  # + "</br>" + "</br>".join(footnote_list)
+
+
+def reify_citations_with_scores(
+    raw_response: str, chunks_with_scores: Sequence[ChunkWithScore]
+) -> str:
+    chunks = [c.chunk for c in chunks_with_scores]
+    return reify_citations(raw_response, chunks)

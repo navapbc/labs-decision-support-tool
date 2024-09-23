@@ -1,6 +1,11 @@
 import pytest
 
-from src.citations import add_citations, get_citation_numbers, get_context, get_context_for_prompt
+from src.citations import (
+    create_prompt_context,
+    get_citation_numbers,
+    reify_citations,
+    split_into_subsections,
+)
 from src.db.models.document import ChunkWithSubsection
 from tests.src.db.models.factories import ChunkFactory
 
@@ -22,9 +27,9 @@ def context(chunks):
 
 
 def test_get_context_for_prompt(chunks):
-    assert get_context_for_prompt([]) == ""
+    assert create_prompt_context([]) == ""
 
-    assert get_context_for_prompt(chunks) == (
+    assert create_prompt_context(chunks) == (
         f"""Citation: citation-0
 Document name: {chunks[0].document.name}
 Headings: {" > ".join(chunks[0].headings)}
@@ -43,16 +48,18 @@ Content: {chunks[1].content}"""
 
 
 def test_add_citations(chunks):
-    assert add_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
+    assert (
+        reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
+    )
 
     assert (
-        add_citations("This is a citation (citation-0) and another (citation-1).", chunks)
+        reify_citations("This is a citation (citation-0) and another (citation-1).", chunks)
         == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
     )
 
 
 def test_get_context(chunks):
-    assert get_context(chunks) == [
+    assert split_into_subsections(chunks) == [
         ChunkWithSubsection(chunks[0], "This is the first chunk."),
         ChunkWithSubsection(chunks[0], "With two subsections"),
         ChunkWithSubsection(chunks[1], chunks[1].content),

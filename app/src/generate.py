@@ -4,7 +4,7 @@ from typing import Any, Sequence
 
 from litellm import completion
 
-from src.citations import get_context_for_prompt
+from src.citations import create_prompt_context
 from src.db.models.document import Chunk
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ def generate(
     """
 
     if context:
-        context_text = get_context_for_prompt(context)
+        context_text = create_prompt_context(context)
         messages = [
             {
                 "content": PROMPT,

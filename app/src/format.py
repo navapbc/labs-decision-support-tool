@@ -3,7 +3,7 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
-from src.citations import add_citations, get_citation_numbers, get_context
+from src.citations import get_citation_numbers, reify_citations_with_scores, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
@@ -21,9 +21,7 @@ def format_guru_cards(
     chunks_with_scores: Sequence[ChunkWithScore],
     raw_response: str,
 ) -> str:
-
-    chunks = [c.chunk for c in chunks_with_scores]
-    response_with_citations = add_citations(raw_response, chunks)
+    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
 
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
@@ -76,10 +74,10 @@ def format_bem_subsections(
 ) -> str:
     global _accordion_id
 
-    chunks = [c.chunk for c in chunks_with_scores]
-    response_with_citations = add_citations(raw_response, chunks)
+    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
 
-    context = get_context(chunks)
+    chunks = [c.chunk for c in chunks_with_scores]
+    context = split_into_subsections(chunks)
     citation_numbers = get_citation_numbers(context, raw_response)
 
     citations_html = ""
@@ -127,8 +125,7 @@ def format_bem_documents(
     chunks_with_scores: Sequence[ChunkWithScore],
     raw_response: str,
 ) -> str:
-    chunks = [c.chunk for c in chunks_with_scores]
-    response_with_citations = add_citations(raw_response, chunks)
+    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
 
     documents = _get_bem_documents_to_show(
         chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
@@ -238,3 +235,9 @@ def _add_ellipses(chunk: Chunk) -> str:
         else:
             return f"... {chunk_content} ..."
     return chunk_content
+
+
+def _get_chunks_from_chunks_with_scores(
+    chunks_with_scores: Sequence[ChunkWithScore],
+) -> list[Chunk]:
+    return [c.chunk for c in chunks_with_scores]
