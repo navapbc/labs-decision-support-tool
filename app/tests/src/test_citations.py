@@ -2,7 +2,7 @@ import pytest
 
 from src.citations import (
     create_prompt_context,
-    get_citation_numbers,
+    dereference_citations,
     reify_citations,
     split_into_subsections,
 )
@@ -47,7 +47,7 @@ Content: {chunks[1].content}"""
     )
 
 
-def test_add_citations(chunks):
+def test_reify_citations(chunks):
     assert (
         reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
     )
@@ -66,10 +66,10 @@ def test_get_context(chunks):
     ]
 
 
-def test_get_citation_numbers(context):
-    assert get_citation_numbers(context, "") == []
-    assert get_citation_numbers([], "A non-existent citation is (citation-0)") == []
-    assert get_citation_numbers(
+def test_dereference_citationss(context):
+    assert dereference_citations(context, "") == {}
+    assert dereference_citations([], "A non-existent citation is (citation-0)") == {}
+    assert dereference_citations(
         context,
         "Now a real citation is (citation-1), which we can cite twice (citation-1), followed by (citation-0)",
-    ) == [context[1], context[0]]
+    ) == {context[1]: 1, context[0]: 2}

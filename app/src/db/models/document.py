@@ -80,7 +80,7 @@ class DocumentWithMaxScore:
     max_score: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class ChunkWithSubsection:
     chunk: Chunk
     subsection: str

@@ -3,7 +3,7 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
-from src.citations import get_citation_numbers, reify_citations_with_scores, split_into_subsections
+from src.citations import dereference_citations, reify_citations_with_scores, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
@@ -78,10 +78,10 @@ def format_bem_subsections(
 
     chunks = [c.chunk for c in chunks_with_scores]
     context = split_into_subsections(chunks)
-    citation_numbers = get_citation_numbers(context, raw_response)
+    citation_to_numbers = dereference_citations(context, raw_response)
 
     citations_html = ""
-    for citation_number, citation in enumerate(citation_numbers, start=1):
+    for citation, citation_number in citation_to_numbers.items():
         _accordion_id += 1
         chunk = citation.chunk
         subsection = citation.subsection
