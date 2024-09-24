@@ -106,7 +106,7 @@ _WIDGET_FACTORIES = {
         label="Number of citations to retrieve for generating LLM response",
         initial=default_value,
         min=0,
-        max=10,
+        max=50,
         step=1,
     ),
     "retrieval_k_min_score": lambda initial_value: Slider(

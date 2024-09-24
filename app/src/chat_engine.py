@@ -106,7 +106,10 @@ class GuruSnapEngine(BaseEngine):
 
 
 class BridgesEligibilityManualEngine(BaseEngine):
+    retrieval_k: int = 10
     retrieval_k_min_score: float = -1
+
+    # Note: currently not used
     chunks_shown_min_score: float = -1
     chunks_shown_max_num: int = 8
 

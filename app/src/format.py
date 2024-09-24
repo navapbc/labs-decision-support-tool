@@ -116,7 +116,11 @@ def format_bem_subsections(
             </div>
         </div>"""
 
-    return response_with_citations + citations_html
+    # This heading is important to prevent Chainlit from embedding citations_html
+    # as the next part of a a list in response_with_citations
+    if citations_html:
+        return response_with_citations + "<h3>Source(s)</h3>" + citations_html
+    return response_with_citations
 
 
 def format_bem_documents(
