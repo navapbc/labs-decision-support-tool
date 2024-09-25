@@ -80,7 +80,7 @@ class SplashAwareDupeFilter(RFPDupeFilter):
 
 
 # Create file
-crawl_log = open(f"crawl_log-{datetime.now().strftime("%Y-%m-%d-%H%M%S")}.txt", "w")
+crawl_log = open(f"crawl_log-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}.txt", "w")
 
 class SplashAwareFSCacheStorage(FilesystemCacheStorage):
     def _get_request_path(self, spider, request):
