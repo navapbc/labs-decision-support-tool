@@ -34,6 +34,9 @@ class AppConfig(PydanticBaseEnvConfig):
     # Default LLM model
     llm: str | None = None
 
+    # Starts the chat API if set to True
+    enable_chat_api: bool = True
+
     def db_session(self) -> db.Session:
         return db.PostgresDBClient().get_session()
 
