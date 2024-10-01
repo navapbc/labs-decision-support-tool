@@ -7,7 +7,6 @@ an API that can be deployed with the Chainlit chatbot or as a standalone app.
 """
 
 import logging
-import os
 import uuid
 from dataclasses import dataclass
 from typing import Optional
@@ -165,6 +164,9 @@ class QueryResponse(BaseModel):
     chunks: list[ChunkResponse]
     formatted_response: str
 
+    # id needed to call the feedback endpoint
+    step_id: Optional[str] | None = None
+
 
 @app.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
@@ -185,12 +187,14 @@ async def query(request: QueryRequest) -> QueryResponse:
         response = await run_query(engine, request.message)
 
         # Example of using parent_id to have a hierarchy of messages in Literal AI
-        literalai.message(
+        response_msg = literalai.message(
             content=str(response.formatted_response),
             type="assistant_message",
             parent_id=request_msg.id,
             # FIXME: metadata=response.__dict__,
         )
+        response.thread_id = request_msg.thread_id
+        response.step_id = response_msg.id
 
     # FIXME: Wait for all steps to be sent. This is NOT needed in production code.
     await literalai.flush()
@@ -275,17 +279,28 @@ def format_to_html(markdown_response: str) -> str:
     return markdown.markdown(markdown_response)
 
 
-# TODO: API endpoint to send feedback; https://docs.literalai.com/guides/logs#add-a-score
-#   - query() must return a run_id/step_id to be used in the feedback endpoint
-#   - feedback endpoint should accept a value and a comment
-async def add_user_feedback(run_id: str, value: int, comment: str):
+class FeedbackRequest(BaseModel):
+    api_key: str
+    username: str
+
+    step_id: str
+    score: float
+    comment: str
+
+
+@app.post("/feedback")
+async def feedback(request: FeedbackRequest) -> str:
+    session = await get_user_session(request.api_key, request.username)
+    # API endpoint to send feedback https://docs.literalai.com/guides/logs#add-a-score
     await literalai.api.create_score(
-        step_id=run_id,
-        name="user-feedback",
+        step_id=request.step_id,
+        name=session.user.username,
         type="HUMAN",
-        value=value,
-        comment=comment,
+        value=request.score,
+        comment=request.comment,
     )
+    return "Logged"
+
 
 if __name__ == "__main__":
     import uvicorn
