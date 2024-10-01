@@ -30,6 +30,7 @@ pdfminer-six = "^20240706"
 unstructured = {extras = ["pdf", "docx", "pptx"], version = "^0.15.8"}
 nltk = "^3.9.1"
 markdown = "^3.7"
+
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
 flake8 = "^6.1.0"
@@ -46,6 +47,7 @@ bandit = "^1.7.5"
 pytest = "^7.4.2"
 pytest-watch = "^4.2.0"
 pytest-lazy-fixture = "^0.6.3"
+types-markdown = "^3.7.0.20240822"
 types-pyyaml = "^6.0.12.11"
 setuptools = "^68.2.2"
 debugpy = "^1.8.1"
