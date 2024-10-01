@@ -70,5 +70,5 @@ Running the Chainlit app will also run the API, if `app_config.enable_chat_api=T
 ### Running only the API (without Chainlit)
 
 1. Run `python -m src.chat_api`
-1. To list chat engines, open a browser to `http://localhost:8001/engines` and `http://localhost:8001/healthcheck`.
-1. To test a query, run this on the commandline: `curl -X POST "http://localhost:8001/query" -d 'message="tell me a joke"'`
+1. To list chat engines, open a browser to http://localhost:8001/healthcheck.
+1. Browse to http://localhost:8001/docs to try out the API.
