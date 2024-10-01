@@ -10,6 +10,7 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
+from typing import Optional
 
 import markdown
 from fastapi import FastAPI, HTTPException, Request
@@ -20,7 +21,7 @@ from pydantic import BaseModel
 from src import backend, chat_engine
 from src.chat_engine import ChatEngineInterface
 from src.db.models.document import ChunkWithScore
-from src.healthcheck import health, HealthCheck
+from src.healthcheck import HealthCheck, health
 
 if __name__ == "__main__":
     # If running directly, define the FastAPI app
@@ -43,6 +44,7 @@ async def healthcheck(request: Request) -> HealthCheck:
 KNOWN_API_KEYS: dict[str, str] = {}
 
 
+# To test: curl -X 'GET' 'http://0.0.0.0:8001/api_key/SNBdoe'
 @app.get("/api_key/{client_name}")
 async def create_api_key(client_name: str) -> str:
     "Placeholder for creating an API key for the user"
@@ -140,15 +142,18 @@ class ChunkResponse(BaseModel):
     text: str
     score: float
     document_name: str
-    page_number: int | None
-    headings: list[str] | None
+    page_number: Optional[int] | None
+    headings: Optional[list[str]] | None
 
-    def __init__(self, scored_chunk: ChunkWithScore):
-        self.text = scored_chunk.chunk.content
-        self.score = scored_chunk.score
-        self.document_name = scored_chunk.chunk.document.name
-        self.page_number = scored_chunk.chunk.page_number
-        self.headings = scored_chunk.chunk.headings
+    @staticmethod
+    def from_chunk_with_score(scored_chunk: ChunkWithScore):
+        return ChunkResponse(
+            text=scored_chunk.chunk.content,
+            score=scored_chunk.score,
+            document_name=scored_chunk.chunk.document.name,
+            page_number=scored_chunk.chunk.page_number,
+            headings=scored_chunk.chunk.headings,
+        )
 
 
 class QueryResponse(BaseModel):
@@ -159,7 +164,7 @@ class QueryResponse(BaseModel):
 
 # To test:
 # http://0.0.0.0:8001/docs
-# curl -X POST "http://localhost:8001/query" -d '{"api_key": "anything", "username":"jdoe", "message": "My question"}' -H "Content-Type: application/json"
+# curl -X POST 'http://0.0.0.0:8001/query' -H 'Content-Type: application/json' -d '{ "api_key": '$CHAT_API_KEY', "username": "siu", "message": "refugee programs?" }'
 @app.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
     session = await get_user_session(request.api_key, request.username)
@@ -198,13 +203,75 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
     #     chunks_with_scores="[ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc45550>, score=0.7413949966430664), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc459a0>, score=0.6745662689208984), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc459d0>, score=0.6454465389251709), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc45a00>, score=0.6299465298652649), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc45a30>, score=0.6249987483024597), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc45a60>, score=0.619025707244873), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc45a90>, score=0.617834746837616), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc45ac0>, score=0.6155949831008911), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc45af0>,score=0.6079249978065491), ChunkWithScore(chunk=<src.db.models.document.Chunk object at 0x30cc45b20>, score=0.5994702577590942)]",
     #     formatted_response='Refugee programs are designed to help refugees become self-sufficient after they arrive in the U.S. Here are some key points about these programs:\n\n- They include Refugee Cash Assistance (RCA) and Refugee Medical Assistance (RMA) <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf#page=1\'>1</a>&nbsp;</sup>.\n- The Office of Refugee Resettlement (ORR) administers these programs, while in Michigan, the Office of Global Michigan handles them <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/100.pdf#page=4\'>2</a>&nbsp;</sup>.\n- Refugee Resettlement Agencies provide services like orientation, counseling, English language instruction, andassistance with employment authorizations <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf#page=2\'>3</a>&nbsp;</sup>.\n- Refugees can receive payments directly or have payments made on their behalf to third parties for necessities like rent and utilities <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/503.pdf#page=19\'>4</a>&nbsp;</sup><sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/503.pdf#page=19\'>5</a>&nbsp;</sup>.\n- Refugees can participate in matching grant programs that focus on job training and maintenance assistance to help them become economically self-sufficient <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/503.pdf#page=18\'>6</a>&nbsp;</sup>.<h3>Source(s)</h3>\n        <div class="usa-accordion" id=accordion-876904>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n                    class="usa-accordion__button"\n  aria-expanded="false"\n                    aria-controls="a-876904">\n                    1. BEM 630: REFUGEE ASSISTANCE PROGRAM\n                </button>\n         </h4>\n            <div id="a-876904" class="usa-accordion__content usa-prose" hidden>\n                <p>Department Philosophy</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">The refugee assistance programs are federal programs which help refugees to become self-sufficient after their arrival in the U.S. Refugee Assistance Program (RAP) has two components; Refugee Cash Assistance (RCA) and Refugee Medical Assistance (RMA).</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf#page=1\'>Open document to page 1</a></p>\n            </div>\n        </div>\n       <div class="usa-accordion" id=accordion-876905>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n                    class="usa-accordion__button"\n                    aria-expanded="false"\n                    aria-controls="a-876905">\n      2. BEM 100: INTRODUCTION\n                </button>\n            </h4>\n            <div id="a-876905" class="usa-accordion__content usa-prose" hidden>\n             <p>Refugee Assistance Programs</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">**The refugee assistance programs** were established by the U.S. Congress. The Office of Refugee Resettlement (ORR) in HHS has specific responsibility for the administration of Refugee Cash Assistance (RCA) and Refugee Medical Assistance (RMA). The Michigan Department of Labor and Economic Opportunity’s (LEO) Office of Global Michigan administers the programs and sets payment rates and eligibility criteria.</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/100.pdf#page=4\'>Open document to page 4</a></p>\n            </div>\n        </div>\n        <div class="usa-accordion" id=accordion-876906>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n                    class="usa-accordion__button"\n                    aria-expanded="false"\n                  aria-controls="a-876906">\n                    3. BEM 630: REFUGEE ASSISTANCE PROGRAM\n                </button>\n            </h4>\n            <div id="a-876906" class="usa-accordion__content usa-prose" hidden>\n                <p>Program administration → Refugee Resettlement Agencies</p>\n <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">Refugee Resettlement Agencies also known as Voluntary Agencies (VOLAGs) may provide the following services:\n- Reception and placement services to newly arrived refugees including orientation, counseling, resettlement grants, translation/interpretation, and related services.\n- Employability services such as English language instruction, transportation, child care, citizenship and employment authorization document assistance, translation/interpretation, and related services.\n- Matching Grants (MG) to help refugees attain economic self- sufficiency without accessing public cashassistance.</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf#page=2\'>Open document to page 2</a></p>\n            </div>\n        </div>\n        <div class="usa-accordion" id=accordion-876907>\n            <h4 class="usa-accordion__heading">\n                <button\n     type="button"\n                    class="usa-accordion__button"\n                    aria-expanded="false"\n                    aria-controls="a-876907">\n                    4. BEM 503: INCOME, UNEARNED\n                </button>\n            </h4>\n            <div id="a-876907" class="usa-accordion__content usa-prose" hidden>\n                <p>GOVERNMENT AID → Refugee Resettlement Assistance</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">Refugee resettlement assistance is distributed within 90 days of a refugee’s date of entry. Payments may be made to third parties such as landlords, utility companies or other service providers: see Third Party Assistance in <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/500.pdf">BEM 500</a>.</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/503.pdf#page=19\'>Open document to page 19</a></p>\n            </div>\n        </div>\n        <div class="usa-accordion" id=accordion-876908>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n                    class="usa-accordion__button"\n                    aria-expanded="false"\n                    aria-controls="a-876908">\n        5. BEM 503: INCOME, UNEARNED\n                </button>\n            </h4>\n            <div id="a-876908" class="usa-accordion__content usa-prose" hidden>\n                <p>GOVERNMENT AID → Refugee Resettlement Assistance</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">Payments may also be made directly to refugees. The number and frequency of payments are determined by the refugee resettlement agency.</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/503.pdf#page=19\'>Open document to page 19</a></p>\n            </div>\n        </div>\n        <div class="usa-accordion" id=accordion-876909>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n      class="usa-accordion__button"\n                    aria-expanded="false"\n                    aria-controls="a-876909">\n                    6. BEM 503: INCOME, UNEARNED\n                </button>\n            </h4>\n            <div id="a-876909" class="usa-accordion__content usa-prose" hidden>\n                <p>GOVERNMENT AID → Refugee Matching Grant</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">This is an employment program administered by refugee resettle- ment agencies. It provides job training and maintenance assistance (food, housing, transportation, etc.) to eligible refugees. The benefits are partly cash, but mainly in-kind goods and services. Enter any cash payments made directly to the refugee in the unearned income logical unit of work.</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/503.pdf#page=18\'>Open document to page 18</a></p>\n            </div>\n        </div>',
     # )
+    return QueryResponse(
+        response="Refugee programs are federal initiatives designed to help refugees become self-sufficient in the United States after their arrival. They include:\n\n- **Refugee Cash Assistance (RCA)** and **Refugee Medical Assistance (RMA)**, which provide financial aid and medical support (citation-0)(citation-2).\n- **Refugee Resettlement Agencies**, which offer services like orientation, counseling, job training, and Matching Grants to assist with economic independence (citation-1).\n- The **Office of Refugee Resettlement (ORR)** oversees these programs, with state agencies managing payment rates and eligibility (citation-2).\n\nThe primary aim is to aid refugees in attaining economic self-sufficiency and integrating into their new communities (citation-3).",
+        chunks=[
+            ChunkResponse(
+                text="The refugee assistance programs are federal programs which help refugees to become self-sufficient after their arrival in the U.S. Refugee Assistance Program (RAP) has two components; Refugee Cash Assistance(RCA) and Refugee Medical Assistance (RMA).",
+                score=0.7114870548248291,
+                document_name="BEM 630: REFUGEE ASSISTANCE PROGRAM",
+                page_number=1,
+                headings=["DepartmentPhilosophy"],
+            ),
+            ChunkResponse(
+                text="Refugee Resettlement Agencies also known as Voluntary Agencies (VOLAGs) may provide the following services:\n- Reception and placement services to newly arrived refugees including orientation, counseling, resettlement grants, translation/interpretation, and related services.\n- Employability services such as English language instruction, transportation, child care, citizenship and employment authorization document assistance, translation/interpretation, and related services.\n- Matching Grants (MG) to help refugees attain economic self- sufficiency without accessing public cash assistance.",
+                score=0.654638409614563,
+                document_name="BEM 630: REFUGEE ASSISTANCE PROGRAM",
+                page_number=2,
+                headings=["Program administration", "Refugee Resettlement Agencies"],
+            ),
+            ChunkResponse(
+                text="**The refugee assistance programs** were established by the U.S. Congress. The Office of Refugee Resettlement (ORR) in HHS has specific responsibility for the administration of Refugee Cash Assistance (RCA) and Refugee Medical Assistance (RMA). The Michigan Department of Labor and Economic Opportunity’s (LEO) Office of Global Michigan administers the programs and sets payment rates and eligibility criteria.",
+                score=0.6306811571121216,
+                document_name="BEM 100: INTRODUCTION",
+                page_number=4,
+                headings=["Refugee Assistance Programs"],
+            ),
+            ChunkResponse(
+                text="The refugee assistance programs provide financial assistance and medical aid to persons admitted into the U.S. as refugees. Eligibility is also available to certain other non-U.S. citizens with specified immigration statuses, identified in the section refugees in BEM 630.\n\nThe Immigration and Nationality Act, the Code of Federal Regula- tions (CFR), and federal court orders are the legal base for policies and procedures for RCA and RMA and are cited in the applicable manualitem.\n\nThe Child Development and Care (CDC) program provides financial assistance with child care expenses to qualifying families.\n\nThe goal of the CDC program is to support low-income families by providing access to high-quality, affordable, and accessible early learning and development opportunities and to assist the familyin achieving economic independence and self-sufficiency.\n\nState Disability Assistance (SDA) provides financial assistance to disabled adults who are not eligible for FIP. The goal of the SDA program is to provide financial assistance to meet a disabled person's basic personal and shelter needs.",
+                score=0.619068443775177,
+                document_name="BEM 100: INTRODUCTION",
+                page_number=4,
+                headings=["Refugee Assistance Programs", "Program Goal"],
+            ),
+        ],
+        formatted_response='Refugee programs are federal initiatives designed to help refugees become self-sufficient in the United States after their arrival. They include:\n\n- **Refugee Cash Assistance (RCA)** and **Refugee Medical Assistance (RMA)**, which provide financial aid and medical support <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf#page=1\'>1</a>&nbsp;</sup><sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/100.pdf#page=4\'>2</a>&nbsp;</sup>.\n- **Refugee Resettlement Agencies**, which offer services like orientation, counseling, job training, and Matching Grants to assist with economic independence <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf#page=2\'>3</a>&nbsp;</sup>.\n- The **Office of Refugee Resettlement (ORR)** oversees these programs, with state agencies managing payment rates and eligibility <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/100.pdf#page=4\'>2</a>&nbsp;</sup>.\n\nThe primary aim is to aid refugees in attaining economic self-sufficiency and integrating into their new communities <sup><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/100.pdf#page=4\'>4</a>&nbsp;</sup>.<h3>Source(s)</h3>\n        <div class="usa-accordion" id=accordion-659596>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n      class="usa-accordion__button"\n                    aria-expanded="false"\n                    aria-controls="a-659596">\n                    1. BEM 630: REFUGEE ASSISTANCE PROGRAM\n                </button>\n            </h4>\n            <div id="a-659596" class="usa-accordion__content usa-prose" hidden>\n        <p>Department Philosophy</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">The refugee assistance programs are federal programs which help refugees to become self-sufficient after their arrival in the U.S. Refugee Assistance Program (RAP) has two components; Refugee Cash Assistance (RCA) and Refugee Medical Assistance (RMA).</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf#page=1\'>Open document to page 1</a></p>\n            </div>\n        </div>\n        <div class="usa-accordion" id=accordion-659597>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n                    class="usa-accordion__button"\n                    aria-expanded="false"\n              aria-controls="a-659597">\n                    2. BEM 100: INTRODUCTION\n                </button>\n            </h4>\n            <div id="a-659597" class="usa-accordion__content usa-prose" hidden>\n                <p>Refugee Assistance Programs</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">**The refugee assistance programs** were established by the U.S. Congress. The Office of Refugee Resettlement (ORR) in HHS has specific responsibility for the administration of Refugee Cash Assistance (RCA) and Refugee Medical Assistance (RMA). The Michigan Department of Labor and Economic Opportunity’s (LEO) Office of Global Michigan administers the programs and sets payment rates and eligibility criteria.</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/100.pdf#page=4\'>Open document to page 4</a></p>\n            </div>\n        </div>\n        <div class="usa-accordion" id=accordion-659598>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n                    class="usa-accordion__button"\n                    aria-expanded="false"\n                    aria-controls="a-659598">\n                    3. BEM 630: REFUGEE ASSISTANCE PROGRAM\n              </button>\n            </h4>\n            <div id="a-659598" class="usa-accordion__content usa-prose" hidden>\n                <p>Program administration → Refugee Resettlement Agencies</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">Refugee Resettlement Agenciesalso known as Voluntary Agencies (VOLAGs) may provide the following services:\n- Reception and placement services to newly arrived refugees including orientation, counseling, resettlement grants, translation/interpretation, and related services.\n- Employability services such as English language instruction, transportation, childcare, citizenship and employment authorization document assistance, translation/interpretation, and related services.\n- Matching Grants (MG) to help refugees attaineconomic self- sufficiency without accessing public cash assistance.</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf#page=2\'>Open document to page 2</a></p>\n            </div>\n        </div>\n        <div class="usa-accordion" id=accordion-659599>\n            <h4 class="usa-accordion__heading">\n                <button\n                    type="button"\n                    class="usa-accordion__button"\n                    aria-expanded="false"\n                    aria-controls="a-659599">\n                    4. BEM 100: INTRODUCTION\n                </button>\n            </h4>\n            <div id="a-659599" class="usa-accordion__content usa-prose" hidden>\n                <p>Refugee Assistance Programs → Program Goal</p>\n                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">The refugee assistance programs provide financial assistance and medical aid to persons admitted into the U.S. as refugees. Eligibility is also available to certain other non-U.S. citizens with specified immigration statuses, identified in the section refugees in <a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/630.pdf">BEM 630</a>.</div>\n                <p><a href=\'https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/100.pdf#page=4\'>Open document to page 4</a></p>\n            </div>\n        </div>',
+    )
 
     # TODO: replace formatted_answer with one created by a formatter suitable for the API client
     (result, formatted_answer) = await backend.run_engine(engine, question)
 
+    # from src.chat_engine import OnMessageResult
+    # from src.db.models.document import Chunk, Document
+    # result = OnMessageResult(
+    #     response="My answer.",
+    #     chunks_with_scores=[
+    #         ChunkWithScore(chunk=Chunk(
+    #             document=Document(name="doc1", content="Bridges Eligibility Manual", dataset="bridges-eligibility-manual", program="Bridges", region="Michigan"),
+    #             content="chunk_text content",
+    #             page_number=2,
+    #             headings=["H1"],
+    #             num_splits=1,
+    #             split_index=0,
+    #         ), score=0.9)
+    #     ]
+    # )
+    # formatted_answer = "My answer.\n- point 1\n- point 2\n- point 3\n- point 4\n- point 5\n- point 6"
+
+    chunks = (
+        [
+            ChunkResponse.from_chunk_with_score(chunk_with_score)
+            for chunk_with_score in result.chunks_with_scores
+        ],
+    )
+    print("Chunks:", chunks)
+
     return QueryResponse(
         response=result.response,
-        chunks=[ChunkResponse(chunk_with_score) for chunk_with_score in result.chunks_with_scores],
+        chunks=[
+            ChunkResponse.from_chunk_with_score(chunk_with_score)
+            for chunk_with_score in result.chunks_with_scores
+        ],
         formatted_response=str(formatted_answer),
     )
 
@@ -220,7 +287,7 @@ async def query_html(request: QueryRequest) -> HTMLResponse:
     return HTMLResponse(format_to_html(response.formatted_response))
 
 
-# TODO: API to send feedback; https://docs.literalai.com/guides/logs#add-a-score
+# TODO: API endpoint to send feedback; https://docs.literalai.com/guides/logs#add-a-score
 
 
 if __name__ == "__main__":
