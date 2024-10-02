@@ -1,14 +1,13 @@
 import logging
 import pprint
-from typing import Any, Sequence
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Select, Slider
-from src import chat_engine
+from src import backend, chat_engine
 from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface
-from src.db.models.document import ChunkWithScore
 from src.generate import get_models
 from src.login import require_login
 
@@ -138,22 +137,13 @@ _WIDGET_FACTORIES = {
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
-    logger.info("Received: %r", message.content)
-
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
-        result = await cl.make_async(lambda: engine.on_message(question=message.content))()
-
-        msg_content = engine.formatter(
-            chunks_shown_max_num=engine.chunks_shown_max_num,
-            chunks_shown_min_score=engine.chunks_shown_min_score,
-            chunks_with_scores=result.chunks_with_scores,
-            raw_response=result.response,
-        )
+        (result, msg_content) = await backend.run_engine(engine, message.content)
 
         await cl.Message(
             content=msg_content,
-            metadata=_get_retrieval_metadata(result.chunks_with_scores),
+            metadata=backend.get_retrieval_metadata(result.chunks_with_scores),
         ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
@@ -163,16 +153,3 @@ async def on_message(message: cl.Message) -> None:
         ).send()
         # Re-raise error to have it in the logs
         raise err
-
-
-def _get_retrieval_metadata(chunks_with_scores: Sequence[ChunkWithScore]) -> dict:
-    return {
-        "chunks": [
-            {
-                "document.name": chunk_with_score.chunk.document.name,
-                "chunk.id": str(chunk_with_score.chunk.id),
-                "score": chunk_with_score.score,
-            }
-            for chunk_with_score in chunks_with_scores
-        ]
-    }
