@@ -80,13 +80,13 @@ class SplashAwareDupeFilter(RFPDupeFilter):
 
 
 # Create file
-crawl_log = open(f"crawl_log-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}.txt", "w")
+# crawl_log = open(f"crawl_log-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}.txt", "w")
 
 class SplashAwareFSCacheStorage(FilesystemCacheStorage):
     def _get_request_path(self, spider, request):
         # key = splash_request_fingerprint(request)
-        global crawl_log
-        crawl_log.write(f"{request.url}\n")
+        # global crawl_log
+        # crawl_log.write(f"{request.url}\n")
         key = request.url.replace("https://edd.ca.gov/en/","edd/").replace(":", "_")
         folders = key.split("/")
         return os.path.join(self.cachedir, spider.name, *folders)
