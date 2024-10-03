@@ -1,4 +1,4 @@
-
+<!-- markdown-link-check-disable -->
 
 ==============================
 How to File a Disability Insurance Claim by Mail https://edd.ca.gov/en/disability/how_to_file_a_di_claim_by_mail
@@ -7254,3 +7254,5 @@ Yes. For more information, visit [Integration of Benefits](/en/disability/integr
 If DI benefits are reportable, we will send a notice to your employee with the first benefit payment explaining that the benefits are being reported to the [Internal Revenue Service (IRS)](https://www.irs.gov/). In January, we will send the employee a [1099G form](/en/unemployment/Get_Tax_Information_Form_1099G/) showing the reportable amounts paid (no more than the original UI maximum) and forward a copy of the 1099G to the IRS.
 
 Paid Family Leave (PFL) benefits are reportable for federal tax purposes, but not state tax purposes. We will provide your employee with a 1099G form and forward a copy of the 1099G to the IRS. PFL benefits are not taxable or reportable to the [California State Franchise Tax Board](https://www.ftb.ca.gov/).
+
+<!-- markdown-link-check-enable -->
