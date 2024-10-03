@@ -1,37 +1,75 @@
-from src.citations import add_citations, get_context_for_prompt
-from src.db.models.document import ChunkWithScore
+import pytest
+
+from src.citations import (
+    create_prompt_context,
+    dereference_citations,
+    reify_citations,
+    split_into_subsections,
+)
+from src.db.models.document import ChunkWithSubsection
 from tests.src.db.models.factories import ChunkFactory
 
 
-def test_get_context_for_prompt():
-    assert get_context_for_prompt([]) == ""
+@pytest.fixture
+def chunks():
+    chunks = ChunkFactory.build_batch(2)
+    chunks[0].content = "This is the first chunk.\n\nWith two subsections"
+    return chunks
 
-    chunks_with_score = [
-        ChunkWithScore(ChunkFactory.build(), 0.90),
-        ChunkWithScore(ChunkFactory.build(), 0.90),
+
+@pytest.fixture
+def context(chunks):
+    return [
+        ChunkWithSubsection(chunks[0], "This is the first chunk."),
+        ChunkWithSubsection(chunks[0], "With two subsections"),
+        ChunkWithSubsection(chunks[1], chunks[1].content),
     ]
-    assert (
-        get_context_for_prompt(chunks_with_score)
-        == f"Citation: chunk-0\nDocument name: {chunks_with_score[0].chunk.document.name}\nHeadings: {" > ".join(chunks_with_score[0].chunk.headings)}\nContent: {chunks_with_score[0].chunk.content}\n\nCitation: chunk-1\nDocument name: {chunks_with_score[1].chunk.document.name}\nHeadings: {" > ".join(chunks_with_score[1].chunk.headings)}\nContent: {chunks_with_score[1].chunk.content}"
+
+
+def test_get_context_for_prompt(chunks):
+    assert create_prompt_context([]) == ""
+
+    assert create_prompt_context(chunks) == (
+        f"""Citation: citation-0
+Document name: {chunks[0].document.name}
+Headings: {" > ".join(chunks[0].headings)}
+Content: This is the first chunk.
+
+Citation: citation-1
+Document name: {chunks[0].document.name}
+Headings: {" > ".join(chunks[0].headings)}
+Content: With two subsections
+
+Citation: citation-2
+Document name: {chunks[1].document.name}
+Headings: {" > ".join(chunks[1].headings)}
+Content: {chunks[1].content}"""
     )
 
 
-def test_add_citations():
-    assert add_citations("This is a citation (chunk-0)", []) == "This is a citation (chunk-0)"
-
-    chunks = ChunkFactory.build_batch(2)
+def test_reify_citations(chunks):
     assert (
-        add_citations("This is a citation (chunk-0) and another (chunk-1).", chunks)
+        reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
+    )
+
+    assert (
+        reify_citations("This is a citation (citation-0) and another (citation-1).", chunks)
         == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
     )
-    """"
-    assert all(
-        text in add_citations("This is a citation (chunk-0) and another (chunk-1).", chunks)
-        for text in [
-            "This is a citation",
-            chunks[0].document.name,
-            "and another",
-            chunks[1].document.name,
-        ]
-    )
-    """
+
+
+def test_get_context(chunks):
+    assert split_into_subsections(chunks) == [
+        ChunkWithSubsection(chunks[0], "This is the first chunk."),
+        ChunkWithSubsection(chunks[0], "With two subsections"),
+        ChunkWithSubsection(chunks[1], chunks[1].content),
+    ]
+
+
+def test_dereference_citationss(context):
+    assert dereference_citations(context, "") == {}
+    assert dereference_citations([], "A non-existent citation is (citation-0)") == {}
+    assert dereference_citations(
+        context,
+        "Now a real citation is (citation-1), which we can cite twice (citation-1), followed by (citation-0)",
+    ) == {context[1]: 1, context[0]: 2}

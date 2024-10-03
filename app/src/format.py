@@ -3,7 +3,9 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
+from src.citations import dereference_citations, reify_citations_with_scores, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, Document
+from src.util.bem_util import get_bem_url, replace_bem_with_link
 
 logger = logging.getLogger(__name__)
 
@@ -12,15 +14,15 @@ logger = logging.getLogger(__name__)
 # Choose a random number to avoid id collisions when hotloading the app during development.
 _accordion_id = random.randint(0, 1000000)
 
-# Regular expression to match BEM followed by 3 digits, optionally followed by a letter
-BEM_PATTERN = r"(BEM\s(\d{3}[A-Z]?))"
-
 
 def format_guru_cards(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
+    raw_response: str,
 ) -> str:
+    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
+
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
         document = chunk_with_score.chunk.document
@@ -32,7 +34,8 @@ def format_guru_cards(
             )
             continue
         cards_html += _format_to_accordion_html(document=document, score=chunk_with_score.score)
-    return "<h3>Related Guru cards</h3>" + cards_html
+
+    return response_with_citations + "<h3>Related Guru cards</h3>" + cards_html
 
 
 def _get_bem_documents_to_show(
@@ -63,16 +66,76 @@ def _get_bem_documents_to_show(
     return documents
 
 
+def format_bem_subsections(
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
+    chunks_with_scores: Sequence[ChunkWithScore],
+    raw_response: str,
+) -> str:
+    global _accordion_id
+
+    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
+
+    chunks = [c.chunk for c in chunks_with_scores]
+    context = split_into_subsections(chunks)
+    citation_to_numbers = dereference_citations(context, raw_response)
+
+    citations_html = ""
+    for citation, citation_number in citation_to_numbers.items():
+        _accordion_id += 1
+        chunk = citation.chunk
+        subsection = citation.subsection
+
+        formatted_subsection = replace_bem_with_link(subsection)
+        bem_url_for_page = get_bem_url(chunk.document.name)
+        if chunk.page_number:
+            bem_url_for_page += "#page=" + str(chunk.page_number)
+
+        citation_headings = "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
+        citation_body = f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>'
+        citation_link = (
+            (f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>")
+            if chunk.page_number
+            else ""
+        )
+        citations_html += f"""
+        <div class="usa-accordion" id=accordion-{_accordion_id}>
+            <h4 class="usa-accordion__heading">
+                <button
+                    type="button"
+                    class="usa-accordion__button"
+                    aria-expanded="false"
+                    aria-controls="a-{_accordion_id}">
+                    {citation_number}. {chunk.document.name}
+                </button>
+            </h4>
+            <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
+                {citation_headings}
+                {citation_body}
+                {citation_link}
+            </div>
+        </div>"""
+
+    # This heading is important to prevent Chainlit from embedding citations_html
+    # as the next part of a a list in response_with_citations
+    if citations_html:
+        return response_with_citations + "<h3>Source(s)</h3>" + citations_html
+    return response_with_citations
+
+
 def format_bem_documents(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
-    chunks_with_scores: list[ChunkWithScore],
+    chunks_with_scores: Sequence[ChunkWithScore],
+    raw_response: str,
 ) -> str:
+    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
+
     documents = _get_bem_documents_to_show(
-        chunks_shown_max_num, chunks_shown_min_score, chunks_with_scores
+        chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
     )
 
-    return _format_to_accordion_group_html(documents)
+    return response_with_citations + _format_to_accordion_group_html(documents)
 
 
 def _format_to_accordion_html(document: Document, score: float) -> str:
@@ -93,6 +156,7 @@ def _format_to_accordion_html(document: Document, score: float) -> str:
             </button>
         </h4>
         <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
+            "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
             {"<p>" + document.content.strip() if document.content else ""}</p>
             {similarity_score}
         </div>
@@ -113,14 +177,14 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
             chunk = chunk_with_score.chunk
 
             formatted_chunk = _add_ellipses(chunk)
-            formatted_chunk = _replace_bem_with_link(formatted_chunk)
+            formatted_chunk = replace_bem_with_link(formatted_chunk)
 
             # Adjust markdown for lists so Chainlit renders correctly
             formatted_chunk = re.sub("^ - ", "- ", formatted_chunk, flags=re.MULTILINE)
             if formatted_chunk.startswith("- "):
                 formatted_chunk = "\n" + formatted_chunk
 
-            bem_url_for_page = _get_bem_url(document.name)
+            bem_url_for_page = get_bem_url(document.name)
             if chunk.page_number:
                 bem_url_for_page += "#page=" + str(chunk.page_number)
 
@@ -154,7 +218,7 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                         aria-expanded="false"
                         aria-controls="a-{_accordion_id}"
                         >
-                        <a href="{_get_bem_url(document.name)}">{document.name}</a> ({citation_range})
+                        <a href="{get_bem_url(document.name)}">{document.name}</a> ({citation_range})
                     </button>
                 </h4>
                 <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
@@ -163,21 +227,6 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
             </div>"""  # noqa: B907
 
     return "\n<h3>Source(s)</h3>" + html if html else ""
-
-
-def _get_bem_url(text: str) -> str:
-    bem = re.search(BEM_PATTERN, text)
-    if not bem:
-        raise ValueError(f"No BEM number found in text: {text}")
-    return f"https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/{bem.group(2)}.pdf"
-
-
-def _replace_bem_with_link(text: str) -> str:
-    return re.sub(
-        BEM_PATTERN,
-        r'<a href="https://dhhs.michigan.gov/OLMWeb/ex/BP/Public/BEM/\2.pdf">\1</a>',
-        text,
-    )
 
 
 def _add_ellipses(chunk: Chunk) -> str:
