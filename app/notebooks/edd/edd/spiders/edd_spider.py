@@ -25,17 +25,21 @@ class EddSpiderSpider(CrawlSpider):
         title = response.css("div.full-width-title h1::text").get()
         assert len(response.css("h1::text").getall()) == 1
         assert title == response.css("h1::text").get()
+        extractions = {"url": response.url, "title": title}
 
-        main_content = response.css("div.two-thirds")
-        # Remove buttons from the main content, i.e., "Show All"
-        main_content.css("button").drop()
+        if main_content := response.css("div.two-thirds"):
+            # Remove buttons from the main content, i.e., "Show All"
+            main_content.css("button").drop()
+            extractions |= self.parse_entire_two_thirds(main_content)
 
-        extractions = {"url": response.url, "title": title} | self.parse_entire_two_thirds(
-            main_content
-        )
-        if main_content.css("div.panel-group.accordion"):
-            extractions |= self.parse_nonaccordion(main_content)
-            extractions |= self.parse_accordions(main_content)
+            if main_content.css("div.panel-group.accordion"):
+                extractions |= self.parse_nonaccordion(main_content)
+                extractions |= self.parse_accordions(main_content)
+        elif main_primary := response.css("main.main-primary"):
+            extractions |= self.parse_main_primary(main_primary)
+        else:
+            pass
+
         return extractions
 
     def to_markdown(self, html):
@@ -52,13 +56,17 @@ class EddSpiderSpider(CrawlSpider):
         markdown = re.sub(r"\n\n+", "\n\n", markdown)
         return markdown.strip()
 
+    def parse_main_primary(self, main_primary):
+        markdown = self.to_markdown(main_primary.get())
+        return {"main_primary": markdown}
+
     def parse_entire_two_thirds(self, main_content):
         markdown = self.to_markdown(main_content.get())
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#collapse-(.*?)\)", r"\1", markdown)
         return {"main_content": cleaned_markdown}
 
     def parse_nonaccordion(self, main_content):
-        # Create a copy so we can call drop() on it
+        # Create a copy for modification without affecting the original
         nonaccordion = Selector(text=main_content.get())
         nonaccordion.css("div.panel-group.accordion").drop()
         return {"nonaccordion": self.to_markdown(nonaccordion.get())}
