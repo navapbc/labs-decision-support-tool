@@ -14,14 +14,15 @@ class EddSpiderSpider(CrawlSpider):
         "https://edd.ca.gov/en/disability/About_the_State_Disability_Insurance_SDI_Program",
         #     "https://edd.ca.gov/en/Disability/Am_I_Eligible_for_DI_Benefits",
         "https://edd.ca.gov/en/disability/how_to_file_a_di_claim_by_mail",
+        "https://edd.ca.gov/en/disability/Faqs/"
     ]
 
-    rules = (Rule(LinkExtractor(allow=r"en/"), callback="parse_item"),)
+    rules = (Rule(LinkExtractor(allow=r"en/"), callback="parse_page"),)
 
     def parse(self, response):
         pass
 
-    def parse_item(self, response):
+    def parse_page(self, response):
         title = response.css("div.full-width-title h1::text").get()
         assert len(response.css("h1::text").getall()) == 1
         assert title == response.css("h1::text").get()
@@ -52,8 +53,8 @@ class EddSpiderSpider(CrawlSpider):
             sup_symbol="<sup>",
             sub_symbol="<sub>",
         )
-        # Clean up markdown text: consolidate newlines, remove escaped hyphens
-        markdown = re.sub(r"\n\n+", "\n\n", markdown)
+        # Clean up markdown text: consolidate newlines; replace non-breaking spaces
+        markdown = re.sub(r"\n\n+", "\n\n", markdown).replace('\u00A0', ' ')
         return markdown.strip()
 
     def parse_main_primary(self, main_primary):
@@ -72,11 +73,8 @@ class EddSpiderSpider(CrawlSpider):
         return {"nonaccordion": self.to_markdown(nonaccordion.get())}
 
     def parse_accordions(self, main_content):
-        panels = main_content.css("div.panel.panel-default")
-        if not panels:
-            return {}
-
         sections: dict[str, list[str]] = {}
+        panels = main_content.css("div.panel.panel-default")
         for p in panels:
             heading = p.css("div.panel-heading :is(h2, h3, h4, h5, h6) a::text").get().strip()
             paragraphs = p.css("div.panel-body")
