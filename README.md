@@ -8,11 +8,11 @@ To set up your local development environment, follow the instructions in [Gettin
 
 ## Data Ingestion
 
-The data streams are currently separated by chat engines which are defined in [app/src/chat_engine.py](https://github.com/navapbc/labs-decision-support-tool/blob/main/app/src/chat_engine.py). To add a new engine, a class must be created with the following attributes engine_id,name, datasets (which must match the name of the ingestion dataset’s script, see below), and a formatter which formats the chat engine’s response.
+The data streams are currently separated by chat engines which are defined in [app/src/chat_engine.py](https://github.com/navapbc/labs-decision-support-tool/blob/main/app/src/chat_engine.py). To add a new engine, a class must be created with the following attributes: `engine_id`, `name`, `datasets` (which must match the name of the ingestion dataset’s script, see below), and a formatter which formats the chat engine’s response.
 
 ## Loading documents
 
-The application supports loading Guru cards from .json files or PDFs of the [Michigan's Bridges Eligibility Manual (BEM)](https://mdhhs-pres-prod.michigan.gov/olmweb/ex/BP/Public/BEM/000.pdf).
+The application supports loading Guru cards from .json files or PDFs of [Michigan's Bridges Eligibility Manual (BEM)](https://mdhhs-pres-prod.michigan.gov/olmweb/ex/BP/Public/BEM/000.pdf).
 
 ### Loading documents locally
 
