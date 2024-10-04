@@ -6,6 +6,10 @@ Welcome! You are at the root of the Nava Labs Decision Support Tool pilot repo.
 
 To set up your local development environment, follow the instructions in [Getting Started](docs/app/getting-started.md).
 
+## Data Ingestion
+
+The data streams are currently separated by chat engines which are defined in [app/src/chat_engine.py](https://github.com/navapbc/labs-decision-support-tool/blob/main/app/src/chat_engine.py). To add a new engine, a class must be created with the following attributes engine_id,name, datasets (which must match the name of the ingestion dataset’s script, see below), and a formatter which formats the chat engine’s response.
+
 ## Loading documents
 
 The application supports loading Guru cards from .json files or PDFs of the [Michigan's Bridges Eligibility Manual (BEM)](https://mdhhs-pres-prod.michigan.gov/olmweb/ex/BP/Public/BEM/000.pdf).
@@ -43,7 +47,3 @@ aws s3 cp path/to/some_cards.json s3://decision-support-tool-app-dev/
 
 Replace `<ENVIRONMENT>` with your environment, e.g., `dev`.
 Note the arguments `"dataset_identifier", "SNAP", "Michigan", "s3://decision-support-tool-app-dev/some_cards.json"` are in the same order as described above for `ingest-guru-cards`, i.e., `DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH`.
-
-## Data Ingestion
-
-The data streams are currently separated by chat engines which are defined in [app/src/chat_engine.py](https://github.com/navapbc/labs-decision-support-tool/blob/main/app/src/chat_engine.py). To add a new engine, a class must be created with the following attributes engine_id,name, datasets (which must match the name of the ingestion dataset’s script, see below), and a formatter which formats the chat engine’s response.
