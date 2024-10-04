@@ -8,7 +8,8 @@ To set up your local development environment, follow the instructions in [Gettin
 
 ## Data Ingestion
 
-The data streams are currently separated by chat engines which are defined in [app/src/chat_engine.py](https://github.com/navapbc/labs-decision-support-tool/blob/main/app/src/chat_engine.py). To add a new engine, a class must be created with the following attributes: `engine_id`, `name`, `datasets` (which must match the name of the ingestion dataset’s script, see below), and a formatter which formats the chat engine’s response.
+Chat engines (defined in [app/src/chat_engine.py](https://github.com/navapbc/labs-decision-support-tool/blob/main/app/src/chat_engine.py)) are downstream consumers of data sources. To add a new engine, a class must be created with the following attributes: `engine_id`, `name`, `datasets` (which must match the name of the ingestion dataset’s script, see below), and a formatter which formats the chat engine’s response.
+The `engine_id` determines the endpoint of the chatbot, while the `dataset` points to the data source to be consumed by the engine.
 
 ## Loading documents
 
