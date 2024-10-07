@@ -20,9 +20,16 @@ def _ingest_edd_web(
     with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
         json_items = json.load(json_file)
 
+    urls_processed: set[str] = set()
     for item in json_items:
+        if item["url"] in urls_processed:
+            # Workaround for duplicate items from web scraping
+            logger.warning("Skipping duplicate URL: %s", item["url"])
+            continue
+
         name = item["title"]
         logger.info("Processing %s (%s)", name, item["url"])
+        urls_processed.add(item["url"])
 
         content = item.get("main_content", item.get("main_primary"))
         assert content, f"Item {name} has no main_content or main_primary"

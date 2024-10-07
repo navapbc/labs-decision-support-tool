@@ -1,5 +1,4 @@
 import json
-import logging
 
 import pytest
 from sqlalchemy import delete, select

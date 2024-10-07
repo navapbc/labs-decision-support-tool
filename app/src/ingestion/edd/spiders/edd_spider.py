@@ -1,5 +1,4 @@
-# import scrapy
-# from w3lib.html import remove_tags
+import logging
 import re
 
 from markdownify import markdownify
@@ -7,6 +6,8 @@ from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import Selector, SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
+
+logger = logging.getLogger(__name__)
 
 AccordionSections = dict[str, list[str]]
 
@@ -37,6 +38,8 @@ class EddSpider(CrawlSpider):
                     "eddservices.edd.ca.gov",
                 ),
                 restrict_css=("div.two-thirds", "main.main-primary"),
+                canonicalize=True,
+                unique=True,
             ),
             callback="parse_page",
             follow=True,
@@ -59,11 +62,15 @@ class EddSpider(CrawlSpider):
             main_content.css("button").drop()
             extractions |= self.parse_entire_two_thirds(main_content)
 
-            if main_content.css("div.panel-group.accordion"):
+            if accordions := main_content.css("div.panel-group.accordion"):
+                if len(accordions) > 1:
+                    logger.info("Multiple accordions found at %s", response.url)
+
                 # If these parse methods become more complicated, move them to items.py
                 # and use ItemLoaders https://docs.scrapy.org/en/latest/topics/loaders.html
                 extractions |= self.parse_nonaccordion(main_content)
                 extractions |= self.parse_accordions(main_content)
+
         elif main_primary := response.css("main.main-primary"):
             main_primary.css("button").drop()
             extractions |= self.parse_main_primary(main_primary)
@@ -93,6 +100,8 @@ class EddSpider(CrawlSpider):
     def parse_entire_two_thirds(self, main_content: SelectorList) -> dict[str, str]:
         markdown = self.to_markdown(main_content.get())
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#collapse-(.*?)\)", r"\1", markdown)
+        # FIXME: parse tab panes correctly -- https://edd.ca.gov/en/unemployment/
+        cleaned_markdown = re.sub(r"\[(.*?)\]\(#pane-(.*?)\)", r"\1", cleaned_markdown)
         return {"main_content": cleaned_markdown}
 
     def parse_nonaccordion(self, main_content: SelectorList) -> dict[str, str]:
