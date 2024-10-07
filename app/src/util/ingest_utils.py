@@ -1,4 +1,5 @@
 import getopt
+import logging
 from logging import Logger
 from typing import Callable
 
@@ -18,6 +19,10 @@ def _drop_existing_dataset(db_session: db.Session, dataset: str) -> bool:
 
 def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call: Callable) -> None:
     """Method that reads sys args and passes them into ingestion call"""
+
+    # Print INFO messages since this is often run from the terminal
+    # during local development
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     if len(argv[1:]) != 4:
         logger.warning(

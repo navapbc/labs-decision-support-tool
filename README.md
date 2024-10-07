@@ -37,3 +37,14 @@ aws s3 cp path/to/some_cards.json s3://decision-support-tool-app-dev/
 
 Replace `<ENVIRONMENT>` with your environment, e.g., `dev`.
 Note the arguments `"dataset_identifier", "SNAP", "Michigan", "s3://decision-support-tool-app-dev/some_cards.json"` are in the same order as described above for `ingest-guru-cards`, i.e., `DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH`.
+
+
+### Web scraping
+
+Scrape web pages and save to a JSON file, for example: 
+```
+cd app/src/ingestion
+scrapy crawl edd_spider -o edd-about-sdi.json
+```
+
+To load into the vector database, see sections above but use `make ingest-edd-web DATASET_ID=edd-web BENEFIT_PROGRAM=employment BENEFIT_REGION=California FILEPATH=src/ingestion/edd_scrapings.json`.
