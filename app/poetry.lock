@@ -7065,6 +7065,17 @@ doc = ["Sphinx (<7)", "packaging", "sphinx-autodoc-typehints (>=1.2.0)", "sphinx
 test = ["mypy (>=1.2.0)", "pytest (>=7)"]
 
 [[package]]
+name = "types-markdown"
+version = "3.7.0.20240822"
+description = "Typing stubs for Markdown"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "types-Markdown-3.7.0.20240822.tar.gz", hash = "sha256:183557c9f4f865bdefd8f5f96a38145c31819271cde111d35557c3bd2069e78d"},
+    {file = "types_Markdown-3.7.0.20240822-py3-none-any.whl", hash = "sha256:bec91c410aaf2470ffdb103e38438fbcc53689b00133f19e64869eb138432ad7"},
+]
+
+[[package]]
 name = "types-python-dateutil"
 version = "2.9.0.20240316"
 description = "Typing stubs for python-dateutil"
@@ -7801,4 +7812,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "52a097d80b6ba9ab194d07f1943beb2c754ee54824037279b9b0867564de15cc"
+content-hash = "d9b4c7601e1948ec9a161d6d0d42b15685dc7b6ec3f739554e820ae273fb8c1a"
