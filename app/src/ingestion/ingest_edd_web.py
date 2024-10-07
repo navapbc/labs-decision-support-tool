@@ -35,6 +35,7 @@ with open(OUTPUT_JSON, "r", encoding="utf-8") as raw_json:
     data = json.load(raw_json)
 
     if "DEBUG_SCRAPINGS" in os.environ:
+        # This code could be moved to pipelines.py to be more formal
         with open(f"pretty-{OUTPUT_JSON}", "w", encoding="utf-8") as formatted_json:
             formatted_json.write(json.dumps(data, indent=4))
             print(f"Formatted JSON saved to pretty-{OUTPUT_JSON}")

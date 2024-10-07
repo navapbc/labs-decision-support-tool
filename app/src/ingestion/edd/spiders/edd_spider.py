@@ -36,9 +36,12 @@ class EddSpider(CrawlSpider):
             extractions |= self.parse_entire_two_thirds(main_content)
 
             if main_content.css("div.panel-group.accordion"):
+                # If these parse methods become more complicated, move them to items.py
+                # and use ItemLoaders https://docs.scrapy.org/en/latest/topics/loaders.html
                 extractions |= self.parse_nonaccordion(main_content)
                 extractions |= self.parse_accordions(main_content)
         elif main_primary := response.css("main.main-primary"):
+            main_primary.css("button").drop()
             extractions |= self.parse_main_primary(main_primary)
         else:
             pass
