@@ -3,6 +3,8 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
+import markdown
+
 from src.citations import dereference_citations, reify_citations_with_scores, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
@@ -66,9 +68,6 @@ def _get_bem_documents_to_show(
     return documents
 
 
-import markdown
-
-
 def to_html(text: str) -> str:
     return markdown.markdown(text.replace("- ", "\n- ", 1))
 
@@ -122,8 +121,6 @@ def format_bem_subsections(
                 {citation_link}
             </div>
         </div>"""
-
-    print(citations_html)
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
