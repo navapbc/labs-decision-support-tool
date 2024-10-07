@@ -6,9 +6,14 @@ Welcome! You are at the root of the Nava Labs Decision Support Tool pilot repo.
 
 To set up your local development environment, follow the instructions in [Getting Started](docs/app/getting-started.md).
 
+## Data Ingestion
+
+Chat engines (defined in [app/src/chat_engine.py](https://github.com/navapbc/labs-decision-support-tool/blob/main/app/src/chat_engine.py)) are downstream consumers of data sources. To add a new engine, a class must be created with the following attributes: `engine_id`, `name`, `datasets` (which must match the name of the ingestion dataset’s script, see below), and a formatter which formats the chat engine’s response.
+The `engine_id` determines the endpoint of the chatbot, while the `dataset` points to the data source to be consumed by the engine.
+
 ## Loading documents
 
-The application supports loading Guru cards from .json files.
+The application supports loading Guru cards from .json files or PDFs of [Michigan's Bridges Eligibility Manual (BEM)](https://mdhhs-pres-prod.michigan.gov/olmweb/ex/BP/Public/BEM/000.pdf).
 
 ### Loading documents locally
 
@@ -16,6 +21,12 @@ To load a JSON file containing Guru cards in your local environment, from within
 
 ```bash
 make ingest-guru-cards DATASET_ID=dataset_identifier BENEFIT_PROGRAM=SNAP BENEFIT_REGION=Michigan FILEPATH=path/to/some_cards.json
+```
+
+To load the BEM pdfs in your local environment, from within `/app`:
+
+```bash
+make ingest-bem-pdfs DATASET_ID=bridges-eligibility-manual BENEFIT_PROGRAM=multiprogram BENEFIT_REGION=Michigan FILEPATH=path/to/bem_pdfs
 ```
 
 - The same `DATASET_ID` identifier can be used for multiple documents (`FILEPATH`) to represent that the documents belong in the same dataset.
