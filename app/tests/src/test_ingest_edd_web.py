@@ -70,7 +70,9 @@ doc_attribs = {
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
-def test__ingest_edd(caplog, app_config, db_session, edd_web_local_file, edd_web_s3_file, file_location):
+def test__ingest_edd(
+    caplog, app_config, db_session, edd_web_local_file, edd_web_s3_file, file_location
+):
     db_session.execute(delete(Document))
 
     with caplog.at_level(logging.WARNING):
@@ -82,6 +84,9 @@ def test__ingest_edd(caplog, app_config, db_session, edd_web_local_file, edd_web
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 2
 
-    assert "Skipping duplicate URL: https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/" in caplog.messages[0]
+    assert (
+        "Skipping duplicate URL: https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
+        in caplog.messages[0]
+    )
 
     # TODO: assert document and chunk contents
