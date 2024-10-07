@@ -15,20 +15,44 @@ class EddSpider(CrawlSpider):
     # This name is used on the commandline: scrapy crawl edd_spider
     name = "edd_spider"
     allowed_domains = ["edd.ca.gov"]
-    start_urls = [
-        "https://edd.ca.gov/en/disability/About_the_State_Disability_Insurance_SDI_Program",
-        #     "https://edd.ca.gov/en/Disability/Am_I_Eligible_for_DI_Benefits",
-        "https://edd.ca.gov/en/disability/how_to_file_a_di_claim_by_mail",
-        "https://edd.ca.gov/en/disability/Faqs/",
-    ]
+    start_urls = ["https://edd.ca.gov/en/claims"]
 
-    rules = (Rule(LinkExtractor(allow=r"en/"), callback="parse_page"),)
+    rules = (
+        Rule(
+            LinkExtractor(
+                allow=r"en/",
+                deny=(
+                    # "en/language-resources" has non-English content
+                    "en/language-resources",
+                    # "EPiServer/CMS/Content" links to CMS backend content
+                    "EPiServer/CMS/Content",
+                    # "/archived-news-releases-..." redirects to pdf files
+                    "/archived-news-releases",
+                ),
+                allow_domains=allowed_domains,
+                deny_domains=(
+                    # Avoid crawling CMS backend content
+                    "cms.edd.ca.gov",
+                    # Avoid crawling EDD services like https://eddservices.edd.ca.gov/tap/open/rateinquiry
+                    "eddservices.edd.ca.gov"
+                    ),
+                restrict_css=("div.two-thirds", "main.main-primary"),
+            ),
+            callback="parse_page",
+            follow=True,
+        ),
+    )
 
     def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
+        extractions = {"url": response.url}
+
         title = response.css("div.full-width-title h1::text").get()
-        assert len(response.css("h1::text").getall()) == 1
-        assert title == response.css("h1::text").get()
-        extractions = {"url": response.url, "title": title}
+        if len(response.css("h1::text").getall()) == 1:
+            title = response.css("h1::text").get()
+            extractions["title"] = title
+        else:
+            titles = ";".join(response.css("h1::text").getall())
+            extractions["title"] = titles
 
         if main_content := response.css("div.two-thirds"):
             # Remove buttons from the main content, i.e., "Show All"
@@ -79,8 +103,7 @@ class EddSpider(CrawlSpider):
 
     def parse_accordions(self, main_content: SelectorList) -> dict[str, AccordionSections]:
         sections: AccordionSections = {}
-        panels = main_content.css("div.panel.panel-default")
-        for p in panels:
+        for p in main_content.css("div.panel.panel-default"):
             heading = p.css("div.panel-heading :is(h2, h3, h4, h5, h6) a::text").get().strip()
             paragraphs = p.css("div.panel-body")
             sections[heading] = [self.to_markdown(para.get()) for para in paragraphs]

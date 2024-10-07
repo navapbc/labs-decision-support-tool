@@ -1,3 +1,4 @@
 /.scrapy
 *.json
 *.json.md
+crawl_log-*.txt

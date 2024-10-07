@@ -1,9 +1,14 @@
 import json
+import logging
 import os
 from pprint import pprint
 
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
+
+
+logger = logging.getLogger(__name__)
+
 
 # Typically, env variable SCRAPY_PROJECT should be set when calling this script.
 # The SCRAPY_PROJECT env variable refers to the projects defined in scrapy.cfg
@@ -29,7 +34,7 @@ if OUTPUT_JSON in os.listdir():
 process.crawl("edd_spider")
 process.start()  # the script will block here until the crawling is finished
 
-print(f"Scraping results saved to {OUTPUT_JSON}")
+logger.info("Scraping results saved to %s", OUTPUT_JSON)
 # Postprocess the JSON output for readability
 with open(OUTPUT_JSON, "r", encoding="utf-8") as raw_json:
     data = json.load(raw_json)
@@ -38,7 +43,7 @@ with open(OUTPUT_JSON, "r", encoding="utf-8") as raw_json:
         # This code could be moved to pipelines.py to be more formal
         with open(f"pretty-{OUTPUT_JSON}", "w", encoding="utf-8") as formatted_json:
             formatted_json.write(json.dumps(data, indent=4))
-            print(f"Formatted JSON saved to pretty-{OUTPUT_JSON}")
+            logger.info("Formatted JSON saved to pretty-%s", OUTPUT_JSON)
 
         with open(f"{OUTPUT_JSON}.md", "w", encoding="utf-8") as md_file:
             for item in data:
@@ -60,4 +65,4 @@ with open(OUTPUT_JSON, "r", encoding="utf-8") as raw_json:
                         for para in paras:
                             item_md.append(para)
                 md_file.write("\n".join(item_md))
-            print(f"User-friendly markdown of JSON saved to {OUTPUT_JSON}.md")
+            logger.info("User-friendly markdown of JSON saved to %s.md", OUTPUT_JSON)

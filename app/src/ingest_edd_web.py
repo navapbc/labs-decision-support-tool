@@ -25,6 +25,7 @@ def _ingest_edd_web(
         logger.info("Processing %s (%s)", name, item["url"])
 
         content = item.get("main_content", item.get("main_primary"))
+        assert content, f"Item {name} has no main_content or main_primary"
 
         document = Document(name=name, content=content, **doc_attribs)
         db_session.add(document)
