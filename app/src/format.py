@@ -69,7 +69,9 @@ def _get_bem_documents_to_show(
 
 
 def to_html(text: str) -> str:
-    return markdown.markdown(text.replace("- ", "\n- ", 1))
+    # markdown expects '\n' before the start of a list
+    corrected_text = re.sub(r'^- ', "\n- ", text, flags=re.MULTILINE, count=1)
+    return markdown.markdown(corrected_text)
 
 
 def format_bem_subsections(
@@ -237,7 +239,6 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
                 {citations}
                 </div>
             </div>"""  # noqa: B907
-    print(html)
 
     return "\n<h3>Source(s)</h3>" + html if html else ""
 
