@@ -42,9 +42,9 @@ Note the arguments `"dataset_identifier", "SNAP", "Michigan", "s3://decision-sup
 ### Web scraping
 
 Scrape web pages and save to a JSON file, for example: 
-```
+```sh
 cd app/src/ingestion
-scrapy crawl edd_spider -o edd-about-sdi.json
+python scrape_edd_web.py
 ```
 
 To load into the vector database, see sections above but use `make ingest-edd-web DATASET_ID=edd-web BENEFIT_PROGRAM=employment BENEFIT_REGION=California FILEPATH=src/ingestion/edd_scrapings.json`.

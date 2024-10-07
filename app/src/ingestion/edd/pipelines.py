@@ -8,6 +8,6 @@
 # from itemadapter import ItemAdapter
 
 
-class EddPipeline:
-    def process_item(self, item, spider):
-        return item
+# class EddPipeline:
+#     def process_item(self, item, spider):
+#         return item

@@ -3,9 +3,12 @@
 import re
 
 from markdownify import markdownify
+from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
-from scrapy.selector import Selector
+from scrapy.selector import Selector, SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
+
+AccordionSections = dict[str, list[str]]
 
 
 class EddSpider(CrawlSpider):
@@ -21,10 +24,7 @@ class EddSpider(CrawlSpider):
 
     rules = (Rule(LinkExtractor(allow=r"en/"), callback="parse_page"),)
 
-    def parse(self, response):
-        pass
-
-    def parse_page(self, response):
+    def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
         title = response.css("div.full-width-title h1::text").get()
         assert len(response.css("h1::text").getall()) == 1
         assert title == response.css("h1::text").get()
@@ -48,7 +48,7 @@ class EddSpider(CrawlSpider):
 
         return extractions
 
-    def to_markdown(self, html):
+    def to_markdown(self, html: str) -> str:
         markdown = markdownify(
             html,
             heading_style="ATX",
@@ -62,23 +62,23 @@ class EddSpider(CrawlSpider):
         markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
         return markdown.strip()
 
-    def parse_main_primary(self, main_primary):
+    def parse_main_primary(self, main_primary: SelectorList) -> dict[str, str]:
         markdown = self.to_markdown(main_primary.get())
         return {"main_primary": markdown}
 
-    def parse_entire_two_thirds(self, main_content):
+    def parse_entire_two_thirds(self, main_content: SelectorList) -> dict[str, str]:
         markdown = self.to_markdown(main_content.get())
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#collapse-(.*?)\)", r"\1", markdown)
         return {"main_content": cleaned_markdown}
 
-    def parse_nonaccordion(self, main_content):
+    def parse_nonaccordion(self, main_content: SelectorList) -> dict[str, str]:
         # Create a copy for modification without affecting the original
         nonaccordion = Selector(text=main_content.get())
         nonaccordion.css("div.panel-group.accordion").drop()
         return {"nonaccordion": self.to_markdown(nonaccordion.get())}
 
-    def parse_accordions(self, main_content):
-        sections: dict[str, list[str]] = {}
+    def parse_accordions(self, main_content: SelectorList) -> dict[str, AccordionSections]:
+        sections: AccordionSections = {}
         panels = main_content.css("div.panel.panel-default")
         for p in panels:
             heading = p.css("div.panel-heading :is(h2, h3, h4, h5, h6) a::text").get().strip()

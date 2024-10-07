@@ -17,7 +17,7 @@ def _ingest_edd_web(
     json_filepath: str,
     doc_attribs: dict[str, str],
 ) -> None:
-    with open(json_filepath, "r", encoding="utf-8") as json_file:
+    with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
         json_items = json.load(json_file)
 
     for item in json_items:
