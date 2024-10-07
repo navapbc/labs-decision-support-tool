@@ -1,4 +1,5 @@
 import json
+import logging
 
 import pytest
 from sqlalchemy import delete, select
@@ -11,6 +12,11 @@ from src.ingest_edd_web import _ingest_edd_web
 def sample_cards():
     return json.dumps(
         [
+            {
+                "url": "https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/",
+                "title": "Options to File for Disability Insurance Benefits",
+                "main_content": "Disability Insurance (DI) provides short-term, partial wage replacement ...\n\nIf you think you are eligible to [file a claim](/en/disability/apply/), review ...",
+            },
             {
                 "url": "https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/",
                 "title": "Options to File for Disability Insurance Benefits",
@@ -44,14 +50,14 @@ If you are enrolled in the Annual Leave Program (ALP), your employer will contin
 
 
 @pytest.fixture
-def guru_local_file(tmp_path, sample_cards):
+def edd_web_local_file(tmp_path, sample_cards):
     file_path = tmp_path / "edd_scrapings.json"
     file_path.write_text(sample_cards)
     return str(file_path)
 
 
 @pytest.fixture
-def guru_s3_file(mock_s3_bucket_resource, sample_cards):
+def edd_web_s3_file(mock_s3_bucket_resource, sample_cards):
     mock_s3_bucket_resource.put_object(Body=sample_cards, Key="edd_scrapings.json")
     return "s3://test_bucket/edd_scrapings.json"
 
@@ -64,15 +70,18 @@ doc_attribs = {
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
-def test__ingest_edd(app_config, db_session, guru_local_file, guru_s3_file, file_location):
+def test__ingest_edd(caplog, app_config, db_session, edd_web_local_file, edd_web_s3_file, file_location):
     db_session.execute(delete(Document))
 
-    if file_location == "local":
-        _ingest_edd_web(db_session, guru_local_file, doc_attribs)
-    else:
-        _ingest_edd_web(db_session, guru_s3_file, doc_attribs)
+    with caplog.at_level(logging.WARNING):
+        if file_location == "local":
+            _ingest_edd_web(db_session, edd_web_local_file, doc_attribs)
+        else:
+            _ingest_edd_web(db_session, edd_web_s3_file, doc_attribs)
 
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 2
+
+    assert "Skipping duplicate URL: https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/" in caplog.messages[0]
 
     # TODO: assert document and chunk contents
