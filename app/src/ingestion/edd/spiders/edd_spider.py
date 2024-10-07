@@ -34,8 +34,8 @@ class EddSpider(CrawlSpider):
                     # Avoid crawling CMS backend content
                     "cms.edd.ca.gov",
                     # Avoid crawling EDD services like https://eddservices.edd.ca.gov/tap/open/rateinquiry
-                    "eddservices.edd.ca.gov"
-                    ),
+                    "eddservices.edd.ca.gov",
+                ),
                 restrict_css=("div.two-thirds", "main.main-primary"),
             ),
             callback="parse_page",
