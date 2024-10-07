@@ -70,7 +70,7 @@ def _get_bem_documents_to_show(
 
 def to_html(text: str) -> str:
     # markdown expects '\n' before the start of a list
-    corrected_text = re.sub(r'^- ', "\n- ", text, flags=re.MULTILINE, count=1)
+    corrected_text = re.sub(r"^- ", "\n- ", text, flags=re.MULTILINE, count=1)
     return markdown.markdown(corrected_text)
 
 
