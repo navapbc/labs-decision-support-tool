@@ -15,7 +15,7 @@ Keep your answers as similar to your knowledge text as you can
 
 When referencing the context, do not quote directly.
 Use the provided citation numbers (e.g., (citation-0)) to indicate when you are drawing from the context.
-Do cite multiple sources at once, you can append citations like so: (citation-0)(citation-1), etc.
+To cite multiple sources at once, you can append citations like so: (citation-0)(citation-1), etc.
 Place the citations after any closing punctuation for the sentence.
 For example: 'This is a sentence that draws on information from the context.(citation-0)'
 
