@@ -1,10 +1,11 @@
 # import scrapy
 # from w3lib.html import remove_tags
 import re
+
 from markdownify import markdownify
+from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import Selector
 from scrapy.spiders.crawl import CrawlSpider, Rule
-from scrapy.linkextractors import LinkExtractor
 
 
 class EddSpider(CrawlSpider):
@@ -15,7 +16,7 @@ class EddSpider(CrawlSpider):
         "https://edd.ca.gov/en/disability/About_the_State_Disability_Insurance_SDI_Program",
         #     "https://edd.ca.gov/en/Disability/Am_I_Eligible_for_DI_Benefits",
         "https://edd.ca.gov/en/disability/how_to_file_a_di_claim_by_mail",
-        "https://edd.ca.gov/en/disability/Faqs/"
+        "https://edd.ca.gov/en/disability/Faqs/",
     ]
 
     rules = (Rule(LinkExtractor(allow=r"en/"), callback="parse_page"),)
@@ -55,7 +56,7 @@ class EddSpider(CrawlSpider):
             sub_symbol="<sub>",
         )
         # Clean up markdown text: consolidate newlines; replace non-breaking spaces
-        markdown = re.sub(r"\n\n+", "\n\n", markdown).replace('\u00A0', ' ')
+        markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
         return markdown.strip()
 
     def parse_main_primary(self, main_primary):
