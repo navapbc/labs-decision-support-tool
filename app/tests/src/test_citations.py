@@ -5,6 +5,7 @@ from src.citations import (
     dereference_citations,
     reify_citations,
     split_into_subsections,
+    combine_citations,
 )
 from src.db.models.document import ChunkWithSubsection
 from tests.src.db.models.factories import ChunkFactory
@@ -64,6 +65,22 @@ def test_get_context(chunks):
         ChunkWithSubsection(chunks[0], "With two subsections"),
         ChunkWithSubsection(chunks[1], chunks[1].content),
     ]
+
+
+def test_combine_citations(chunks):
+    chunk_with_subsections = {
+        ChunkWithSubsection(chunks[0], "This is the first chunk."): 1,
+        ChunkWithSubsection(chunks[0], "With two subsections"): 2,
+        ChunkWithSubsection(chunks[1], chunks[1].content): 3,
+    }
+
+    assert combine_citations(chunk_with_subsections) == {
+        chunks[0]: [
+            {1: "This is the first chunk."},
+            {2: "With two subsections"},
+        ],
+        chunks[1]: [{3: chunks[1].content}],
+    }
 
 
 def test_dereference_citationss(context):

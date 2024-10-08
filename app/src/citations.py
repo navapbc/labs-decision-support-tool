@@ -3,7 +3,11 @@ import random
 import re
 from typing import Match, Sequence
 
-from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection
+from src.db.models.document import (
+    Chunk,
+    ChunkWithScore,
+    ChunkWithSubsection,
+)
 from src.util.bem_util import get_bem_url
 
 logger = logging.getLogger(__name__)
@@ -73,6 +77,18 @@ def dereference_citations(
             citation_number += 1
 
     return citations
+
+
+def combine_citations(
+    citations: dict[ChunkWithSubsection, int]
+) -> dict[Chunk, list[dict[int, str]]]:
+    combined_obj: dict[Chunk, list[dict[int, str]]] = {}
+    for citation, citation_number in citations.items():
+        if citation.chunk in combined_obj:
+            combined_obj[citation.chunk].append({citation_number: citation.subsection})
+        else:
+            combined_obj[citation.chunk] = [{citation_number: citation.subsection}]
+    return combined_obj
 
 
 def reify_citations(response: str, chunks: list[Chunk]) -> str:

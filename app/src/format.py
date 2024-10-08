@@ -3,7 +3,12 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
-from src.citations import dereference_citations, reify_citations_with_scores, split_into_subsections
+from src.citations import (
+    combine_citations,
+    dereference_citations,
+    reify_citations_with_scores,
+    split_into_subsections,
+)
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
@@ -79,20 +84,25 @@ def format_bem_subsections(
     chunks = [c.chunk for c in chunks_with_scores]
     context = split_into_subsections(chunks)
     citation_to_numbers = dereference_citations(context, raw_response)
-
     citations_html = ""
-    for citation, citation_number in citation_to_numbers.items():
-        _accordion_id += 1
-        chunk = citation.chunk
-        subsection = citation.subsection
 
-        formatted_subsection = replace_bem_with_link(subsection)
+    combined_citations = combine_citations(citation_to_numbers)
+    for citation, grouped_citations in combined_citations.items():
+        _accordion_id += 1
+        chunk = citation
+        citation_body = ""
+        citation_numbers = []
+        for citation_item in grouped_citations:
+            for citation_number, subsection in citation_item.items():
+                citation_numbers.append(f"{citation_number}")
+                citation_body += f'<div>Citation #{citation_number}: </div><div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{subsection}</div>'
+
+        formatted_citation_body = replace_bem_with_link(citation_body)
         bem_url_for_page = get_bem_url(chunk.document.name)
         if chunk.page_number:
             bem_url_for_page += "#page=" + str(chunk.page_number)
 
         citation_headings = "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
-        citation_body = f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>'
         citation_link = (
             (f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>")
             if chunk.page_number
@@ -106,12 +116,12 @@ def format_bem_subsections(
                     class="usa-accordion__button"
                     aria-expanded="false"
                     aria-controls="a-{_accordion_id}">
-                    {citation_number}. {chunk.document.name}
+                    {",".join(citation_numbers)}. {chunk.document.name}
                 </button>
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
                 {citation_headings}
-                {citation_body}
+                {formatted_citation_body}
                 {citation_link}
             </div>
         </div>"""
