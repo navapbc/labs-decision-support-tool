@@ -51,14 +51,13 @@ def get_models() -> dict[str, str]:
 def generate(
     llm: str,
     query: str,
-    context: Sequence[Chunk] | None = None,
+    context_text: str | None = None,
 ) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
     """
 
-    if context:
-        context_text = create_prompt_context(context)
+    if context_text:
         messages = [
             {
                 "content": PROMPT,
