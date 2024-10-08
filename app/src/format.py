@@ -3,6 +3,8 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
+import markdown
+
 from src.citations import dereference_citations, reify_citations_with_scores, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
@@ -66,6 +68,12 @@ def _get_bem_documents_to_show(
     return documents
 
 
+def to_html(text: str) -> str:
+    # markdown expects '\n' before the start of a list
+    corrected_text = re.sub(r"^- ", "\n- ", text, flags=re.MULTILINE, count=1)
+    return markdown.markdown(corrected_text)
+
+
 def format_bem_subsections(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
@@ -74,7 +82,7 @@ def format_bem_subsections(
 ) -> str:
     global _accordion_id
 
-    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
+    response_with_citations = to_html(reify_citations_with_scores(raw_response, chunks_with_scores))
 
     chunks = [c.chunk for c in chunks_with_scores]
     context = split_into_subsections(chunks)
@@ -86,7 +94,7 @@ def format_bem_subsections(
         chunk = citation.chunk
         subsection = citation.subsection
 
-        formatted_subsection = replace_bem_with_link(subsection)
+        formatted_subsection = to_html(replace_bem_with_link(subsection))
         bem_url_for_page = get_bem_url(chunk.document.name)
         if chunk.page_number:
             bem_url_for_page += "#page=" + str(chunk.page_number)
@@ -119,8 +127,14 @@ def format_bem_subsections(
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
     if citations_html:
-        return response_with_citations + "<h3>Source(s)</h3>" + citations_html
-    return response_with_citations
+        return (
+            "<div>"
+            + response_with_citations
+            + "</div><h3>Source(s)</h3><div>"
+            + citations_html
+            + "</div>"
+        )
+    return "<div>" + response_with_citations + "</div>"
 
 
 def format_bem_documents(
