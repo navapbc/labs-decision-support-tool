@@ -141,10 +141,15 @@ def test__add_ellipses():
 
 
 def test_format_bem_subsections(chunks_with_scores):
-    assert format_bem_subsections(0, 0, chunks_with_scores, "") == ""
+    assert format_bem_subsections(0, 0, chunks_with_scores, "") == "<div></div>"
     assert (
         format_bem_subsections(0, 0, [], "Non-existant citation: (citation-0)")
-        == "Non-existant citation: (citation-0)"
+        == "<div><p>Non-existant citation: (citation-0)</p></div>"
+    )
+
+    assert (
+        format_bem_subsections(0, 0, [], "List intro sentence: \n- item 1\n- item 2")
+        == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
     )
 
     chunks_with_scores[0].chunk.document.name = "BEM 100: Intro"
