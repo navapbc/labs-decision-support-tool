@@ -5,7 +5,7 @@ from typing import OrderedDict, Sequence
 
 import markdown
 
-from src.citations import dereference_citations, reify_citations_with_scores, split_into_subsections
+from src.citations import dereference_citations, reify_citations_with_scores, split_into_subsections, CitationFactory
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
@@ -85,11 +85,11 @@ def format_bem_subsections(
     response_with_citations = to_html(reify_citations_with_scores(raw_response, chunks_with_scores))
 
     chunks = [c.chunk for c in chunks_with_scores]
-    context = split_into_subsections(chunks)
-    citation_to_numbers = dereference_citations(context, raw_response)
+    subsections = split_into_subsections(chunks, factory = CitationFactory()) # FIXME: minimize calls to split_into_subsections()
+    citation_to_numbers = dereference_citations(subsections, raw_response)
 
     citations_html = ""
-    for citation, citation_number in citation_to_numbers.items():
+    for citation in citation_to_numbers:
         _accordion_id += 1
         chunk = citation.chunk
         subsection = citation.subsection
@@ -114,7 +114,7 @@ def format_bem_subsections(
                     class="usa-accordion__button"
                     aria-expanded="false"
                     aria-controls="a-{_accordion_id}">
-                    {citation_number}. {chunk.document.name}
+                    {citation.id}. {chunk.document.name}
                 </button>
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>

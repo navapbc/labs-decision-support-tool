@@ -155,6 +155,6 @@ def test_format_bem_subsections(chunks_with_scores):
     chunks_with_scores[0].chunk.document.name = "BEM 100: Intro"
     chunks_with_scores[1].chunk.document.name = "BEM 101: Another"
     html = format_bem_subsections(
-        0, 0, chunks_with_scores, "Some real citations: (citation-0) (citation-1)"
+        0, 0, chunks_with_scores, "Some real citations: (citation-1) (citation-2)"
     )
     assert len(_unique_accordion_ids(html)) == 2

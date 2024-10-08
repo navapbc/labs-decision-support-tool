@@ -1,11 +1,8 @@
 import logging
 import os
-from typing import Any, Sequence
+from typing import Any
 
 from litellm import completion
-
-from src.citations import create_prompt_context
-from src.db.models.document import Chunk
 
 logger = logging.getLogger(__name__)
 
