@@ -74,7 +74,7 @@ HTTPCACHE_DIR = "httpcache"
 # HTTPCACHE_IGNORE_HTTP_CODES = []
 # Based on https://doc.scrapy.org/en/latest/topics/downloader-middleware.html#module-scrapy.downloadermiddlewares.httpcache
 # and https://stackoverflow.com/questions/51432471/how-to-set-same-cache-folder-for-different-spiders-now-scrapy-creates-subfolder
-HTTPCACHE_STORAGE = "edd.cache.SplashAwareFSCacheStorage"
+HTTPCACHE_STORAGE = "edd.cache.FolderBasedFSCacheStorage"
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
