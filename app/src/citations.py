@@ -40,11 +40,18 @@ def split_into_subsections(
     factory: CitationIdFactory = citation_id_factory,
 ) -> Sequence[ChunkWithSubsection]:
     # Given a list of chunks, split them into a flat list of subsections to be used as citations
-    return [
+    subsections = [
         factory.create_citation(chunk, subsection)
         for chunk in chunks
         for subsection in chunk_splitter(chunk)
     ]
+    logger.info(
+        "Split %d chunks into %d subsections:\n%s",
+        len(chunks),
+        len(subsections),
+        "\n".join([f"{c.id}: {c.chunk.id}, {c.chunk.document.name}" for c in subsections]),
+    )
+    return subsections
 
 
 def create_prompt_context(subsections: Sequence[ChunkWithSubsection]) -> str:
@@ -96,6 +103,10 @@ def remap_citation_ids(
             # Add a copy of the subsection with the id replaced by a new consecutive citation number
             citation = citation_map[citation_id]
             citations[citation_id] = factory.create_citation(citation.chunk, citation.subsection)
+    logger.info(
+        "Remapped citations:\n  %s",
+        "\n  ".join([f"{id} -> {c.id}, {c.chunk.document.name}" for id, c in citations.items()]),
+    )
     return citations
 
 

@@ -143,7 +143,7 @@ async def on_message(message: cl.Message) -> None:
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
         result = await cl.make_async(lambda: engine.on_message(question=message.content))()
-
+        logger.info("Response: %s", result.response)
         msg_content = engine.formatter(
             chunks_shown_max_num=engine.chunks_shown_max_num,
             chunks_shown_min_score=engine.chunks_shown_min_score,

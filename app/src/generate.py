@@ -70,7 +70,7 @@ def generate(
 
     messages.append({"content": query, "role": "user"})
 
-    logger.info("Calling %s for query: %s", llm, query)
+    logger.info("Calling %s for query: %s with context:\n%s", llm, query, context_text)
     response = completion(model=llm, messages=messages, **completion_args(llm))
 
     return response["choices"][0]["message"]["content"]

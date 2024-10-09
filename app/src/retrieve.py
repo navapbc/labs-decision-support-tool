@@ -43,7 +43,7 @@ def retrieve_with_scores(
         ).all()
 
         retrievals = [
-            f"{index}. score {-score:.4f}: {chunk.document.name!r}"
+            f"{index}. score {-score:.4f}: {chunk.id}, {chunk.document.name!r}"
             for index, (chunk, score) in enumerate(chunks_with_scores, start=1)
         ]
         logger.info("Retrieved %d docs:\n  %s", len(chunks_with_scores), "\n  ".join(retrievals))
