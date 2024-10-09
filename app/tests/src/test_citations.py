@@ -5,8 +5,8 @@ import pytest
 from src.citations import (
     CitationIdFactory,
     create_prompt_context,
-    dereference_citations,
     reify_citations,
+    remap_citation_ids,
     split_into_subsections,
 )
 from tests.src.db.models.factories import ChunkFactory
@@ -82,10 +82,10 @@ def test_get_context(chunks, subsections):
     assert subsections[2].subsection == chunks[1].content
 
 
-def test_dereference_citations(subsections):
-    assert dereference_citations(subsections, "") == []
-    assert dereference_citations([], "A non-existent citation is (citation-0)") == []
-    assert dereference_citations(
+def test_remap_citation_ids(subsections):
+    assert remap_citation_ids(subsections, "") == []
+    assert remap_citation_ids([], "A non-existent citation is (citation-0)") == []
+    assert remap_citation_ids(
         subsections,
         f"Now a real citation is ({subsections[1].id}), which we can cite twice ({subsections[1].id}), followed by ({subsections[0].id})",
     ) == [dataclasses.replace(subsections[1], id="1"), dataclasses.replace(subsections[0], id="2")]

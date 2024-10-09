@@ -5,10 +5,7 @@ from typing import OrderedDict, Sequence
 
 import markdown
 
-from src.citations import (
-    dereference_citations,
-    reify_citations,
-)
+from src.citations import add_citation_links, reify_citations, remap_citation_ids
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
@@ -87,9 +84,9 @@ def format_bem_subsections(
 ) -> str:
     global _accordion_id
 
-    citation_to_numbers = dereference_citations(subsections, raw_response)
+    remapped_citations = remap_citation_ids(subsections, raw_response)
     citations_html = ""
-    for citation in citation_to_numbers:
+    for citation in remapped_citations:
         _accordion_id += 1
         chunk = citation.chunk
         subsection = citation.subsection
@@ -126,7 +123,7 @@ def format_bem_subsections(
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
-    response_with_citations = to_html(reify_citations(raw_response, subsections))
+    response_with_citations = to_html(add_citation_links(raw_response, remapped_citations))
     if citations_html:
         return (
             "<div>"

@@ -28,7 +28,9 @@ def _unique_accordion_ids(html):
 
 
 def to_subsections(chunks_with_scores):
-    return split_into_subsections([c.chunk for c in chunks_with_scores], factory=CitationIdFactory())
+    return split_into_subsections(
+        [c.chunk for c in chunks_with_scores], factory=CitationIdFactory()
+    )
 
 
 def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
