@@ -86,7 +86,7 @@ def format_bem_subsections(
 
     remapped_citations = remap_citation_ids(subsections, raw_response)
     citations_html = ""
-    for citation in remapped_citations:
+    for _orig_citation_id, citation in remapped_citations.items():
         _accordion_id += 1
         chunk = citation.chunk
         subsection = citation.subsection

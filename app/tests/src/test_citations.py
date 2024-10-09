@@ -83,9 +83,12 @@ def test_get_context(chunks, subsections):
 
 
 def test_remap_citation_ids(subsections):
-    assert remap_citation_ids(subsections, "") == []
-    assert remap_citation_ids([], "A non-existent citation is (citation-0)") == []
+    assert remap_citation_ids(subsections, "") == {}
+    assert remap_citation_ids([], "A non-existent citation is (citation-0)") == {}
     assert remap_citation_ids(
         subsections,
         f"Now a real citation is ({subsections[1].id}), which we can cite twice ({subsections[1].id}), followed by ({subsections[0].id})",
-    ) == [dataclasses.replace(subsections[1], id="1"), dataclasses.replace(subsections[0], id="2")]
+    ) == {
+        subsections[1].id: dataclasses.replace(subsections[1], id="1"),
+        subsections[0].id: dataclasses.replace(subsections[0], id="2"),
+    }
