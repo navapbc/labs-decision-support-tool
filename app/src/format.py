@@ -4,7 +4,7 @@ import re
 from typing import OrderedDict, Sequence
 
 from src.citations import (
-    combine_citations,
+    combine_citations_by_document,
     dereference_citations,
     reify_citations_with_scores,
     split_into_subsections,
@@ -86,45 +86,51 @@ def format_bem_subsections(
     citation_to_numbers = dereference_citations(context, raw_response)
     citations_html = ""
 
-    combined_citations = combine_citations(citation_to_numbers)
-    for citation, grouped_citations in combined_citations.items():
-        _accordion_id += 1
-        chunk = citation
-        citation_body = ""
-        citation_numbers = []
-        for citation_item in grouped_citations:
-            for citation_number, subsection in citation_item.items():
-                citation_numbers.append(f"{citation_number}")
-                citation_body += f'<div>Citation #{citation_number}: </div><div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{subsection}</div>'
+    citations_by_document = combine_citations_by_document(citation_to_numbers)
+    for document, chunk_list in citations_by_document.items():
+        for chunk in chunk_list:
+            for citation, grouped_citations in chunk.items():
+                _accordion_id += 1
+                chunk = citation
+                citation_body = ""
+                citation_numbers = []
+                for citation_item in grouped_citations:
+                    for citation_number, subsection in citation_item.items():
+                        citation_numbers.append(f"{citation_number}")
+                        citation_body += f'<div>Citation #{citation_number}: </div><div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{subsection}</div>'
 
-        formatted_citation_body = replace_bem_with_link(citation_body)
-        bem_url_for_page = get_bem_url(chunk.document.name)
-        if chunk.page_number:
-            bem_url_for_page += "#page=" + str(chunk.page_number)
+                formatted_citation_body = replace_bem_with_link(citation_body)
+                bem_url_for_page = get_bem_url(document.name)
+                if chunk.page_number:
+                    bem_url_for_page += "#page=" + str(chunk.page_number)
 
-        citation_headings = "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
-        citation_link = (
-            (f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>")
-            if chunk.page_number
-            else ""
-        )
-        citations_html += f"""
-        <div class="usa-accordion" id=accordion-{_accordion_id}>
-            <h4 class="usa-accordion__heading">
-                <button
-                    type="button"
-                    class="usa-accordion__button"
-                    aria-expanded="false"
-                    aria-controls="a-{_accordion_id}">
-                    {",".join(citation_numbers)}. {chunk.document.name}
-                </button>
-            </h4>
-            <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-                {citation_headings}
-                {formatted_citation_body}
-                {citation_link}
-            </div>
-        </div>"""
+                citation_headings = (
+                    "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
+                )
+                citation_link = (
+                    (
+                        f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
+                    )
+                    if chunk.page_number
+                    else ""
+                )
+            citations_html += f"""
+            <div class="usa-accordion" id=accordion-{_accordion_id}>
+                <h4 class="usa-accordion__heading">
+                    <button
+                        type="button"
+                        class="usa-accordion__button"
+                        aria-expanded="false"
+                        aria-controls="a-{_accordion_id}">
+                        {",".join(citation_numbers)}. {document.name}
+                    </button>
+                </h4>
+                <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
+                    {citation_headings}
+                    {formatted_citation_body}
+                    {citation_link}
+                </div>
+            </div>"""
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations

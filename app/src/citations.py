@@ -2,11 +2,13 @@ import logging
 import random
 import re
 from typing import Match, Sequence
+from uuid import UUID
 
 from src.db.models.document import (
     Chunk,
     ChunkWithScore,
     ChunkWithSubsection,
+    Document,
 )
 from src.util.bem_util import get_bem_url
 
@@ -79,16 +81,30 @@ def dereference_citations(
     return citations
 
 
-def combine_citations(
+def combine_citations_by_document(
     citations: dict[ChunkWithSubsection, int]
-) -> dict[Chunk, list[dict[int, str]]]:
-    combined_obj: dict[Chunk, list[dict[int, str]]] = {}
+) -> dict[Document, list[dict[Chunk, list[dict[int, str]]]]]:
+    """
+    This function groups the chunks by document and nests the values of the citation number and
+    substring.
+    """
+
+    citations_by_chunk: dict[Chunk, list[dict[int, str]]] = {}
     for citation, citation_number in citations.items():
-        if citation.chunk in combined_obj:
-            combined_obj[citation.chunk].append({citation_number: citation.subsection})
+        if citation.chunk in citations_by_chunk:
+            citations_by_chunk[citation.chunk].append({citation_number: citation.subsection})
         else:
-            combined_obj[citation.chunk] = [{citation_number: citation.subsection}]
-    return combined_obj
+            citations_by_chunk[citation.chunk] = [{citation_number: citation.subsection}]
+    citations_by_document: dict[Document, list[dict[Chunk, list[dict[int, str]]]]] = {}
+    for (
+        chunk,
+        citation,
+    ) in citations_by_chunk.items():
+        if chunk.document in citations_by_document:
+            citations_by_document[chunk.document].append({chunk: citation})
+        else:
+            citations_by_document[chunk.document] = [{chunk: citation}]
+    return citations_by_document
 
 
 def reify_citations(response: str, chunks: list[Chunk]) -> str:
