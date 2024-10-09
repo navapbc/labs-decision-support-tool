@@ -68,6 +68,7 @@ ingest-guru-cards = "src.ingest_guru_cards:main"
 ingest-policy-pdfs = "src.ingest_policy_pdfs:main"
 ingest-bem-pdfs = "src.ingest_bem_pdfs:main"
 ingest-edd-web = "src.ingest_edd_web:main"
+scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 
 [tool.black]
 line-length = 100
