@@ -19,7 +19,8 @@ if "SCRAPY_PROJECT" not in os.environ:
 
 OUTPUT_JSON = "edd_scrapings.json"
 
-def run_edd_spider():
+
+def run_edd_spider() -> None:
     settings = get_project_settings()
     settings["FEEDS"] = {
         OUTPUT_JSON: {"format": "json"},
@@ -37,7 +38,8 @@ def run_edd_spider():
 
     logger.info("Scraping results saved to %s", OUTPUT_JSON)
 
-def postprocess_json():
+
+def postprocess_json() -> None:
     # Postprocess the JSON output for readability
     with open(OUTPUT_JSON, "r", encoding="utf-8") as raw_json:
         data = json.load(raw_json)
@@ -69,8 +71,11 @@ def postprocess_json():
                 md_file.write("\n".join(item_md))
             logger.info("User-friendly markdown of JSON saved to %s.md", OUTPUT_JSON)
 
+
 def main() -> None:
+    # Scrapy expects the scrapy.cfg file to be in the current working directory
     os.chdir("src/ingestion")
     run_edd_spider()
+
     if "DEBUG_SCRAPINGS" in os.environ:
         postprocess_json()

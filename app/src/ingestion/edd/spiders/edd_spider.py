@@ -52,24 +52,33 @@ class EddSpider(CrawlSpider):
         title = response.css("div.full-width-title h1::text").get()
         if len(response.css("h1::text").getall()) == 1:
             title = response.css("h1::text").get()
-            extractions["title"] = title
+            extractions["title"] = title.strip()
         else:
             titles = ";".join(response.css("h1::text").getall())
             extractions["title"] = titles
 
-        if main_content := response.css("div.two-thirds"):
+        if two_thirds := response.css("div.two-thirds"):
             # Remove buttons from the main content, i.e., "Show All"
-            main_content.css("button").drop()
-            extractions |= self.parse_entire_two_thirds(main_content)
+            two_thirds.css("button").drop()
+            extractions |= self.parse_entire_two_thirds(two_thirds)
 
-            if accordions := main_content.css("div.panel-group.accordion"):
+            if not extractions.get("main_content"):
+                logger.warning(
+                    "Insufficient div.two-thirds content, fallback to parsing entire main-content for %s",
+                    response.url,
+                )
+                # The main-content div often has boilerplate navigation content that we usually ignore.
+                # For these 'en/about_edd/news_releases_and_announcements' pages, the navigation content doesn't exist
+                extractions |= self.parse_main_content(response.css("div#main-content"))
+
+            if accordions := two_thirds.css("div.panel-group.accordion"):
                 if len(accordions) > 1:
                     logger.info("Multiple accordions found at %s", response.url)
 
                 # If these parse methods become more complicated, move them to items.py
                 # and use ItemLoaders https://docs.scrapy.org/en/latest/topics/loaders.html
-                extractions |= self.parse_nonaccordion(main_content)
-                extractions |= self.parse_accordions(main_content)
+                extractions |= self.parse_nonaccordion(two_thirds)
+                extractions |= self.parse_accordions(two_thirds)
 
         elif main_primary := response.css("main.main-primary"):
             main_primary.css("button").drop()
@@ -97,8 +106,12 @@ class EddSpider(CrawlSpider):
         markdown = self.to_markdown(main_primary.get())
         return {"main_primary": markdown}
 
-    def parse_entire_two_thirds(self, main_content: SelectorList) -> dict[str, str]:
+    def parse_main_content(self, main_content: SelectorList) -> dict[str, str]:
         markdown = self.to_markdown(main_content.get())
+        return {"main_content": markdown}
+
+    def parse_entire_two_thirds(self, two_thirds: SelectorList) -> dict[str, str]:
+        markdown = self.to_markdown(two_thirds.get())
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#collapse-(.*?)\)", r"\1", markdown)
         # FIXME: parse tab panes correctly -- https://edd.ca.gov/en/unemployment/
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#pane-(.*?)\)", r"\1", cleaned_markdown)
