@@ -53,28 +53,22 @@ def generate(
     """
     Returns a string response from an LLM model, based on a query input.
     """
+    messages = [
+        {
+            "content": PROMPT,
+            "role": "system",
+        }
+    ]
 
     if context_text:
-        messages = [
-            {
-                "content": PROMPT,
-                "role": "system",
-            },
+        messages.append(
             {
                 "content": f"Use the following context to answer the question: {context_text}",
                 "role": "system",
             },
-            {"content": query, "role": "user"},
-        ]
+        )
 
-    else:
-        messages = [
-            {
-                "content": PROMPT,
-                "role": "system",
-            },
-            {"content": query, "role": "user"},
-        ]
+    messages.append({"content": query, "role": "user"})
 
     logger.info("Calling %s for query: %s", llm, query)
     response = completion(model=llm, messages=messages, **completion_args(llm))
