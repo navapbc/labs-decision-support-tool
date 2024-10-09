@@ -45,13 +45,6 @@ def _ingest_edd_web(
         )
         db_session.add(chunk)
 
-        # if tokens > embedding_model.max_seq_length:
-        #     logger.warning(
-        #         "Chunk %s has %i tokens, which exceeds the embedding model's max sequence length.",
-        #         name,
-        #         tokens,
-        #     )
-
 
 def main() -> None:
     process_and_ingest_sys_args(sys.argv, logger, _ingest_edd_web)
