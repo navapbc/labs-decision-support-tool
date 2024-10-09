@@ -48,7 +48,6 @@ def split_into_subsections(
 
 
 def create_prompt_context(subsections: Sequence[ChunkWithSubsection]) -> str:
-
     context_list = []
     for chunk_with_subsection in subsections:
         context_text = f"Citation: {chunk_with_subsection.id}\n"
@@ -64,24 +63,24 @@ def create_prompt_context(subsections: Sequence[ChunkWithSubsection]) -> str:
 
 # FIXME: rename to remap_citation_ids
 def dereference_citations(
-    context: Sequence[ChunkWithSubsection], response: str
+    subsections: Sequence[ChunkWithSubsection], response: str
 ) -> list[ChunkWithSubsection]:
     """
-    Map (citation-<index>) in `response`, where index is the index in `context`,
+    Map (citation-<index>) in `response`, where index is the index in `subsections`,
     to a dict of ChunkWithSubsection, where the key of the dictionary is the ChunkWithSubsection
     that the citation refers to, and the value is the user-friendly citation number
     for that citation.
-    E.g., if `context` is a list with five entries, and `response` is a string like
+    E.g., if `subsections` is a list with five entries, and `response` is a string like
     "Example (citation-3)(citation-1), another example (citation-1).", then this function will return
-    {context[3]: 1, context[1]: 2}; citations referencing context[3] should be shown to the user as "1" and
-    citations referencing context[1] should be shown as "2".
+    {subsections[3]: 1, subsections[1]: 2}; citations referencing subsections[3] should be shown to the user as "1" and
+    citations referencing subsections[1] should be shown as "2".
 
     """
-    print()
-    for c in context:
-        print(c.id, c.subsection)
-    citation_map = {c.id: c for c in context}
-    print("dereference_citations", citation_map)
+    # print()
+    # for c in subsections:
+    #     print(c.id, c.subsection)
+    citation_map = {c.id: c for c in subsections}
+    # print("dereference_citations", citation_map)
 
     citation_indices = re.findall(CITATION_PATTERN, response)
 

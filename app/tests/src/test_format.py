@@ -27,13 +27,15 @@ def _unique_accordion_ids(html):
     )
 
 
+def to_subsections(chunks_with_scores):
+    return split_into_subsections([c.chunk for c in chunks_with_scores], factory=CitationFactory())
+
+
 def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
 
     chunks_with_scores = _get_chunks_with_scores()
-    subsections = split_into_subsections(
-        [c.chunk for c in chunks_with_scores], factory=CitationFactory()
-    )
+    subsections = to_subsections(chunks_with_scores)
 
     html = format_guru_cards(
         chunks_shown_max_num=2,
@@ -62,28 +64,22 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
 
 
 def test_format_guru_cards_given_chunks_shown_max_num(chunks_with_scores):
-    subsections = split_into_subsections(
-        [c.chunk for c in chunks_with_scores], factory=CitationFactory()
-    )
     html = format_guru_cards(
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.8,
         chunks_with_scores=chunks_with_scores,
-        subsections=subsections,
+        subsections=to_subsections(chunks_with_scores),
         raw_response="",
     )
     assert len(_unique_accordion_ids(html)) == 2
 
 
 def test_format_guru_cards_given_chunks_shown_max_num_and_min_score(chunks_with_scores):
-    subsections = split_into_subsections(
-        [c.chunk for c in chunks_with_scores], factory=CitationFactory()
-    )
     html = format_guru_cards(
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.91,
         chunks_with_scores=chunks_with_scores,
-        subsections=subsections,
+        subsections=to_subsections(chunks_with_scores),
         raw_response="",
     )
     assert len(_unique_accordion_ids(html)) == 1
@@ -122,14 +118,11 @@ def test_format_bem_documents():
         ChunkWithScore(ChunkFactory.build(document=docs[3]), 0.95),
     ]
 
-    subsections = split_into_subsections(
-        [c.chunk for c in chunks_with_scores], factory=CitationFactory()
-    )
     html = format_bem_documents(
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.91,
         chunks_with_scores=chunks_with_scores,
-        subsections=subsections,
+        subsections=to_subsections(chunks_with_scores),
         raw_response="",
     )
 
@@ -160,9 +153,7 @@ def test__add_ellipses():
 
 
 def test_format_bem_subsections(chunks_with_scores):
-    subsections = split_into_subsections(
-        [c.chunk for c in chunks_with_scores], factory=CitationFactory()
-    )
+    subsections = to_subsections(chunks_with_scores)
 
     assert format_bem_subsections(0, 0, chunks_with_scores, subsections, "") == "<div></div>"
     assert (

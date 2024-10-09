@@ -20,6 +20,12 @@ def chunks():
 
 
 @pytest.fixture
+def subsections(chunks):
+    # Provide a factory to reset the citation id counter
+    return split_into_subsections(chunks, factory=CitationFactory())
+
+
+@pytest.fixture
 def context(chunks):
     factory = CitationFactory()
     return [
@@ -29,11 +35,10 @@ def context(chunks):
     ]
 
 
-def test_get_context_for_prompt(chunks):
+def test_get_context_for_prompt(chunks, subsections):
     assert create_prompt_context([]) == ""
 
-    subsection = split_into_subsections(chunks)
-    assert create_prompt_context(subsection) == (
+    assert create_prompt_context(subsections) == (
         f"""Citation: citation-1
 Document name: {chunks[0].document.name}
 Headings: {" > ".join(chunks[0].headings)}
@@ -51,13 +56,11 @@ Content: {chunks[1].content}"""
     )
 
 
-def test_reify_citations(chunks):
+def test_reify_citations(subsections):
     assert (
         reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
     )
 
-    subsections = split_into_subsections(chunks, factory=CitationFactory())
-    print("INPUT:", f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).")
     assert (
         reify_citations(
             f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
@@ -67,9 +70,7 @@ def test_reify_citations(chunks):
     )
 
 
-def test_get_context(chunks):
-    # Provide a factory to reset the citation id counter
-    subsections = split_into_subsections(chunks, factory=CitationFactory())
+def test_get_context(chunks, subsections):
     assert subsections[0].id == "citation-1"
     assert subsections[0].chunk == chunks[0]
     assert subsections[0].subsection == "This is the first chunk."
@@ -81,10 +82,10 @@ def test_get_context(chunks):
     assert subsections[2].subsection == chunks[1].content
 
 
-def test_dereference_citations(context):
-    assert dereference_citations(context, "") == []
+def test_dereference_citations(subsections):
+    assert dereference_citations(subsections, "") == []
     assert dereference_citations([], "A non-existent citation is (citation-0)") == []
     assert dereference_citations(
-        context,
-        f"Now a real citation is ({context[1].id}), which we can cite twice ({context[1].id}), followed by ({context[0].id})",
-    ) == [dataclasses.replace(context[1], id="1"), dataclasses.replace(context[0], id="2")]
+        subsections,
+        f"Now a real citation is ({subsections[1].id}), which we can cite twice ({subsections[1].id}), followed by ({subsections[0].id})",
+    ) == [dataclasses.replace(subsections[1], id="1"), dataclasses.replace(subsections[0], id="2")]

@@ -114,8 +114,7 @@ def test_generate(monkeypatch):
 
 def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
-    chunks = [c.chunk for c in chunks_with_scores]
-    subsection = split_into_subsections(chunks)
+    subsection = split_into_subsections([c.chunk for c in chunks_with_scores])
     context_text = create_prompt_context(subsection)
     expected_response = (
         'Called gpt-4o with [{"content": "'
