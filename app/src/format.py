@@ -3,14 +3,14 @@ import random
 import re
 from typing import OrderedDict, Sequence
 
+import markdown
+
 from src.citations import (
     combine_citations_by_document,
     dereference_citations,
     reify_citations_with_scores,
     split_into_subsections,
 )
-import markdown
-
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
