@@ -11,10 +11,10 @@ Use bullet points. Keep your answers brief, max of 5 sentences.
 Keep your answers as similar to your knowledge text as you can
 
 When referencing the context, do not quote directly.
-Use the provided citation numbers (e.g., (citation-0)) to indicate when you are drawing from the context.
-To cite multiple sources at once, you can append citations like so: (citation-0)(citation-1), etc.
+Use the provided citation numbers (e.g., (citation-1)) to indicate when you are drawing from the context.
+To cite multiple sources at once, you can append citations like so: (citation-1)(citation-2), etc.
 Place the citations after any closing punctuation for the sentence.
-For example: 'This is a sentence that draws on information from the context.(citation-0)'
+For example: 'This is a sentence that draws on information from the context.(citation-1)'
 
 Example Answer:
 If the client and their roommate purchase and prepare food separately, they can be considered different SNAP (FAP) groups. For instance:
