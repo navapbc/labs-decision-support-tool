@@ -1,9 +1,9 @@
+import dataclasses
 import logging
 import random
 import re
-import dataclasses
-from typing import Match, Sequence, Callable
 from itertools import count
+from typing import Callable, Match, Sequence
 
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection
 from src.util.bem_util import get_bem_url
@@ -26,6 +26,7 @@ class CitationFactory:
 
     def create_citation(self, chunk: Chunk, subsection: str) -> ChunkWithSubsection:
         return ChunkWithSubsection(self.next_id(), chunk, subsection)
+
 
 citation_factory = CitationFactory()
 
@@ -94,7 +95,9 @@ def dereference_citations(
         # so it's possible for it to hallucinate index numbers that don't exist
         if citation_id in citation_map and citation_id not in seen_ids:
             seen_ids.add(citation_id)
-            citations.append(dataclasses.replace(citation_map[citation_id], id=str(citation_number.__next__())))
+            citations.append(
+                dataclasses.replace(citation_map[citation_id], id=str(citation_number.__next__()))
+            )
 
     return citations
 
@@ -111,14 +114,16 @@ def reify_citations(response: str, subsections: Sequence[ChunkWithSubsection]) -
 
     # Replace (citation-<index>) with the appropriate citation
     def replace_citation(match: Match) -> str:
-        matched_text=match.group(1)
+        matched_text = match.group(1)
         global _footnote_index
         _footnote_index += 1
         # Leave a citation for chunks that don't exist alone
         citation_id = matched_text.removeprefix("citation-")
-        logger.warning("citation_id: %s", citation_id) # REMOVE
+        logger.warning("citation_id: %s", citation_id)  # REMOVE
         if citation_id not in citation_map:
-            logger.warning("LLM generated a citation for a reference (%s) that doesn't exist.", citation_id)
+            logger.warning(
+                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
+            )
             return f"({matched_text})"
 
         chunk = citation_map[citation_id].chunk
@@ -135,11 +140,3 @@ def reify_citations(response: str, subsections: Sequence[ChunkWithSubsection]) -
 
     # For now, don't show footnote list
     return added_citations  # + "</br>" + "</br>".join(footnote_list)
-
-
-def reify_citations_with_scores(
-    raw_response: str, chunks_with_scores: Sequence[ChunkWithScore]
-) -> str:
-    chunks = [c.chunk for c in chunks_with_scores]
-    subsections = split_into_subsections(chunks, factory = CitationFactory())
-    return reify_citations(raw_response, subsections)

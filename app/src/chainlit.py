@@ -148,6 +148,7 @@ async def on_message(message: cl.Message) -> None:
             chunks_shown_max_num=engine.chunks_shown_max_num,
             chunks_shown_min_score=engine.chunks_shown_min_score,
             chunks_with_scores=result.chunks_with_scores,
+            subsections=result.subsections,
             raw_response=result.response,
         )
 

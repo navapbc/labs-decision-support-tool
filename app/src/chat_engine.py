@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Sequence
 
 from src.citations import create_prompt_context, split_into_subsections
-from src.db.models.document import ChunkWithScore
+from src.db.models.document import ChunkWithScore, ChunkWithSubsection
 from src.format import format_bem_subsections, format_guru_cards
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 class OnMessageResult:
     response: str
     chunks_with_scores: Sequence[ChunkWithScore]
+    subsections: Sequence[ChunkWithSubsection]
 
 
 class ChatEngineInterface(ABC):
@@ -91,7 +92,7 @@ class BaseEngine(ChatEngineInterface):
         subsections = split_into_subsections(chunks)
         context_text = create_prompt_context(subsections)
         response = generate(self.llm, question, context_text=context_text)
-        return OnMessageResult(response, chunks_with_scores)
+        return OnMessageResult(response, chunks_with_scores, subsections)
 
 
 class GuruMultiprogramEngine(BaseEngine):

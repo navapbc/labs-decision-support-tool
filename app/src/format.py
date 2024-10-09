@@ -5,8 +5,13 @@ from typing import OrderedDict, Sequence
 
 import markdown
 
-from src.citations import dereference_citations, reify_citations_with_scores, reify_citations, split_into_subsections, CitationFactory
-from src.db.models.document import Chunk, ChunkWithScore, Document
+from src.citations import (
+    CitationFactory,
+    dereference_citations,
+    reify_citations,
+    split_into_subsections,
+)
+from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
 logger = logging.getLogger(__name__)
@@ -21,9 +26,10 @@ def format_guru_cards(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
+    subsections: Sequence[ChunkWithSubsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
+    response_with_citations = reify_citations(raw_response, subsections)
 
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
@@ -78,11 +84,11 @@ def format_bem_subsections(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
+    subsections: Sequence[ChunkWithSubsection],
     raw_response: str,
 ) -> str:
     global _accordion_id
 
-    subsections = split_into_subsections([c.chunk for c in chunks_with_scores], factory = CitationFactory())
     citation_to_numbers = dereference_citations(subsections, raw_response)
     citations_html = ""
     for citation in citation_to_numbers:
@@ -138,9 +144,10 @@ def format_bem_documents(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
+    subsections: Sequence[ChunkWithSubsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
+    response_with_citations = reify_citations(raw_response, subsections)
 
     documents = _get_bem_documents_to_show(
         chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)

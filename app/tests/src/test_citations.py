@@ -1,12 +1,13 @@
-import pytest
 import dataclasses
 
+import pytest
+
 from src.citations import (
+    CitationFactory,
     create_prompt_context,
     dereference_citations,
     reify_citations,
     split_into_subsections,
-    CitationFactory
 )
 from tests.src.db.models.factories import ChunkFactory
 
@@ -55,17 +56,20 @@ def test_reify_citations(chunks):
         reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
     )
 
-    subsections = split_into_subsections(chunks, factory = CitationFactory())
+    subsections = split_into_subsections(chunks, factory=CitationFactory())
     print("INPUT:", f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).")
     assert (
-        reify_citations(f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).", subsections)
+        reify_citations(
+            f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
+            subsections,
+        )
         == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
     )
 
 
 def test_get_context(chunks):
     # Provide a factory to reset the citation id counter
-    subsections = split_into_subsections(chunks, factory = CitationFactory())
+    subsections = split_into_subsections(chunks, factory=CitationFactory())
     assert subsections[0].id == "citation-1"
     assert subsections[0].chunk == chunks[0]
     assert subsections[0].subsection == "This is the first chunk."
