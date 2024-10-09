@@ -29,6 +29,8 @@ pdfminer-six = "^20240706"
 
 unstructured = {extras = ["pdf", "docx", "pptx"], version = "^0.15.8"}
 nltk = "^3.9.1"
+markdown = "^3.7"
+
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
 flake8 = "^6.1.0"
@@ -38,6 +40,7 @@ isort = "^5.12.0"
 mypy = "^1.5.1"
 moto = {extras = ["s3"], version = "^4.0.2"}
 types-pytz = "^2023.3.1.1"
+types-markdown = "^3.7.0.20240822"
 coverage = "^7.3.2"
 Faker = "^19.8.0"
 factory-boy = "^3.3.0"
