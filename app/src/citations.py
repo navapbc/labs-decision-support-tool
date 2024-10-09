@@ -46,11 +46,10 @@ def split_into_subsections(
     return context_mapping
 
 
-def create_prompt_context(chunks: Sequence[Chunk]) -> str:
-    context = split_into_subsections(chunks)
+def create_prompt_context(subsections: Sequence[ChunkWithSubsection]) -> str:
 
     context_list = []
-    for chunk_with_subsection in context:
+    for chunk_with_subsection in subsections:
         context_text = f"Citation: {chunk_with_subsection.id}\n"
         context_text += "Document name: " + chunk_with_subsection.chunk.document.name + "\n"
         if chunk_with_subsection.chunk.headings:
@@ -62,6 +61,7 @@ def create_prompt_context(chunks: Sequence[Chunk]) -> str:
     return "\n\n".join(context_list)
 
 
+# FIXME: rename to remap_citation_ids
 def dereference_citations(
     context: Sequence[ChunkWithSubsection], response: str
 ) -> list[ChunkWithSubsection]:

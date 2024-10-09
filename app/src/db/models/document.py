@@ -86,4 +86,3 @@ class ChunkWithSubsection:
     chunk: Chunk
     # specific substring within chunk.text
     subsection: str
-

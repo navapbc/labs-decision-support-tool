@@ -31,7 +31,8 @@ def context(chunks):
 def test_get_context_for_prompt(chunks):
     assert create_prompt_context([]) == ""
 
-    assert create_prompt_context(chunks) == (
+    subsection = split_into_subsections(chunks)
+    assert create_prompt_context(subsection) == (
         f"""Citation: citation-1
 Document name: {chunks[0].document.name}
 Headings: {" > ".join(chunks[0].headings)}
@@ -63,19 +64,17 @@ def test_reify_citations(chunks):
 
 
 def test_get_context(chunks):
-    subsections = split_into_subsections(chunks)
-    assert subsections[0].chunk == chunks[0]
-    assert subsections[0].subsection == "This is the first chunk."
-    assert subsections[1].chunk == chunks[0]
-    assert subsections[1].subsection == "With two subsections"
-    assert subsections[2].chunk == chunks[1]
-    assert subsections[2].subsection == chunks[1].content
-
     # Provide a factory to reset the citation id counter
     subsections = split_into_subsections(chunks, factory = CitationFactory())
     assert subsections[0].id == "citation-1"
+    assert subsections[0].chunk == chunks[0]
+    assert subsections[0].subsection == "This is the first chunk."
     assert subsections[1].id == "citation-2"
+    assert subsections[1].chunk == chunks[0]
+    assert subsections[1].subsection == "With two subsections"
     assert subsections[2].id == "citation-3"
+    assert subsections[2].chunk == chunks[1]
+    assert subsections[2].subsection == chunks[1].content
 
 
 def test_dereference_citations(context):

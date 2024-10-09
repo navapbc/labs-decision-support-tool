@@ -2,7 +2,7 @@ import os
 
 import ollama
 
-from src.citations import create_prompt_context
+from src.citations import create_prompt_context, split_into_subsections
 from src.generate import PROMPT, generate, get_models
 from tests.mock import mock_completion
 
@@ -115,7 +115,8 @@ def test_generate(monkeypatch):
 def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
     chunks = [c.chunk for c in chunks_with_scores]
-    context_text = create_prompt_context(chunks)
+    subsection = split_into_subsections(chunks)
+    context_text = create_prompt_context(subsection)
     expected_response = (
         'Called gpt-4o with [{"content": "'
         + PROMPT

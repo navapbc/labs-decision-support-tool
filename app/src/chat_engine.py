@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
-from src.citations import create_prompt_context
+from src.citations import create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore
 from src.format import format_bem_subsections, format_guru_cards
 from src.generate import generate
@@ -88,7 +88,8 @@ class BaseEngine(ChatEngineInterface):
         )
 
         chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-        context_text = create_prompt_context(chunks)
+        subsections = split_into_subsections(chunks)
+        context_text = create_prompt_context(subsections)
         response = generate(self.llm, question, context_text=context_text)
         return OnMessageResult(response, chunks_with_scores)
 
