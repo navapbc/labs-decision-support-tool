@@ -15,10 +15,6 @@ from src.util.ingest_utils import process_and_ingest_sys_args
 
 logger = logging.getLogger(__name__)
 
-# Print INFO messages since this is often run from the terminal
-# during local development
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 HEADER_PATTERN = r"(BEM\s\d*\s+\d+\sof\s\d+\s+\w.*)"
 
 

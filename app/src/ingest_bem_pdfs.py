@@ -24,10 +24,6 @@ from src.util.string_utils import split_list, split_paragraph
 
 logger = logging.getLogger(__name__)
 
-# Print INFO messages since this is often run from the terminal
-# during local development
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 
 def _get_bem_title(file: BinaryIO, file_path: str) -> str:
     """
