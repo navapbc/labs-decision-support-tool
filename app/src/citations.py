@@ -1,7 +1,8 @@
+from collections import defaultdict
 import logging
 import random
 import re
-from typing import Match, Sequence
+from typing import Match, Sequence, TypeAlias
 
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.util.bem_util import get_bem_url
@@ -75,29 +76,34 @@ def dereference_citations(
     return citations
 
 
+CitationNumberAndSubstring: TypeAlias = dict[int, str]
+ChunkWithCitation: TypeAlias = dict[Chunk, list[CitationNumberAndSubstring]]
+
+
 def combine_citations_by_document(
     citations: dict[ChunkWithSubsection, int]
-) -> dict[Document, list[dict[Chunk, list[dict[int, str]]]]]:
+) -> dict[Document, list[ChunkWithCitation]]:
     """
     This function groups the chunks by document and nests the values of the citation number and
     substring.
+
+    Args:
+        citations (dict[ChunkWithSubsection, int])
+        ChunkWithSubsection is the Chunk item with subsection string
+        and int is the user friendly citation number of that substring chunk
     """
 
-    citations_by_chunk: dict[Chunk, list[dict[int, str]]] = {}
+    citations_by_chunk: dict[Chunk, list[CitationNumberAndSubstring]] = defaultdict(list)
+
+    # Adding to the dictionary
+
     for citation, citation_number in citations.items():
-        if citation.chunk in citations_by_chunk:
-            citations_by_chunk[citation.chunk].append({citation_number: citation.subsection})
-        else:
-            citations_by_chunk[citation.chunk] = [{citation_number: citation.subsection}]
-    citations_by_document: dict[Document, list[dict[Chunk, list[dict[int, str]]]]] = {}
-    for (
-        chunk,
-        citation_item,
-    ) in citations_by_chunk.items():
-        if chunk.document in citations_by_document:
-            citations_by_document[chunk.document].append({chunk: citation_item})
-        else:
-            citations_by_document[chunk.document] = [{chunk: citation_item}]
+        citations_by_chunk[citation.chunk].append({citation_number: citation.subsection})
+
+    citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
+    for chunk, citation_item in citations_by_chunk.items():
+        citations_by_document[chunk.document].append({chunk: citation_item})
+
     return citations_by_document
 
 
