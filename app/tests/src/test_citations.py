@@ -3,7 +3,7 @@ import dataclasses
 import pytest
 
 from src.citations import (
-    CitationFactory,
+    CitationIdFactory,
     create_prompt_context,
     dereference_citations,
     reify_citations,
@@ -22,12 +22,12 @@ def chunks():
 @pytest.fixture
 def subsections(chunks):
     # Provide a factory to reset the citation id counter
-    return split_into_subsections(chunks, factory=CitationFactory())
+    return split_into_subsections(chunks, factory=CitationIdFactory())
 
 
 @pytest.fixture
 def context(chunks):
-    factory = CitationFactory()
+    factory = CitationIdFactory()
     return [
         factory.create_citation(chunks[0], "This is the first chunk."),
         factory.create_citation(chunks[0], "With two subsections"),

@@ -6,10 +6,8 @@ from typing import OrderedDict, Sequence
 import markdown
 
 from src.citations import (
-    CitationFactory,
     dereference_citations,
     reify_citations,
-    split_into_subsections,
 )
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link

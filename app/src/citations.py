@@ -5,7 +5,7 @@ import re
 from itertools import count
 from typing import Callable, Match, Sequence
 
-from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection
+from src.db.models.document import Chunk, ChunkWithSubsection
 from src.util.bem_util import get_bem_url
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ _footnote_index = 0
 CITATION_PATTERN = r"\((citation-\d+)\)"
 
 
-class CitationFactory:
+class CitationIdFactory:
     def __init__(self, start: int = 1, next_id: Callable | None = None):
         self.counter = count(start)
         if next_id:
@@ -28,23 +28,24 @@ class CitationFactory:
         return ChunkWithSubsection(self.next_id(), chunk, subsection)
 
 
-citation_factory = CitationFactory()
+citation_id_factory = CitationIdFactory()
+
+
+def default_chunk_splitter(chunk: Chunk) -> list[str]:
+    return chunk.content.split("\n\n")
 
 
 def split_into_subsections(
-    chunks: Sequence[Chunk], delimiter: str = "\n\n", factory: CitationFactory | None = None
+    chunks: Sequence[Chunk],
+    chunk_splitter: Callable = default_chunk_splitter,
+    id_factory: CitationIdFactory = citation_id_factory,
 ) -> Sequence[ChunkWithSubsection]:
-    if factory is None:
-        factory = citation_factory
-
-    # Given a list of chunks, split them into a flat list of subsections
-    context_mapping = []
-
-    for chunk in chunks:
-        for subsection in chunk.content.split(delimiter):
-            context_mapping.append(factory.create_citation(chunk, subsection))
-
-    return context_mapping
+    # Given a list of chunks, split them into a flat list of subsections to be used as citations
+    return [
+        id_factory.create_citation(chunk, subsection)
+        for chunk in chunks
+        for subsection in chunk_splitter(chunk)
+    ]
 
 
 def create_prompt_context(subsections: Sequence[ChunkWithSubsection]) -> str:
