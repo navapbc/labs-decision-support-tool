@@ -1,11 +1,11 @@
 import pytest
 
 from src.citations import (
+    combine_citations_by_document,
     create_prompt_context,
     dereference_citations,
     reify_citations,
     split_into_subsections,
-    combine_citations_by_document,
 )
 from src.db.models.document import ChunkWithSubsection
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
@@ -88,13 +88,10 @@ def test_combine_citations_by_document():
     # Check for items with the same chunk and different subsections
     assert combine_citations_by_document(chunks_items) == {
         docs[0]: [
-            {chunk_list[0]: [{1: "Subsection 1"}, {2: "Subsection 1"}]},
+            {chunk_list[0]: [{1: "Subsection 1"}, {2: "Subsection 2"}]},
             {chunk_list[1]: [{3: "Subsection 3"}]},
         ],
-        docs[1]: [
-            {chunk_list[2]: [{5: "Subsection 5"}]},
-            {chunk_list[3]: [{6: "Subsection 6"}]},
-        ],
+        docs[1]: [{chunk_list[2]: [{5: "Subsection 5"}]}, {chunk_list[3]: [{6: "Subsection 6"}]}],
     }
 
 

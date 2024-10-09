@@ -91,7 +91,6 @@ def format_bem_subsections(
         for chunk in chunk_list:
             for citation, grouped_citations in chunk.items():
                 _accordion_id += 1
-                chunk = citation
                 citation_body = ""
                 citation_numbers = []
                 for citation_item in grouped_citations:
@@ -101,17 +100,17 @@ def format_bem_subsections(
 
                 formatted_citation_body = replace_bem_with_link(citation_body)
                 bem_url_for_page = get_bem_url(document.name)
-                if chunk.page_number:
-                    bem_url_for_page += "#page=" + str(chunk.page_number)
+                if citation.page_number:
+                    bem_url_for_page += "#page=" + str(citation.page_number)
 
                 citation_headings = (
-                    "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
+                    "<p>" + " → ".join(citation.headings) + "</p>" if citation.headings else ""
                 )
                 citation_link = (
                     (
-                        f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
+                        f"<p><a href={bem_url_for_page!r}>Open document to page {citation.page_number}</a></p>"
                     )
-                    if chunk.page_number
+                    if citation.page_number
                     else ""
                 )
             citations_html += f"""

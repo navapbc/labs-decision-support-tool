@@ -2,14 +2,8 @@ import logging
 import random
 import re
 from typing import Match, Sequence
-from uuid import UUID
 
-from src.db.models.document import (
-    Chunk,
-    ChunkWithScore,
-    ChunkWithSubsection,
-    Document,
-)
+from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.util.bem_util import get_bem_url
 
 logger = logging.getLogger(__name__)
@@ -98,12 +92,12 @@ def combine_citations_by_document(
     citations_by_document: dict[Document, list[dict[Chunk, list[dict[int, str]]]]] = {}
     for (
         chunk,
-        citation,
+        citation_item,
     ) in citations_by_chunk.items():
         if chunk.document in citations_by_document:
-            citations_by_document[chunk.document].append({chunk: citation})
+            citations_by_document[chunk.document].append({chunk: citation_item})
         else:
-            citations_by_document[chunk.document] = [{chunk: citation}]
+            citations_by_document[chunk.document] = [{chunk: citation_item}]
     return citations_by_document
 
 
