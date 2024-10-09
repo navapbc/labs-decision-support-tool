@@ -256,3 +256,6 @@ ingest-policy-pdfs: check-ingest-arguments
 
 ingest-bem-pdfs: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-bem-pdfs $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+
+ingest-edd-web: check-ingest-arguments
+	$(PY_RUN_CMD) ingest-edd-web $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)

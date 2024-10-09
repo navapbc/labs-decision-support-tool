@@ -2,35 +2,37 @@ import json
 import logging
 import sys
 
-from smart_open import open
+from smart_open import open as smart_open
 
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.util.html import get_text_from_html
 from src.util.ingest_utils import process_and_ingest_sys_args
 
 logger = logging.getLogger(__name__)
 
 
-NAME_KEY = "preferredPhrase"
-CONTENT_KEY = "content"
-
-
-def _ingest_cards(
+def _ingest_edd_web(
     db_session: db.Session,
-    guru_cards_filepath: str,
+    json_filepath: str,
     doc_attribs: dict[str, str],
 ) -> None:
-    with open(guru_cards_filepath, "r") as guru_cards_file:
-        cards_as_json = json.load(guru_cards_file)
+    with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
+        json_items = json.load(json_file)
 
-    for card in cards_as_json:
-        logger.info(f"Processing card {card[NAME_KEY]!r}")
+    urls_processed: set[str] = set()
+    for item in json_items:
+        if item["url"] in urls_processed:
+            # Workaround for duplicate items from web scraping
+            logger.warning("Skipping duplicate URL: %s", item["url"])
+            continue
 
-        # Strip the HTML of the content and return just the content
-        name = card[NAME_KEY].strip()
-        content = get_text_from_html(card[CONTENT_KEY])
+        name = item["title"]
+        logger.info("Processing %s (%s)", name, item["url"])
+        urls_processed.add(item["url"])
+
+        content = item.get("main_content", item.get("main_primary"))
+        assert content, f"Item {name} has no main_content or main_primary"
 
         document = Document(name=name, content=content, **doc_attribs)
         db_session.add(document)
@@ -43,11 +45,6 @@ def _ingest_cards(
         )
         db_session.add(chunk)
 
-        if tokens > embedding_model.max_seq_length:
-            logger.warning(
-                f"Card {name!r} has {tokens} tokens, which exceeds the embedding model's max sequence length."
-            )
-
 
 def main() -> None:
-    process_and_ingest_sys_args(sys.argv, logger, _ingest_cards)
+    process_and_ingest_sys_args(sys.argv, logger, _ingest_edd_web)

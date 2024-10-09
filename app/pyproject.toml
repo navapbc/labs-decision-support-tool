@@ -29,6 +29,8 @@ pdfminer-six = "^20240706"
 
 unstructured = {extras = ["pdf", "docx", "pptx"], version = "^0.15.8"}
 nltk = "^3.9.1"
+scrapy = "^2.11.2"
+markdownify = "^0.13.1"
 markdown = "^3.7"
 
 [tool.poetry.group.dev.dependencies]
@@ -65,6 +67,8 @@ db-migrate-down-all = "src.db.migrations.run:downall"
 ingest-guru-cards = "src.ingest_guru_cards:main"
 ingest-policy-pdfs = "src.ingest_policy_pdfs:main"
 ingest-bem-pdfs = "src.ingest_bem_pdfs:main"
+ingest-edd-web = "src.ingest_edd_web:main"
+scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 
 [tool.black]
 line-length = 100
