@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from typing import NamedTuple
 from uuid import UUID
 
 import numpy as np
@@ -67,21 +67,18 @@ class Chunk(Base, IdMixin, TimestampMixin):
         return as_json
 
 
-@dataclass
-class ChunkWithScore:
+class ChunkWithScore(NamedTuple):
     chunk: Chunk
     score: float
 
 
-@dataclass
-class DocumentWithMaxScore:
+class DocumentWithMaxScore(NamedTuple):
     document: Document
     # The maximium similarity score of all Chunks associated with that document
     max_score: float
 
 
-@dataclass(frozen=True)
-class ChunkWithSubsection:
+class ChunkWithSubsection(NamedTuple):
     id: str
     chunk: Chunk
     # specific substring within chunk.text
