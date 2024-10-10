@@ -1,14 +1,13 @@
 import logging
 import pprint
-from typing import Any, Sequence
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Select, Slider, TextInput
 from src import chat_engine
 from src.app_config import app_config
-from src.chat_engine import ChatEngineInterface
-from src.db.models.document import ChunkWithScore
+from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.generate import get_models
 from src.login import require_login
 
@@ -161,7 +160,7 @@ async def on_message(message: cl.Message) -> None:
 
         await cl.Message(
             content=msg_content,
-            metadata=_get_retrieval_metadata(result.chunks_with_scores),
+            metadata=_get_retrieval_metadata(result),
         ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
@@ -173,14 +172,24 @@ async def on_message(message: cl.Message) -> None:
         raise err
 
 
-def _get_retrieval_metadata(chunks_with_scores: Sequence[ChunkWithScore]) -> dict:
+def _get_retrieval_metadata(result: OnMessageResult) -> dict:
     return {
+        "system_prompt": result.system_prompt,
         "chunks": [
             {
                 "document.name": chunk_with_score.chunk.document.name,
                 "chunk.id": str(chunk_with_score.chunk.id),
                 "score": chunk_with_score.score,
             }
-            for chunk_with_score in chunks_with_scores
-        ]
+            for chunk_with_score in result.chunks_with_scores
+        ],
+        "citations": [
+            {
+                "id": citations.id,
+                "chunk.id": str(citations.chunk.id),
+                "document.name": citations.chunk.document.name,
+                "text": citations.subsection,
+            }
+            for citations in result.subsections
+        ],
     }

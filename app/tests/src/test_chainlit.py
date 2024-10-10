@@ -1,5 +1,8 @@
 from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata
+from src.chat_engine import OnMessageResult
+from src.citations import CitationFactory
+from src.db.models.document import ChunkWithSubsection
 
 
 def test_url_query_values(monkeypatch):
@@ -20,7 +23,12 @@ def test_url_query_values(monkeypatch):
 
 
 def test__get_retrieval_metadata(chunks_with_scores):
-    assert _get_retrieval_metadata(chunks_with_scores) == {
+    system_prompt = "Some system prompt"
+    chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+    subsections = [ChunkWithSubsection(chunk.id, chunk, chunk.content) for chunk in chunks]
+    result = OnMessageResult("Some response", system_prompt, chunks_with_scores, subsections)
+    assert _get_retrieval_metadata(result) == {
+        "system_prompt": system_prompt,
         "chunks": [
             {
                 "document.name": chunks_with_scores[0].chunk.document.name,
@@ -37,5 +45,14 @@ def test__get_retrieval_metadata(chunks_with_scores):
                 "chunk.id": str(chunks_with_scores[2].chunk.id),
                 "score": chunks_with_scores[2].score,
             },
-        ]
+        ],
+        "citations": [
+            {
+                "id": citations.id,
+                "chunk.id": str(citations.chunk.id),
+                "document.name": citations.chunk.document.name,
+                "text": citations.subsection,
+            }
+            for citations in subsections
+        ],
     }

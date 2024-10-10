@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class OnMessageResult:
     response: str
+    system_prompt: str
     chunks_with_scores: Sequence[ChunkWithScore]
     subsections: Sequence[ChunkWithSubsection]
 
@@ -96,7 +97,7 @@ class BaseEngine(ChatEngineInterface):
         subsections = split_into_subsections(chunks, factory=CitationFactory())
         context_text = create_prompt_context(subsections)
         response = generate(self.llm, self.system_prompt, question, context_text)
-        return OnMessageResult(response, chunks_with_scores, subsections)
+        return OnMessageResult(response, self.system_prompt, chunks_with_scores, subsections)
 
 
 class GuruMultiprogramEngine(BaseEngine):
