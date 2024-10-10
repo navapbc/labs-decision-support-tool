@@ -3,9 +3,10 @@ import re
 from sqlalchemy import delete
 
 from src.citations import CitationFactory, split_into_subsections
-from src.db.models.document import Chunk, ChunkWithScore, Document
+from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.format import (
     _add_ellipses,
+    _combine_citations_by_document,
     _format_to_accordion_html,
     format_bem_documents,
     format_bem_subsections,
@@ -191,3 +192,34 @@ def test_reify_citations():
         )
         == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
     )
+
+
+def test__combine_citations_by_document():
+    docs = DocumentFactory.build_batch(2)
+    for doc in docs:
+        doc.name += "BEM 123"
+    chunk_list = ChunkFactory.build_batch(4)
+
+    chunk_list[0].document = docs[0]
+    chunk_list[1].document = docs[0]
+    chunk_list[2].document = docs[1]
+    chunk_list[3].document = docs[1]
+
+    chunks_items = {
+        "1": ChunkWithSubsection("citation-22", chunk_list[0], "Subsection 1"),
+        "2": ChunkWithSubsection("citation-21", chunk_list[0], "Subsection 2"),
+        "3": ChunkWithSubsection("citation-20", chunk_list[1], "Subsection 3"),
+        "5": ChunkWithSubsection("citation-27", chunk_list[2], "Subsection 5"),
+        "6": ChunkWithSubsection("citation-25", chunk_list[3], "Subsection 6"),
+    }
+    # Check for items with the same chunk and different subsections
+    assert _combine_citations_by_document(chunks_items) == {
+        docs[0]: [
+            {chunk_list[0]: [{"1": "Subsection 1"}, {"2": "Subsection 2"}]},
+            {chunk_list[1]: [{"3": "Subsection 3"}]},
+        ],
+        docs[1]: [
+            {chunk_list[2]: [{"5": "Subsection 5"}]},
+            {chunk_list[3]: [{"6": "Subsection 6"}]},
+        ],
+    }

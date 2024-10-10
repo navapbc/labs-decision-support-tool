@@ -1,18 +1,13 @@
 import logging
 import random
 import re
+from collections import defaultdict
 from typing import Match, OrderedDict, Sequence
 
 import markdown
 
 from src.citations import CITATION_PATTERN, remap_citation_ids
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
-from src.citations import (
-    combine_citations_by_document,
-    reify_citations_with_scores,
-    split_into_subsections,
-)
-from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
 logger = logging.getLogger(__name__)
@@ -92,12 +87,7 @@ def format_bem_subsections(
 
     remapped_citations = remap_citation_ids(subsections, raw_response)
     citations_html = ""
-    for _orig_citation_id, citation in remapped_citations.items():
-        _accordion_id += 1
-        chunk = citation.chunk
-        subsection = citation.subsection
-
-    citations_by_document = combine_citations_by_document(remapped_citations)
+    citations_by_document = _combine_citations_by_document(remapped_citations)
     for document, chunks_in_doc in citations_by_document.items():
         citation_body = ""
         citation_numbers = []
@@ -155,6 +145,30 @@ def format_bem_subsections(
             + "</div>"
         )
     return "<div>" + response_with_citations + "</div>"
+
+
+CitationIdToSubsection = dict[str, str]
+ChunkWithCitation = dict[Chunk, list[CitationIdToSubsection]]
+
+
+def _combine_citations_by_document(
+    citations: dict[str, ChunkWithSubsection]
+) -> dict[Document, list[ChunkWithCitation]]:
+    """
+    Group the chunks by document and nests the values of the citation number and subsection string.
+    Argument `citations` maps citation_id to ChunkWithSubsection
+    """
+
+    # for readability and so we don't need to run an index look up to update the nested chunk key
+    citations_by_chunk: dict[Chunk, list[CitationIdToSubsection]] = defaultdict(list)
+    for citation_id, citation in citations.items():
+        citations_by_chunk[citation.chunk].append({citation_id: citation.subsection})
+
+    citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
+    for chunk, citation_item_list in citations_by_chunk.items():
+        citations_by_document[chunk.document].append({chunk: citation_item_list})
+
+    return citations_by_document
 
 
 def format_bem_documents(
