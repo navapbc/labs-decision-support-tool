@@ -2,7 +2,7 @@ import re
 
 from sqlalchemy import delete
 
-from src.citations import CitationIdFactory, split_into_subsections
+from src.citations import CitationFactory, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, Document
 from src.format import (
     _add_ellipses,
@@ -29,7 +29,7 @@ def _unique_accordion_ids(html):
 
 def to_subsections(chunks_with_scores):
     return split_into_subsections(
-        [c.chunk for c in chunks_with_scores], factory=CitationIdFactory()
+        [c.chunk for c in chunks_with_scores], factory=CitationFactory()
     )
 
 

@@ -15,7 +15,7 @@ _footnote_index = 0
 CITATION_PATTERN = r"\((citation-\d+)\)"
 
 
-class CitationIdFactory:
+class CitationFactory:
     def __init__(self, start: int = 1, prefix: str = "citation-", next_id: Callable | None = None):
         self.counter = count(start)
         if next_id:
@@ -27,7 +27,7 @@ class CitationIdFactory:
         return ChunkWithSubsection(self.next_id(), chunk, subsection)
 
 
-citation_id_factory = CitationIdFactory()
+citation_factory = CitationFactory()
 
 
 def default_chunk_splitter(chunk: Chunk) -> list[str]:
@@ -37,7 +37,7 @@ def default_chunk_splitter(chunk: Chunk) -> list[str]:
 def split_into_subsections(
     chunks: Sequence[Chunk],
     chunk_splitter: Callable = default_chunk_splitter,
-    factory: CitationIdFactory = citation_id_factory,
+    factory: CitationFactory = citation_factory,
 ) -> Sequence[ChunkWithSubsection]:
     # Given a list of chunks, split them into a flat list of subsections to be used as citations
     subsections = [
@@ -93,7 +93,7 @@ def remap_citation_ids(
     # Create a lookup map from original citation id to the corresponding ChunkWithSubsection
     citation_map = {c.id: c for c in subsections}
     # Factory to create new consecutive citation ids
-    factory = CitationIdFactory(start=1, prefix="")
+    factory = CitationFactory(start=1, prefix="")
     # Citations to be returned; note that uncited subsections are not included
     citations: dict[str, ChunkWithSubsection] = {}
     for citation_id in deduped_indices:
