@@ -152,17 +152,17 @@ ChunkWithCitation = dict[Chunk, list[CitationIdToSubsection]]
 
 
 def _combine_citations_by_document(
-    citations: dict[str, ChunkWithSubsection]
+    remapped_citations: dict[str, ChunkWithSubsection]
 ) -> dict[Document, list[ChunkWithCitation]]:
     """
     Group the chunks by document and nests the values of the citation number and subsection string.
-    Argument `citations` maps citation_id to ChunkWithSubsection
+    Argument `remapped_citations` maps original citation_id (used in the LLM generated response) to ChunkWithSubsection
     """
 
     # for readability and so we don't need to run an index look up to update the nested chunk key
     citations_by_chunk: dict[Chunk, list[CitationIdToSubsection]] = defaultdict(list)
-    for citation_id, citation in citations.items():
-        citations_by_chunk[citation.chunk].append({citation_id: citation.subsection})
+    for _orig_citation_id, citation in remapped_citations.items():
+        citations_by_chunk[citation.chunk].append({citation.id: citation.subsection})
 
     citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
     for chunk, citation_item_list in citations_by_chunk.items():
@@ -306,21 +306,21 @@ def _add_citation_links(response: str, remapped_citations: dict[str, ChunkWithSu
 
     # Replace (citation-<index>) with the appropriate citation
     def replace_citation(match: Match) -> str:
-        matched_text = match.group(1)
-        global _footnote_index
-        _footnote_index += 1
+        citation_id = match.group(1)
         # Leave a citation for chunks that don't exist alone
-        citation_id = matched_text  # .removeprefix("citation-")
         if citation_id not in remapped_citations:
             logger.warning(
                 "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
             )
-            return f"({matched_text})"
+            return f"({citation_id})"
 
         chunk = remapped_citations[citation_id].chunk
         bem_link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
         bem_link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
         citation = f"<sup><a href={bem_link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
+
+        global _footnote_index
+        _footnote_index += 1
         footnote_list.append(
             f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
         )
