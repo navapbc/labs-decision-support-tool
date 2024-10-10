@@ -86,11 +86,16 @@ def _init_chat_settings(
 
 
 @cl.on_settings_update
-def update_settings(settings: dict[str, Any]) -> Any:
+async def update_settings(settings: dict[str, Any]) -> Any:
     logger.info("Updating settings: %s", pprint.pformat(settings, indent=4))
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     for setting_id, value in settings.items():
         setattr(engine, setting_id, value)
+    await cl.Message(
+        author="backend",
+        metadata=settings,
+        content="Settings updated for this session.",
+    ).send()
 
 
 # The ordering of _WIDGET_FACTORIES affects the order of the settings in the UI
