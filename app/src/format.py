@@ -96,11 +96,11 @@ def format_bem_subsections(
 
     citations_by_document = combine_citations_by_document(citation_to_numbers)
     for document, chunks_in_doc in citations_by_document.items():
+        citation_body = ""
+        citation_numbers = []
         for chunk_in_doc in chunks_in_doc:
             for citation, grouped_citations in chunk_in_doc.items():
                 _accordion_id += 1
-                citation_body = ""
-                citation_numbers = []
                 for citation_item in grouped_citations:
                     for citation_number, subsection in citation_item.items():
                         citation_numbers.append(f"{citation_number}")
@@ -121,23 +121,24 @@ def format_bem_subsections(
                     if citation.page_number
                     else ""
                 )
-            citations_html += f"""
-            <div class="usa-accordion" id=accordion-{_accordion_id}>
-                <h4 class="usa-accordion__heading">
-                    <button
-                        type="button"
-                        class="usa-accordion__button"
-                        aria-expanded="false"
-                        aria-controls="a-{_accordion_id}">
-                        {",".join(citation_numbers)}. {document.name}
-                    </button>
-                </h4>
-                <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-                    {citation_headings}
-                    {formatted_citation_body}
-                    {citation_link}
-                </div>
-            </div>"""
+
+        citations_html += f"""
+        <div class="usa-accordion" id=accordion-{_accordion_id}>
+            <h4 class="usa-accordion__heading">
+                <button
+                    type="button"
+                    class="usa-accordion__button"
+                    aria-expanded="false"
+                    aria-controls="a-{_accordion_id}">
+                    {",".join(citation_numbers)}. {document.name}
+                </button>
+            </h4>
+            <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
+                {citation_headings}
+                {formatted_citation_body}
+                {citation_link}
+            </div>
+        </div>"""
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
