@@ -1,13 +1,14 @@
 import pytest
 
 from src.citations import (
+    combine_citations_by_document,
     create_prompt_context,
     dereference_citations,
     reify_citations,
     split_into_subsections,
 )
 from src.db.models.document import ChunkWithSubsection
-from tests.src.db.models.factories import ChunkFactory
+from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
 @pytest.fixture
@@ -64,6 +65,34 @@ def test_get_context(chunks):
         ChunkWithSubsection(chunks[0], "With two subsections"),
         ChunkWithSubsection(chunks[1], chunks[1].content),
     ]
+
+
+def test_combine_citations_by_document():
+    docs = DocumentFactory.build_batch(2)
+    for doc in docs:
+        doc.name += "BEM 123"
+    chunk_list = ChunkFactory.build_batch(4)
+
+    chunk_list[0].document = docs[0]
+    chunk_list[1].document = docs[0]
+    chunk_list[2].document = docs[1]
+    chunk_list[3].document = docs[1]
+
+    chunks_items = {
+        ChunkWithSubsection(chunk_list[0], "Subsection 1"): 1,
+        ChunkWithSubsection(chunk_list[0], "Subsection 2"): 2,
+        ChunkWithSubsection(chunk_list[1], "Subsection 3"): 3,
+        ChunkWithSubsection(chunk_list[2], "Subsection 5"): 5,
+        ChunkWithSubsection(chunk_list[3], "Subsection 6"): 6,
+    }
+    # Check for items with the same chunk and different subsections
+    assert combine_citations_by_document(chunks_items) == {
+        docs[0]: [
+            {chunk_list[0]: [{1: "Subsection 1"}, {2: "Subsection 2"}]},
+            {chunk_list[1]: [{3: "Subsection 3"}]},
+        ],
+        docs[1]: [{chunk_list[2]: [{5: "Subsection 5"}]}, {chunk_list[3]: [{6: "Subsection 6"}]}],
+    }
 
 
 def test_dereference_citationss(context):

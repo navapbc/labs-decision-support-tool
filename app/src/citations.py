@@ -1,9 +1,10 @@
 import logging
 import random
 import re
-from typing import Match, Sequence
+from collections import defaultdict
+from typing import Match, Sequence, TypeAlias
 
-from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection
+from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.util.bem_util import get_bem_url
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,35 @@ def dereference_citations(
             citation_number += 1
 
     return citations
+
+
+CitationNumberAndSubsection: TypeAlias = dict[int, str]
+ChunkWithCitation: TypeAlias = dict[Chunk, list[CitationNumberAndSubsection]]
+
+
+def combine_citations_by_document(
+    citations: dict[ChunkWithSubsection, int]
+) -> dict[Document, list[ChunkWithCitation]]:
+    """
+    This function groups the chunks by document and nests the values of the citation number and
+    substring.
+
+    Args:
+        citations (dict[ChunkWithSubsection, int])
+        ChunkWithSubsection is the Chunk item with subsection string
+        and int is the user-friendly citation number of that subsection
+    """
+
+    # for readability and so we don't need to run an index look up to update the nested chunk key
+    citations_by_chunk: dict[Chunk, list[CitationNumberAndSubsection]] = defaultdict(list)
+    for citation, citation_number in citations.items():
+        citations_by_chunk[citation.chunk].append({citation_number: citation.subsection})
+
+    citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
+    for chunk, citation_item in citations_by_chunk.items():
+        citations_by_document[chunk.document].append({chunk: citation_item})
+
+    return citations_by_document
 
 
 def reify_citations(response: str, chunks: list[Chunk]) -> str:
