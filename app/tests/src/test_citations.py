@@ -5,7 +5,6 @@ import pytest
 from src.citations import (
     CitationFactory,
     create_prompt_context,
-    reify_citations,
     remap_citation_ids,
     split_into_subsections,
 )
@@ -53,20 +52,6 @@ Citation: citation-3
 Document name: {chunks[1].document.name}
 Headings: {" > ".join(chunks[1].headings)}
 Content: {chunks[1].content}"""
-    )
-
-
-def test_reify_citations(subsections):
-    assert (
-        reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
-    )
-
-    assert (
-        reify_citations(
-            f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
-            subsections,
-        )
-        == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
     )
 
 

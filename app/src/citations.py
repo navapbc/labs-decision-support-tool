@@ -1,16 +1,11 @@
 import logging
-import random
 import re
 from itertools import count
-from typing import Callable, Match, Sequence
+from typing import Callable, Sequence
 
 from src.db.models.document import Chunk, ChunkWithSubsection
-from src.util.bem_util import get_bem_url
 
 logger = logging.getLogger(__name__)
-
-_footnote_id = random.randint(0, 1000000)
-_footnote_index = 0
 
 CITATION_PATTERN = r"\((citation-\d+)\)"
 
@@ -108,44 +103,3 @@ def remap_citation_ids(
         "\n  ".join([f"{id} -> {c.id}, {c.chunk.document.name}" for id, c in citations.items()]),
     )
     return citations
-
-
-# TODO: move this to format.py
-def reify_citations(response: str, subsections: Sequence[ChunkWithSubsection]) -> str:
-    remapped_citations = remap_citation_ids(subsections, response)
-    return add_citation_links(response, remapped_citations)
-
-
-# TODO: move this to format.py since this is UI logic
-def add_citation_links(response: str, remapped_citations: dict[str, ChunkWithSubsection]) -> str:
-    global _footnote_id
-    _footnote_id += 1
-    footnote_list = []
-
-    # Replace (citation-<index>) with the appropriate citation
-    def replace_citation(match: Match) -> str:
-        matched_text = match.group(1)
-        global _footnote_index
-        _footnote_index += 1
-        # Leave a citation for chunks that don't exist alone
-        citation_id = matched_text  # .removeprefix("citation-")
-        if citation_id not in remapped_citations:
-            logger.warning(
-                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
-            )
-            return f"({matched_text})"
-
-        chunk = remapped_citations[citation_id].chunk
-        bem_link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
-        bem_link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
-        citation = f"<sup><a href={bem_link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
-        footnote_list.append(
-            f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
-        )
-        return citation
-
-    # Replace all instances of (citation-<index>) with an html link on superscript "<index>"
-    added_citations = re.sub(CITATION_PATTERN, replace_citation, response)
-
-    # For now, don't show footnote list
-    return added_citations  # + "</br>" + "</br>".join(footnote_list)

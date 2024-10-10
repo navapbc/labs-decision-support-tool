@@ -1,11 +1,11 @@
 import logging
 import random
 import re
-from typing import OrderedDict, Sequence
+from typing import Match, OrderedDict, Sequence
 
 import markdown
 
-from src.citations import add_citation_links, reify_citations, remap_citation_ids
+from src.citations import CITATION_PATTERN, remap_citation_ids
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
@@ -123,7 +123,7 @@ def format_bem_subsections(
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
-    response_with_citations = to_html(add_citation_links(raw_response, remapped_citations))
+    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations))
     if citations_html:
         return (
             "<div>"
@@ -252,3 +252,46 @@ def _add_ellipses(chunk: Chunk) -> str:
         else:
             return f"... {chunk_content} ..."
     return chunk_content
+
+
+def reify_citations(response: str, subsections: Sequence[ChunkWithSubsection]) -> str:
+    remapped_citations = remap_citation_ids(subsections, response)
+    return _add_citation_links(response, remapped_citations)
+
+
+_footnote_id = random.randint(0, 1000000)
+_footnote_index = 0
+
+
+def _add_citation_links(response: str, remapped_citations: dict[str, ChunkWithSubsection]) -> str:
+    global _footnote_id
+    _footnote_id += 1
+    footnote_list = []
+
+    # Replace (citation-<index>) with the appropriate citation
+    def replace_citation(match: Match) -> str:
+        matched_text = match.group(1)
+        global _footnote_index
+        _footnote_index += 1
+        # Leave a citation for chunks that don't exist alone
+        citation_id = matched_text  # .removeprefix("citation-")
+        if citation_id not in remapped_citations:
+            logger.warning(
+                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
+            )
+            return f"({matched_text})"
+
+        chunk = remapped_citations[citation_id].chunk
+        bem_link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
+        bem_link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
+        citation = f"<sup><a href={bem_link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
+        footnote_list.append(
+            f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
+        )
+        return citation
+
+    # Replace all instances of (citation-<index>) with an html link on superscript "<index>"
+    added_citations = re.sub(CITATION_PATTERN, replace_citation, response)
+
+    # For now, don't show footnote list
+    return added_citations  # + "</br>" + "</br>".join(footnote_list)

@@ -10,6 +10,7 @@ from src.format import (
     format_bem_documents,
     format_bem_subsections,
     format_guru_cards,
+    reify_citations,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
@@ -28,9 +29,7 @@ def _unique_accordion_ids(html):
 
 
 def to_subsections(chunks_with_scores):
-    return split_into_subsections(
-        [c.chunk for c in chunks_with_scores], factory=CitationFactory()
-    )
+    return split_into_subsections([c.chunk for c in chunks_with_scores], factory=CitationFactory())
 
 
 def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
@@ -174,3 +173,21 @@ def test_format_bem_subsections(chunks_with_scores):
         0, 0, chunks_with_scores, subsections, "Some real citations: (citation-1) (citation-2)"
     )
     assert len(_unique_accordion_ids(html)) == 2
+
+
+def test_reify_citations():
+    chunks = ChunkFactory.build_batch(2)
+    chunks[0].content = "This is the first chunk.\n\nWith two subsections"
+    subsections = split_into_subsections(chunks, factory=CitationFactory())
+
+    assert (
+        reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
+    )
+
+    assert (
+        reify_citations(
+            f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
+            subsections,
+        )
+        == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
+    )
