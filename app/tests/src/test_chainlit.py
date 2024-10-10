@@ -51,6 +51,7 @@ def test__get_retrieval_metadata(chunks_with_scores):
             "id": citations.id,
             "chunk.id": str(citations.chunk.id),
             "document.name": citations.chunk.document.name,
+            "headings": citations.chunk.headings,
             "text": citations.subsection,
         }
         for citations in subsections
