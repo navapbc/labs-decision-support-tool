@@ -206,11 +206,11 @@ def test__combine_citations_by_document():
     chunk_list[3].document = docs[1]
 
     chunks_items = {
-        "1": ChunkWithSubsection("citation-22", chunk_list[0], "Subsection 1"),
-        "2": ChunkWithSubsection("citation-21", chunk_list[0], "Subsection 2"),
-        "3": ChunkWithSubsection("citation-20", chunk_list[1], "Subsection 3"),
-        "5": ChunkWithSubsection("citation-27", chunk_list[2], "Subsection 5"),
-        "6": ChunkWithSubsection("citation-25", chunk_list[3], "Subsection 6"),
+        "citation-22": ChunkWithSubsection("1", chunk_list[0], "Subsection 1"),
+        "citation-21": ChunkWithSubsection("2", chunk_list[0], "Subsection 2"),
+        "citation-20": ChunkWithSubsection("3", chunk_list[1], "Subsection 3"),
+        "citation-27": ChunkWithSubsection("4", chunk_list[2], "Subsection 5"),
+        "citation-25": ChunkWithSubsection("5", chunk_list[3], "Subsection 6"),
     }
     # Check for items with the same chunk and different subsections
     assert _combine_citations_by_document(chunks_items) == {
@@ -219,7 +219,7 @@ def test__combine_citations_by_document():
             {chunk_list[1]: [{"3": "Subsection 3"}]},
         ],
         docs[1]: [
-            {chunk_list[2]: [{"5": "Subsection 5"}]},
-            {chunk_list[3]: [{"6": "Subsection 6"}]},
+            {chunk_list[2]: [{"4": "Subsection 5"}]},
+            {chunk_list[3]: [{"5": "Subsection 6"}]},
         ],
     }
