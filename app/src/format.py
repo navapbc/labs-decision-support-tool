@@ -95,9 +95,9 @@ def format_bem_subsections(
     citations_html = ""
 
     citations_by_document = combine_citations_by_document(citation_to_numbers)
-    for document, chunk_list in citations_by_document.items():
-        for chunk in chunk_list:
-            for citation, grouped_citations in chunk.items():
+    for document, chunks_in_doc in citations_by_document.items():
+        for chunk_in_doc in chunks_in_doc:
+            for citation, grouped_citations in chunk_in_doc.items():
                 _accordion_id += 1
                 citation_body = ""
                 citation_numbers = []

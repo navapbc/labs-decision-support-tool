@@ -76,8 +76,8 @@ def dereference_citations(
     return citations
 
 
-CitationNumberAndSubstring: TypeAlias = dict[int, str]
-ChunkWithCitation: TypeAlias = dict[Chunk, list[CitationNumberAndSubstring]]
+CitationNumberAndSubsection: TypeAlias = dict[int, str]
+ChunkWithCitation: TypeAlias = dict[Chunk, list[CitationNumberAndSubsection]]
 
 
 def combine_citations_by_document(
@@ -90,13 +90,11 @@ def combine_citations_by_document(
     Args:
         citations (dict[ChunkWithSubsection, int])
         ChunkWithSubsection is the Chunk item with subsection string
-        and int is the user friendly citation number of that substring chunk
+        and int is the user-friendly citation number of that subsection
     """
 
-    citations_by_chunk: dict[Chunk, list[CitationNumberAndSubstring]] = defaultdict(list)
-
-    # Adding to the dictionary
-
+    # for readability and so we don't need to run an index look up to update the nested chunk key
+    citations_by_chunk: dict[Chunk, list[CitationNumberAndSubsection]] = defaultdict(list)
     for citation, citation_number in citations.items():
         citations_by_chunk[citation.chunk].append({citation_number: citation.subsection})
 
