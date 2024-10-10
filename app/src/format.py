@@ -137,6 +137,54 @@ def format_bem_subsections(
     return "<div>" + response_with_citations + "</div>"
 
 
+def format_web_subsections(
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
+    chunks_with_scores: Sequence[ChunkWithScore],
+    raw_response: str,
+) -> str:
+    global _accordion_id
+
+    response_with_citations = to_html(reify_citations_with_scores(raw_response, chunks_with_scores))
+
+    chunks = [c.chunk for c in chunks_with_scores]
+    context = split_into_subsections(chunks)
+    citation_to_numbers = dereference_citations(context, raw_response)
+
+    citations_html = ""
+    for citation, citation_number in citation_to_numbers.items():
+        _accordion_id += 1
+        chunk = citation.chunk
+        formatted_subsection = to_html(citation.subsection)
+        citations_html += f"""
+        <div class="usa-accordion" id=accordion-{_accordion_id}>
+            <h4 class="usa-accordion__heading">
+                <button
+                    type="button"
+                    class="usa-accordion__button"
+                    aria-expanded="false"
+                    aria-controls="a-{_accordion_id}">
+                    {citation_number}. {chunk.document.name}
+                </button>
+            </h4>
+            <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
+                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>
+            </div>
+        </div>"""
+
+    # This heading is important to prevent Chainlit from embedding citations_html
+    # as the next part of a a list in response_with_citations
+    if citations_html:
+        return (
+            "<div>"
+            + response_with_citations
+            + "</div><h3>Source(s)</h3><div>"
+            + citations_html
+            + "</div>"
+        )
+    return "<div>" + response_with_citations + "</div>"
+
+
 def format_bem_documents(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
