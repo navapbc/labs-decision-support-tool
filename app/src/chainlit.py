@@ -183,11 +183,12 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
             }
             for chunk_with_score in result.chunks_with_scores
         ],
-        "citations": [
+        "subsections": [
             {
                 "id": citations.id,
                 "chunk.id": str(citations.chunk.id),
                 "document.name": citations.chunk.document.name,
+                "headings": citations.chunk.headings,
                 "text": citations.subsection,
             }
             for citations in result.subsections

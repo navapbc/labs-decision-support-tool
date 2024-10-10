@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 PROMPT = """Provide answers in plain language written at the average American reading level.
 Use bullet points. Keep your answers brief, max of 5 sentences.
-Keep your answers as similar to your knowledge text as you can
+Keep your answers as similar to your knowledge text as you can.
 
 When referencing the context, do not quote directly.
 Use the provided citation numbers (e.g., (citation-1)) to indicate when you are drawing from the context.
@@ -60,6 +60,7 @@ def generate(
             "role": "system",
         }
     ]
+    logger.info("Using system prompt: %s", system_prompt)
 
     if context_text:
         messages.append(
