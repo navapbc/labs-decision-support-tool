@@ -4,6 +4,7 @@ import logging
 import pytest
 from sqlalchemy import delete, select
 
+from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
 from src.ingest_edd_web import _ingest_edd_web
 
@@ -73,6 +74,9 @@ doc_attribs = {
 def test__ingest_edd(
     caplog, app_config, db_session, edd_web_local_file, edd_web_s3_file, file_location
 ):
+    # Force a short max_seq_length to test chunking
+    app_config_for_test.sentence_transformer.max_seq_length = 25
+
     db_session.execute(delete(Document))
 
     with caplog.at_level(logging.WARNING):
@@ -89,4 +93,23 @@ def test__ingest_edd(
         in caplog.messages[0]
     )
 
-    # TODO: assert document and chunk contents
+    documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
+    assert len(documents) == 2
+    assert documents[0].name == "Nonindustrial Disability Insurance FAQs"
+    assert documents[0].source == "https://edd.ca.gov/en/disability/nonindustrial/faqs/"
+    assert documents[1].name == "Options to File for Disability Insurance Benefits"
+    assert (
+        documents[1].source == "https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
+    )
+
+    assert len(documents[0].chunks) == 5
+    assert (
+        documents[0].chunks[0].content
+        == "## Nonindustrial Disability Insurance\n\nGet answers to FAQs about Nonindustrial Disability Insurance (NDI) and Nonindustrial Disability Insurance-Family Care Leave (NDI-FCL)."
+    )
+
+    assert len(documents[1].chunks) == 1
+    assert (
+        documents[1].chunks[0].content
+        == "Disability Insurance (DI) provides short-term, partial wage replacement ...\n\nIf you think you are eligible to [file a claim](/en/disability/apply/), review ..."
+    )

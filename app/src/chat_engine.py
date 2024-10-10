@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Sequence
 
 from src.db.models.document import ChunkWithScore
-from src.format import format_bem_subsections, format_guru_cards
+from src.format import format_bem_subsections, format_guru_cards, format_web_subsections
 from src.generate import generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
@@ -117,3 +117,17 @@ class BridgesEligibilityManualEngine(BaseEngine):
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
     datasets = ["bridges-eligibility-manual"]
     formatter = staticmethod(format_bem_subsections)
+
+
+class CaEddWebEngine(BaseEngine):
+    retrieval_k: int = 10
+    retrieval_k_min_score: float = -1
+
+    # Note: currently not used
+    chunks_shown_min_score: float = -1
+    chunks_shown_max_num: int = 8
+
+    engine_id: str = "ca-edd-web"
+    name: str = "CA EDD Web Chat Engine"
+    datasets = ["ca-edd-web"]
+    formatter = staticmethod(format_web_subsections)

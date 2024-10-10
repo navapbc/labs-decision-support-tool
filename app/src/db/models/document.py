@@ -22,6 +22,8 @@ class Document(Base, IdMixin, TimestampMixin):
         "Chunk", back_populates="document", cascade="all, delete"
     )
 
+    source: Mapped[str | None] = mapped_column(comment="Source of the document, e.g., a URI")
+
     # Domain-specific columns follow
     dataset: Mapped[str] = mapped_column(comment="dataset in which the document belongs")
     program: Mapped[str] = mapped_column(comment="benefit program")
