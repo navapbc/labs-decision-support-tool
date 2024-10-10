@@ -2,13 +2,16 @@ import re
 
 from sqlalchemy import delete
 
-from src.db.models.document import Chunk, ChunkWithScore, Document
+from src.citations import CitationFactory, split_into_subsections
+from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.format import (
     _add_ellipses,
+    _combine_citations_by_document,
     _format_to_accordion_html,
     format_bem_documents,
     format_bem_subsections,
     format_guru_cards,
+    reify_citations,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
@@ -26,14 +29,21 @@ def _unique_accordion_ids(html):
     )
 
 
+def to_subsections(chunks_with_scores):
+    return split_into_subsections([c.chunk for c in chunks_with_scores], factory=CitationFactory())
+
+
 def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
     db_session.execute(delete(Document))
 
     chunks_with_scores = _get_chunks_with_scores()
+    subsections = to_subsections(chunks_with_scores)
+
     html = format_guru_cards(
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.0,
         chunks_with_scores=chunks_with_scores,
+        subsections=subsections,
         raw_response="",
     )
     assert len(_unique_accordion_ids(html)) == len(chunks_with_scores)
@@ -49,6 +59,7 @@ def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enabl
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.0,
         chunks_with_scores=chunks_with_scores,
+        subsections=subsections,
         raw_response="",
     )
     assert len(_unique_accordion_ids(html + next_html)) == 2 * len(chunks_with_scores)
@@ -59,6 +70,7 @@ def test_format_guru_cards_given_chunks_shown_max_num(chunks_with_scores):
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.8,
         chunks_with_scores=chunks_with_scores,
+        subsections=to_subsections(chunks_with_scores),
         raw_response="",
     )
     assert len(_unique_accordion_ids(html)) == 2
@@ -69,6 +81,7 @@ def test_format_guru_cards_given_chunks_shown_max_num_and_min_score(chunks_with_
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.91,
         chunks_with_scores=chunks_with_scores,
+        subsections=to_subsections(chunks_with_scores),
         raw_response="",
     )
     assert len(_unique_accordion_ids(html)) == 1
@@ -111,6 +124,7 @@ def test_format_bem_documents():
         chunks_shown_max_num=2,
         chunks_shown_min_score=0.91,
         chunks_with_scores=chunks_with_scores,
+        subsections=to_subsections(chunks_with_scores),
         raw_response="",
     )
 
@@ -141,20 +155,71 @@ def test__add_ellipses():
 
 
 def test_format_bem_subsections(chunks_with_scores):
-    assert format_bem_subsections(0, 0, chunks_with_scores, "") == "<div></div>"
+    subsections = to_subsections(chunks_with_scores)
+
+    assert format_bem_subsections(0, 0, chunks_with_scores, subsections, "") == "<div></div>"
     assert (
-        format_bem_subsections(0, 0, [], "Non-existant citation: (citation-0)")
+        format_bem_subsections(0, 0, [], [], "Non-existant citation: (citation-0)")
         == "<div><p>Non-existant citation: (citation-0)</p></div>"
     )
 
     assert (
-        format_bem_subsections(0, 0, [], "List intro sentence: \n- item 1\n- item 2")
+        format_bem_subsections(0, 0, [], [], "List intro sentence: \n- item 1\n- item 2")
         == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
     )
 
     chunks_with_scores[0].chunk.document.name = "BEM 100: Intro"
     chunks_with_scores[1].chunk.document.name = "BEM 101: Another"
     html = format_bem_subsections(
-        0, 0, chunks_with_scores, "Some real citations: (citation-0) (citation-1)"
+        0, 0, chunks_with_scores, subsections, "Some real citations: (citation-1) (citation-2)"
     )
     assert len(_unique_accordion_ids(html)) == 2
+
+
+def test_reify_citations():
+    chunks = ChunkFactory.build_batch(2)
+    chunks[0].content = "This is the first chunk.\n\nWith two subsections"
+    subsections = split_into_subsections(chunks, factory=CitationFactory())
+
+    assert (
+        reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
+    )
+
+    assert (
+        reify_citations(
+            f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
+            subsections,
+        )
+        == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
+    )
+
+
+def test__combine_citations_by_document():
+    docs = DocumentFactory.build_batch(2)
+    for doc in docs:
+        doc.name += "BEM 123"
+    chunk_list = ChunkFactory.build_batch(4)
+
+    chunk_list[0].document = docs[0]
+    chunk_list[1].document = docs[0]
+    chunk_list[2].document = docs[1]
+    chunk_list[3].document = docs[1]
+
+    chunks_items = {
+        "citation-22": ChunkWithSubsection("1", chunk_list[0], "Subsection 1"),
+        "citation-21": ChunkWithSubsection("2", chunk_list[0], "Subsection 2"),
+        "citation-20": ChunkWithSubsection("3", chunk_list[1], "Subsection 3"),
+        "citation-27": ChunkWithSubsection("4", chunk_list[2], "Subsection 5"),
+        "citation-25": ChunkWithSubsection("5", chunk_list[3], "Subsection 6"),
+    }
+    # Check for items with the same chunk and different subsections
+    assert _combine_citations_by_document(chunks_items) == {
+        docs[0]: [
+            {chunk_list[0]: [{"1": "Subsection 1"}, {"2": "Subsection 2"}]},
+            {chunk_list[1]: [{"3": "Subsection 3"}]},
+        ],
+        docs[1]: [
+            {chunk_list[2]: [{"4": "Subsection 5"}]},
+            {chunk_list[3]: [{"5": "Subsection 6"}]},
+        ],
+    }

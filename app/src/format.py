@@ -1,17 +1,13 @@
 import logging
 import random
 import re
-from typing import OrderedDict, Sequence
+from collections import defaultdict
+from typing import Match, OrderedDict, Sequence
 
 import markdown
 
-from src.citations import (
-    combine_citations_by_document,
-    dereference_citations,
-    reify_citations_with_scores,
-    split_into_subsections,
-)
-from src.db.models.document import Chunk, ChunkWithScore, Document
+from src.citations import CITATION_PATTERN, remap_citation_ids
+from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
 logger = logging.getLogger(__name__)
@@ -26,9 +22,10 @@ def format_guru_cards(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
+    subsections: Sequence[ChunkWithSubsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
+    response_with_citations = reify_citations(raw_response, subsections)
 
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
@@ -83,18 +80,14 @@ def format_bem_subsections(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
+    subsections: Sequence[ChunkWithSubsection],
     raw_response: str,
 ) -> str:
     global _accordion_id
 
-    response_with_citations = to_html(reify_citations_with_scores(raw_response, chunks_with_scores))
-
-    chunks = [c.chunk for c in chunks_with_scores]
-    context = split_into_subsections(chunks)
-    citation_to_numbers = dereference_citations(context, raw_response)
+    remapped_citations = remap_citation_ids(subsections, raw_response)
     citations_html = ""
-
-    citations_by_document = combine_citations_by_document(citation_to_numbers)
+    citations_by_document = _combine_citations_by_document(remapped_citations)
     for document, chunks_in_doc in citations_by_document.items():
         citation_body = ""
         citation_numbers = []
@@ -142,6 +135,7 @@ def format_bem_subsections(
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
+    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations))
     if citations_html:
         return (
             "<div>"
@@ -153,13 +147,38 @@ def format_bem_subsections(
     return "<div>" + response_with_citations + "</div>"
 
 
+CitationIdToSubsection = dict[str, str]
+ChunkWithCitation = dict[Chunk, list[CitationIdToSubsection]]
+
+
+def _combine_citations_by_document(
+    remapped_citations: dict[str, ChunkWithSubsection]
+) -> dict[Document, list[ChunkWithCitation]]:
+    """
+    Group the chunks by document and nests the values of the citation number and subsection string.
+    Argument `remapped_citations` maps original citation_id (used in the LLM generated response) to ChunkWithSubsection
+    """
+
+    # for readability and so we don't need to run an index look up to update the nested chunk key
+    citations_by_chunk: dict[Chunk, list[CitationIdToSubsection]] = defaultdict(list)
+    for _orig_citation_id, citation in remapped_citations.items():
+        citations_by_chunk[citation.chunk].append({citation.id: citation.subsection})
+
+    citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
+    for chunk, citation_item_list in citations_by_chunk.items():
+        citations_by_document[chunk.document].append({chunk: citation_item_list})
+
+    return citations_by_document
+
+
 def format_bem_documents(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
+    subsections: Sequence[ChunkWithSubsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations_with_scores(raw_response, chunks_with_scores)
+    response_with_citations = reify_citations(raw_response, subsections)
 
     documents = _get_bem_documents_to_show(
         chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
@@ -269,3 +288,46 @@ def _add_ellipses(chunk: Chunk) -> str:
         else:
             return f"... {chunk_content} ..."
     return chunk_content
+
+
+def reify_citations(response: str, subsections: Sequence[ChunkWithSubsection]) -> str:
+    remapped_citations = remap_citation_ids(subsections, response)
+    return _add_citation_links(response, remapped_citations)
+
+
+_footnote_id = random.randint(0, 1000000)
+_footnote_index = 0
+
+
+def _add_citation_links(response: str, remapped_citations: dict[str, ChunkWithSubsection]) -> str:
+    global _footnote_id
+    _footnote_id += 1
+    footnote_list = []
+
+    # Replace (citation-<index>) with the appropriate citation
+    def replace_citation(match: Match) -> str:
+        citation_id = match.group(1)
+        # Leave a citation for chunks that don't exist alone
+        if citation_id not in remapped_citations:
+            logger.warning(
+                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
+            )
+            return f"({citation_id})"
+
+        chunk = remapped_citations[citation_id].chunk
+        bem_link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
+        bem_link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
+        citation = f"<sup><a href={bem_link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
+
+        global _footnote_index
+        _footnote_index += 1
+        footnote_list.append(
+            f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
+        )
+        return citation
+
+    # Replace all instances of (citation-<index>) with an html link on superscript "<index>"
+    added_citations = re.sub(CITATION_PATTERN, replace_citation, response)
+
+    # For now, don't show footnote list
+    return added_citations  # + "</br>" + "</br>".join(footnote_list)

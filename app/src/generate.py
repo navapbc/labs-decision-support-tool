@@ -1,11 +1,8 @@
 import logging
 import os
-from typing import Any, Sequence
+from typing import Any
 
 from litellm import completion
-
-from src.citations import create_prompt_context
-from src.db.models.document import Chunk
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +11,10 @@ Use bullet points. Keep your answers brief, max of 5 sentences.
 Keep your answers as similar to your knowledge text as you can
 
 When referencing the context, do not quote directly.
-Use the provided citation numbers (e.g., (citation-0)) to indicate when you are drawing from the context.
-To cite multiple sources at once, you can append citations like so: (citation-0)(citation-1), etc.
+Use the provided citation numbers (e.g., (citation-1)) to indicate when you are drawing from the context.
+To cite multiple sources at once, you can append citations like so: (citation-1)(citation-2), etc.
 Place the citations after any closing punctuation for the sentence.
-For example: 'This is a sentence that draws on information from the context.(citation-0)'
+For example: 'This is a sentence that draws on information from the context.(citation-1)'
 
 Example Answer:
 If the client and their roommate purchase and prepare food separately, they can be considered different SNAP (FAP) groups. For instance:
@@ -51,36 +48,29 @@ def get_models() -> dict[str, str]:
 def generate(
     llm: str,
     query: str,
-    context: Sequence[Chunk] | None = None,
+    context_text: str | None = None,
 ) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
     """
+    messages = [
+        {
+            "content": PROMPT,
+            "role": "system",
+        }
+    ]
 
-    if context:
-        context_text = create_prompt_context(context)
-        messages = [
-            {
-                "content": PROMPT,
-                "role": "system",
-            },
+    if context_text:
+        messages.append(
             {
                 "content": f"Use the following context to answer the question: {context_text}",
                 "role": "system",
             },
-            {"content": query, "role": "user"},
-        ]
+        )
 
-    else:
-        messages = [
-            {
-                "content": PROMPT,
-                "role": "system",
-            },
-            {"content": query, "role": "user"},
-        ]
+    messages.append({"content": query, "role": "user"})
 
-    logger.info("Calling %s for query: %s", llm, query)
+    logger.info("Calling %s for query: %s with context:\n%s", llm, query, context_text)
     response = completion(model=llm, messages=messages, **completion_args(llm))
 
     return response["choices"][0]["message"]["content"]
