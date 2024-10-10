@@ -160,7 +160,7 @@ def format_web_subsections(
         citation_link = ""
         if chunk.document.source:
             citation_link = (
-                f'<p>Source: <a href="{chunk.document.source}">{chunk.document.source}</a></p>'
+                f'<p>Source: <a href={chunk.document.source!r}>{chunk.document.source}</a></p>'
             )
 
         citations_html += f"""
