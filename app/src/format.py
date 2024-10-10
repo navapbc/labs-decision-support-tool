@@ -1,9 +1,9 @@
 import logging
+import markdown
 import random
 import re
 from typing import OrderedDict, Sequence
 
-import markdown
 
 from src.citations import (
     combine_citations_by_document,
