@@ -4,7 +4,7 @@ from typing import Any, Sequence
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
-from chainlit.input_widget import InputWidget, Select, Slider
+from chainlit.input_widget import InputWidget, Select, Slider, TextInput
 from src import chat_engine
 from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface
@@ -46,10 +46,11 @@ async def start() -> None:
             content=f"Unused URL query parameters: {query_values}",
         ).send()
 
+    user = cl.user_session.get("user")
     await cl.Message(
         author="backend",
         metadata={"engine": engine_id, "settings": settings},
-        content=f"{engine.name} started with settings:\n{pprint.pformat(settings, indent=3)}",
+        content=f"{engine.name} started {f'for {user}' if user else ''}",
     ).send()
 
 
@@ -132,6 +133,12 @@ _WIDGET_FACTORIES = {
         min=-1,
         max=1,
         step=0.25,
+    ),
+    "system_prompt": lambda initial_value: TextInput(
+        id="system_prompt",
+        label="System prompt",
+        initial=initial_value,
+        multiline=True,
     ),
 }
 

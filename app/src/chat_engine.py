@@ -6,7 +6,7 @@ from typing import Callable, Sequence
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, ChunkWithSubsection
 from src.format import format_bem_subsections, format_guru_cards
-from src.generate import generate
+from src.generate import generate, PROMPT
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
 
@@ -72,12 +72,15 @@ class BaseEngine(ChatEngineInterface):
     retrieval_k: int = 8
     retrieval_k_min_score: float = 0.45
 
+    system_prompt: str = PROMPT
+
     user_settings = [
         "llm",
         "retrieval_k",
         "retrieval_k_min_score",
         "chunks_shown_max_num",
         "chunks_shown_min_score",
+        "system_prompt"
     ]
 
     def on_message(self, question: str) -> OnMessageResult:
