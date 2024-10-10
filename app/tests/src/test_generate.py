@@ -109,7 +109,7 @@ def test_generate(monkeypatch):
         + PROMPT
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
-    assert generate("gpt-4o", "some query") == expected_response
+    assert generate("gpt-4o", PROMPT, "some query") == expected_response
 
 
 def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
@@ -123,4 +123,4 @@ def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
         + context_text
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
-    assert generate("gpt-4o", "some query", context_text) == expected_response
+    assert generate("gpt-4o", PROMPT, "some query", context_text) == expected_response

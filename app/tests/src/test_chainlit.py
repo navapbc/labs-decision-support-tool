@@ -1,5 +1,7 @@
 from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata
+from src.chat_engine import OnMessageResult
+from src.db.models.document import ChunkWithSubsection
 
 
 def test_url_query_values(monkeypatch):
@@ -20,22 +22,37 @@ def test_url_query_values(monkeypatch):
 
 
 def test__get_retrieval_metadata(chunks_with_scores):
-    assert _get_retrieval_metadata(chunks_with_scores) == {
-        "chunks": [
-            {
-                "document.name": chunks_with_scores[0].chunk.document.name,
-                "chunk.id": str(chunks_with_scores[0].chunk.id),
-                "score": chunks_with_scores[0].score,
-            },
-            {
-                "document.name": chunks_with_scores[1].chunk.document.name,
-                "chunk.id": str(chunks_with_scores[1].chunk.id),
-                "score": chunks_with_scores[1].score,
-            },
-            {
-                "document.name": chunks_with_scores[2].chunk.document.name,
-                "chunk.id": str(chunks_with_scores[2].chunk.id),
-                "score": chunks_with_scores[2].score,
-            },
-        ]
-    }
+    system_prompt = "Some system prompt"
+    chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+    subsections = [ChunkWithSubsection(chunk.id, chunk, chunk.content) for chunk in chunks]
+    result = OnMessageResult("Some response", system_prompt, chunks_with_scores, subsections)
+
+    metadata = _get_retrieval_metadata(result)
+    assert metadata["system_prompt"] == system_prompt
+    assert metadata["chunks"] == [
+        {
+            "document.name": chunks_with_scores[0].chunk.document.name,
+            "chunk.id": str(chunks_with_scores[0].chunk.id),
+            "score": chunks_with_scores[0].score,
+        },
+        {
+            "document.name": chunks_with_scores[1].chunk.document.name,
+            "chunk.id": str(chunks_with_scores[1].chunk.id),
+            "score": chunks_with_scores[1].score,
+        },
+        {
+            "document.name": chunks_with_scores[2].chunk.document.name,
+            "chunk.id": str(chunks_with_scores[2].chunk.id),
+            "score": chunks_with_scores[2].score,
+        },
+    ]
+    assert metadata["subsections"] == [
+        {
+            "id": citations.id,
+            "chunk.id": str(citations.chunk.id),
+            "document.name": citations.chunk.document.name,
+            "headings": citations.chunk.headings,
+            "text": citations.subsection,
+        }
+        for citations in subsections
+    ]
