@@ -156,6 +156,13 @@ def format_web_subsections(
         _accordion_id += 1
         chunk = citation.chunk
         formatted_subsection = to_html(citation.subsection)
+
+        citation_link = ""
+        if chunk.document.source:
+            citation_link = (
+                f'<p>Source: <a href="{chunk.document.source}">{chunk.document.source}</a></p>'
+            )
+
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -169,6 +176,7 @@ def format_web_subsections(
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
                 <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>
+                {citation_link}
             </div>
         </div>"""
 
