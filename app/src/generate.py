@@ -47,6 +47,7 @@ def get_models() -> dict[str, str]:
 
 def generate(
     llm: str,
+    system_prompt: str,
     query: str,
     context_text: str | None = None,
 ) -> str:
@@ -55,7 +56,7 @@ def generate(
     """
     messages = [
         {
-            "content": PROMPT,
+            "content": system_prompt,
             "role": "system",
         }
     ]

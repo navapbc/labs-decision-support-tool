@@ -6,7 +6,7 @@ from typing import Callable, Sequence
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, ChunkWithSubsection
 from src.format import format_bem_subsections, format_guru_cards
-from src.generate import generate, PROMPT
+from src.generate import PROMPT, generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
 
@@ -30,6 +30,8 @@ class ChatEngineInterface(ABC):
     # Thresholds that determine which retrieved documents are shown in the UI
     chunks_shown_max_num: int = 5
     chunks_shown_min_score: float = 0.65
+
+    system_prompt: str = PROMPT
 
     # List of engine-specific configuration settings that can be set by the user.
     # The string elements must match the attribute names for the configuration setting.
@@ -72,15 +74,13 @@ class BaseEngine(ChatEngineInterface):
     retrieval_k: int = 8
     retrieval_k_min_score: float = 0.45
 
-    system_prompt: str = PROMPT
-
     user_settings = [
         "llm",
         "retrieval_k",
         "retrieval_k_min_score",
         "chunks_shown_max_num",
         "chunks_shown_min_score",
-        "system_prompt"
+        "system_prompt",
     ]
 
     def on_message(self, question: str) -> OnMessageResult:
@@ -95,7 +95,7 @@ class BaseEngine(ChatEngineInterface):
         # Provide a factory to reset the citation id counter
         subsections = split_into_subsections(chunks, factory=CitationFactory())
         context_text = create_prompt_context(subsections)
-        response = generate(self.llm, question, context_text=context_text)
+        response = generate(self.llm, self.system_prompt, question, context_text)
         return OnMessageResult(response, chunks_with_scores, subsections)
 
 
