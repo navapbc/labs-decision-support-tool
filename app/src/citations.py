@@ -1,7 +1,7 @@
-from collections import defaultdict
 import logging
 import random
 import re
+from collections import defaultdict
 from typing import Match, Sequence, TypeAlias
 
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
