@@ -1,7 +1,6 @@
 from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata
 from src.chat_engine import OnMessageResult
-from src.citations import CitationFactory
 from src.db.models.document import ChunkWithSubsection
 
 
