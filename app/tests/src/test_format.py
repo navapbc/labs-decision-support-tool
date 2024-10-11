@@ -6,8 +6,8 @@ from src.citations import CitationFactory, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.format import (
     _add_ellipses,
-    _group_by_document_and_chunks,
     _format_to_accordion_html,
+    _group_by_document_and_chunks,
     format_bem_documents,
     format_bem_subsections,
     format_guru_cards,
