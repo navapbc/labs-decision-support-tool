@@ -215,11 +215,11 @@ def test__combine_citations_by_document():
     # Check for items with the same chunk and different subsections
     assert _combine_citations_by_document(chunks_items) == {
         docs[0]: [
-            {chunk_list[0]: [{"1": "Subsection 1"}, {"2": "Subsection 2"}]},
-            {chunk_list[1]: [{"3": "Subsection 3"}]},
+            {chunk_list[0]: [("1", "Subsection 1"), ("2", "Subsection 2")]},
+            {chunk_list[1]: [("3", "Subsection 3")]},
         ],
         docs[1]: [
-            {chunk_list[2]: [{"4": "Subsection 5"}]},
-            {chunk_list[3]: [{"5": "Subsection 6"}]},
+            {chunk_list[2]: [("4", "Subsection 5")]},
+            {chunk_list[3]: [("5", "Subsection 6")]},
         ],
     }

@@ -94,10 +94,10 @@ def format_bem_subsections(
         for chunk_in_doc in chunks_in_doc:
             for citation, grouped_citations in chunk_in_doc.items():
                 _accordion_id += 1
-                for citation_item in grouped_citations:
-                    for citation_number, subsection in citation_item.items():
-                        citation_numbers.append(f"{citation_number}")
-                        citation_body += f'<div>Citation #{citation_number}: </div><div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{subsection}</div>'
+                for citation_number, subsection in grouped_citations:
+                    # for citation_number, subsection in citation_item.items():
+                    citation_numbers.append(f"{citation_number}")
+                    citation_body += f'<div>Citation #{citation_number}: </div><div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{subsection}</div>'
 
                 formatted_citation_body = to_html(replace_bem_with_link(citation_body))
                 bem_url_for_page = get_bem_url(document.name)
@@ -147,9 +147,9 @@ def format_bem_subsections(
     return "<div>" + response_with_citations + "</div>"
 
 
-CitationIdToSubsection = dict[str, str]
-ChunkWithCitation = dict[Chunk, list[CitationIdToSubsection]]
+ChunkWithCitation = dict[Chunk, Sequence[tuple[str,str]]]
 
+from itertools import groupby
 
 def _combine_citations_by_document(
     remapped_citations: dict[str, ChunkWithSubsection]
@@ -158,15 +158,16 @@ def _combine_citations_by_document(
     Group the chunks by document and nests the values of the citation number and subsection string.
     Argument `remapped_citations` maps original citation_id (used in the LLM generated response) to ChunkWithSubsection
     """
+    # Group the input citations by chunk then by document
+    by_chunk = groupby(remapped_citations.items(), key=lambda t: t[1].chunk)
+    by_doc = groupby(by_chunk, key=lambda t: t[0].document)
 
-    # for readability and so we don't need to run an index look up to update the nested chunk key
-    citations_by_chunk: dict[Chunk, list[CitationIdToSubsection]] = defaultdict(list)
-    for _orig_citation_id, citation in remapped_citations.items():
-        citations_by_chunk[citation.chunk].append({citation.id: citation.subsection})
-
+    # Replace the citation_id with the citation number and subsection string
     citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
-    for chunk, citation_item_list in citations_by_chunk.items():
-        citations_by_document[chunk.document].append({chunk: citation_item_list})
+    for doc, chunk_list in by_doc:
+        for chunk, citation_list in chunk_list:
+            id_to_subsection_dict = {citation.id: citation.subsection for citation_id, citation in citation_list}
+            citations_by_document[doc].append({chunk: list(id_to_subsection_dict.items())})
 
     return citations_by_document
 
