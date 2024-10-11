@@ -2,6 +2,7 @@ import logging
 import random
 import re
 from collections import defaultdict
+from itertools import groupby
 from typing import Match, OrderedDict, Sequence
 
 import markdown
@@ -91,30 +92,30 @@ def format_bem_subsections(
     for document, chunks_in_doc in citations_by_document.items():
         citation_body = ""
         citation_numbers = []
-        for chunk_in_doc in chunks_in_doc:
-            for citation, grouped_citations in chunk_in_doc.items():
-                _accordion_id += 1
-                for citation_number, subsection in grouped_citations:
-                    # for citation_number, subsection in citation_item.items():
-                    citation_numbers.append(f"{citation_number}")
-                    citation_body += f'<div>Citation #{citation_number}: </div><div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{subsection}</div>'
+        for chunk, subsection_list in chunks_in_doc:
+            for chunk_subsection in subsection_list:
+                citation_number = chunk_subsection.id
+                subsection = chunk_subsection.subsection
+                citation_numbers.append(f"{citation_number}")
+                citation_body += f'<div>Citation #{citation_number}: </div><div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{subsection}</div>'
 
-                formatted_citation_body = to_html(replace_bem_with_link(citation_body))
-                bem_url_for_page = get_bem_url(document.name)
-                if citation.page_number:
-                    bem_url_for_page += "#page=" + str(citation.page_number)
+            formatted_citation_body = to_html(replace_bem_with_link(citation_body))
+            bem_url_for_page = get_bem_url(document.name)
+            if chunk.page_number:
+                bem_url_for_page += "#page=" + str(chunk.page_number)
 
-                citation_headings = (
-                    "<p>" + " → ".join(citation.headings) + "</p>" if citation.headings else ""
+            citation_headings = (
+                "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
+            )
+            citation_link = (
+                (
+                    f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
                 )
-                citation_link = (
-                    (
-                        f"<p><a href={bem_url_for_page!r}>Open document to page {citation.page_number}</a></p>"
-                    )
-                    if citation.page_number
-                    else ""
-                )
+                if chunk.page_number
+                else ""
+            )
 
+        _accordion_id += 1
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -147,9 +148,8 @@ def format_bem_subsections(
     return "<div>" + response_with_citations + "</div>"
 
 
-ChunkWithCitation = dict[Chunk, Sequence[tuple[str,str]]]
+ChunkWithCitation = tuple[Chunk, Sequence[ChunkWithSubsection]]
 
-from itertools import groupby
 
 def _combine_citations_by_document(
     remapped_citations: dict[str, ChunkWithSubsection]
@@ -159,15 +159,14 @@ def _combine_citations_by_document(
     Argument `remapped_citations` maps original citation_id (used in the LLM generated response) to ChunkWithSubsection
     """
     # Group the input citations by chunk then by document
-    by_chunk = groupby(remapped_citations.items(), key=lambda t: t[1].chunk)
+    by_chunk = groupby(remapped_citations.values(), key=lambda t: t.chunk)
     by_doc = groupby(by_chunk, key=lambda t: t[0].document)
 
     # Replace the citation_id with the citation number and subsection string
     citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
     for doc, chunk_list in by_doc:
-        for chunk, citation_list in chunk_list:
-            id_to_subsection_dict = {citation.id: citation.subsection for citation_id, citation in citation_list}
-            citations_by_document[doc].append({chunk: list(id_to_subsection_dict.items())})
+        for chunk, subsection_list in chunk_list:
+            citations_by_document[doc].append((chunk, list(subsection_list)))
 
     return citations_by_document
 
