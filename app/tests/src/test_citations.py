@@ -1,5 +1,3 @@
-import dataclasses
-
 import pytest
 
 from src.citations import (
@@ -74,6 +72,6 @@ def test_remap_citation_ids(subsections):
         subsections,
         f"Now a real citation is ({subsections[1].id}), which we can cite twice ({subsections[1].id}), followed by ({subsections[0].id})",
     ) == {
-        subsections[1].id: dataclasses.replace(subsections[1], id="1"),
-        subsections[0].id: dataclasses.replace(subsections[0], id="2"),
+        subsections[1].id: subsections[1]._replace(id="1"),
+        subsections[0].id: subsections[0]._replace(id="2"),
     }
