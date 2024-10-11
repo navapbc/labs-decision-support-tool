@@ -6,7 +6,7 @@ from src.citations import CitationFactory, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
 from src.format import (
     _add_ellipses,
-    _combine_citations_by_document,
+    _group_by_document_and_chunks,
     _format_to_accordion_html,
     format_bem_documents,
     format_bem_subsections,
@@ -194,7 +194,7 @@ def test_reify_citations():
     )
 
 
-def test__combine_citations_by_document():
+def test__group_by_document_and_chunks():
     docs = DocumentFactory.build_batch(2)
     for doc in docs:
         doc.name += "BEM 123"
@@ -212,7 +212,7 @@ def test__combine_citations_by_document():
         ChunkWithSubsection("4", chunk_list[2], "Subsection 5"),
         ChunkWithSubsection("5", chunk_list[3], "Subsection 6"),
     ]
-    chunks_items = {
+    remapped_citations = {
         "citation-22": subsections[0],
         "citation-21": subsections[1],
         "citation-20": subsections[2],
@@ -220,7 +220,7 @@ def test__combine_citations_by_document():
         "citation-25": subsections[4],
     }
     # Check for items with the same chunk and different subsections
-    assert _combine_citations_by_document(chunks_items) == {
+    assert _group_by_document_and_chunks(remapped_citations) == {
         docs[0]: [
             (chunk_list[0], [subsections[0], subsections[1]]),
             (chunk_list[1], [subsections[2]]),

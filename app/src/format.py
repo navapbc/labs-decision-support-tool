@@ -88,7 +88,7 @@ def format_bem_subsections(
 
     remapped_citations = remap_citation_ids(subsections, raw_response)
     citations_html = ""
-    citations_by_document = _combine_citations_by_document(remapped_citations)
+    citations_by_document = _group_by_document_and_chunks(remapped_citations)
     for document, chunks_in_doc in citations_by_document.items():
         citation_numbers = []
         citation_body = ""
@@ -106,9 +106,9 @@ def format_bem_subsections(
             for chunk_subsection in subsection_list:
                 citation_numbers.append(chunk_subsection.id)
                 citation_body += (
-                    f'<div>Citation #{chunk_subsection.id}: {citation_headings}</div>'
+                    f"<div>Citation #{chunk_subsection.id}: <b>{citation_headings}</b></div>"
                     f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{chunk_subsection.subsection}</div>'
-                    f'<div>{citation_link}</div>'
+                    f"<div>{citation_link}</div>"
                 )
 
         _accordion_id += 1
@@ -146,7 +146,7 @@ def format_bem_subsections(
 ChunkWithCitation = tuple[Chunk, Sequence[ChunkWithSubsection]]
 
 
-def _combine_citations_by_document(
+def _group_by_document_and_chunks(
     remapped_citations: dict[str, ChunkWithSubsection]
 ) -> dict[Document, list[ChunkWithCitation]]:
     """
@@ -157,7 +157,7 @@ def _combine_citations_by_document(
     by_chunk = groupby(remapped_citations.values(), key=lambda t: t.chunk)
     by_doc = groupby(by_chunk, key=lambda t: t[0].document)
 
-    # Replace the citation_id with the citation number and subsection string
+    # Create output dictionary with structure {Document: [(Chunk, [ChunkWithSubsection])]}
     citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
     for doc, chunk_list in by_doc:
         for chunk, subsection_list in chunk_list:
