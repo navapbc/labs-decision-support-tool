@@ -32,9 +32,7 @@ def _ingest_edd_web(
         urls_processed.add(item["url"])
 
         content = item.get("main_content", item.get("main_primary"))
-        if not content:
-            logger.warning("Item %s has no main_content or main_primary", name)
-            continue
+        assert content, f"Item {name} has no main_content or main_primary"
 
         document = Document(name=name, content=content, source=item["url"], **doc_attribs)
         db_session.add(document)
