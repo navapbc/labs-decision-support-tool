@@ -90,32 +90,29 @@ def format_bem_subsections(
     citations_html = ""
     citations_by_document = _combine_citations_by_document(remapped_citations)
     for document, chunks_in_doc in citations_by_document.items():
-        citation_body = ""
         citation_numbers = []
+        citation_body = ""
         for chunk, subsection_list in chunks_in_doc:
-            for chunk_subsection in subsection_list:
-                citation_number = chunk_subsection.id
-                subsection = chunk_subsection.subsection
-                citation_numbers.append(f"{citation_number}")
-                citation_body += f'<div>Citation #{citation_number}: </div><div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{subsection}</div>'
-
-            formatted_citation_body = to_html(replace_bem_with_link(citation_body))
+            citation_headings = " → ".join(chunk.headings) if chunk.headings else ""
             bem_url_for_page = get_bem_url(document.name)
             if chunk.page_number:
                 bem_url_for_page += "#page=" + str(chunk.page_number)
-
-            citation_headings = (
-                "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
-            )
             citation_link = (
-                (
-                    f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
-                )
+                f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
                 if chunk.page_number
                 else ""
             )
 
+            for chunk_subsection in subsection_list:
+                citation_numbers.append(chunk_subsection.id)
+                citation_body += (
+                    f'<div>Citation #{chunk_subsection.id}: {citation_headings}</div>'
+                    f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{chunk_subsection.subsection}</div>'
+                    f'<div>{citation_link}</div>'
+                )
+
         _accordion_id += 1
+        formatted_citation_body = to_html(replace_bem_with_link(citation_body))
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -128,9 +125,7 @@ def format_bem_subsections(
                 </button>
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-                {citation_headings}
                 {formatted_citation_body}
-                {citation_link}
             </div>
         </div>"""
 
