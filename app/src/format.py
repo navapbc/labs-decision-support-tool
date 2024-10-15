@@ -143,6 +143,60 @@ def format_bem_subsections(
     return "<div>" + response_with_citations + "</div>"
 
 
+def format_web_subsections(
+    chunks_shown_max_num: int,
+    chunks_shown_min_score: float,
+    chunks_with_scores: Sequence[ChunkWithScore],
+    subsections: Sequence[ChunkWithSubsection],
+    raw_response: str,
+) -> str:
+    global _accordion_id
+
+    remapped_citations = remap_citation_ids(subsections, raw_response)
+    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations))
+
+    citations_html = ""
+    for _, citation in remapped_citations.items():
+        _accordion_id += 1
+        chunk = citation.chunk
+        formatted_subsection = to_html(citation.subsection)
+
+        citation_link = ""
+        if chunk.document.source:
+            citation_link = (
+                f"<p>Source: <a href={chunk.document.source!r}>{chunk.document.source}</a></p>"
+            )
+
+        citations_html += f"""
+        <div class="usa-accordion" id=accordion-{_accordion_id}>
+            <h4 class="usa-accordion__heading">
+                <button
+                    type="button"
+                    class="usa-accordion__button"
+                    aria-expanded="false"
+                    aria-controls="a-{_accordion_id}">
+                    {citation.id}. {chunk.document.name}
+                </button>
+            </h4>
+            <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
+                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>
+                {citation_link}
+            </div>
+        </div>"""
+
+    # This heading is important to prevent Chainlit from embedding citations_html
+    # as the next part of a a list in response_with_citations
+    if citations_html:
+        return (
+            "<div>"
+            + response_with_citations
+            + "</div><h3>Source(s)</h3><div>"
+            + citations_html
+            + "</div>"
+        )
+    return "<div>" + response_with_citations + "</div>"
+
+
 ChunkWithCitation = tuple[Chunk, Sequence[ChunkWithSubsection]]
 
 

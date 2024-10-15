@@ -34,16 +34,43 @@ def _ingest_edd_web(
         content = item.get("main_content", item.get("main_primary"))
         assert content, f"Item {name} has no main_content or main_primary"
 
-        document = Document(name=name, content=content, **doc_attribs)
+        document = Document(name=name, content=content, source=item["url"], **doc_attribs)
         db_session.add(document)
 
-        embedding_model = app_config.sentence_transformer
-        tokens = len(embedding_model.tokenizer.tokenize(content))
-        mpnet_embedding = embedding_model.encode(content, show_progress_bar=False)
-        chunk = Chunk(
-            document=document, content=content, tokens=tokens, mpnet_embedding=mpnet_embedding
+        chunks = _chunk_page(content)
+        for chunk in chunks:
+            chunk.document = document
+        db_session.add_all(chunks)
+        logger.info("Split %s into %d chunks", name, len(chunks))
+
+
+def _chunk_page(content: str) -> list[Chunk]:
+    embedding_model = app_config.sentence_transformer
+
+    # Split content by double newlines, then gather into the largest chunks
+    # that tokenize to less than the max_seq_length
+    content_split_by_double_newlines = content.split("\n\n")
+    subsections = [content_split_by_double_newlines[0]]
+    for subsection in content_split_by_double_newlines[1:]:
+        tokens_with_new_subsection = len(
+            embedding_model.tokenizer.tokenize(subsections[-1] + subsection)
         )
-        db_session.add(chunk)
+        if tokens_with_new_subsection < embedding_model.max_seq_length:
+            subsections[-1] += "\n\n" + subsection
+        else:
+            subsections.append(subsection)
+
+    # Parallelize embedding generation for performance
+    subsection_embeddings = embedding_model.encode(subsections, show_progress_bar=False)
+
+    return [
+        Chunk(
+            content=subsection,
+            mpnet_embedding=embedding,
+            tokens=len(embedding_model.tokenizer.tokenize(subsection)),
+        )
+        for subsection, embedding in zip(subsections, subsection_embeddings, strict=True)
+    ]
 
 
 def main() -> None:
