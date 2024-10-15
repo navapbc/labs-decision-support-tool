@@ -194,7 +194,7 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
                 "chunk.id": str(citations.chunk.id),
                 "document.name": citations.chunk.document.name,
                 "headings": citations.chunk.headings,
-                "text": citations.subsection,
+                "text": citations.text,
             }
             for citations in result.subsections
         ],

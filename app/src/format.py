@@ -8,7 +8,7 @@ from typing import Match, OrderedDict, Sequence
 import markdown
 
 from src.citations import CITATION_PATTERN, remap_citation_ids
-from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
+from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
 from src.util.bem_util import get_bem_url, replace_bem_with_link
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def format_guru_cards(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[ChunkWithSubsection],
+    subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
     response_with_citations = reify_citations(raw_response, subsections)
@@ -81,7 +81,7 @@ def format_bem_subsections(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[ChunkWithSubsection],
+    subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
     global _accordion_id
@@ -107,7 +107,7 @@ def format_bem_subsections(
                 citation_numbers.append(chunk_subsection.id)
                 citation_body += (
                     f"<div>Citation #{chunk_subsection.id}: <b>{citation_headings}</b></div>"
-                    f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{chunk_subsection.subsection}</div>'
+                    f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{chunk_subsection.text}</div>'
                     f"<div>{citation_link}</div>"
                 )
 
@@ -147,7 +147,7 @@ def format_web_subsections(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[ChunkWithSubsection],
+    subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
     global _accordion_id
@@ -159,7 +159,7 @@ def format_web_subsections(
     for _, citation in remapped_citations.items():
         _accordion_id += 1
         chunk = citation.chunk
-        formatted_subsection = to_html(citation.subsection)
+        formatted_subsection = to_html(citation.text)
 
         citation_link = ""
         if chunk.document.source:
@@ -197,21 +197,21 @@ def format_web_subsections(
     return "<div>" + response_with_citations + "</div>"
 
 
-ChunkWithCitation = tuple[Chunk, Sequence[ChunkWithSubsection]]
+ChunkWithCitation = tuple[Chunk, Sequence[Subsection]]
 
 
 def _group_by_document_and_chunks(
-    remapped_citations: dict[str, ChunkWithSubsection]
+    remapped_citations: dict[str, Subsection]
 ) -> dict[Document, list[ChunkWithCitation]]:
     """
     Group the chunks by document and nests the values of the citation number and subsection string.
-    Argument `remapped_citations` maps original citation_id (used in the LLM generated response) to ChunkWithSubsection
+    Argument `remapped_citations` maps original citation_id (used in the LLM generated response) to Subsection
     """
     # Group the input citations by chunk then by document
     by_chunk = groupby(remapped_citations.values(), key=lambda t: t.chunk)
     by_doc = groupby(by_chunk, key=lambda t: t[0].document)
 
-    # Create output dictionary with structure {Document: [(Chunk, [ChunkWithSubsection])]}
+    # Create output dictionary with structure {Document: [(Chunk, [Subsection])]}
     citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
     for doc, chunk_list in by_doc:
         for chunk, subsection_list in chunk_list:
@@ -224,7 +224,7 @@ def format_bem_documents(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
     chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[ChunkWithSubsection],
+    subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
     response_with_citations = reify_citations(raw_response, subsections)
@@ -339,7 +339,7 @@ def _add_ellipses(chunk: Chunk) -> str:
     return chunk_content
 
 
-def reify_citations(response: str, subsections: Sequence[ChunkWithSubsection]) -> str:
+def reify_citations(response: str, subsections: Sequence[Subsection]) -> str:
     remapped_citations = remap_citation_ids(subsections, response)
     return _add_citation_links(response, remapped_citations)
 
@@ -348,7 +348,7 @@ _footnote_id = random.randint(0, 1000000)
 _footnote_index = 0
 
 
-def _add_citation_links(response: str, remapped_citations: dict[str, ChunkWithSubsection]) -> str:
+def _add_citation_links(response: str, remapped_citations: dict[str, Subsection]) -> str:
     global _footnote_id
     _footnote_id += 1
     footnote_list = []

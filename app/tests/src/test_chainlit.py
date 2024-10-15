@@ -1,7 +1,7 @@
 from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata
 from src.chat_engine import OnMessageResult
-from src.db.models.document import ChunkWithSubsection
+from src.db.models.document import Subsection
 
 
 def test_url_query_values(monkeypatch):
@@ -24,7 +24,7 @@ def test_url_query_values(monkeypatch):
 def test__get_retrieval_metadata(chunks_with_scores):
     system_prompt = "Some system prompt"
     chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-    subsections = [ChunkWithSubsection(chunk.id, chunk, chunk.content) for chunk in chunks]
+    subsections = [Subsection(chunk.id, chunk, chunk.content) for chunk in chunks]
     result = OnMessageResult("Some response", system_prompt, chunks_with_scores, subsections)
 
     metadata = _get_retrieval_metadata(result)
@@ -52,7 +52,7 @@ def test__get_retrieval_metadata(chunks_with_scores):
             "chunk.id": str(citations.chunk.id),
             "document.name": citations.chunk.document.name,
             "headings": citations.chunk.headings,
-            "text": citations.subsection,
+            "text": citations.text,
         }
         for citations in subsections
     ]
