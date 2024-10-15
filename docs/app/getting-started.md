@@ -61,3 +61,35 @@ We use Jupyter notebooks for saving and sharing exploratory code. You can open a
 ```
 
 Copy and paste the provided URL that starts with http://127.0.0.1:8888 to access Jupyter.
+
+
+## Terminology
+
+### Relevant to data source ingestion
+- Document: a PDF file, web page, etc.
+    - A document may have headings and sections.
+    - Document content (i.e., text) is parsed, partitioned, and stored into a vector DB for use in RAG.
+- Chunk: a size-limited block of text stored in the vector DB
+    - Document text must be partitioned into chunks for storage and retrieval.
+    - Natural delineations in the text should be used to create separate chunks so that text in a chunk is topically cohesive.
+    - Due to the size limit, cohesive text must be split into separate chunks. For example, a single list of many bullets and/or long texts must be split. Paragraph(s) introducing the list should be included in each chunk or associated with each chunk to provide context. Similarly, long document sections need to be split, preferably at paragraph breaks. For context, it may be useful to provide summaries of prior paragraphs in the chunk, in addition to headings.
+
+### Relevant to Retrieval (the 'R' in RAG)
+- Citation: user-friendly, short-length text for reference
+    - While chunk texts are size-limited, they are still too lengthy to present to users.
+    - A citation is a a subsection within chunk text.
+- Subsection: substring within chunk text
+    - For each retrieved chunk, the chunk text is partitioned into subsections.
+    - The subsections are assigned an identifier for an LLM to choose relevant subsections, which are presented to the user as citations.
+
+### Prompt Anatomy (the 'G' in RAG)
+A prompt is sent to the LLM to have it generate an answer to a question.
+
+An LLM prompt consists of:
+- **System prompt** sets the LLM's role, tone, style; e.g. "You are …", "Act as ..."
+- **Chat history** used by the LLM as its conversational memory
+- **Context** offers background or relevant information, including retrieved chunk texts for RAG
+- **Instruction** a.k.a. query or question
+- **Content** to which the instruction is applied (e.g., for "Summarize the content")
+- **Examples** of questions and answers; used for in-context learning (ICL)
+- **Cue** is the prefix for the answer that the LLM will complete
