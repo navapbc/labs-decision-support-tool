@@ -77,7 +77,7 @@ Copy and paste the provided URL that starts with http://127.0.0.1:8888 to access
 ### Relevant to Retrieval (the 'R' in RAG)
 - Citation: user-friendly, short-length text for reference
     - While chunk texts are size-limited, they are still too lengthy to present to users.
-    - A citation is a a subsection within chunk text.
+    - A citation is a subsection within chunk text.
 - Subsection: substring within chunk text
     - For each retrieved chunk, the chunk text is partitioned into subsections.
     - The subsections are assigned an identifier for an LLM to choose relevant subsections, which are presented to the user as citations.
