@@ -155,7 +155,6 @@ def format_web_subsections(
     remapped_citations = remap_citation_ids(subsections, raw_response)
     response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations))
 
-
     citations_html = ""
     for _, citation in remapped_citations.items():
         _accordion_id += 1
@@ -196,6 +195,8 @@ def format_web_subsections(
             + "</div>"
         )
     return "<div>" + response_with_citations + "</div>"
+
+
 ChunkWithCitation = tuple[Chunk, Sequence[ChunkWithSubsection]]
 
 
