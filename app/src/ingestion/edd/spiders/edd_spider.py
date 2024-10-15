@@ -1,5 +1,6 @@
 import logging
 import re
+from urllib.parse import urlparse
 
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
@@ -57,10 +58,11 @@ class EddSpider(CrawlSpider):
             titles = ";".join(response.css("h1::text").getall())
             extractions["title"] = titles
 
+        base_url = response.url
         if two_thirds := response.css("div.two-thirds"):
             # Remove buttons from the main content, i.e., "Show All"
             two_thirds.css("button").drop()
-            extractions |= self.parse_entire_two_thirds(two_thirds)
+            extractions |= self.parse_entire_two_thirds(base_url, two_thirds)
 
             if not extractions.get("main_content"):
                 logger.warning(
@@ -69,7 +71,7 @@ class EddSpider(CrawlSpider):
                 )
                 # The main-content div often has boilerplate navigation content that we usually ignore.
                 # For these 'en/about_edd/news_releases_and_announcements' pages, the navigation content doesn't exist
-                extractions |= self.parse_main_content(response.css("div#main-content"))
+                extractions |= self.parse_main_content(base_url, response.css("div#main-content"))
 
             if accordions := two_thirds.css("div.panel-group.accordion"):
                 if len(accordions) > 1:
@@ -77,18 +79,18 @@ class EddSpider(CrawlSpider):
 
                 # If these parse methods become more complicated, move them to items.py
                 # and use ItemLoaders https://docs.scrapy.org/en/latest/topics/loaders.html
-                extractions |= self.parse_nonaccordion(two_thirds)
-                extractions |= self.parse_accordions(two_thirds)
+                extractions |= self.parse_nonaccordion(base_url, two_thirds)
+                extractions |= self.parse_accordions(base_url, two_thirds)
 
         elif main_primary := response.css("main.main-primary"):
             main_primary.css("button").drop()
-            extractions |= self.parse_main_primary(main_primary)
+            extractions |= self.parse_main_primary(base_url, main_primary)
         else:
             pass
 
         return extractions
 
-    def to_markdown(self, html: str) -> str:
+    def to_markdown(self, base_url: str, html: str) -> str:
         markdown = markdownify(
             html,
             heading_style="ATX",
@@ -100,34 +102,46 @@ class EddSpider(CrawlSpider):
         )
         # Clean up markdown text: consolidate newlines; replace non-breaking spaces
         markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
+
+        # Replace non-absolute URLs with absolute URLs. 2 scenarios:
+        parsed = urlparse(base_url)
+        domain_prefix = parsed.scheme + "://" + parsed.netloc + "/"
+        # Scenario 1: link starts with '/' like "/en/unemployment/"
+        # Prepend the domain prefix to the link
+        markdown = re.sub(r"\]\(\/", rf"]({domain_prefix}", markdown)
+        # Scenario 2: link does not start with '/' or "http://" or "https://", like "unemployment/"
+        # Insert the base URL of the web page before the link
+        markdown = re.sub(r"\]\((?!\/|https?:\/\/)", rf"]({base_url}", markdown)
         return markdown.strip()
 
-    def parse_main_primary(self, main_primary: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(main_primary.get())
+    def parse_main_primary(self, base_url: str, main_primary: SelectorList) -> dict[str, str]:
+        markdown = self.to_markdown(base_url, main_primary.get())
         return {"main_primary": markdown}
 
-    def parse_main_content(self, main_content: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(main_content.get())
+    def parse_main_content(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
+        markdown = self.to_markdown(base_url, main_content.get())
         return {"main_content": markdown}
 
-    def parse_entire_two_thirds(self, two_thirds: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(two_thirds.get())
+    def parse_entire_two_thirds(self, base_url: str, two_thirds: SelectorList) -> dict[str, str]:
+        markdown = self.to_markdown(base_url, two_thirds.get())
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#collapse-(.*?)\)", r"\1", markdown)
         # FIXME: parse tab panes correctly -- https://edd.ca.gov/en/unemployment/
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#pane-(.*?)\)", r"\1", cleaned_markdown)
         return {"main_content": cleaned_markdown}
 
-    def parse_nonaccordion(self, main_content: SelectorList) -> dict[str, str]:
+    def parse_nonaccordion(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
         # Create a copy for modification without affecting the original
         nonaccordion = Selector(text=main_content.get())
         nonaccordion.css("div.panel-group.accordion").drop()
-        return {"nonaccordion": self.to_markdown(nonaccordion.get())}
+        return {"nonaccordion": self.to_markdown(base_url, nonaccordion.get())}
 
-    def parse_accordions(self, main_content: SelectorList) -> dict[str, AccordionSections]:
+    def parse_accordions(
+        self, base_url: str, main_content: SelectorList
+    ) -> dict[str, AccordionSections]:
         sections: AccordionSections = {}
         for p in main_content.css("div.panel.panel-default"):
             heading = p.css("div.panel-heading :is(h2, h3, h4, h5, h6) a::text").get().strip()
             paragraphs = p.css("div.panel-body")
-            sections[heading] = [self.to_markdown(para.get()) for para in paragraphs]
+            sections[heading] = [self.to_markdown(base_url, para.get()) for para in paragraphs]
 
         return {"accordions": sections}
