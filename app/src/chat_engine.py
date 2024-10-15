@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
-from src.db.models.document import ChunkWithScore, ChunkWithSubsection
+from src.db.models.document import ChunkWithScore, Subsection
 from src.format import format_bem_subsections, format_guru_cards, format_web_subsections
 from src.generate import PROMPT, generate
 from src.retrieve import retrieve_with_scores
@@ -18,7 +18,7 @@ class OnMessageResult:
     response: str
     system_prompt: str
     chunks_with_scores: Sequence[ChunkWithScore]
-    subsections: Sequence[ChunkWithSubsection]
+    subsections: Sequence[Subsection]
 
 
 class ChatEngineInterface(ABC):

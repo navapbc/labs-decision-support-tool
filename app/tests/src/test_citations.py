@@ -56,13 +56,13 @@ Content: {chunks[1].content}"""
 def test_get_context(chunks, subsections):
     assert subsections[0].id == "citation-1"
     assert subsections[0].chunk == chunks[0]
-    assert subsections[0].subsection == "This is the first chunk."
+    assert subsections[0].text == "This is the first chunk."
     assert subsections[1].id == "citation-2"
     assert subsections[1].chunk == chunks[0]
-    assert subsections[1].subsection == "With two subsections"
+    assert subsections[1].text == "With two subsections"
     assert subsections[2].id == "citation-3"
     assert subsections[2].chunk == chunks[1]
-    assert subsections[2].subsection == chunks[1].content
+    assert subsections[2].text == chunks[1].content
 
 
 def test_remap_citation_ids(subsections):

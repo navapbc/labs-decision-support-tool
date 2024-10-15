@@ -3,7 +3,7 @@ import re
 from sqlalchemy import delete
 
 from src.citations import CitationFactory, split_into_subsections
-from src.db.models.document import Chunk, ChunkWithScore, ChunkWithSubsection, Document
+from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
 from src.format import (
     _add_ellipses,
     _format_to_accordion_html,
@@ -206,11 +206,11 @@ def test__group_by_document_and_chunks():
     chunk_list[3].document = docs[1]
 
     subsections = [
-        ChunkWithSubsection("1", chunk_list[0], "Subsection 1"),
-        ChunkWithSubsection("2", chunk_list[0], "Subsection 2"),
-        ChunkWithSubsection("3", chunk_list[1], "Subsection 3"),
-        ChunkWithSubsection("4", chunk_list[2], "Subsection 5"),
-        ChunkWithSubsection("5", chunk_list[3], "Subsection 6"),
+        Subsection("1", chunk_list[0], "Subsection 1"),
+        Subsection("2", chunk_list[0], "Subsection 2"),
+        Subsection("3", chunk_list[1], "Subsection 3"),
+        Subsection("4", chunk_list[2], "Subsection 5"),
+        Subsection("5", chunk_list[3], "Subsection 6"),
     ]
     remapped_citations = {
         "citation-22": subsections[0],

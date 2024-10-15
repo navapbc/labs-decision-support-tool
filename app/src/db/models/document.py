@@ -80,8 +80,8 @@ class DocumentWithMaxScore(NamedTuple):
     max_score: float
 
 
-class ChunkWithSubsection(NamedTuple):
+class Subsection(NamedTuple):
     id: str
     chunk: Chunk
     # specific substring within chunk.text
-    subsection: str
+    text: str
