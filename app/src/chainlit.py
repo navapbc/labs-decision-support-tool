@@ -1,14 +1,13 @@
 import logging
 import pprint
-from typing import Any, Sequence
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
-from chainlit.input_widget import InputWidget, Select, Slider
+from chainlit.input_widget import InputWidget, Select, Slider, TextInput
 from src import chat_engine
 from src.app_config import app_config
-from src.chat_engine import ChatEngineInterface
-from src.db.models.document import ChunkWithScore
+from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.generate import get_models
 from src.login import require_login
 
@@ -46,10 +45,11 @@ async def start() -> None:
             content=f"Unused URL query parameters: {query_values}",
         ).send()
 
+    user = cl.user_session.get("user")
     await cl.Message(
         author="backend",
         metadata={"engine": engine_id, "settings": settings},
-        content=f"{engine.name} started with settings:\n{pprint.pformat(settings, indent=3)}",
+        content=f"{engine.name} started {f'for {user}' if user else ''}",
     ).send()
 
 
@@ -86,11 +86,16 @@ def _init_chat_settings(
 
 
 @cl.on_settings_update
-def update_settings(settings: dict[str, Any]) -> Any:
+async def update_settings(settings: dict[str, Any]) -> Any:
     logger.info("Updating settings: %s", pprint.pformat(settings, indent=4))
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     for setting_id, value in settings.items():
         setattr(engine, setting_id, value)
+    await cl.Message(
+        author="backend",
+        metadata=settings,
+        content="Settings updated for this session.",
+    ).send()
 
 
 # The ordering of _WIDGET_FACTORIES affects the order of the settings in the UI
@@ -133,6 +138,12 @@ _WIDGET_FACTORIES = {
         max=1,
         step=0.25,
     ),
+    "system_prompt": lambda initial_value: TextInput(
+        id="system_prompt",
+        label="System prompt",
+        initial=initial_value,
+        multiline=True,
+    ),
 }
 
 
@@ -143,17 +154,18 @@ async def on_message(message: cl.Message) -> None:
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
         result = await cl.make_async(lambda: engine.on_message(question=message.content))()
-
+        logger.info("Response: %s", result.response)
         msg_content = engine.formatter(
             chunks_shown_max_num=engine.chunks_shown_max_num,
             chunks_shown_min_score=engine.chunks_shown_min_score,
             chunks_with_scores=result.chunks_with_scores,
+            subsections=result.subsections,
             raw_response=result.response,
         )
 
         await cl.Message(
             content=msg_content,
-            metadata=_get_retrieval_metadata(result.chunks_with_scores),
+            metadata=_get_retrieval_metadata(result),
         ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
@@ -165,14 +177,25 @@ async def on_message(message: cl.Message) -> None:
         raise err
 
 
-def _get_retrieval_metadata(chunks_with_scores: Sequence[ChunkWithScore]) -> dict:
+def _get_retrieval_metadata(result: OnMessageResult) -> dict:
     return {
+        "system_prompt": result.system_prompt,
         "chunks": [
             {
                 "document.name": chunk_with_score.chunk.document.name,
                 "chunk.id": str(chunk_with_score.chunk.id),
                 "score": chunk_with_score.score,
             }
-            for chunk_with_score in chunks_with_scores
-        ]
+            for chunk_with_score in result.chunks_with_scores
+        ],
+        "subsections": [
+            {
+                "id": citations.id,
+                "chunk.id": str(citations.chunk.id),
+                "document.name": citations.chunk.document.name,
+                "headings": citations.chunk.headings,
+                "text": citations.subsection,
+            }
+            for citations in result.subsections
+        ],
     }
