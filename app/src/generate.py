@@ -4,6 +4,8 @@ from typing import Any
 
 from litellm import completion
 
+from src.app_config import app_config
+
 logger = logging.getLogger(__name__)
 
 PROMPT = """Provide answers in plain language written at the average American reading level.
@@ -73,7 +75,9 @@ def generate(
     messages.append({"content": query, "role": "user"})
 
     logger.info("Calling %s for query: %s with context:\n%s", llm, query, context_text)
-    response = completion(model=llm, messages=messages, **completion_args(llm))
+    response = completion(
+        model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
+    )
 
     return response["choices"][0]["message"]["content"]
 
