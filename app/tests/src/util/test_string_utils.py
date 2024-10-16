@@ -35,3 +35,21 @@ def test_split_list():
         ),
         ("Following are list items:\n    - This is a third sentence."),
     ]
+
+
+def test_resolve_urls_scenario1():
+    base_url = "https://example.com"
+    markdown = "[This is a link](/relative/path) and [another](https://example.com/absolute/path)"
+    assert (
+        string_utils.resolve_urls(base_url, markdown)
+        == "[This is a link](https://example.com/relative/path) and [another](https://example.com/absolute/path)"
+    )
+
+
+def test_resolve_urls_scenario2():
+    base_url = "https://example.com/some_webpage"
+    markdown = "[This is a link](relative/path) and [another](path2/index.html)"
+    assert (
+        string_utils.resolve_urls(base_url, markdown)
+        == "[This is a link](https://example.com/some_webpage/relative/path) and [another](https://example.com/some_webpage/path2/index.html)"
+    )

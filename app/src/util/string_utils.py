@@ -121,5 +121,7 @@ def resolve_urls(base_url: str, markdown: str) -> str:
     markdown = re.sub(r"\]\(\/", rf"]({domain_prefix}", markdown)
     # Scenario 2: link does not start with '/' or "http://" or "https://", like "unemployment/"
     # Insert the base URL of the web page before the link
+    if not base_url.endswith("/"):
+        base_url += "/"
     markdown = re.sub(r"\]\((?!\/|https?:\/\/)", rf"]({base_url}", markdown)
     return markdown
