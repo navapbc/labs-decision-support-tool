@@ -30,6 +30,7 @@ class AppConfig(PydanticBaseEnvConfig):
 
     # Default chat engine
     chat_engine: str = "guru-snap"
+    temperature: float = 0.0
 
     # Default LLM model
     llm: str | None = None
