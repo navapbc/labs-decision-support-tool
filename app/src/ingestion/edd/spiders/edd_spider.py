@@ -1,12 +1,18 @@
 import logging
+import os
 import re
-from urllib.parse import urlparse
+import sys
 
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import Selector, SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
+
+app_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+print("Adding app folder to sys.path:", app_folder)
+sys.path.append(app_folder)
+from src.util import string_utils  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -103,15 +109,8 @@ class EddSpider(CrawlSpider):
         # Clean up markdown text: consolidate newlines; replace non-breaking spaces
         markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
 
-        # Replace non-absolute URLs with absolute URLs. 2 scenarios:
-        parsed = urlparse(base_url)
-        domain_prefix = parsed.scheme + "://" + parsed.netloc + "/"
-        # Scenario 1: link starts with '/' like "/en/unemployment/"
-        # Prepend the domain prefix to the link
-        markdown = re.sub(r"\]\(\/", rf"]({domain_prefix}", markdown)
-        # Scenario 2: link does not start with '/' or "http://" or "https://", like "unemployment/"
-        # Insert the base URL of the web page before the link
-        markdown = re.sub(r"\]\((?!\/|https?:\/\/)", rf"]({base_url}", markdown)
+        # Replace non-absolute URLs with absolute URLs
+        markdown = string_utils.resolve_urls(base_url, markdown)
         return markdown.strip()
 
     def parse_main_primary(self, base_url: str, main_primary: SelectorList) -> dict[str, str]:
