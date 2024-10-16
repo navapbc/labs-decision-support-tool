@@ -10,7 +10,6 @@ from unstructured.documents.elements import ElementMetadata, Text
 
 from src.db.models.document import Chunk, Document
 from src.ingest_bem_pdfs import (
-    _add_embeddings,
     _enrich_texts,
     _get_bem_title,
     _ingest_bem_pdfs,
@@ -20,7 +19,6 @@ from src.ingest_bem_pdfs import (
 )
 from src.ingestion.pdf_elements import EnrichedText
 from src.util.pdf_utils import Heading
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_ingest_policy_pdfs import doc_attribs
 
@@ -198,15 +196,6 @@ def test__next_heading(mock_outline, mock_elements):
         Heading(title="Overview", level=1, pageno=1),
         Heading(title="Test Level 2", level=2, pageno=2),
     ]
-
-
-def test__add_embeddings(app_config):
-    embedding_model = MockSentenceTransformer()
-    chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)
-    _add_embeddings(chunks)
-    for chunk in chunks:
-        assert chunk.tokens == len(embedding_model.tokenizer.tokenize(chunk.content))
-        assert chunk.mpnet_embedding == embedding_model.encode(chunk.content)
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])

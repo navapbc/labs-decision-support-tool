@@ -8,7 +8,7 @@ from transformers import PreTrainedTokenizerFast
 
 from src.adapters import db
 from src.app_config import app_config
-from src.db.models.document import Document
+from src.db.models.document import Chunk, Document
 
 
 def _drop_existing_dataset(db_session: db.Session, dataset: str) -> bool:
@@ -74,3 +74,19 @@ def tokenize(text: str) -> list[str]:
         return tokenizer.tokenize(text)
 
     raise ValueError(f"Unexpected tokenizer: {tokenizer.__class__}")
+
+
+def add_embeddings(chunks: list[Chunk]) -> None:
+    embedding_model = app_config.sentence_transformer
+
+    # Generate all the embeddings in parallel for speed
+    embeddings = embedding_model.encode(
+        [chunk.content for chunk in chunks], show_progress_bar=False
+    )
+
+    for chunk, embedding in zip(chunks, embeddings, strict=True):
+        chunk.mpnet_embedding = embedding
+        chunk.tokens = len(tokenize(chunk.content))
+        assert (
+            chunk.tokens <= embedding_model.max_seq_length
+        ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:100]}..."

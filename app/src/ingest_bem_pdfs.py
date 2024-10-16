@@ -18,7 +18,7 @@ from src.ingestion.pdf_postprocess import add_markdown, associate_stylings, grou
 from src.ingestion.pdf_stylings import extract_stylings
 from src.util import pdf_utils
 from src.util.file_util import get_files
-from src.util.ingest_utils import process_and_ingest_sys_args, tokenize
+from src.util.ingest_utils import add_embeddings, process_and_ingest_sys_args, tokenize
 from src.util.pdf_utils import Heading
 from src.util.string_utils import split_list, split_paragraph
 
@@ -63,7 +63,7 @@ def _ingest_bem_pdfs(
             db_session.add(document)
 
             chunks = _split_into_chunks(document, grouped_texts)
-            _add_embeddings(chunks)
+            add_embeddings(chunks)
             db_session.add_all(chunks)
 
             if save_json:
@@ -239,23 +239,6 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
         ]
         chunks += text_chunks
     return chunks
-
-
-def _add_embeddings(chunks: list[Chunk]) -> None:
-    embedding_model = app_config.sentence_transformer
-
-    # Generate all the embeddings in parallel for speed
-    embeddings = embedding_model.encode(
-        [chunk.content for chunk in chunks],
-        show_progress_bar=False,
-    )
-
-    for i, chunk in enumerate(chunks):
-        chunk.mpnet_embedding = embeddings[i]  # type: ignore
-        chunk.tokens = len(tokenize(chunk.content))
-        assert (
-            chunk.tokens <= embedding_model.max_seq_length
-        ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:100]} ..."
 
 
 def _save_json(file_path: str, chunks: list[Chunk]) -> None:
