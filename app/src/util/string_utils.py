@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from typing import Optional
+from urllib.parse import urlparse
 
 import nltk
 from nltk.tokenize import sent_tokenize
@@ -109,3 +110,18 @@ def _join_up_to(lines: list[str], char_limit: int, delimiter: str = " ") -> list
 
     assert all(len(chunk) <= char_limit for chunk in chunks)
     return chunks
+
+
+def resolve_urls(base_url: str, markdown: str) -> str:
+    "Replace non-absolute URLs in markdown with absolute URLs."
+    parsed = urlparse(base_url)
+    domain_prefix = parsed.scheme + "://" + parsed.netloc + "/"
+    # Scenario 1: link starts with '/' like "/en/unemployment/"
+    # Prepend the domain prefix to the link
+    markdown = re.sub(r"\]\(\/", rf"]({domain_prefix}", markdown)
+    # Scenario 2: link does not start with '/' or "http://" or "https://", like "unemployment/"
+    # Insert the base URL of the web page before the link
+    if not base_url.endswith("/"):
+        base_url += "/"
+    markdown = re.sub(r"\]\((?!\/|https?:\/\/)", rf"]({base_url}", markdown)
+    return markdown
