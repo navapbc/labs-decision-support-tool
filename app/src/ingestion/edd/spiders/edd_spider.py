@@ -35,7 +35,10 @@ class EddSpider(CrawlSpider):
                     # "EPiServer/CMS/Content" links to CMS backend content
                     "EPiServer/CMS/Content",
                     # "/archived-news-releases-..." redirects to pdf files
-                    "/archived-news-releases",
+                    "en/about_edd/archived-news-releases",
+                    "en/about_edd/google-translate",
+                    "en/about_edd/news_releases",
+                    "en/newsroom",
                 ),
                 allow_domains=allowed_domains,
                 deny_domains=(
