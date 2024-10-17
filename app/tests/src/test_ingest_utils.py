@@ -4,8 +4,14 @@ from unittest.mock import ANY, Mock
 from sqlalchemy import delete, select
 
 from src.db.models.document import Document
-from src.util.ingest_utils import _drop_existing_dataset, process_and_ingest_sys_args
-from tests.src.db.models.factories import DocumentFactory
+from src.util.ingest_utils import (
+    _drop_existing_dataset,
+    add_embeddings,
+    process_and_ingest_sys_args,
+    tokenize,
+)
+from tests.mock.mock_sentence_transformer import MockSentenceTransformer
+from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
 def test__drop_existing_dataset(db_session, enable_factory_create):
@@ -113,3 +119,12 @@ def test_process_and_ingest_sys_args_drops_existing_dataset(
             is None
         )
         assert db_session.execute(select(Document).where(Document.dataset == "other dataset")).one()
+
+
+def test__add_embeddings(app_config):
+    embedding_model = MockSentenceTransformer()
+    chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)
+    add_embeddings(chunks)
+    for chunk in chunks:
+        assert chunk.tokens == len(tokenize(chunk.content))
+        assert chunk.mpnet_embedding == embedding_model.encode(chunk.content)
