@@ -11,7 +11,7 @@ from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.file_util import get_files
-from src.util.ingest_utils import process_and_ingest_sys_args
+from src.util.ingest_utils import process_and_ingest_sys_args, tokenize
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def process_chunk(text: str, document: Document, db_session: db.Session) -> None
         sentence = text[current_position : boundary_start + 1]
         current_position = boundary_end
 
-        token_count = len(embedding_model.tokenizer.tokenize(sentence))
+        token_count = len(tokenize(sentence))
 
         if current_token_count + token_count <= embedding_model.max_seq_length:
             current_chunk.append(sentence)

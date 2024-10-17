@@ -8,7 +8,7 @@ from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.html import get_text_from_html
-from src.util.ingest_utils import process_and_ingest_sys_args
+from src.util.ingest_utils import process_and_ingest_sys_args, tokenize
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def _ingest_cards(
         db_session.add(document)
 
         embedding_model = app_config.sentence_transformer
-        tokens = len(embedding_model.tokenizer.tokenize(content))
+        tokens = len(tokenize(content))
         mpnet_embedding = embedding_model.encode(content, show_progress_bar=False)
         chunk = Chunk(
             document=document, content=content, tokens=tokens, mpnet_embedding=mpnet_embedding
