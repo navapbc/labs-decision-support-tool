@@ -1,10 +1,11 @@
 import logging
 import os
 import re
-from typing import Optional
+from typing import Iterator, Optional
 from urllib.parse import urlparse
 
 import nltk
+from langchain_text_splitters import MarkdownHeaderTextSplitter
 from nltk.tokenize import sent_tokenize
 
 logger = logging.getLogger(__name__)
@@ -125,3 +126,33 @@ def resolve_urls(base_url: str, markdown: str) -> str:
         base_url += "/"
     markdown = re.sub(r"\]\((?!\/|https?:\/\/)", rf"]({base_url}", markdown)
     return markdown
+
+
+MARKDOWN_HEADER_TUPLES = [
+    ("#", "H1"),
+    ("##", "H2"),
+    ("###", "H3"),
+    ("####", "H4"),
+    ("#####", "H5"),
+    ("######", "H6"),
+]
+
+MARKDOWN_METADATA_KEYS = [key for _, key in MARKDOWN_HEADER_TUPLES]
+
+
+def split_markdown_by_heading(markdown: str) -> Iterator[tuple[list[str], str]]:
+    markdown_splitter = MarkdownHeaderTextSplitter(MARKDOWN_HEADER_TUPLES)
+    for doc in markdown_splitter.split_text(markdown):
+        headings = [
+            # Strip out the markdown link syntax from the headings
+            re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", doc.metadata[key]) if key in doc.metadata else ""
+            for key in MARKDOWN_METADATA_KEYS
+        ]
+        # Remove empty headings at the end of list
+        while headings and not headings[-1]:
+            headings.pop()
+        yield headings, doc.page_content
+
+
+def headings_as_markdown(headings: list[str]) -> str:
+    return "\n".join(f"{"#" * i} {h}" for i, h in enumerate(headings, start=1) if h)
