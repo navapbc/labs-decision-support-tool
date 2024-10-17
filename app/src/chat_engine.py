@@ -129,7 +129,7 @@ class BridgesEligibilityManualEngine(BaseEngine):
 
 
 class CaEddWebEngine(BaseEngine):
-    retrieval_k: int = 10
+    retrieval_k: int = 50
     retrieval_k_min_score: float = -1
 
     # Note: currently not used
