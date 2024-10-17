@@ -7,7 +7,7 @@ from smart_open import open as smart_open
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.util.ingest_utils import process_and_ingest_sys_args
+from src.util.ingest_utils import process_and_ingest_sys_args, tokenize
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +52,7 @@ def _chunk_page(content: str) -> list[Chunk]:
     content_split_by_double_newlines = content.split("\n\n")
     subsections = [content_split_by_double_newlines[0]]
     for subsection in content_split_by_double_newlines[1:]:
-        tokens_with_new_subsection = len(
-            embedding_model.tokenizer.tokenize(subsections[-1] + subsection)
-        )
+        tokens_with_new_subsection = len(tokenize(subsections[-1] + subsection))
         if tokens_with_new_subsection < embedding_model.max_seq_length:
             subsections[-1] += "\n\n" + subsection
         else:
@@ -67,7 +65,7 @@ def _chunk_page(content: str) -> list[Chunk]:
         Chunk(
             content=subsection,
             mpnet_embedding=embedding,
-            tokens=len(embedding_model.tokenizer.tokenize(subsection)),
+            tokens=len(tokenize(subsection)),
         )
         for subsection, embedding in zip(subsections, subsection_embeddings, strict=True)
     ]
