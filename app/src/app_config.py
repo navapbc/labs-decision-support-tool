@@ -44,6 +44,3 @@ class AppConfig(PydanticBaseEnvConfig):
 
 
 app_config = AppConfig()
-
-app_config.sentence_transformer.tokenizer
-
