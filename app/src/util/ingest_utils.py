@@ -1,7 +1,7 @@
 import getopt
 import logging
 from logging import Logger
-from typing import Callable
+from typing import Callable, Sequence
 
 from sqlalchemy import delete, select
 from transformers import PreTrainedTokenizerFast
@@ -76,17 +76,22 @@ def tokenize(text: str) -> list[str]:
     raise ValueError(f"Unexpected tokenizer: {tokenizer.__class__}")
 
 
-def add_embeddings(chunks: list[Chunk]) -> None:
+def add_embeddings(chunks: Sequence[Chunk], texts_to_encode: Sequence[str] = ()) -> None:
     embedding_model = app_config.sentence_transformer
 
-    # Generate all the embeddings in parallel for speed
-    embeddings = embedding_model.encode(
-        [chunk.content for chunk in chunks], show_progress_bar=False
-    )
+    to_encode = [
+        text if text else chunk.content for chunk, text in zip(chunks, texts_to_encode, strict=True)
+    ]
 
-    for chunk, embedding in zip(chunks, embeddings, strict=True):
+    # Generate all the embeddings in parallel for speed
+    embeddings = embedding_model.encode([text for text in to_encode], show_progress_bar=False)
+
+    for chunk, embedding, text in zip(chunks, embeddings, texts_to_encode, strict=True):
         chunk.mpnet_embedding = embedding
-        chunk.tokens = len(tokenize(chunk.content))
+        if not chunk.tokens:
+            chunk.tokens = len(tokenize(text))
+        else:
+            assert chunk.tokens == len(tokenize(text))
         assert (
             chunk.tokens <= embedding_model.max_seq_length
-        ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:100]}..."
+        ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:80]}...{chunk.content[-50:]}"
