@@ -115,12 +115,9 @@ def test__ingest_edd(
         "Nonindustrial Disability Insurance",
     ]
 
-    # MarkdownHeaderTextSplitter reaggregates the text using this delimiter
-    MarkdownHeaderTextSplitter_DELIMITER = "  \n"
-    extracted_content = sample_cards[0]["main_content"].replace(
-        "\n\n", MarkdownHeaderTextSplitter_DELIMITER
-    )
-
     # assert len(documents[1].chunks) == 1
-    assert documents[1].chunks[0].content == extracted_content
+    assert (
+        documents[1].chunks[0].content
+        == "Disability Insurance (DI) provides short-term, partial wage replacement ...\n\nIf you think you are eligible to [file a claim](/en/disability/apply/), review ..."
+    )
     assert documents[1].chunks[0].headings == ["Options to File for Disability Insurance Benefits"]

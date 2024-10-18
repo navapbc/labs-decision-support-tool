@@ -42,10 +42,10 @@ class SplitWithContextText:
         self.token_count = len(tokenize(self.text_to_encode))
 
     def add_if_within_limit(self, paragraph: str) -> bool:
-        new_text_to_encode = f"{self.text_to_encode}\n{remove_links(paragraph)}"
+        new_text_to_encode = f"{self.text_to_encode}\n\n{remove_links(paragraph)}"
         token_count = len(tokenize(new_text_to_encode))
         if token_count <= app_config.sentence_transformer.max_seq_length:
-            self.text += f"\n{paragraph}"
+            self.text += f"\n\n{paragraph}"
             self.text_to_encode = new_text_to_encode
             self.token_count = token_count
             return True
@@ -108,15 +108,20 @@ def _chunk_page(
     return chunks, splits
 
 
+# MarkdownHeaderTextSplitter splits text by "\n" then calls aggregate_lines_to_chunks() to reaggregate
+# paragraphs using "  \n", so "\n\n" is replaced by "  \n"
+MarkdownHeaderTextSplitter_DELIMITER = "  \n"
+
+
 def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWithContextText]:
     # Add headings to the context_str; other context can also be added
     context_str = headings_as_markdown(headings)
     logger.debug("New heading: %s", headings)
 
     splits: list[SplitWithContextText] = []
-    # Split content by double newlines, then gather into the largest chunks
+    # Split content by MarkdownHeaderTextSplitter_DELIMITER, then gather into the largest chunks
     # that tokenize to less than the max_seq_length
-    paragraphs = text.split("\n")
+    paragraphs = text.split(MarkdownHeaderTextSplitter_DELIMITER)
     # Start new split with the first paragraph
     splits.append(SplitWithContextText(headings, paragraphs[0], context_str))
     for paragraph in paragraphs[1:]:
@@ -145,35 +150,3 @@ def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWith
 
 def main() -> None:
     process_and_ingest_sys_args(sys.argv, logger, _ingest_edd_web)
-
-
-# if __name__ == "__main__":
-#     from transformers.models.mpnet.tokenization_mpnet_fast import MPNetTokenizerFast
-
-#     split = """# Unemployment Insurance – Forms and Publications
-#     ## Publications
-
-#     [DE 1275B](https://edd.ca.gov/siteassets/files/pdf_pub_ctr/de1275b.pdf) – English | [DE 1275B/A](https://edd.ca.gov/siteassets/files/pdf_pub_ctr/de1275ba.pdf) – Armenian
-#     """
-#     print(len(split))
-
-#     sentence_transformer = app_config.sentence_transformer
-#     embedding = sentence_transformer.encode(split, show_progress_bar=True)
-#     embedding2 = sentence_transformer.encode(split + "blah " * 200, show_progress_bar=True)
-#     print(f"{embedding.shape}")
-#     print(f"{embedding2.shape}")
-#     print(f"{embedding == embedding2}")
-
-#     # sentence_transformer.tokenizer.clean_up_tokenization_spaces=True
-#     print(sentence_transformer.tokenizer.__class__)
-#     print(sentence_transformer.tokenizer)
-#     tokens0 = sentence_transformer.tokenizer.tokenize(split, add_special_tokens=True)
-#     # tokens0 = sentence_transformer.tokenizer.encode_plus(split).tokens()
-#     print(len(tokens0))
-#     print(tokens0)
-#     tokens = sentence_transformer.tokenize([split])
-#     print(tokens["input_ids"].shape)
-#     print(tokens["input_ids"])
-#     print(tokens["input_ids"][0])
-#     tokens = sentence_transformer.tokenize([split * 2])
-#     print(tokens["input_ids"].shape)
