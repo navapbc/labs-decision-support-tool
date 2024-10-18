@@ -4,7 +4,6 @@ from logging import Logger
 from typing import Callable
 
 from sqlalchemy import delete, select
-from transformers import PreTrainedTokenizerFast
 
 from src.adapters import db
 from src.app_config import app_config
