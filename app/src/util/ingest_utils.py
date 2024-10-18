@@ -68,12 +68,8 @@ def tokenize(text: str) -> list[str]:
     Setting add_special_tokens=True will add the special tokens CLS(0) and SEP(2) to the beginning and end of the input text.
     """
     tokenizer = app_config.sentence_transformer.tokenizer
-    if isinstance(tokenizer, PreTrainedTokenizerFast):
-        return tokenizer.tokenize(text, add_special_tokens=True)
-    elif tokenizer.__class__.__name__ == "MockTokenizer":
-        return tokenizer.tokenize(text)
-
-    raise ValueError(f"Unexpected tokenizer: {tokenizer.__class__}")
+    # The add_special_tokens argument is valid for only PreTrainedTokenizerFast subclasses
+    return tokenizer.tokenize(text, add_special_tokens=True)
 
 
 def add_embeddings(chunks: list[Chunk]) -> None:
