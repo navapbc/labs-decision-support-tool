@@ -137,7 +137,9 @@ def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWith
         logger.debug("\n".join([f"[Split {i}]: {s.text_to_encode}" for i, s in enumerate(splits)]))
 
     for split in splits:
-        assert split.valid()
+        assert (
+            split.valid()
+        ), f"token_count: {split.token_count} > {app_config.sentence_transformer.max_seq_length}"
     return splits
 
 

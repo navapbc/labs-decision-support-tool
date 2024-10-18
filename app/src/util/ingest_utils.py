@@ -1,10 +1,9 @@
 import getopt
 import logging
 from logging import Logger
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence
 
 from sqlalchemy import delete, select
-from transformers import PreTrainedTokenizerFast
 
 from src.adapters import db
 from src.app_config import app_config
@@ -72,17 +71,23 @@ def tokenize(text: str) -> list[str]:
     return tokenizer.tokenize(text, add_special_tokens=True)
 
 
-def add_embeddings(chunks: Sequence[Chunk], texts_to_encode: Sequence[str] = ()) -> None:
+def add_embeddings(
+    chunks: Sequence[Chunk], texts_to_encode: Optional[Sequence[str]] = None
+) -> None:
     embedding_model = app_config.sentence_transformer
 
-    to_encode = [
-        text if text else chunk.content for chunk, text in zip(chunks, texts_to_encode, strict=True)
-    ]
+    if texts_to_encode:
+        to_encode = [
+            text if text else chunk.content
+            for chunk, text in zip(chunks, texts_to_encode, strict=True)
+        ]
+    else:
+        to_encode = [chunk.content for chunk in chunks]
 
     # Generate all the embeddings in parallel for speed
     embeddings = embedding_model.encode([text for text in to_encode], show_progress_bar=False)
 
-    for chunk, embedding, text in zip(chunks, embeddings, texts_to_encode, strict=True):
+    for chunk, embedding, text in zip(chunks, embeddings, to_encode, strict=True):
         chunk.mpnet_embedding = embedding
         if not chunk.tokens:
             chunk.tokens = len(tokenize(text))
