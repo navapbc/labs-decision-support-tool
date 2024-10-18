@@ -30,5 +30,5 @@ class MockSentenceTransformer:
 
 
 class MockTokenizer:
-    def tokenize(self, text):
+    def tokenize(self, text, **kwargs):
         return text.split()
