@@ -135,6 +135,6 @@ def test__add_embeddings_with_texts_to_encode(app_config):
     chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)
     texts_to_encode = ["text1", "text2", "text3"]
     add_embeddings(chunks, texts_to_encode)
-    for chunk, text in zip(chunks, texts_to_encode):
+    for chunk, text in zip(chunks, texts_to_encode, strict=True):
         assert chunk.tokens == len(tokenize(text))
         assert chunk.mpnet_embedding == embedding_model.encode(text)
