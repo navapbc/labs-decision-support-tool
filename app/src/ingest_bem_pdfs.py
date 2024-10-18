@@ -18,7 +18,7 @@ from src.ingestion.pdf_postprocess import add_markdown, associate_stylings, grou
 from src.ingestion.pdf_stylings import extract_stylings
 from src.util import pdf_utils
 from src.util.file_util import get_files
-from src.util.ingest_utils import process_and_ingest_sys_args
+from src.util.ingest_utils import process_and_ingest_sys_args, tokenize
 from src.util.pdf_utils import Heading
 from src.util.string_utils import split_list, split_paragraph
 
@@ -196,7 +196,7 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
         assert paragraph.page_number is not None
 
         embedding_model = app_config.sentence_transformer
-        token_count = len(embedding_model.tokenizer.tokenize(paragraph.text))
+        token_count = len(tokenize(paragraph.text))
         if token_count > embedding_model.max_seq_length:
             # Split the text into chunks of approximately equal length by characters,
             # which doesn't necessarily mean equal number of tokens, but close enough.
@@ -252,7 +252,7 @@ def _add_embeddings(chunks: list[Chunk]) -> None:
 
     for i, chunk in enumerate(chunks):
         chunk.mpnet_embedding = embeddings[i]  # type: ignore
-        chunk.tokens = len(embedding_model.tokenizer.tokenize(chunk.content))
+        chunk.tokens = len(tokenize(chunk.content))
         assert (
             chunk.tokens <= embedding_model.max_seq_length
         ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:100]} ..."

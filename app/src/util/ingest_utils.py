@@ -58,3 +58,14 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
         db_session.commit()
 
     logger.info("Finished processing")
+
+
+def tokenize(text: str) -> list[str]:
+    """
+    The add_special_tokens argument is specified in PreTrainedTokenizerFast.encode_plus(), parent class of MPNetTokenizerFast.
+    It defaults to True for encode_plus() but defaults to False for .tokenize().
+    Setting add_special_tokens=True will add the special tokens CLS(0) and SEP(2) to the beginning and end of the input text.
+    """
+    tokenizer = app_config.sentence_transformer.tokenizer
+    # The add_special_tokens argument is valid for only PreTrainedTokenizerFast subclasses
+    return tokenizer.tokenize(text, add_special_tokens=True)
