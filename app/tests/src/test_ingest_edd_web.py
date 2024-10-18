@@ -105,7 +105,7 @@ def test__ingest_edd(
         documents[1].source == "https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
     )
 
-    # assert len(documents[0].chunks) == 5
+    assert len(documents[0].chunks) == 3
     assert (
         documents[0].chunks[0].content
         == "Get answers to FAQs about Nonindustrial Disability Insurance (NDI) and Nonindustrial Disability Insurance-Family Care Leave (NDI-FCL)."
@@ -115,7 +115,7 @@ def test__ingest_edd(
         "Nonindustrial Disability Insurance",
     ]
 
-    # assert len(documents[1].chunks) == 1
+    assert len(documents[1].chunks) == 1
     assert (
         documents[1].chunks[0].content
         == "Disability Insurance (DI) provides short-term, partial wage replacement ...\n\nIf you think you are eligible to [file a claim](/en/disability/apply/), review ..."

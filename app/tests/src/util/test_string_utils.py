@@ -1,4 +1,12 @@
 from src.util import string_utils
+from src.util.string_utils import (
+    headings_as_markdown,
+    remove_links,
+    resolve_urls,
+    split_list,
+    split_markdown_by_heading,
+    split_paragraph,
+)
 
 
 def test_split_paragraph():
@@ -53,3 +61,41 @@ def test_resolve_urls_scenario2():
         string_utils.resolve_urls(base_url, markdown)
         == "[This is a link](https://example.com/some_webpage/relative/path) and [another](https://example.com/some_webpage/path2/index.html)"
     )
+
+
+def test_split_markdown_by_heading():
+    markdown = (
+        "Intro text\n"
+        "# Heading 1\n"
+        "Some text under heading 1\n"
+        "## Heading 2\n"
+        "Some text under heading 2\n"
+        "### Heading 3\n"
+        "Some text under heading 3"
+    )
+    heading_sections = list(split_markdown_by_heading(markdown))
+    assert heading_sections == [
+        ((), "Intro text"),
+        (("Heading 1",), "Some text under heading 1"),
+        (("Heading 1", "Heading 2"), "Some text under heading 2"),
+        (("Heading 1", "Heading 2", "Heading 3"), "Some text under heading 3"),
+    ]
+    assert len(heading_sections[0][0]) == 0
+    assert len(heading_sections[1][0]) == 1
+    assert len(heading_sections[2][0]) == 2
+
+
+def test_headings_as_markdown():
+    assert headings_as_markdown([]) == ""
+
+    assert headings_as_markdown(["Heading 1"]) == "# Heading 1"
+
+    assert (
+        headings_as_markdown(["Heading 1", "Heading 2", "Heading 3"])
+        == "# Heading 1\n## Heading 2\n### Heading 3"
+    )
+
+
+def test_remove_links():
+    markdown = "[This is a link](https://example.com/relative/path) and [another](https://example.com/absolute/path)"
+    assert remove_links(markdown) == "This is a link and another"
