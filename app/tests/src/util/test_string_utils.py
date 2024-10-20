@@ -1,5 +1,10 @@
 from src.util.string_utils import (
+    deconstruct_list,
+    deconstruct_table,
+    ensure_blank_line_suffix,
     headings_as_markdown,
+    reconstruct_list,
+    reconstruct_table,
     remove_links,
     resolve_urls,
     split_list,
@@ -27,20 +32,81 @@ def test_split_paragraph_on_overly_long_sentence():
     ]
 
 
-def test_split_list():
-    text = (
-        "Following are list items:\n"
+def test_ensure_blank_line_suffix():
+    assert ensure_blank_line_suffix("This is a sentence.") == "This is a sentence.\n\n"
+    assert ensure_blank_line_suffix("This is a sentence.\n") == "This is a sentence.\n\n"
+    assert ensure_blank_line_suffix("This is a sentence.\n\n") == "This is a sentence.\n\n"
+
+
+TEST_LIST_MARKDOWN = (
+    "Following are list items:\n"
+    "    - This is a sentence.\n"
+    "    - This is another sentence.\n"
+    "    - This is a third sentence."
+)
+
+
+CHUNKED_TEST_LIST = [
+    (
+        "Following are list items:\n\n"
         "    - This is a sentence.\n"
         "    - This is another sentence.\n"
+    ),
+    (
+        "Following are list items:\n\n"  #
         "    - This is a third sentence."
+    ),
+]
+
+
+def test_split_list():
+    assert split_list(TEST_LIST_MARKDOWN, 90) == CHUNKED_TEST_LIST
+
+
+def test_deconstruct_and_reconstruct_list():
+    intro_sentence = "Following are list items:\n"
+    deconstructed_list_items = [
+        "    - This is a sentence.\n",
+        "    - This is another sentence.\n",
+        "    - This is a third sentence.",
+    ]
+
+    assert deconstruct_list(TEST_LIST_MARKDOWN) == (intro_sentence, deconstructed_list_items)
+
+    assert reconstruct_list(90, intro_sentence, deconstructed_list_items) == CHUNKED_TEST_LIST
+
+
+def test_deconstruct_and_reconstruct_table():
+    table_markdown = (
+        "Following is a table:\n"
+        "| Header 1 | Header 2 |\n"
+        "| --- | --- |\n"
+        "| Row 1, col 1 | Row 1, col 2 |\n"
+        "| Row 2, col 1 | Row 2, col 2 |\n"
     )
-    assert split_list(text, 90) == [
+
+    intro_sentence = "Following is a table:\n"
+    table_header = "| Header 1 | Header 2 |\n| --- | --- |\n"
+    table_rows = [
+        "| Row 1, col 1 | Row 1, col 2 |\n",
+        "| Row 2, col 1 | Row 2, col 2 |\n",
+    ]
+
+    assert deconstruct_table(table_markdown) == (intro_sentence, table_header, table_rows)
+
+    assert reconstruct_table(100, intro_sentence, table_header, table_rows) == [
         (
-            "Following are list items:\n"
-            "    - This is a sentence.\n"
-            "    - This is another sentence."
+            "Following is a table:\n\n"
+            "| Header 1 | Header 2 |\n"
+            "| --- | --- |\n"
+            "| Row 1, col 1 | Row 1, col 2 |\n"
         ),
-        ("Following are list items:\n    - This is a third sentence."),
+        (
+            "Following is a table:\n\n"
+            "| Header 1 | Header 2 |\n"
+            "| --- | --- |\n"
+            "| Row 2, col 1 | Row 2, col 2 |\n"
+        ),
     ]
 
 

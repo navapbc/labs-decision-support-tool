@@ -57,33 +57,100 @@ def split_paragraph(text: str, char_limit: int) -> list[str]:
     return _join_up_to(sents, char_limit)
 
 
-def split_list(text: str, char_limit: int, has_intro_sentence: bool = True) -> list[str]:
+def split_list(
+    markdown: str,
+    char_limit: int,
+    has_intro_sentence: bool = False,
+    list_delimiter: str = r"^( *[\-\*\+] )",
+) -> list[str]:
     """
-    Split text containing a list of items into chunks having up to a character limit each.
-    The first line is treated as an introductory sentence, which will be repeated as the first line of each chunk.
-    The first line and each list item should be separated by a newline character.
+    Split markdown containing a list of items into chunks having up to a character limit each.
+    The first split may be treated as an introductory sentence, which will be repeated as the first line of each chunk.
+    Each list item should begin with the list_delimiter regex.
     """
-    _prep_nltk_tokenizer()
+    intro_sentence, list_items = deconstruct_list(markdown, has_intro_sentence, list_delimiter)
+    return reconstruct_list(char_limit, intro_sentence, list_items, join_delimiter="")
 
-    lines = text.split("\n")
-    if has_intro_sentence:
-        intro_sentence = lines[0]
-        list_items = lines[1:]
+
+def deconstruct_list(
+    markdown: str, has_intro_sentence: bool = False, list_delimiter: str = r"^( *[\-\*\+] )"
+) -> tuple[str, list[str]]:
+    "Deconstruct a list of items into an introductory sentence and a list of items"
+    splits = re.split(list_delimiter, markdown, flags=re.MULTILINE)
+    if has_intro_sentence or not markdown.startswith(list_delimiter):
+        intro_sentence = splits[0]
+        splits = splits[1:]
     else:
         intro_sentence = ""
-        list_items = lines
 
-    # len(lines) accounts for the number of newline characters
-    list_items_char_limit = char_limit - len(intro_sentence) - len(lines)
+    # Reconstruct each list item
+    list_items = [(splits[a] + splits[a + 1]) for a in range(0, len(splits), 2)]
+    return intro_sentence, list_items
+
+
+def reconstruct_list(
+    char_limit: int, intro_sentence: str, list_items: Sequence[str], join_delimiter: str = ""
+) -> list[str]:
+    "Reconstruct a list of items into chunks (with same intro_sentence) having up to a character limit each"
+    # Before the set of list items, there should be a blank line
+    intro_sentence = ensure_blank_line_suffix(intro_sentence)
+
+    list_items_char_limit = char_limit - len(intro_sentence)
     chunks = [
-        f"{intro_sentence}\n{chunk}"
-        for chunk in _join_up_to(list_items, list_items_char_limit, delimiter="\n")
+        intro_sentence + some_list_items
+        for some_list_items in _join_up_to(
+            list_items, list_items_char_limit, delimiter=join_delimiter
+        )
     ]
     assert all(len(chunk) <= char_limit for chunk in chunks)
     return chunks
 
 
-def _join_up_to(lines: list[str], char_limit: int, delimiter: str = " ") -> list[str]:
+def ensure_blank_line_suffix(text: str) -> str:
+    "Return text with a blank line after the text"
+    if not text.endswith("\n\n"):
+        if text.endswith("\n"):
+            text += "\n"
+        else:
+            text += "\n\n"
+    return text
+
+
+def deconstruct_table(
+    markdown: str, has_intro_sentence: bool = False, list_delimiter: str = r"^(\| )"
+) -> tuple[str, str, list[str]]:
+    "Deconstruct a table of items into an introductory sentence, a table header, and a list of items"
+    intro_sentence, list_items = deconstruct_list(markdown, has_intro_sentence, list_delimiter)
+
+    if list_items[1].startswith("| --- |"):
+        table_header = list_items.pop(0) + list_items.pop(0)
+
+    return intro_sentence, table_header, list_items
+
+
+def reconstruct_table(
+    char_limit: int,
+    intro_sentence: str,
+    table_header: str,
+    table_rows: Sequence[str],
+    join_delimiter: str = "",
+) -> list[str]:
+    "Reconstruct a table of items into chunks (with intro_sentence + table_header) having up to a character limit each."
+
+    # Before the table, there should be a blank line
+    intro_sentence = ensure_blank_line_suffix(intro_sentence)
+
+    intro = intro_sentence + table_header
+    table_char_limit = char_limit - len(intro)
+    chunks = [
+        intro + some_table_rows
+        for some_table_rows in _join_up_to(table_rows, table_char_limit, delimiter=join_delimiter)
+    ]
+    assert all(len(chunk) <= char_limit for chunk in chunks), [len(chunk) for chunk in chunks]
+    return chunks
+
+
+def _join_up_to(lines: Sequence[str], char_limit: int, delimiter: str = " ") -> list[str]:
     "Join sentences or words in lines up to a character limit"
     chunks = []
     chunk = ""

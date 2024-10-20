@@ -41,6 +41,8 @@ class EddSpider(CrawlSpider):
                     "en/about_edd/google-translate",
                     # Exclude WSINs (Workforce Services Information Notices)
                     "en/jobs_and_training/Information_Notices/wsin",
+                    # Irrelevant pages
+                    r"en/disability/paid-family-leave/.*/social-media-toolkit",
                 ),
                 allow_domains=allowed_domains,
                 deny_domains=(
