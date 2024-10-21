@@ -24,6 +24,11 @@ def _ingest_edd_web(
 
     # First, split all json_items into chunks (fast) to debug any issues quickly
     for document, chunks, splits in _create_chunks(json_items, doc_attribs):
+        if not splits:
+            # Temporary: skip documents with no splits; TODO: fix in a separate PR
+            continue
+
+        logger.info("Adding embeddings for %r", document.source)
         # Next, add embeddings to each chunk (slow)
         add_embeddings(chunks, [s.text_to_encode for s in splits])
         logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
@@ -41,11 +46,11 @@ class SplitWithContextText:
         self.text_to_encode = f"{context_str}\n\n" + remove_links(text)
         self.token_count = len(tokenize(self.text_to_encode))
 
-    def add_if_within_limit(self, paragraph: str) -> bool:
-        new_text_to_encode = f"{self.text_to_encode}\n\n{remove_links(paragraph)}"
+    def add_if_within_limit(self, paragraph: str, delimiter: str = "\n\n") -> bool:
+        new_text_to_encode = f"{self.text_to_encode}{delimiter}{remove_links(paragraph)}"
         token_count = len(tokenize(new_text_to_encode))
         if token_count <= app_config.sentence_transformer.max_seq_length:
-            self.text += f"\n\n{paragraph}"
+            self.text += f"{delimiter}{paragraph}"
             self.text_to_encode = new_text_to_encode
             self.token_count = token_count
             return True
@@ -142,7 +147,7 @@ def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWith
         logger.debug("\n".join([f"[Split {i}]: {s.text_to_encode}" for i, s in enumerate(splits)]))
 
     # Temporary: remove splits that are too long; TODO: fix in a separate PR
-    valid_splits = [split for split in splits if not split.valid()]
+    valid_splits = [split for split in splits if split.valid()]
     return valid_splits
 
 
