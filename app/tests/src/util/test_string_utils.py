@@ -1,10 +1,5 @@
 from src.util.string_utils import (
-    deconstruct_list,
-    deconstruct_table,
-    ensure_blank_line_suffix,
     headings_as_markdown,
-    reconstruct_list,
-    reconstruct_table,
     remove_links,
     resolve_urls,
     split_list,
@@ -32,35 +27,14 @@ def test_split_paragraph_on_overly_long_sentence():
     ]
 
 
-def test_ensure_blank_line_suffix():
-    assert ensure_blank_line_suffix("This is a sentence.") == "This is a sentence.\n\n"
-    assert ensure_blank_line_suffix("This is a sentence.\n") == "This is a sentence.\n\n"
-    assert ensure_blank_line_suffix("This is a sentence.\n\n") == "This is a sentence.\n\n"
-
-
-TEST_LIST_MARKDOWN = (
-    "Following are list items:\n"
-    "    - This is a sentence.\n"
-    "    - This is another sentence.\n"
-    "    - This is a third sentence."
-)
-
-
-CHUNKED_TEST_LIST = [
-    (
-        "Following are list items:\n\n"
+def test_split_list():
+    list_markdown = (
+        "Following are list items:\n"
         "    - This is a sentence.\n"
         "    - This is another sentence.\n"
-    ),
-    (
-        "Following are list items:\n\n"  #
         "    - This is a third sentence."
-    ),
-]
-
-
-def test_split_list():
-    assert split_list(TEST_LIST_MARKDOWN, 90) == [
+    )
+    assert split_list(list_markdown, 90) == [
         (
             "Following are list items:\n"
             "    - This is a sentence.\n"
@@ -69,55 +43,6 @@ def test_split_list():
         (
             "Following are list items:\n"  #
             "    - This is a third sentence."
-        ),
-    ]
-
-
-# Use app_config fixture to provide sentence_transformer
-def test_deconstruct_and_reconstruct_list(app_config):
-    intro_sentence = "Following are list items:\n"
-    deconstructed_list_items = [
-        "    - This is a sentence.\n",
-        "    - This is another sentence.\n",
-        "    - This is a third sentence.",
-    ]
-
-    assert deconstruct_list(TEST_LIST_MARKDOWN) == (intro_sentence, deconstructed_list_items)
-
-    assert reconstruct_list(9 + 15, intro_sentence, deconstructed_list_items) == CHUNKED_TEST_LIST
-
-
-# Use app_config fixture to provide sentence_transformer
-def test_deconstruct_and_reconstruct_table(app_config):
-    table_markdown = (
-        "Following is a table:\n"
-        "| Header 1 | Header 2 |\n"
-        "| --- | --- |\n"
-        "| Row 1, col 1 | Row 1, col 2 |\n"
-        "| Row 2, col 1 | Row 2, col 2 |\n"
-    )
-
-    intro_sentence = "Following is a table:\n"
-    table_header = "| Header 1 | Header 2 |\n| --- | --- |\n"
-    table_rows = [
-        "| Row 1, col 1 | Row 1, col 2 |\n",
-        "| Row 2, col 1 | Row 2, col 2 |\n",
-    ]
-
-    assert deconstruct_table(table_markdown) == (intro_sentence, table_header, table_rows)
-
-    assert reconstruct_table(9 + 30, intro_sentence, table_header, table_rows) == [
-        (
-            "Following is a table:\n\n"
-            "| Header 1 | Header 2 |\n"
-            "| --- | --- |\n"
-            "| Row 1, col 1 | Row 1, col 2 |\n"
-        ),
-        (
-            "Following is a table:\n\n"
-            "| Header 1 | Header 2 |\n"
-            "| --- | --- |\n"
-            "| Row 2, col 1 | Row 2, col 2 |\n"
         ),
     ]
 

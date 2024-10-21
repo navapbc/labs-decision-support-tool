@@ -9,16 +9,16 @@ from smart_open import open as smart_open
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.util.ingest_utils import add_embeddings, process_and_ingest_sys_args, tokenize
-from src.util.string_utils import (
+from src.util.ingest_utils import (
+    add_embeddings,
     deconstruct_list,
     deconstruct_table,
-    headings_as_markdown,
+    process_and_ingest_sys_args,
     reconstruct_list,
     reconstruct_table,
-    remove_links,
-    split_markdown_by_heading,
+    tokenize,
 )
+from src.util.string_utils import headings_as_markdown, remove_links, split_markdown_by_heading
 
 logger = logging.getLogger(__name__)
 
