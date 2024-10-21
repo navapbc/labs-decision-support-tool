@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import sys
 from typing import Sequence
 
@@ -124,6 +125,17 @@ def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWith
     context_str = headings_as_markdown(headings)
     logger.debug("New heading: %s", headings)
 
+    # Keep intro sentence with the subsequent list or table
+    text = re.sub(
+        rf"{MarkdownHeaderTextSplitter_DELIMITER}^( *[\-\*\+] )",
+        r"\n\n\1",
+        text,
+        flags=re.MULTILINE,
+    )
+    text = re.sub(
+        rf"{MarkdownHeaderTextSplitter_DELIMITER}^(\| )", r"\n\n\1", text, flags=re.MULTILINE
+    )
+
     splits: list[SplitWithContextText] = []
     # Split content by MarkdownHeaderTextSplitter_DELIMITER, then gather into the largest chunks
     # that tokenize to less than the max_seq_length
@@ -148,8 +160,10 @@ def _create_splits(
     delimiter: str = "\n\n",
 ) -> None:
     splits.append(SplitWithContextText(headings, paragraphs[0], context_str))
+    logger.info("Paragraph0: %r", paragraphs[0])
     for paragraph in paragraphs[1:]:
-        _split_large_paragraph(headings, context_str, splits)
+        logger.info("Paragraph: %r", paragraph)
+        _split_large_text_block(headings, context_str, splits)
 
         if not paragraph:
             continue
@@ -159,7 +173,7 @@ def _create_splits(
             logger.info("Split %i has %i tokens", len(splits), splits[-1].token_count)
             # Start new split since longer_split will exceed max_seq_length
             splits.append(SplitWithContextText(headings, paragraph, context_str))
-    _split_large_paragraph(headings, context_str, splits)
+    _split_large_text_block(headings, context_str, splits)
 
     for split in splits:
         assert (
@@ -167,40 +181,46 @@ def _create_splits(
         ), f"token_count: {split.token_count} > {app_config.sentence_transformer.max_seq_length}"
 
 
-def _split_large_paragraph(
+def _split_large_text_block(
     headings: Sequence[str], context_str: str, splits: list[SplitWithContextText]
 ) -> None:
-    if splits[-1].exceeds_limit():
-        # Try to detect list items in the paragraph
-        intro_sentence, list_items = deconstruct_list(splits[-1].text)
-        if "| --- |" in splits[-1].text:
-            intro_sentence, table_header, table_items = deconstruct_table(splits[-1].text)
-        else:
-            table_items = None
+    split = splits[-1]  # SplitWithContextText(headings, text_block, context_str)
+    context_token_count = len(tokenize(f"{context_str}\n\n"))
+    token_limit = app_config.sentence_transformer.max_seq_length - context_token_count
+    if split.exceeds_limit():
+        # Try to detect list items in the text_block
+        intro_sentence, list_items = deconstruct_list(split.text)
         if list_items:
             splits.pop()
             logger.info(
-                "Split paragraph into %i list items with intro: %r", len(list_items), intro_sentence
-            )
-            chunk_texts = reconstruct_list(1000, intro_sentence, list_items)
-            _create_splits(headings, context_str, splits, chunk_texts)
-        elif table_items:
-            splits.pop()
-            logger.info(
-                "Split paragraph into %i table items with intro: %r",
-                len(table_items),
+                "Split text_block into %i list items with intro: %r",
+                len(list_items),
                 intro_sentence,
             )
-            chunk_texts = reconstruct_table(1000, intro_sentence, table_header, table_items)
+            chunk_texts = reconstruct_list(token_limit, intro_sentence, list_items)
             _create_splits(headings, context_str, splits, chunk_texts)
-        elif splits[-1].text.count("\n") > 2:
-            # Split paragraph into smaller paragraphs
-            chunk_texts = splits[-1].text.split("\n")
+        elif "| --- |" in split.text:
+            table_intro_sentence, table_header, table_items = deconstruct_table(split.text)
             splits.pop()
-            logger.info("Split paragraph into %i smaller paragraphs", len(chunk_texts))
+            logger.info(
+                "Split text_block into %i table items with intro: %r",
+                len(table_items),
+                table_intro_sentence,
+            )
+            chunk_texts = reconstruct_table(
+                token_limit, table_intro_sentence, table_header, table_items
+            )
+            _create_splits(headings, context_str, splits, chunk_texts)
+        elif split.text.count("\n") > 2:
+            # Split text_block into smaller text_blocks
+            chunk_texts = split.text.split("\n")
+            splits.pop()
+            logger.info("Split text_block into %i smaller text_blocks", len(chunk_texts))
             _create_splits(headings, context_str, splits, chunk_texts, delimiter="\n")
         else:
-            raise ValueError(f"Cannot split long paragraph: {splits[-1].text}")
+            raise ValueError(
+                f"Cannot split long ({split.token_count} tokens) text_block: {split.text}"
+            )
 
 
 def main() -> None:

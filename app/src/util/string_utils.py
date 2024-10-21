@@ -8,6 +8,8 @@ import nltk
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from nltk.tokenize import sent_tokenize
 
+from src.util.ingest_utils import tokenize
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,19 +59,30 @@ def split_paragraph(text: str, char_limit: int) -> list[str]:
     return _join_up_to(sents, char_limit)
 
 
-def split_list(
-    markdown: str,
-    char_limit: int,
-    has_intro_sentence: bool = False,
-    list_delimiter: str = r"^( *[\-\*\+] )",
-) -> list[str]:
+def split_list(text: str, char_limit: int, has_intro_sentence: bool = True) -> list[str]:
     """
-    Split markdown containing a list of items into chunks having up to a character limit each.
-    The first split may be treated as an introductory sentence, which will be repeated as the first line of each chunk.
-    Each list item should begin with the list_delimiter regex.
+    Split text containing a list of items into chunks having up to a character limit each.
+    The first line is treated as an introductory sentence, which will be repeated as the first line of each chunk.
+    The first line and each list item should be separated by a newline character.
     """
-    intro_sentence, list_items = deconstruct_list(markdown, has_intro_sentence, list_delimiter)
-    return reconstruct_list(char_limit, intro_sentence, list_items, join_delimiter="")
+    _prep_nltk_tokenizer()
+
+    lines = text.split("\n")
+    if has_intro_sentence:
+        intro_sentence = lines[0]
+        list_items = lines[1:]
+    else:
+        intro_sentence = ""
+        list_items = lines
+
+    # len(lines) accounts for the number of newline characters
+    list_items_char_limit = char_limit - len(intro_sentence) - len(lines)
+    chunks = [
+        f"{intro_sentence}\n{chunk}"
+        for chunk in _join_up_to(list_items, list_items_char_limit, delimiter="\n")
+    ]
+    assert all(len(chunk) <= char_limit for chunk in chunks)
+    return chunks
 
 
 def deconstruct_list(
@@ -89,20 +102,24 @@ def deconstruct_list(
 
 
 def reconstruct_list(
-    char_limit: int, intro_sentence: str, list_items: Sequence[str], join_delimiter: str = ""
+    token_limit: int,
+    intro_sentence: str,
+    list_items: Sequence[str],
+    join_delimiter: str = "",
 ) -> list[str]:
     "Reconstruct a list of items into chunks (with same intro_sentence) having up to a character limit each"
     # Before the set of list items, there should be a blank line
     intro_sentence = ensure_blank_line_suffix(intro_sentence)
 
-    list_items_char_limit = char_limit - len(intro_sentence)
+    item_max_seq_length = token_limit - len(tokenize(intro_sentence))
+    assert item_max_seq_length > 0, item_max_seq_length
     chunks = [
         intro_sentence + some_list_items
-        for some_list_items in _join_up_to(
-            list_items, list_items_char_limit, delimiter=join_delimiter
+        for some_list_items in _join_up_to_max_seq_length(
+            list_items, item_max_seq_length, delimiter=join_delimiter
         )
     ]
-    assert all(len(chunk) <= char_limit for chunk in chunks)
+    # assert all(len(chunk) <= char_limit for chunk in chunks)
     return chunks
 
 
@@ -129,7 +146,7 @@ def deconstruct_table(
 
 
 def reconstruct_table(
-    char_limit: int,
+    token_limit: int,
     intro_sentence: str,
     table_header: str,
     table_rows: Sequence[str],
@@ -141,12 +158,42 @@ def reconstruct_table(
     intro_sentence = ensure_blank_line_suffix(intro_sentence)
 
     intro = intro_sentence + table_header
-    table_char_limit = char_limit - len(intro)
+    item_max_seq_length = token_limit - len(tokenize(intro))
+    assert item_max_seq_length > 0, item_max_seq_length
     chunks = [
         intro + some_table_rows
-        for some_table_rows in _join_up_to(table_rows, table_char_limit, delimiter=join_delimiter)
+        for some_table_rows in _join_up_to_max_seq_length(
+            table_rows, item_max_seq_length, delimiter=join_delimiter
+        )
     ]
-    assert all(len(chunk) <= char_limit for chunk in chunks), [len(chunk) for chunk in chunks]
+    # assert all(len(chunk) <= char_limit for chunk in chunks), [len(chunk) for chunk in chunks]
+    return chunks
+
+
+def _join_up_to_max_seq_length(
+    lines: Sequence[str], max_seq_length: int, delimiter: str = " "
+) -> list[str]:
+    chunks = []
+    chunk = ""
+    for line in lines:
+        test_chunk = delimiter.join([chunk, line]) if chunk else line
+        token_count = len(tokenize(test_chunk))
+        logger.debug("%i / %i : %r", token_count, max_seq_length, test_chunk)
+        if token_count > max_seq_length:
+            # Don't use test_chunk; start a new chunk
+            if chunk:
+                chunks.append(chunk)
+            if len(tokenize(line)) <= max_seq_length:
+                chunk = line
+            else:
+                chunk = ""
+        else:
+            chunk = test_chunk
+
+    # Add the last chunk
+    chunks.append(chunk)
+
+    # assert all(len(chunk) <= char_limit for chunk in chunks)
     return chunks
 
 

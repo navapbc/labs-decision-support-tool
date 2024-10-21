@@ -60,7 +60,17 @@ CHUNKED_TEST_LIST = [
 
 
 def test_split_list():
-    assert split_list(TEST_LIST_MARKDOWN, 90) == CHUNKED_TEST_LIST
+    assert split_list(TEST_LIST_MARKDOWN, 90) == [
+        (
+            "Following are list items:\n"
+            "    - This is a sentence.\n"
+            "    - This is another sentence."
+        ),
+        (
+            "Following are list items:\n"  #
+            "    - This is a third sentence."
+        ),
+    ]
 
 
 def test_deconstruct_and_reconstruct_list():
@@ -73,7 +83,7 @@ def test_deconstruct_and_reconstruct_list():
 
     assert deconstruct_list(TEST_LIST_MARKDOWN) == (intro_sentence, deconstructed_list_items)
 
-    assert reconstruct_list(90, intro_sentence, deconstructed_list_items) == CHUNKED_TEST_LIST
+    assert reconstruct_list(9 + 15, intro_sentence, deconstructed_list_items) == CHUNKED_TEST_LIST
 
 
 def test_deconstruct_and_reconstruct_table():
@@ -94,7 +104,7 @@ def test_deconstruct_and_reconstruct_table():
 
     assert deconstruct_table(table_markdown) == (intro_sentence, table_header, table_rows)
 
-    assert reconstruct_table(100, intro_sentence, table_header, table_rows) == [
+    assert reconstruct_table(9 + 30, intro_sentence, table_header, table_rows) == [
         (
             "Following is a table:\n\n"
             "| Header 1 | Header 2 |\n"
