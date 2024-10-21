@@ -108,7 +108,7 @@ def test__ingest_edd(
 
     db_session.execute(delete(Document))
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.WARNING):
         if file_location == "local":
             _ingest_edd_web(db_session, edd_web_local_file, doc_attribs)
         else:
@@ -117,10 +117,10 @@ def test__ingest_edd(
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 4
 
-    # assert (
-    #     "Skipping duplicate URL: https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
-    #     in caplog.messages[0]
-    # )
+    assert (
+        "Skipping duplicate URL: https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
+        in caplog.messages[0]
+    )
 
     assert documents[0].name == "Nonindustrial Disability Insurance FAQs"
     assert documents[0].source == "https://edd.ca.gov/en/disability/nonindustrial/faqs/"

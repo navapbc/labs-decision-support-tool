@@ -28,13 +28,13 @@ def test_split_paragraph_on_overly_long_sentence():
 
 
 def test_split_list():
-    list_markdown = (
+    text = (
         "Following are list items:\n"
         "    - This is a sentence.\n"
         "    - This is another sentence.\n"
         "    - This is a third sentence."
     )
-    assert split_list(list_markdown, 90) == [
+    assert split_list(text, 90) == [
         (
             "Following are list items:\n"
             "    - This is a sentence.\n"
