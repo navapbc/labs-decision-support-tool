@@ -119,7 +119,7 @@ def reconstruct_list(
             list_items, item_max_seq_length, delimiter=join_delimiter
         )
     ]
-    # assert all(len(chunk) <= char_limit for chunk in chunks)
+    assert all(len(tokenize(chunk)) <= token_limit for chunk in chunks)
     return chunks
 
 
@@ -141,6 +141,8 @@ def deconstruct_table(
 
     if list_items[1].startswith("| --- |"):
         table_header = list_items.pop(0) + list_items.pop(0)
+    else:  # Assume no table header
+        table_header = ""
 
     return intro_sentence, table_header, list_items
 
@@ -160,13 +162,16 @@ def reconstruct_table(
     intro = intro_sentence + table_header
     item_max_seq_length = token_limit - len(tokenize(intro))
     assert item_max_seq_length > 0, item_max_seq_length
+    print("item_max_seq_length", item_max_seq_length)
+    for row in table_rows:
+        print("row", row)
     chunks = [
         intro + some_table_rows
         for some_table_rows in _join_up_to_max_seq_length(
             table_rows, item_max_seq_length, delimiter=join_delimiter
         )
     ]
-    # assert all(len(chunk) <= char_limit for chunk in chunks), [len(chunk) for chunk in chunks]
+    assert all(len(tokenize(chunk)) <= token_limit for chunk in chunks)
     return chunks
 
 
@@ -180,12 +185,14 @@ def _join_up_to_max_seq_length(
         token_count = len(tokenize(test_chunk))
         logger.debug("%i / %i : %r", token_count, max_seq_length, test_chunk)
         if token_count > max_seq_length:
-            # Don't use test_chunk; start a new chunk
+            # Don't use test_chunk; add current chunk; start a new chunk
             if chunk:
                 chunks.append(chunk)
-            if len(tokenize(line)) <= max_seq_length:
+
+            if (line_token_count := len(tokenize(line))) <= max_seq_length:
                 chunk = line
             else:
+                logger.warning("Line is too long (%i tokens): %s", line_token_count, line)
                 chunk = ""
         else:
             chunk = test_chunk
@@ -193,7 +200,7 @@ def _join_up_to_max_seq_length(
     # Add the last chunk
     chunks.append(chunk)
 
-    # assert all(len(chunk) <= char_limit for chunk in chunks)
+    assert all(len(tokenize(chunk)) <= max_seq_length for chunk in chunks)
     return chunks
 
 

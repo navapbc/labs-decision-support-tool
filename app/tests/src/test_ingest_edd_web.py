@@ -62,6 +62,19 @@ If you are enrolled in the Annual Leave Program (ALP), your employer will contin
                     "These schemes are meant to unlawfully lower an employer\u2019s UI tax rate. Employers should know about these schemes and their potential legal ramifications.\n\n"
                 ),
             },
+            {
+                "url": "https://edd.ca.gov/en/jobs_and_training/northern_region/",
+                "title": "The Northern Job Fairs and Workshops",
+                "main_primary": (
+                    "## Scheduled Events\n\n"
+                    "**Career Center Orientation**\n"
+                    "| Location | Date/Time | Other Information |\n"
+                    "| --- | --- | --- |\n"
+                    "| Virtual | Friday | This workshop will ... |\n"
+                    "| Virtual | Friday | This workshop is for ... |\n"
+                    "| Virtual | Friday | Staff will conduct ... |\n"
+                ),
+            },
         ]
     )
 
@@ -102,7 +115,7 @@ def test__ingest_edd(
             _ingest_edd_web(db_session, edd_web_s3_file, doc_attribs)
 
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
-    assert len(documents) == 3
+    assert len(documents) == 4
 
     # assert (
     #     "Skipping duplicate URL: https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
@@ -117,6 +130,8 @@ def test__ingest_edd(
     )
     assert documents[2].name == "State Unemployment Tax Act Dumping"
     assert documents[2].source == "https://edd.ca.gov/en/payroll_taxes/suta_dumping/"
+    assert documents[3].name == "The Northern Job Fairs and Workshops"
+    assert documents[3].source == "https://edd.ca.gov/en/jobs_and_training/northern_region/"
 
     assert len(documents[0].chunks) == 3
     assert (
@@ -135,6 +150,7 @@ def test__ingest_edd(
     )
     assert documents[1].chunks[0].headings == ["Options to File for Disability Insurance Benefits"]
 
+    # Document[2] has a list
     assert len(documents[2].chunks) == 4
     assert (
         documents[2].chunks[0].content
@@ -176,3 +192,32 @@ def test__ingest_edd(
         "",
         "SUTA Dumping Schemes",
     ]
+
+    # Document[3] has a table
+    assert len(documents[3].chunks) == 3
+    for chunk in documents[3].chunks:
+        print("======")
+        print(chunk.content)
+    assert documents[3].chunks[0].content == (
+        "**Career Center Orientation**\n\n"
+        "| Location | Date/Time | Other Information |\n"
+        "| --- | --- | --- |\n"
+        "| Virtual | Friday | This workshop will ... |\n"
+    )
+    assert documents[3].chunks[1].content == (
+        "**Career Center Orientation**\n\n"
+        "| Location | Date/Time | Other Information |\n"
+        "| --- | --- | --- |\n"
+        "| Virtual | Friday | This workshop is for ... |\n"
+    )
+    assert documents[3].chunks[2].content == (
+        "**Career Center Orientation**\n\n"
+        "| Location | Date/Time | Other Information |\n"
+        "| --- | --- | --- |\n"
+        "| Virtual | Friday | Staff will conduct ... |"
+    )
+    for chunk in documents[3].chunks:
+        assert chunk.headings == [
+            "The Northern Job Fairs and Workshops",
+            "Scheduled Events",
+        ]

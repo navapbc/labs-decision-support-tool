@@ -73,7 +73,8 @@ def test_split_list():
     ]
 
 
-def test_deconstruct_and_reconstruct_list():
+# Use app_config fixture to provide sentence_transformer
+def test_deconstruct_and_reconstruct_list(app_config):
     intro_sentence = "Following are list items:\n"
     deconstructed_list_items = [
         "    - This is a sentence.\n",
@@ -86,7 +87,8 @@ def test_deconstruct_and_reconstruct_list():
     assert reconstruct_list(9 + 15, intro_sentence, deconstructed_list_items) == CHUNKED_TEST_LIST
 
 
-def test_deconstruct_and_reconstruct_table():
+# Use app_config fixture to provide sentence_transformer
+def test_deconstruct_and_reconstruct_table(app_config):
     table_markdown = (
         "Following is a table:\n"
         "| Header 1 | Header 2 |\n"
