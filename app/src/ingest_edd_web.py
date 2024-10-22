@@ -192,7 +192,7 @@ def _create_splits(
 def _split_large_text_block(
     headings: Sequence[str], context_str: str, splits: list[SplitWithContextText]
 ) -> None:
-    split = splits[-1]  # SplitWithContextText(headings, text_block, context_str)
+    split = splits[-1]
     context_token_count = len(tokenize(f"{context_str}\n\n"))
     token_limit = app_config.sentence_transformer.max_seq_length - context_token_count
     if split.exceeds_limit():
