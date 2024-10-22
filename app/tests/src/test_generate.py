@@ -112,6 +112,34 @@ def test_generate(monkeypatch):
     assert generate("gpt-4o", PROMPT, "some query") == expected_response
 
 
+def test_generate_with_history(monkeypatch):
+    monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
+    history = [
+        {"content": "some query", "role": "user"},
+        {"role": "assistant", "content": "<div> answer</div>"},
+        {"content": "some other query", "role": "user"},
+    ]
+    expected_response = (
+        'Called gpt-4o with [{"content": "'
+        + PROMPT
+        + '", "role": "system"}, {"content": "Use the following context to answer'
+        + ' the question: context", "role": "system"},'
+        + ' {"content": "some query", "role": "user"}, {"content": "<div> answer</div>",'
+        + ' "role": "assistant"}, {"content": "some other query", "role": "user"}]'
+    )
+
+    assert (
+        generate(
+            llm="gpt-4o",
+            system_prompt=PROMPT,
+            context_text="context",
+            chat_history=history,
+            query="some other query",
+        )
+        == expected_response
+    )
+
+
 def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
     subsection = split_into_subsections([c.chunk for c in chunks_with_scores])
@@ -124,3 +152,9 @@ def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
     assert generate("gpt-4o", PROMPT, "some query", context_text) == expected_response
+
+
+[
+    {"role": "assistant", "content": "Michigan Bridges Eligibility Manual Chat Engine started "},
+    {"role": "user", "content": "some query"},
+]

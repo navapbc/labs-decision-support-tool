@@ -76,14 +76,12 @@ def generate(
     # chat_history has the user query as the last item, but we want to insert the context first
     if chat_history:
         chat_history.pop()
-        chat_history += messages
-    else:
-        chat_history = messages
+        messages.extend(chat_history)
 
-    chat_history.append({"content": query, "role": "user"})
+    messages.append({"content": query, "role": "user"})
     logger.info("Calling %s for query: %s with context:\n%s", llm, query, context_text)
     response = completion(
-        model=llm, messages=chat_history, **completion_args(llm), temperature=app_config.temperature
+        model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
     )
 
     return response["choices"][0]["message"]["content"]
