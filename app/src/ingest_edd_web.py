@@ -95,7 +95,7 @@ def _create_chunks(
         result.append((document, chunks, splits))
     return result
 
-
+  
 def _chunk_page(
     document: Document, content: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
