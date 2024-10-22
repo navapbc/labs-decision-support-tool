@@ -163,4 +163,5 @@ def headings_as_markdown(headings: Sequence[str]) -> str:
 
 
 def remove_links(markdown: str) -> str:
+    # Remove markdown links, e.g., `[This is a link](https://example.com/relative/path) and [another](https://example.com/absolute/path)` -> `This is a link and another`
     return re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", markdown)
