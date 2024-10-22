@@ -18,7 +18,7 @@ from src.util.ingest_utils import (
     reconstruct_table,
     tokenize,
 )
-from src.util.string_utils import headings_as_markdown, remove_links, split_markdown_by_heading
+from src.util.string_utils import remove_links, split_markdown_by_heading
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ def _ingest_edd_web(
     all_chunks = _create_chunks(json_items, doc_attribs)
     logger.info("Done splitting %d webpages into %d chunks", len(json_items), sum(len(chunks) for _, chunks, _ in all_chunks))
     for document, chunks, splits in all_chunks:
+    for document, chunks, splits in _create_chunks(json_items, doc_attribs):
+        logger.info("Adding embeddings for %r", document.source)
         # Next, add embeddings to each chunk (slow)
         add_embeddings(chunks, [s.text_to_encode for s in splits])
         logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
@@ -124,7 +126,7 @@ MarkdownHeaderTextSplitter_DELIMITER = "  \n"
 
 def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWithContextText]:
     # Add headings to the context_str; other context can also be added
-    context_str = headings_as_markdown(headings)
+    context_str = "\n".join(headings)
     logger.debug("New heading: %s", headings)
 
     # Keep intro sentence with the subsequent list or table
