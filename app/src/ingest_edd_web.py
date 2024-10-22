@@ -33,9 +33,12 @@ def _ingest_edd_web(
 
     # First, split all json_items into chunks (fast) to debug any issues quickly
     all_chunks = _create_chunks(json_items, doc_attribs)
-    logger.info("Done splitting %d webpages into %d chunks", len(json_items), sum(len(chunks) for _, chunks, _ in all_chunks))
+    logger.info(
+        "Done splitting %d webpages into %d chunks",
+        len(json_items),
+        sum(len(chunks) for _, chunks, _ in all_chunks),
+    )
     for document, chunks, splits in all_chunks:
-    for document, chunks, splits in _create_chunks(json_items, doc_attribs):
         logger.info("Adding embeddings for %r", document.source)
         # Next, add embeddings to each chunk (slow)
         add_embeddings(chunks, [s.text_to_encode for s in splits])
@@ -95,7 +98,7 @@ def _create_chunks(
         result.append((document, chunks, splits))
     return result
 
-  
+
 def _chunk_page(
     document: Document, content: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
@@ -129,7 +132,8 @@ def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWith
     context_str = "\n".join(headings)
     logger.debug("New heading: %s", headings)
 
-    # Keep intro sentence with the subsequent list or table
+    # Keep intro sentence/paragraph together with the subsequent list or table by
+    # replacing the MarkdownHeaderTextSplitter_DELIMITER with "\n\n" so that they are not split
     text = re.sub(
         rf"{MarkdownHeaderTextSplitter_DELIMITER}^( *[\-\*\+] )",
         r"\n\n\1",

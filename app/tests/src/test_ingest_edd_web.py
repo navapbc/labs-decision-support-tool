@@ -194,7 +194,7 @@ def test__ingest_edd(
     ]
 
     # Document[3] has a table
-    assert len(documents[3].chunks) == 3
+    assert len(documents[3].chunks) == 2
     for chunk in documents[3].chunks:
         print("======")
         print(chunk.content)
@@ -203,14 +203,9 @@ def test__ingest_edd(
         "| Location | Date/Time | Other Information |\n"
         "| --- | --- | --- |\n"
         "| Virtual | Friday | This workshop will ... |\n"
-    )
-    assert documents[3].chunks[1].content == (
-        "**Career Center Orientation**\n\n"
-        "| Location | Date/Time | Other Information |\n"
-        "| --- | --- | --- |\n"
         "| Virtual | Friday | This workshop is for ... |\n"
     )
-    assert documents[3].chunks[2].content == (
+    assert documents[3].chunks[1].content == (
         "**Career Center Orientation**\n\n"
         "| Location | Date/Time | Other Information |\n"
         "| --- | --- | --- |\n"
