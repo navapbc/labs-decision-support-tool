@@ -32,7 +32,9 @@ def _ingest_edd_web(
         json_items = json.load(json_file)
 
     # First, split all json_items into chunks (fast) to debug any issues quickly
-    for document, chunks, splits in _create_chunks(json_items, doc_attribs):
+    all_chunks = _create_chunks(json_items, doc_attribs)
+    logger.info("Done splitting %d webpages into %d chunks", len(json_items), sum(len(chunks) for _, chunks, _ in all_chunks))
+    for document, chunks, splits in all_chunks:
         # Next, add embeddings to each chunk (slow)
         add_embeddings(chunks, [s.text_to_encode for s in splits])
         logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
@@ -144,10 +146,10 @@ def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWith
     _create_splits(headings, context_str, splits, paragraphs)
 
     if len(splits) == 1:
-        logger.info("Heading section fits in 1 chunk: %s", headings[-1])
+        logger.debug("Section fits in 1 chunk: %s", headings[-1])
     else:
         logger.info("Split %i has %i tokens", len(splits), splits[-1].token_count)
-        logger.info("Partitioned heading section into %i splits", len(splits))
+        logger.info("Partitioned section into %i splits", len(splits))
         logger.debug("\n".join([f"[Split {i}]: {s.text_to_encode}" for i, s in enumerate(splits)]))
     return splits
 
@@ -160,9 +162,9 @@ def _create_splits(
     delimiter: str = "\n\n",
 ) -> None:
     splits.append(SplitWithContextText(headings, paragraphs[0], context_str))
-    logger.info("Paragraph0: %r", paragraphs[0])
+    logger.debug("Paragraph0: %r", paragraphs[0])
     for paragraph in paragraphs[1:]:
-        logger.info("Paragraph: %r", paragraph)
+        logger.debug("Paragraph: %r", paragraph)
         _split_large_text_block(headings, context_str, splits)
 
         if not paragraph:
