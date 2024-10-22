@@ -159,6 +159,9 @@ def format_web_subsections(
     for _, citation in remapped_citations.items():
         _accordion_id += 1
         chunk = citation.chunk
+        citation_headings = (
+            f"<div><b>{' → '.join(chunk.headings)}</b></div>" if chunk.headings else ""
+        )
         formatted_subsection = to_html(citation.text)
 
         citation_link = ""
@@ -179,6 +182,7 @@ def format_web_subsections(
                 </button>
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
+                {citation_headings}
                 <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>
                 {citation_link}
             </div>

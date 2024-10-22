@@ -1,13 +1,15 @@
 import json
 import logging
 import sys
+from typing import Sequence
 
 from smart_open import open as smart_open
 
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.util.ingest_utils import process_and_ingest_sys_args, tokenize
+from src.util.ingest_utils import add_embeddings, process_and_ingest_sys_args, tokenize
+from src.util.string_utils import remove_links, split_markdown_by_heading
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,55 @@ def _ingest_edd_web(
     with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
         json_items = json.load(json_file)
 
+    # First, split all json_items into chunks (fast) to debug any issues quickly
+    for document, chunks, splits in _create_chunks(json_items, doc_attribs):
+        if not splits:
+            # Temporary: skip documents with no splits; TODO: fix in a separate PR
+            continue
+
+        logger.info("Adding embeddings for %r", document.source)
+        # Next, add embeddings to each chunk (slow)
+        add_embeddings(chunks, [s.text_to_encode for s in splits])
+        logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
+
+        # Then, add to the database
+        db_session.add(document)
+        db_session.add_all(chunks)
+
+
+class SplitWithContextText:
+
+    def __init__(self, headings: Sequence[str], text: str, context_str: str):
+        self.headings = headings
+        self.text = text
+        self.text_to_encode = f"{context_str}\n\n" + remove_links(text)
+        self.token_count = len(tokenize(self.text_to_encode))
+
+    def add_if_within_limit(self, paragraph: str, delimiter: str = "\n\n") -> bool:
+        new_text_to_encode = f"{self.text_to_encode}{delimiter}{remove_links(paragraph)}"
+        token_count = len(tokenize(new_text_to_encode))
+        if token_count <= app_config.sentence_transformer.max_seq_length:
+            self.text += f"{delimiter}{paragraph}"
+            self.text_to_encode = new_text_to_encode
+            self.token_count = token_count
+            return True
+        return False
+
+    def is_valid(self) -> bool:
+        if self.token_count > app_config.sentence_transformer.max_seq_length:
+            logger.warning(
+                "Text too long with %i tokens: %s", self.token_count, self.text_to_encode
+            )
+            return False
+        return True
+
+
+def _create_chunks(
+    json_items: Sequence[dict[str, str]],
+    doc_attribs: dict[str, str],
+) -> Sequence[tuple[Document, Sequence[Chunk], Sequence[SplitWithContextText]]]:
     urls_processed: set[str] = set()
+    result = []
     for item in json_items:
         if item["url"] in urls_processed:
             # Workaround for duplicate items from web scraping
@@ -28,47 +78,77 @@ def _ingest_edd_web(
             continue
 
         name = item["title"]
-        logger.info("Processing %s (%s)", name, item["url"])
+        logger.info("Processing: %s (%s)", name, item["url"])
         urls_processed.add(item["url"])
 
         content = item.get("main_content", item.get("main_primary"))
         assert content, f"Item {name} has no main_content or main_primary"
 
         document = Document(name=name, content=content, source=item["url"], **doc_attribs)
-        db_session.add(document)
-
-        chunks = _chunk_page(content)
-        for chunk in chunks:
-            chunk.document = document
-        db_session.add_all(chunks)
-        logger.info("Split %s into %d chunks", name, len(chunks))
+        chunks, splits = _chunk_page(document, content)
+        result.append((document, chunks, splits))
+    return result
 
 
-def _chunk_page(content: str) -> list[Chunk]:
-    embedding_model = app_config.sentence_transformer
+def _chunk_page(
+    document: Document, content: str
+) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
+    splits: list[SplitWithContextText] = []
+    for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
+        # Start a new split for each heading
+        section_splits = _split_heading_section(headings, text)
+        splits.extend(section_splits)
 
-    # Split content by double newlines, then gather into the largest chunks
-    # that tokenize to less than the max_seq_length
-    content_split_by_double_newlines = content.split("\n\n")
-    subsections = [content_split_by_double_newlines[0]]
-    for subsection in content_split_by_double_newlines[1:]:
-        tokens_with_new_subsection = len(tokenize(subsections[-1] + subsection))
-        if tokens_with_new_subsection < embedding_model.max_seq_length:
-            subsections[-1] += "\n\n" + subsection
-        else:
-            subsections.append(subsection)
-
-    # Parallelize embedding generation for performance
-    subsection_embeddings = embedding_model.encode(subsections, show_progress_bar=False)
-
-    return [
+    chunks = [
         Chunk(
-            content=subsection,
-            mpnet_embedding=embedding,
-            tokens=len(tokenize(subsection)),
+            document=document,
+            content=split.text,
+            headings=split.headings,
+            num_splits=len(splits),
+            split_index=index,
+            tokens=split.token_count,
         )
-        for subsection, embedding in zip(subsections, subsection_embeddings, strict=True)
+        for index, split in enumerate(splits)
     ]
+    return chunks, splits
+
+
+# MarkdownHeaderTextSplitter splits text by "\n" then calls aggregate_lines_to_chunks() to reaggregate
+# paragraphs using "  \n", so "\n\n" is replaced by "  \n"
+MarkdownHeaderTextSplitter_DELIMITER = "  \n"
+
+
+def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWithContextText]:
+    # Add headings to the context_str; other context can also be added
+    context_str = "\n".join(headings)
+    logger.debug("New heading: %s", headings)
+
+    splits: list[SplitWithContextText] = []
+    # Split content by MarkdownHeaderTextSplitter_DELIMITER, then gather into the largest chunks
+    # that tokenize to less than the max_seq_length
+    paragraphs = text.split(MarkdownHeaderTextSplitter_DELIMITER)
+    # Start new split with the first paragraph
+    splits.append(SplitWithContextText(headings, paragraphs[0], context_str))
+    for paragraph in paragraphs[1:]:
+        if not paragraph:
+            continue
+        if splits[-1].add_if_within_limit(paragraph):
+            logger.debug("adding to Split %i => %i tokens", len(splits), splits[-1].token_count)
+        else:
+            logger.info("Split %i has %i tokens", len(splits), splits[-1].token_count)
+            # Start new split since longer_split will exceed max_seq_length
+            splits.append(SplitWithContextText(headings, paragraph, context_str))
+
+    if len(splits) == 1:
+        logger.info("Heading section fits in 1 chunk: %s", headings[-1])
+    else:
+        logger.info("Split %i has %i tokens", len(splits), splits[-1].token_count)
+        logger.info("Partitioned heading section into %i splits", len(splits))
+        logger.debug("\n".join([f"[Split {i}]: {s.text_to_encode}" for i, s in enumerate(splits)]))
+
+    # Temporary: remove splits that are too long; TODO: fix in a separate PR
+    valid_splits = [split for split in splits if split.is_valid()]
+    return valid_splits
 
 
 def main() -> None:

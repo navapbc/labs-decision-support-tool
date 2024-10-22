@@ -32,6 +32,7 @@ nltk = "^3.9.1"
 scrapy = "^2.11.2"
 markdownify = "^0.13.1"
 markdown = "^3.7"
+langchain-text-splitters = "^0.3.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"

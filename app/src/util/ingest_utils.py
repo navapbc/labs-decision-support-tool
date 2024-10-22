@@ -1,7 +1,7 @@
 import getopt
 import logging
 from logging import Logger
-from typing import Callable
+from typing import Callable, Optional, Sequence
 
 from sqlalchemy import delete, select
 
@@ -71,17 +71,34 @@ def tokenize(text: str) -> list[str]:
     return tokenizer.tokenize(text, add_special_tokens=True)
 
 
-def add_embeddings(chunks: list[Chunk]) -> None:
+def add_embeddings(
+    chunks: Sequence[Chunk], texts_to_encode: Optional[Sequence[str]] = None
+) -> None:
+    """
+    Add embeddings to each chunk using the text from either texts_to_encode or chunk.content.
+    Arguments chunks and texts_to_encode should be the same length, or texts_to_encode can be None/empty.
+    This allows us to create embeddings using text other than chunk.content.
+    If the corresponding texts_to_encode element evaluates to False, then chunk.content is used instead.
+    """
     embedding_model = app_config.sentence_transformer
 
-    # Generate all the embeddings in parallel for speed
-    embeddings = embedding_model.encode(
-        [chunk.content for chunk in chunks], show_progress_bar=False
-    )
+    if texts_to_encode:
+        to_encode = [
+            text if text else chunk.content
+            for chunk, text in zip(chunks, texts_to_encode, strict=True)
+        ]
+    else:
+        to_encode = [chunk.content for chunk in chunks]
 
-    for chunk, embedding in zip(chunks, embeddings, strict=True):
+    # Generate all the embeddings in parallel for speed
+    embeddings = embedding_model.encode([text for text in to_encode], show_progress_bar=False)
+
+    for chunk, embedding, text in zip(chunks, embeddings, to_encode, strict=True):
         chunk.mpnet_embedding = embedding
-        chunk.tokens = len(tokenize(chunk.content))
+        if not chunk.tokens:
+            chunk.tokens = len(tokenize(text))
+        else:
+            assert chunk.tokens == len(tokenize(text))
         assert (
             chunk.tokens <= embedding_model.max_seq_length
-        ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:100]}..."
+        ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:80]}...{chunk.content[-50:]}"
