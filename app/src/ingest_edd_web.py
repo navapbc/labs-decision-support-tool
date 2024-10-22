@@ -9,7 +9,7 @@ from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.util.ingest_utils import add_embeddings, process_and_ingest_sys_args, tokenize
-from src.util.string_utils import headings_as_markdown, remove_links, split_markdown_by_heading
+from src.util.string_utils import remove_links, split_markdown_by_heading
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ MarkdownHeaderTextSplitter_DELIMITER = "  \n"
 
 def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWithContextText]:
     # Add headings to the context_str; other context can also be added
-    context_str = headings_as_markdown(headings)
+    context_str = "\n".join(headings)
     logger.debug("New heading: %s", headings)
 
     splits: list[SplitWithContextText] = []

@@ -78,7 +78,7 @@ def add_embeddings(
     Add embeddings to each chunk using the text from either texts_to_encode or chunk.content.
     Arguments chunks and texts_to_encode should be the same length, or texts_to_encode can be None/empty.
     This allows us to create embeddings using text other than chunk.content.
-    If the corresponding texts_to_encode element evaluates to False, then chunk.content is embedded.
+    If the corresponding texts_to_encode element evaluates to False, then chunk.content is used instead.
     """
     embedding_model = app_config.sentence_transformer
 
