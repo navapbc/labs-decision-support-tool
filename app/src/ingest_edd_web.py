@@ -56,7 +56,7 @@ class SplitWithContextText:
             return True
         return False
 
-    def valid(self) -> bool:
+    def is_valid(self) -> bool:
         if self.token_count > app_config.sentence_transformer.max_seq_length:
             logger.warning(
                 "Text too long with %i tokens: %s", self.token_count, self.text_to_encode
@@ -147,7 +147,7 @@ def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWith
         logger.debug("\n".join([f"[Split {i}]: {s.text_to_encode}" for i, s in enumerate(splits)]))
 
     # Temporary: remove splits that are too long; TODO: fix in a separate PR
-    valid_splits = [split for split in splits if split.valid()]
+    valid_splits = [split for split in splits if split.is_valid()]
     return valid_splits
 
 

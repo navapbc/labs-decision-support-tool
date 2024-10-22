@@ -79,9 +79,6 @@ def test_split_markdown_by_heading():
         (("Heading 1", "Heading 2"), "Some text under heading 2"),
         (("Heading 1", "Heading 2", "Heading 3"), "Some text under heading 3"),
     ]
-    assert len(heading_sections[0][0]) == 0
-    assert len(heading_sections[1][0]) == 1
-    assert len(heading_sections[2][0]) == 2
 
 
 def test_headings_as_markdown():
@@ -96,5 +93,5 @@ def test_headings_as_markdown():
 
 
 def test_remove_links():
-    markdown = "[This is a link](https://example.com/relative/path) and [another](https://example.com/absolute/path)"
+    markdown = "[This is a link](relative/path) and [another](https://example.com/absolute/path)"
     assert remove_links(markdown) == "This is a link and another"

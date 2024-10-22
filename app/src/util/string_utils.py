@@ -145,11 +145,7 @@ def split_markdown_by_heading(markdown: str) -> Iterator[tuple[Sequence[str], st
     for doc in markdown_splitter.split_text(markdown):
         headings = [
             # Strip out the markdown link syntax from the headings
-            (
-                re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", doc.metadata[key])
-                if key in doc.metadata
-                else ""
-            )
+            (remove_links(doc.metadata[key]) if key in doc.metadata else "")
             for key in MARKDOWN_METADATA_KEYS
         ]
         # Remove empty headings at the end of list
