@@ -3,6 +3,7 @@ import pytest
 from src.citations import (
     CitationFactory,
     create_prompt_context,
+    default_chunk_splitter,
     remap_citation_ids,
     split_into_subsections,
 )
@@ -75,3 +76,27 @@ def test_remap_citation_ids(subsections):
         subsections[1].id: subsections[1]._replace(id="1"),
         subsections[0].id: subsections[0]._replace(id="2"),
     }
+
+
+def test_default_chunk_splitter():
+    chunk = ChunkFactory.build(
+        content=(
+            "## My Heading\n\n"
+            "First paragraph.\n\n"
+            "Paragraph two.\n\n"
+            "And paragraph 3\n\n"
+            "### Heading with empty next paragraph\n\n"
+            "\n\n"
+            "### Heading without next paragraph\n\n"
+            "## Last Heading\n\n"
+            "Last paragraph."
+        )
+    )
+    assert default_chunk_splitter(chunk) == [
+        "## My Heading\nFirst paragraph.",
+        "Paragraph two.",
+        "And paragraph 3",
+        "### Heading with empty next paragraph",
+        "### Heading without next paragraph",
+        "## Last Heading\nLast paragraph.",
+    ]
