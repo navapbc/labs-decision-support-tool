@@ -134,7 +134,7 @@ def reconstruct_list(
     intro_sentence = _ensure_blank_line_suffix(intro_sentence)
 
     item_max_seq_length = token_limit - len(tokenize(intro_sentence))
-    assert item_max_seq_length > 0, item_max_seq_length
+    assert item_max_seq_length > 0, "Intro sentence exceeds max sequence length"
     chunks = [
         intro_sentence + some_list_items
         for some_list_items in _join_up_to_max_seq_length(
