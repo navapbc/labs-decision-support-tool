@@ -40,7 +40,10 @@ def test_split_list():
             "    - This is a sentence.\n"
             "    - This is another sentence."
         ),
-        ("Following are list items:\n    - This is a third sentence."),
+        (
+            "Following are list items:\n"  #
+            "    - This is a third sentence."
+        ),
     ]
 
 

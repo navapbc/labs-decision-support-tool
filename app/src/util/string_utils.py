@@ -83,7 +83,7 @@ def split_list(text: str, char_limit: int, has_intro_sentence: bool = True) -> l
     return chunks
 
 
-def _join_up_to(lines: list[str], char_limit: int, delimiter: str = " ") -> list[str]:
+def _join_up_to(lines: Sequence[str], char_limit: int, delimiter: str = " ") -> list[str]:
     "Join sentences or words in lines up to a character limit"
     chunks = []
     chunk = ""
