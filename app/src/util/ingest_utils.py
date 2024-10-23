@@ -214,8 +214,7 @@ def _join_up_to_max_seq_length(
             if (line_token_count := len(tokenize(line))) <= max_seq_length:
                 chunk = line
             else:
-                logger.warning("Line is too long (%i tokens): %s", line_token_count, line)
-                chunk = ""
+                assert False, "Line is too long (%i tokens): %s" % (line_token_count, line)
         else:
             chunk = test_chunk
 

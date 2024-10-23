@@ -143,6 +143,13 @@ def _split_heading_section(headings: Sequence[str], text: str) -> list[SplitWith
     text = re.sub(
         rf"{MarkdownHeaderTextSplitter_DELIMITER}^(\| )", r"\n\n\1", text, flags=re.MULTILINE
     )
+    # Ensure a list and subsequent table are being split; https://edd.ca.gov/en/payroll_taxes/Due_Dates_Calendar/
+    text = re.sub(
+        r"^( *[\-\*\+] .*\n)\n^(\| )",
+        rf"\1{MarkdownHeaderTextSplitter_DELIMITER}\2",
+        text,
+        flags=re.MULTILINE,
+    )
 
     splits: list[SplitWithContextText] = []
     # Split content by MarkdownHeaderTextSplitter_DELIMITER, then gather into the largest chunks
