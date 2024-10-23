@@ -160,7 +160,9 @@ def format_web_subsections(
         _accordion_id += 1
         chunk = citation.chunk
         citation_headings = (
-            f"<div><b>{' → '.join(chunk.headings)}</b></div>" if chunk.headings else ""
+            f"<div><b>{' → '.join(chunk.headings)}</b></div>"
+            if chunk.headings
+            else "<div>&nbsp;</div>"
         )
         formatted_subsection = to_html(citation.text)
 
