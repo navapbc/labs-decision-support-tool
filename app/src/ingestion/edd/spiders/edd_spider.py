@@ -42,7 +42,7 @@ class EddSpider(CrawlSpider):
                     # Exclude WSINs (Workforce Services Information Notices)
                     "en/jobs_and_training/Information_Notices/wsin",
                     # Irrelevant pages
-                    r"en/disability/paid-family-leave/.*/social-media-toolkit",
+                    r"en/.*social-media-toolkit",
                 ),
                 allow_domains=allowed_domains,
                 deny_domains=(
