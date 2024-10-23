@@ -211,10 +211,12 @@ def _join_up_to_max_seq_length(
             if chunk:
                 chunks.append(chunk)
 
-            if (line_token_count := len(tokenize(line))) <= max_seq_length:
-                chunk = line
-            else:
-                assert False, "Line is too long (%i tokens): %s" % (line_token_count, line)
+            line_token_count = len(tokenize(line))
+            assert line_token_count <= max_seq_length, "Line is too long (%i tokens): %s" % (
+                line_token_count,
+                line,
+            )
+            chunk = line
         else:
             chunk = test_chunk
 
