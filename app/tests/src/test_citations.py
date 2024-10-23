@@ -89,7 +89,8 @@ def test_default_chunk_splitter():
             "\n\n"
             "### Heading without next paragraph\n\n"
             "## Last Heading\n\n"
-            "Last paragraph."
+            "Last paragraph.\n\n"
+            "## Last Heading without next paragraph\n"
         )
     )
     assert default_chunk_splitter(chunk) == [
@@ -99,4 +100,5 @@ def test_default_chunk_splitter():
         "### Heading with empty next paragraph",
         "### Heading without next paragraph",
         "## Last Heading\nLast paragraph.",
+        "## Last Heading without next paragraph\n",
     ]
