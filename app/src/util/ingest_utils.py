@@ -129,7 +129,7 @@ def reconstruct_list(
     list_items: Sequence[str],
     join_delimiter: str = "",
 ) -> list[str]:
-    "Reconstruct a list of items into chunks (with same intro_sentence) having up to a character limit each"
+    "Reconstruct a list of items into chunks (with same intro_sentence) having up to a token limit each"
     # Before the set of list items, there should be a blank line
     intro_sentence = _ensure_blank_line_suffix(intro_sentence)
 
