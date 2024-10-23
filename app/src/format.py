@@ -181,8 +181,7 @@ def format_web_subsections(
                     {citation.id}. {chunk.document.name}
                 </button>
             </h4>
-            <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-                {citation_headings}
+            <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>{citation_headings}
                 <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>
                 {citation_link}
             </div>
