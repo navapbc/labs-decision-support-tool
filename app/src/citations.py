@@ -26,7 +26,24 @@ citation_factory = CitationFactory()
 
 
 def default_chunk_splitter(chunk: Chunk) -> list[str]:
-    return chunk.content.split("\n\n")
+    splits = [split for split in chunk.content.split("\n\n") if split]
+    # Rejoin headings with the subsequent first paragraph
+    better_splits = []
+    skip_next = False
+    for i, split in enumerate(splits):
+        if skip_next:
+            skip_next = False
+            continue
+
+        next_split = splits[i + 1] if i + 1 < len(splits) else None
+        if next_split and split.startswith("#") and not next_split.startswith("#"):
+            better_splits.append(f"{split}\n{next_split}")
+            skip_next = True
+            continue
+
+        better_splits.append(split)
+
+    return better_splits
 
 
 def split_into_subsections(
