@@ -150,10 +150,13 @@ _WIDGET_FACTORIES = {
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
     logger.info("Received: %r", message.content)
+    chat_history = cl.chat_context.to_openai()
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
-        result = await cl.make_async(lambda: engine.on_message(question=message.content))()
+        result = await cl.make_async(
+            lambda: engine.on_message(question=message.content, chat_history=chat_history)
+        )()
         logger.info("Response: %s", result.response)
         msg_content = engine.formatter(
             chunks_shown_max_num=engine.chunks_shown_max_num,

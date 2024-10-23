@@ -57,7 +57,9 @@ name = "Decision support tool"
 # description = ""
 
 # Large size content are by default collapsed for a cleaner ui
-default_collapse_content = true
+default_collapse_content = false
+
+default_expand_messages = true
 
 # Hide the chain of thought details from the user in the UI.
 hide_cot = false

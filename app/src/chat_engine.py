@@ -42,7 +42,7 @@ class ChatEngineInterface(ABC):
         super().__init__()
 
     @abstractmethod
-    def on_message(self, question: str) -> OnMessageResult:
+    def on_message(self, question: str, chat_history: list[dict[str, str]]) -> OnMessageResult:
         pass
 
 
@@ -84,7 +84,7 @@ class BaseEngine(ChatEngineInterface):
         "system_prompt",
     ]
 
-    def on_message(self, question: str) -> OnMessageResult:
+    def on_message(self, question: str, chat_history: list[dict[str, str]]) -> OnMessageResult:
         chunks_with_scores = retrieve_with_scores(
             question,
             retrieval_k=self.retrieval_k,
@@ -96,7 +96,7 @@ class BaseEngine(ChatEngineInterface):
         # Provide a factory to reset the citation id counter
         subsections = split_into_subsections(chunks, factory=CitationFactory())
         context_text = create_prompt_context(subsections)
-        response = generate(self.llm, self.system_prompt, question, context_text)
+        response = generate(self.llm, self.system_prompt, question, context_text, chat_history)
         return OnMessageResult(response, self.system_prompt, chunks_with_scores, subsections)
 
 

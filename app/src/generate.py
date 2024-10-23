@@ -52,6 +52,7 @@ def generate(
     system_prompt: str,
     query: str,
     context_text: str | None = None,
+    chat_history: list[dict[str, str]] | None = None,
 ) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
@@ -72,8 +73,12 @@ def generate(
             },
         )
 
-    messages.append({"content": query, "role": "user"})
+    # chat_history has the user query as the last item, but we want to insert the context first
+    if chat_history:
+        chat_history.pop()
+        messages.extend(chat_history)
 
+    messages.append({"content": query, "role": "user"})
     logger.info("Calling %s for query: %s with context:\n%s", llm, query, context_text)
     response = completion(
         model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
