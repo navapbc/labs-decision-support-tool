@@ -8,5 +8,7 @@ def mock_completion(model, messages, **kwargs):
     messages = json.dumps(messages, sort_keys=True)
     # Strip generated JSON of escaped newlines to make it simple to compare with prompts
     messages = messages.replace("\\n", "\n")
+    # Also strip generated JSON of escaped double quotes
+    messages = messages.replace('\\"', '"')
     mock_response = f"Called {model} with {messages}"
     return completion(model, messages, mock_response=mock_response)
