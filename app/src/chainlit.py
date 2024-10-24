@@ -147,10 +147,32 @@ _WIDGET_FACTORIES = {
 }
 
 
+def get_raw_chat_history(messages: list[cl.Message]) -> list[dict[str, str]]:
+    raw_chat_history: list[dict[str, str]] = []
+    for message in messages:
+        if message.type == "assistant_message":
+            raw_chat_history.append(
+                {
+                    "role": "assistant",
+                    "content": (
+                        message.metadata["raw_response"]
+                        if message.metadata and "raw_response" in message.metadata
+                        else message.content
+                    ),
+                }
+            )
+        elif message.type == "user_message":
+            raw_chat_history.append({"role": "user", "content": message.content})
+        else:
+            raw_chat_history.append({"role": "system", "content": message.content})
+    return raw_chat_history
+
+
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
     logger.info("Received: %r", message.content)
-    chat_history = cl.chat_context.to_openai()
+    chat_context = cl.chat_context.get()
+    chat_history = get_raw_chat_history(chat_context)
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
     try:
@@ -201,4 +223,5 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
             }
             for citations in result.subsections
         ],
+        "raw_response": result.response,
     }
