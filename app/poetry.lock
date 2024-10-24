@@ -3870,6 +3870,22 @@ files = [
 ]
 
 [[package]]
+name = "nutree"
+version = "0.9.0"
+description = "A Python library for tree data structures with an intuitive, yet powerful, API."
+optional = false
+python-versions = "*"
+files = [
+    {file = "nutree-0.9.0-py3-none-any.whl", hash = "sha256:d986d8e17747be2d88576ed7aab5bb7e5f945b480474397d2db58e03c14feb48"},
+    {file = "nutree-0.9.0.tar.gz", hash = "sha256:34367ef7d4b9d47fbcf8a6a1964ee836f1bd59126608f7dce9f9e70ec47119fd"},
+]
+
+[package.extras]
+all = ["fabulist", "graphviz", "pydot", "rdflib"]
+graph = ["graphviz", "pydot", "rdflib"]
+random = ["fabulist"]
+
+[[package]]
 name = "nvidia-cublas-cu12"
 version = "12.1.3.1"
 description = "CUBLAS native runtime libraries"
@@ -8370,4 +8386,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "65f936bc785ad440c51ed2fca6aea9253888e7be4d10d09b93415ee7792bedea"
+content-hash = "12af1b6cd79238065b7da7c1974fe6dc8bdd03352af7ee919bb6245faa2e7c3c"
