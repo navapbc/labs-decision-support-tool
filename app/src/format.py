@@ -159,11 +159,7 @@ def format_web_subsections(
     for _, citation in remapped_citations.items():
         _accordion_id += 1
         chunk = citation.chunk
-        citation_headings = (
-            f"<div><b>{' → '.join(chunk.headings)}</b></div>"
-            if chunk.headings
-            else "<div>&nbsp;</div>"
-        )
+        citation_headings = _get_breadcrumb_html(chunk.headings)
         formatted_subsection = to_html(citation.text)
 
         citation_link = ""
@@ -201,6 +197,13 @@ def format_web_subsections(
             + "</div>"
         )
     return "<div>" + response_with_citations + "</div>"
+
+
+def _get_breadcrumb_html(headings: Sequence[str] | None) -> str:
+    if not headings:
+        return "<div>&nbsp;</div>"
+
+    return f"<div><b>{' → '.join(h for h in headings if h)}</b></div>"
 
 
 ChunkWithCitation = tuple[Chunk, Sequence[Subsection]]

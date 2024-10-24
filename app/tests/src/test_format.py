@@ -7,6 +7,7 @@ from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
 from src.format import (
     _add_ellipses,
     _format_to_accordion_html,
+    _get_breadcrumb_html,
     _group_by_document_and_chunks,
     format_bem_documents,
     format_bem_subsections,
@@ -230,3 +231,14 @@ def test__group_by_document_and_chunks():
             (chunk_list[3], [subsections[4]]),
         ],
     }
+
+
+def test__get_breadcrumb_html():
+    headings = []
+    assert _get_breadcrumb_html(headings) == "<div>&nbsp;</div>"
+
+    headings = ["Heading 1", "Heading 2", "Heading 3"]
+    assert _get_breadcrumb_html(headings) == "<div><b>Heading 1 → Heading 2 → Heading 3</b></div>"
+
+    headings = ["Heading 1", "", "Heading 3"]
+    assert _get_breadcrumb_html(headings) == "<div><b>Heading 1 → Heading 3</b></div>"
