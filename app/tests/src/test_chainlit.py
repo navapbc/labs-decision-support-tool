@@ -1,6 +1,5 @@
 from unittest.mock import MagicMock
 
-import tests.src.db.models.factories as factories
 from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata, get_raw_chat_history
 from src.chat_engine import OnMessageResult
