@@ -235,10 +235,16 @@ def test__group_by_document_and_chunks():
 
 def test__get_breadcrumb_html():
     headings = []
-    assert _get_breadcrumb_html(headings) == "<div>&nbsp;</div>"
+    assert _get_breadcrumb_html(headings, "Doc name") == "<div>&nbsp;</div>"
 
+    # Omit first heading
     headings = ["Heading 1", "Heading 2", "Heading 3"]
-    assert _get_breadcrumb_html(headings) == "<div><b>Heading 1 → Heading 2 → Heading 3</b></div>"
+    assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 2 → Heading 3</b></div>"
 
+    # Omit empty headings
     headings = ["Heading 1", "", "Heading 3"]
-    assert _get_breadcrumb_html(headings) == "<div><b>Heading 1 → Heading 3</b></div>"
+    assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 1 → Heading 3</b></div>"
+
+    # Omit headings that match doc name
+    headings = ["Doc name", "Heading 2"]
+    assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 2</b></div>"
