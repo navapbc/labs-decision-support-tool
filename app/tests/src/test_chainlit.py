@@ -1,4 +1,4 @@
-import chainlit as cl
+from unittest.mock import MagicMock
 
 from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata, get_raw_chat_history
@@ -63,72 +63,59 @@ def test__get_retrieval_metadata(chunks_with_scores):
 
 
 def test__get_raw_chat_history():
-    message = [
-        cl.Message(
-            language=None,
-            content="CA EDD Web Chat Engine started ",
-            metadata={
-                "engine": "ca-edd-web",
-                "settings": {
-                    "llm": "gpt-4o",
-                    "retrieval_k": 50.0,
-                    "retrieval_k_min_score": -1.0,
-                    "chunks_shown_max_num": 8.0,
-                    "chunks_shown_min_score": -1.0,
-                    "system_prompt": PROMPT,
-                },
-            },
-            tags=None,
-            author="backend",
-            type="assistant_message",
-            actions=[],
-            elements=[],
-            disable_feedback=False,
-            id="d750c47e-9245-4275-9224-fc4e4a49daa5",
-            created_at="2024-10-24T16:06:52.906328Z",
-        ),
-        cl.Message(
-            language=None,
-            content="can you tell me about income eligibility?",
-            id="90492e09-0636-43a0-af37-f278449e21b0",
-            created_at="2024-10-24T16:08:43.016542Z",
-            metadata=None,
-            tags=None,
-            author="User",
-            type="user_message",
-            actions=[],
-            elements=[],
-            disable_feedback=False,
-        ),
-        cl.Message(
-            language=None,
-            content="<div>To be eligible for unemployment benefits, you need to have earned enough wages during a specific 12-month period called the base period (citation-46). <p>For Disability Insurance, you must have earned at least $300 in wages that were subject to State Disability Insurance (SDI) deductions (citation-123). For Paid Family Leave, you also need to have earned at least $300 with SDI deductions during your base period (citation-129).</p> If you are applying for an overpayment waiver, your average monthly income must be less than or equal to the amounts in the Family Income Level Table (citation-118).</div>",
-            metadata={
+    clMessage1 = MagicMock()
+    clMessage2 = MagicMock()
+    clMessage3 = MagicMock()
+    clMessage1.configure_mock(
+        content="CA EDD Web Chat Engine started ",
+        metadata={
+            "engine": "ca-edd-web",
+            "settings": {
+                "llm": "gpt-4o",
+                "retrieval_k": 50.0,
+                "retrieval_k_min_score": -1.0,
+                "chunks_shown_max_num": 8.0,
+                "chunks_shown_min_score": -1.0,
                 "system_prompt": PROMPT,
-                "chunks": [factories.ChunkFactory.build()],
-                "subsections": [
-                    {
-                        "id": "citation-1",
-                        "chunk.id": "9549160f-cbea-41a0-8de7-0d835966328e",
-                        "document.name": "Disability Insurance Eligibility Requirements",
-                        "headings": [
-                            "Disability Insurance Eligibility Requirements",
-                            "More Information",
-                        ],
-                        "text": "* Citizenship and immigration status do not affect eligibility.\n* We will notify your employer that you submitted a DI claim. But your medical information is private and we will not share it with your employer.\n* We may ask for an independent medical examination. This means we will get a second opinion to decide your initial or continuing eligibility.\n* School employees are not eligible for DI benefits when:",
-                    },
-                ],
-                "raw_response": "To be eligible for unemployment benefits, you need to have earned enough wages during a specific 12-month period called the base period (citation-46). For Disability Insurance, you must have earned at least $300 in wages that were subject to State Disability Insurance (SDI) deductions (citation-123). For Paid Family Leave, you also need to have earned at least $300 with SDI deductions during your base period (citation-129). If you are applying for an overpayment waiver, your average monthly income must be less than or equal to the amounts in the Family Income Level Table (citation-118).",
             },
-            tags=None,
-            author="Decision support tool",
-            type="assistant_message",
-            actions=[],
-            elements=[],
-            disable_feedback=False,
-            id="2c2b6fb7-b60c-4e55-a607-3ab026c46a5d",
-            created_at="2024-10-24T16:08:53.899600Z",
-        ),
-    ]
+        },
+        author="backend",
+        type="assistant_message",
+    )
+    clMessage2.configure_mock(
+        content="can you tell me about income eligibility?",
+        author="User",
+        type="user_message",
+    )
+    clMessage3.configure_mock(
+        content="<div>To be eligible for unemployment benefits, you need to have earned enough wages during a specific 12-month period called the base period (citation-46). <p>For Disability Insurance, you must have earned at least $300 in wages that were subject to State Disability Insurance (SDI) deductions (citation-123). For Paid Family Leave, you also need to have earned at least $300 with SDI deductions during your base period (citation-129).</p> If you are applying for an overpayment waiver, your average monthly income must be less than or equal to the amounts in the Family Income Level Table (citation-118).</div>",
+        metadata={
+            "system_prompt": PROMPT,
+            "chunks": [factories.ChunkFactory.build()],
+            "subsections": [
+                {
+                    "id": "citation-1",
+                    "chunk.id": "9549160f-cbea-41a0-8de7-0d835966328e",
+                    "document.name": "Disability Insurance Eligibility Requirements",
+                    "headings": [
+                        "Disability Insurance Eligibility Requirements",
+                        "More Information",
+                    ],
+                    "text": "* Citizenship and immigration status do not affect eligibility.\n* We will notify your employer that you submitted a DI claim. But your medical information is private and we will not share it with your employer.\n* We may ask for an independent medical examination. This means we will get a second opinion to decide your initial or continuing eligibility.\n* School employees are not eligible for DI benefits when:",
+                },
+            ],
+            "raw_response": "To be eligible for unemployment benefits, you need to have earned enough wages during a specific 12-month period called the base period (citation-46). For Disability Insurance, you must have earned at least $300 in wages that were subject to State Disability Insurance (SDI) deductions (citation-123). For Paid Family Leave, you also need to have earned at least $300 with SDI deductions during your base period (citation-129). If you are applying for an overpayment waiver, your average monthly income must be less than or equal to the amounts in the Family Income Level Table (citation-118).",
+        },
+        author="Decision support tool",
+        type="assistant_message",
+    )
+    message = [clMessage1, clMessage2, clMessage3]
 
-    assert get_raw_chat_history(message) == []
+    assert get_raw_chat_history(message) == [
+        {"role": "assistant", "content": "CA EDD Web Chat Engine started "},
+        {"role": "user", "content": "can you tell me about income eligibility?"},
+        {
+            "role": "assistant",
+            "content": "To be eligible for unemployment benefits, you need to have earned enough wages during a specific 12-month period called the base period (citation-46). For Disability Insurance, you must have earned at least $300 in wages that were subject to State Disability Insurance (SDI) deductions (citation-123). For Paid Family Leave, you also need to have earned at least $300 with SDI deductions during your base period (citation-129). If you are applying for an overpayment waiver, your average monthly income must be less than or equal to the amounts in the Family Income Level Table (citation-118).",
+        },
+    ]
