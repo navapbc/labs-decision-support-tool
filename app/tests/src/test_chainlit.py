@@ -1,7 +1,10 @@
+from unittest.mock import MagicMock
+
 from src import chainlit, chat_engine
-from src.chainlit import _get_retrieval_metadata
+from src.chainlit import _get_retrieval_metadata, get_raw_chat_history
 from src.chat_engine import OnMessageResult
 from src.db.models.document import Subsection
+from src.generate import PROMPT
 
 
 def test_url_query_values(monkeypatch):
@@ -55,4 +58,50 @@ def test__get_retrieval_metadata(chunks_with_scores):
             "text": citations.text,
         }
         for citations in subsections
+    ]
+
+
+def test__get_raw_chat_history():
+    clMessage1 = MagicMock()
+    clMessage2 = MagicMock()
+    clMessage3 = MagicMock()
+    clMessage1.configure_mock(
+        content="CA EDD Web Chat Engine started ",
+        metadata={
+            "engine": "ca-edd-web",
+            "settings": {
+                "llm": "gpt-4o",
+                "retrieval_k": 50.0,
+                "retrieval_k_min_score": -1.0,
+                "chunks_shown_max_num": 8.0,
+                "chunks_shown_min_score": -1.0,
+                "system_prompt": PROMPT,
+            },
+        },
+        author="backend",
+        type="assistant_message",
+    )
+    clMessage2.configure_mock(
+        content="can you tell me about income eligibility?",
+        author="User",
+        type="user_message",
+    )
+    clMessage3.configure_mock(
+        content="<div>To be eligible for unemployment benefits, you need to have earned enough wages during a specific 12-month period called the base period (citation-46). <p>For Disability Insurance, you must have earned at least $300 in wages that were subject to State Disability Insurance (SDI) deductions (citation-123). For Paid Family Leave, you also need to have earned at least $300 with SDI deductions during your base period (citation-129).</p> If you are applying for an overpayment waiver, your average monthly income must be less than or equal to the amounts in the Family Income Level Table (citation-118).</div>",
+        metadata={
+            "system_prompt": PROMPT,
+            "raw_response": "To be eligible for unemployment benefits, you need to have earned enough wages during a specific 12-month period called the base period (citation-46). For Disability Insurance, you must have earned at least $300 in wages that were subject to State Disability Insurance (SDI) deductions (citation-123). For Paid Family Leave, you also need to have earned at least $300 with SDI deductions during your base period (citation-129). If you are applying for an overpayment waiver, your average monthly income must be less than or equal to the amounts in the Family Income Level Table (citation-118).",
+        },
+        author="Decision support tool",
+        type="assistant_message",
+    )
+    message = [clMessage1, clMessage2, clMessage3]
+
+    assert get_raw_chat_history(message) == [
+        {"role": "assistant", "content": "CA EDD Web Chat Engine started "},
+        {"role": "user", "content": "can you tell me about income eligibility?"},
+        {
+            "role": "assistant",
+            "content": "To be eligible for unemployment benefits, you need to have earned enough wages during a specific 12-month period called the base period (citation-46). For Disability Insurance, you must have earned at least $300 in wages that were subject to State Disability Insurance (SDI) deductions (citation-123). For Paid Family Leave, you also need to have earned at least $300 with SDI deductions during your base period (citation-129). If you are applying for an overpayment waiver, your average monthly income must be less than or equal to the amounts in the Family Income Level Table (citation-118).",
+        },
     ]
