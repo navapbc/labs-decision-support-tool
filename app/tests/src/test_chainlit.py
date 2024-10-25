@@ -1,11 +1,11 @@
 from unittest.mock import MagicMock
 
+import tests.src.db.models.factories as factories
 from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata, get_raw_chat_history
 from src.chat_engine import OnMessageResult
 from src.db.models.document import Subsection
 from src.generate import PROMPT
-import tests.src.db.models.factories as factories
 
 
 def test_url_query_values(monkeypatch):
