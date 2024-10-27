@@ -4,10 +4,11 @@ import textwrap
 import types
 from collections import defaultdict
 from copy import copy
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Iterable
 
 import mistletoe
 from mistletoe import block_token
+from mistletoe.ast_renderer import AstRenderer
 from mistletoe.block_token import TableRow
 from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.token import Token
@@ -19,13 +20,31 @@ logger = logging.getLogger(__name__)
 def create_markdown_tree(
     markdown: str, name: str = "Markdown tree", normalize_md: bool = True
 ) -> Tree:
+    """
+    Returns a tree reflecting the structure of the Tokens parsed from the markdown text.
+    The tree is created using mistletoe's Tokens and the TokenNodeData class.
+    Note that the structure of the tree (i.e., each node's parent and children) are independent of each Token's parent and children.
+    FIXME: So tree modification need to propagate to the tokens' parent and children so that mistletoe's renderer works correctly.
+    """
     if normalize_md:
         markdown = normalize_markdown(markdown)
     doc = mistletoe.Document(markdown)
-    tree = Tree(name)
-    _create_nutree(tree, doc)
+    # The shadow_attrs=True argument allows accessing node.data.age as node.age
+    tree = Tree(name, shadow_attrs=True)
+    _populate_nutree(tree.system_root, doc)
     validate_tree(tree)
     return tree
+
+
+def describe_markdown_as_json(markdown: str) -> str:
+    """
+    For the given markdown, returns mistletoe's resulting Tokens as JSON.
+    Useful for examining the tokens used to create nodes in a create_markdown_tree().
+    """
+    with AstRenderer() as ast_renderer:
+        doc = mistletoe.Document(markdown)
+        ast_json = ast_renderer.render(doc)
+        return ast_json
 
 
 def normalize_markdown(markdown: str) -> str:
@@ -44,22 +63,29 @@ def _new_md_renderer() -> MarkdownRenderer:
     return MarkdownRenderer(normalize_whitespace=False)
 
 
-def _create_nutree(parent: Node, token: Token) -> Node:
-    data = TokenNodeData(token)
-    node = parent.add(data, data_id=data.id)
-    data.node = node
+def _populate_nutree(parent: Node, token: Token) -> Node:
+    data = TokenNodeData(token, parent.tree)
+    node = parent.add(data, data_id=data.data_id)
     if token.children:
         # Recurse to create children nodes
         for child_token in token.children:
-            _create_nutree(node, child_token)
+            _populate_nutree(node, child_token)
     return node
 
 
 def validate_tree(tree: Tree) -> None:
     def validate_node(node: Node, memo: dict) -> None:
         assert (
-            node.data.id == node.data_id
-        ), f"Node {node.data_id!r} has mismatched data.id {node.data.id!r}"
+            node.data_id == node.data_id == node.data.data_id
+        ), f"Node {node.data_id!r} has mismatched data_id: {node.data_id!r} and {node.data.data_id!r}"
+
+        if isinstance(node.data, TokenNodeData):
+            assert (
+                node.data_type
+                == node.data.data_type
+                == node.data.token.__class__.__name__
+                == node.data.token.type
+            ), f"Node {node.data_id!r} has mismatched data_type: {node.data.data_type!r} and {node.data.token.type!r}"
 
     tree.visit(validate_node)
 
@@ -69,14 +95,26 @@ def describe_tree(tree: Tree) -> dict:
     parents = defaultdict(set)
     children = defaultdict(set)
     for node in tree.iterator(method=IterMethod.POST_ORDER):
-        attribs[node.data.type].update(node.data.__dict__.keys())
-        children[node.data.type].update([child.data.type for child in node.children])
-        parents[node.data.type].add(node.data.type)
+        attribs[node.data_type].update(node.data.__dict__.keys())
+        children[node.data_type].update([child.data_type for child in node.children])
+        parents[node.data_type].add(node.data_type)
     return {
         "attribs": attribs,
         "parents": parents,
         "children": children,
     }
+
+
+def update_tokens_to_match_tree(tree: Tree) -> None:
+    """
+    Update the token parent and children to match the tree structure.
+    """
+
+    def update_token(node: Node, memo: dict) -> None:
+        token = node.data.token
+        token.children = [child.data.token for child in node.children]
+
+    tree.visit(update_token)
 
 
 def render_tree(tree: Tree, normalize: bool = True) -> str:
@@ -85,53 +123,55 @@ def render_tree(tree: Tree, normalize: bool = True) -> str:
 
 def render_branch(node: Node, normalize: bool = True) -> str:
     """
-    Render the node and its children to markdown text.
+    Render the node and its descendants (a subtree) to markdown text.
     Useful for creating markdown text for chunks.
     """
     out_str = []
     render = TokenNodeData.render_token
-    for node in node.iterator(method=IterMethod.PRE_ORDER, add_self=True):
+    for n in node.iterator(method=IterMethod.PRE_ORDER, add_self=True):
         # Only render data of type TokenNodeData and its subclasses
-        if not isinstance(node.data, TokenNodeData):
+        if not isinstance(n.data, TokenNodeData):
             continue
         # Don't need to render these as their content is rendered as part of other nodes
-        if node.data.type in ["Document", "HeadingSection", "TableCell"]:
+        if n.data_type in ["Document", "HeadingSection", "TableCell"]:
             continue
 
-        token = node.data.token
-        match node.data.type:
+        match n.data_type:
             case "Heading":
                 out_str.append("\n")
-                out_str.append(render(token))
+                out_str.append(render(n.token))
             case "Paragraph":
                 # Only render Paragraphs that are not rendered as part of a List or Table
-                if node.parent.data.type not in ["ListItem", "TableRow"]:
+                if n.parent.data_type not in ["ListItem", "TableRow"]:
                     # Don't add extra newline if it's the first child of a Document
-                    if node.parent.data.type not in ["Document"]:
+                    if n.parent.data_type not in ["Document"]:
                         out_str.append("\n")
-                    out_str.append(render(token))
+                    out_str.append(render(n.token))
             case "List":
-                if intro := intro_if_needed(node):
+                if intro := intro_if_needed(n):
                     print(f"Appending Intro: {intro}")
                     out_str.append(intro)
-                if node.parent.data.type not in ["ListItem"]:
+                if n.parent.data_type not in ["ListItem"]:
+                    # Insert a blank line if the List is not a sublist
                     out_str.append("\n")
+
+            # FIXME: Why aren't these rendered normally? Because renderer follows tokens' parent and children, not Nodes.
             case "ListItem":
-                token2 = copy(token)
-                # Remove children that are List or ListItem so that they are not rendered
+                token2 = copy(n.token)
+                # Exclude children that are List so that they are not rendered as part of this ListItem
                 # TODO: If it's possible to have children: [Paragraph, List, Paragraph], that's not handled well.
                 token2.children = [c for c in token2.children if c.type != "List"]
                 out_str.append(render(token2))
             case "Table":
-                if intro := intro_if_needed(node):
+                if intro := intro_if_needed(n):
                     out_str.append(intro)
                 out_str.append("\n")
-                out_str.append(render(token.header))
-                out_str.append("| " + " | ".join(token.header.sep_line) + " |\n")
+                out_str.append(render(n.token.header))
+                out_str.append("| " + " | ".join(n.token.header.sep_line) + " |\n")
             case "TableRow":
-                out_str.append(render(token))
+                out_str.append(render(n.token))
             case _:
-                raise ValueError(f"Unexpected node type {node.data.type}: {node.data_id}")
+                raise ValueError(f"Unexpected node type {n.data_type}: {n.data_id}")
 
     md_str = "".join(out_str).strip()
     if normalize:
@@ -148,7 +188,7 @@ def intro_if_needed(node: Node) -> str | None:
         if (
             node.data["force_intro"]
             or not (prev_node := node.prev_sibling())
-            or prev_node.data.type not in ["Paragraph", "Heading"]
+            or prev_node.data_type not in ["Paragraph", "Heading"]
         ):
             return intro
     return None
@@ -188,14 +228,13 @@ def _create_custom_md_renderer() -> MarkdownRenderer:
 class MdNodeData:
     def __init__(
         self,
-        element_type: str,
-        node_id: str = "",
+        data_type: str,
+        data_id: str,
+        tree: Tree,
     ):
-        self.type = element_type
-        self.id = node_id
-
-        # Reference to the associated tree node; typically needed for custom types
-        self.node: Optional[Node] = None
+        self.data_type = data_type
+        self.data_id = data_id
+        self.tree = tree
 
     # Allow adding custom attributes to this node data object; useful during tree manipulation or chunking
     def __setitem__(self, key: str, value: Any) -> None:
@@ -205,12 +244,16 @@ class MdNodeData:
         return getattr(self, key, None)
 
     @property
+    def node(self) -> Node | None:
+        return self.tree.find_first(data_id=self.data_id)
+
+    @property
     def id_string(self) -> str:
-        return f"{self.type} ({self.id})"
+        return f"{self.data_type} ({self.data_id})"
 
     def render(self) -> str:
-        if self.node:
-            return "\n\n".join(child.data.render() for child in self.node.children)
+        if node := self.node:
+            return "\n\n".join(child.data.render() for child in node.children)
         return ""
 
     def __repr__(self) -> str:
@@ -218,8 +261,8 @@ class MdNodeData:
         oneliner = [self.id_string]
 
         # Metadata
-        if self.node:
-            oneliner.append(f"with {len(self.node.children)} children")
+        if node := self.node:
+            oneliner.append(f"with {len(node.children)} children")
 
         # Provide some text content for referencing back to the markdown text
         content = self.content_oneliner()
@@ -244,7 +287,7 @@ class TokenNodeData(MdNodeData):
             return f"H{token.level}."
         return "".join(char for char in token.type if char.isupper())
 
-    def __init__(self, token: Token):
+    def __init__(self, token: Token, tree: Tree):
         self.token = token
         # Add 'type' attribute to token object for consistently referencing a token's and MdNodeData's type
         token.type = token.__class__.__name__
@@ -256,7 +299,7 @@ class TokenNodeData(MdNodeData):
             _id = f"{self.get_id_prefix(token)}{token.line_number}"
         else:  # span token
             _id = f"s.{next(self.counter)}"
-        super().__init__(token.type, _id)
+        super().__init__(token.type, _id, tree)
 
         if token.type == "Table":
             self._init_for_table()
@@ -291,7 +334,7 @@ class TokenNodeData(MdNodeData):
 
     @classmethod
     def render_token(cls: type["TokenNodeData"], token: Token) -> str:
-        "Render the token and its children using the custom MarkdownRenderer"
+        "Render the token and its descendants using the custom MarkdownRenderer"
         # MD renderer should always be used within a context manager
         with cls.md_renderer as renderer:
             return renderer.render(token)
@@ -303,7 +346,7 @@ class TokenNodeData(MdNodeData):
         oneliner = [self.id_string]
 
         # Metadata
-        if self.type == "Paragraph":
+        if self.data_type == "Paragraph":
             oneliner.append(
                 f"of length {len(self.render())} across {len(self.token.children)} children"
             )
@@ -311,16 +354,16 @@ class TokenNodeData(MdNodeData):
         # Provide single-line text content for referencing back to the markdown text
         content = self.content_oneliner()
         if not content:
-            if self.type in ["Heading", "Link", "TableRow"]:
+            if self.data_type in ["Heading", "Link", "TableRow"]:
                 # Render these single-line types. Assume TableRow is a single line for now.
                 content = self.render()
-            elif self.type in ["ListItem"]:
+            elif self.data_type in ["ListItem"]:
                 # Handle multiline list items
                 content = f"{self.render()[: self.ONELINER_CONTENT_LIMIT]!r}"
-            elif self.type in ["Table"]:
+            elif self.data_type in ["Table"]:
                 # Render just the header row
                 self.render_token(self.token.header)
-            elif self.type in ["Paragraph", "TableCell"]:
+            elif self.data_type in ["Paragraph", "TableCell"]:
                 # These will have RawText children that will show the content
                 content = ""
             else:  # for Document, List, etc
@@ -332,16 +375,16 @@ class TokenNodeData(MdNodeData):
 def collapse_span_tokens(tree: Tree) -> int:
     collapse_counter = 0
     for node in tree.iterator(method=IterMethod.POST_ORDER):  # Depth-first-traversal, post-order
-        if not node.data.is_block_token():
+        if not node.is_block_token():
             continue
 
         # Unless node is a TableRow, if any descendant is a BlockToken, then don't collapse.
-        data_type = node.data.type
+        data_type = node.data_type
         if data_type in ["TableRow"]:
             # TODO: Address complex tables with BlockTokens nested in TableRows.
             #   For now, collapse TableRow assuming it has no nested BlockTokens.
             pass
-        elif any_descendant_of_type(node, lambda n: n.data.is_block_token()):
+        elif any_descendant_of_type(node, lambda n: n.is_block_token()):
             continue
 
         # Ignore these data types
@@ -351,7 +394,7 @@ def collapse_span_tokens(tree: Tree) -> int:
         ]:
             continue
 
-        logger.info("Collapsing %s with %i children", node.data.type, len(node.children))
+        logger.info("Collapsing %s with %i children", node.data_type, len(node.children))
         # Create custom attribute to store the collapsed content so that tree.print() renders nicely
         node.data["collapsed_content_str"] = textwrap.shorten(
             node.data.render(), 50, placeholder="...(collapsed)", drop_whitespace=False
@@ -359,7 +402,7 @@ def collapse_span_tokens(tree: Tree) -> int:
 
         # Add raw text content for Heading nodes to use the text in heading breadcrumbs
         if data_type == "Heading":
-            raw_text_node = any_descendant_of_type(node, lambda n: n.data.type == "RawText")
+            raw_text_node = any_descendant_of_type(node, lambda n: n.data_type == "RawText")
             node.data["raw_text"] = raw_text_node.data.token.content
 
         node.remove_children()
@@ -384,26 +427,25 @@ def any_descendant_of_type(node: Node, does_match: Callable[[Node], bool]) -> No
 def create_heading_sections(tree: Tree) -> int:
     "Create custom HeadingSection nodes for each Heading node and its associated content"
     hsection_counter = 0
-    heading_nodes = tree.find_all(match=lambda n: n.data.type == "Heading")
+    heading_nodes = tree.find_all(match=lambda n: n.data_type == "Heading")
     for n in heading_nodes:
         hsection_counter += 1
-        hs_node_data = MdNodeData("HeadingSection", f"_H{n.data.token.level}.{hsection_counter}")
+        hs_node_data = MdNodeData("HeadingSection", f"_H{n.data.token.level}.{hsection_counter}", tree)
         # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
-        hsection_node = n.prepend_sibling(hs_node_data, data_id=hs_node_data.id)
-        hs_node_data.node = hsection_node
+        hs_node = n.prepend_sibling(hs_node_data, data_id=hs_node_data.data_id)
         # Get all siblings up to next Heading; these will be HeadingSection's new children
         children = list(get_siblings_up_to(n, "Heading"))
         # Move in order the Heading and associated children to the new HeadingSection node
-        n.move_to(hsection_node)
+        n.move_to(hs_node)
         for body in children:
-            body.move_to(hsection_node)
-        logger.info("Created new %s", hsection_node.data)
+            body.move_to(hs_node)
+        logger.info("Created new %s", hs_node.data)
     return hsection_counter
 
 
 def get_siblings_up_to(node: Node, data_type: str) -> Iterable[Node]:
     sibling = node.next_sibling()
-    while sibling and sibling.data.type != data_type:
+    while sibling and sibling.data_type != data_type:
         yield sibling
         sibling = sibling.next_sibling()
 
@@ -412,12 +454,12 @@ def nest_heading_sections(tree: Tree) -> int:
     "Move HeadingSection nodes under other HeadingSection nodes to coincide with their heading level"
     # heading_stack[1] corresponds to an H1 heading
     heading_stack: list[Node | None] = [None for _ in range(7)]
-    if tree.children[0].data.type == "Document":
+    if tree.children[0].data_type == "Document":
         heading_stack[0] = tree.children[0]
 
     # Get heading sections in order of appearance in markdown text
     heading_sections = [
-        n for n in tree.iterator(method=IterMethod.POST_ORDER) if n.data.type == "HeadingSection"
+        n for n in tree.iterator(method=IterMethod.POST_ORDER) if n.data_type == "HeadingSection"
     ]
     move_counter = 0
     last_heading_level = 0
@@ -454,12 +496,12 @@ def add_list_and_table_intros(tree: Tree) -> int:
     to avoid duplicate intro text in the chunk.
     """
     counter = 0
-    list_nodes = tree.find_all(match=lambda n: n.data.type == "List")
+    list_nodes = tree.find_all(match=lambda n: n.data_type == "List")
     for n in list_nodes:
         if _add_intro_attrib(n):
             counter += 1
 
-    table_nodes = tree.find_all(match=lambda n: n.data.type == "Table")
+    table_nodes = tree.find_all(match=lambda n: n.data_type == "Table")
     for n in table_nodes:
         if _add_intro_attrib(n):
             counter += 1
@@ -469,7 +511,7 @@ def add_list_and_table_intros(tree: Tree) -> int:
 
 def _add_intro_attrib(node: Node) -> bool:
     if prev_node := node.prev_sibling():
-        if prev_node.data.type in ["Paragraph", "Heading"]:
+        if prev_node.data_type in ["Paragraph", "Heading"]:
             if node.data["intro"]:
                 logger.info("Skipping %s: already has intro %r", node.data_id, node.data["intro"])
                 return False  # Don't override existing intro
@@ -480,7 +522,7 @@ def _add_intro_attrib(node: Node) -> bool:
             logger.info("Added intro to %s: %r", node.data_id, node.data["intro"])
             return True
         else:
-            print(f"Unexpected prev node type: {prev_node.data.type} {prev_node.data_id}")
+            print(f"Unexpected prev node type: {prev_node.data_type} {prev_node.data_id}")
     return False
 
 
@@ -500,7 +542,7 @@ def get_parent_headings(node: Node) -> Iterable[TokenNodeData]:
     """
     headings: list[TokenNodeData] = []
     while node.parent:
-        if node.data.type == "HeadingSection":
+        if node.data_type == "HeadingSection":
             heading_node = node.children[0]
             headings.append(heading_node.data)
         node = node.parent
@@ -527,9 +569,9 @@ def capacity_used(markdown: str) -> float:
     return len(markdown) / 500
 
 
-def branch_as_md(node: Node, add_context = True) -> str:
+def branch_as_md(node: Node, add_context=True) -> str:
     # Don't render Heading nodes by themselves
-    if node.data.type in ["Heading"]:
+    if node.data_type in ["Heading"]:
         return ""
 
     context_str = heading_breadcrumb_for(node) if add_context else None
@@ -542,8 +584,9 @@ def branch_as_md(node: Node, add_context = True) -> str:
     node.data["force_intro"] = False
     return normalize_markdown(md)
 
+
 def heading_breadcrumb_for(node):
-    if node.data.type == "HeadingSection":
+    if node.data_type == "HeadingSection":
         node = node.first_child()
 
     if parent_headings := get_parent_headings_md(node):
@@ -553,7 +596,7 @@ def heading_breadcrumb_for(node):
 
 
 def create_chunk(md_str, *nodes) -> None:
-    chunk_id = f"{next(chunk_counter)}:" + nodes[0].data.id
+    chunk_id = f"{next(chunk_counter)}:" + nodes[0].data_id
     memo[chunk_id].append(md_str)
     for node in nodes:
         node.data["chunked"] = chunk_id
@@ -573,21 +616,22 @@ def chunk_nodes(node: Node, capacity_exceeded=lambda s: capacity_used(s) > 1.0) 
     # Starting from the root and go down the branches
     if not capacity_exceeded(md_str):
         print(
-            f"YAY1: Chunked {node.data.id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
+            f"YAY1: Chunked {node.data.data_id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
         )
         create_chunk(md_str, node)
         # Don't visit child nodes
         return
 
     # First iteration: chunk heading sections
-    childs = (n.data.type for n in node.children)
-    print(f"{node.data.id} with {len(md_str)}: Too large to chunk, go to children")
+    childs = (n.data_type for n in node.children)
+    print(f"{node.data.data_id} with {len(md_str)}: Too large to chunk, go to children")
     print("Childs", list(childs))
-    # for n in (n for n in node.children if n.data.type == "HeadingSection"):
+    # for n in (n for n in node.children if n.data_type == "HeadingSection"):
     for n in node.children:
         chunk_nodes(n)
 
     # Try chunking again but with shortened heading sections
+    # FIXME: Replace with call to chunk_nodes( nodes) for all nodes in list or create a temporary subtree
     md_str_list = []
     if context_str := heading_breadcrumb_for(node):
         # TODO: Refactor relative to branch_as_md() for consistency
@@ -602,9 +646,9 @@ def chunk_nodes(node: Node, capacity_exceeded=lambda s: capacity_used(s) > 1.0) 
             md_str = branch_as_md(n, add_context=False)
             if capacity_exceeded(md_str):
                 print(
-                    f"ERROR: Child section too long for {n.data.type} {n.data.id} with {len(md_str)}"
+                    f"ERROR: Child section too long for {n.data_type} {n.data_id} with {len(md_str)}"
                 )
-                # raise AssertionError(f"Child section too long for {n.data.type} {n.data.id} with {len(md_str)}")
+                # raise AssertionError(f"Child section too long for {n.data_type} {n.data_id} with {len(md_str)}")
             else:
                 md_str_list.append(md_str)
 
@@ -613,14 +657,14 @@ def chunk_nodes(node: Node, capacity_exceeded=lambda s: capacity_used(s) > 1.0) 
         md_str = "\n\n".join(md_str_list)
         if not capacity_exceeded(md_str):
             print(
-                f"YAY2: Chunked {node.data.id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
+                f"YAY2: Chunked {node.data.data_id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
             )
             create_chunk(md_str, node)
             return
 
     return
     # Split into chunks
-    print(f"Retrying chunking {node.data.id} with {len(md_str)}")
+    print(f"Retrying chunking {node.data_id} with {len(md_str)}")
 
     md_str = ""
     for md in md_str_list:
@@ -628,17 +672,17 @@ def chunk_nodes(node: Node, capacity_exceeded=lambda s: capacity_used(s) > 1.0) 
             raise AssertionError(f"Too long {len(md_str)}: {md_str}")
         next_md_str = md_str + "\n" + md
         if capacity_exceeded(next_md_str):
-            memo_key = node.data.id + f".{next(chunk_counter)}"
+            memo_key = node.data_id + f".{next(chunk_counter)}"
             # memo[memo_key].append(md_str)
             create_chunk(md_str, node)
             print(f"Chunked {memo_key} with len {len(md_str)}")
             md_str = md
     if md_str:  # Last chunk
-        memo_key = node.data.id + f".{next(chunk_counter)}"
+        memo_key = node.data_id + f".{next(chunk_counter)}"
         # memo[memo_key].append(md_str)
         print(f"Chunked {memo_key} with len {len(md_str)}")
 
     if next(chunk_counter) == 0:
-        print(f"!! Overfilling chunk for {node.data.id}")  # FIXME
+        print(f"!! Overfilling chunk for {node.data_id}")  # FIXME
         md_str = branch_as_md(n)
         create_chunk(md_str, node)
