@@ -555,7 +555,7 @@ def _add_intro_attrib(node: Node) -> bool:
                 logger.info("Skipping %s: already has intro %r", node.data_id, node.data["intro"])
                 return False  # Don't override existing intro
 
-            intro_md = prev_node.data.render()
+            intro_md = prev_node.data["raw_text"] or prev_node.data.render()
             # Limit size of intro by using only the last sentence
             node.data["intro"] = intro_md.split(".")[-1]
             logger.info("Added intro to %s: %r", node.data_id, node.data["intro"])
@@ -578,13 +578,19 @@ def get_parent_headings(node: Node) -> Iterable[TokenNodeData]:
     """
     Return the list of node's parent Headings in order of appearance in the markdown text.
     Check headings[i].token.level for the heading level, which may not be consecutive.
+    This assumes that nest_heading_sections() has been called. # TODO: Add a check for this
     """
+    # If the node is a Heading and it's parent is a HeadingSection, start with the HeadingSection node instead
+    # so that the node will not be included in the returned list.
+    if node.data_type == "Heading" and node.parent.data_type == "HeadingSection":
+        node = node.parent
+
     headings: list[TokenNodeData] = []
-    while node.parent:
+    while node := node.parent:
         if node.data_type == "HeadingSection":
             heading_node = node.children[0]
             headings.append(heading_node.data)
-        node = node.parent
+
     for h in headings:
         assert isinstance(h.token.level, int), f"Expected int, got {h['level']!r}"
     return reversed(headings)
@@ -608,28 +614,29 @@ def capacity_used(markdown: str) -> float:
     return len(markdown) / 500
 
 
-def branch_as_md(node: Node, add_context: bool = True) -> str:
+def branch_as_md(*nodes: Node) -> str:
     # Don't render Heading nodes by themselves
-    if node.data_type in ["Heading"]:
+    if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
         return ""
 
-    context_str = heading_breadcrumb_for(node) if add_context else None
+    context_str = heading_breadcrumb_for(nodes[0])
 
-    node.data["force_intro"] = True
+    md_list: list[str] = []
     if context_str:
-        md = "\n--\n".join([context_str, render_branch(node)])
-    else:
-        md = render_branch(node)
-    node.data["force_intro"] = False
-    return normalize_markdown(md)
+        md_list.append(context_str)
+    for node in nodes:
+        node.data["force_intro"] = True
+        if not (node_md := node.data["summary"]):
+            node_md = render_branch(node)
+        md_list.append(node_md)
+        node.data["force_intro"] = False
+    return normalize_markdown("\n\n".join(md_list))
 
 
 def heading_breadcrumb_for(node: Node) -> str | None:
-    if node.data_type == "HeadingSection":
-        node = node.first_child()
-
     if parent_headings := get_parent_headings_md(node):
-        return "\n".join(parent_headings)
+        # print("Parent Headings: ", node.data, "\n  ", parent_headings)
+        return "\n".join(parent_headings) + "\n---\n"
     else:
         return None
 
@@ -664,38 +671,36 @@ def chunk_nodes(
         return
 
     # First iteration: chunk heading sections
-    childs = (n.data_type for n in node.children)
     print(f"{node.data.data_id} with {len(md_str)}: Too large to chunk, go to children")
-    print("Childs", list(childs))
+    # childs = (n.data_type for n in node.children)
+    # print("Childs", list(childs))
     # for n in (n for n in node.children if n.data_type == "HeadingSection"):
     for n in node.children:
         chunk_nodes(n)
 
     # Try chunking again but with shortened heading sections
-    # FIXME: Replace with call to chunk_nodes( nodes) for all nodes in list or create a temporary subtree
-    md_str_list = []
-    if context_str := heading_breadcrumb_for(node):
-        # TODO: Refactor relative to branch_as_md() for consistency
-        md_str_list.append(context_str + "\n--\n")
+    node_list = []
+
     for n in node.children:
         if n.data["chunked"]:
-            # TODO: Refactor relative to branch_as_md() for consistency
             summarize(n)
-            md_str_list.append(n.data["summary"])
+            node_list.append(n)
             continue
         else:
-            md_str = branch_as_md(n, add_context=False)
-            if capacity_exceeded(md_str):
+            test_md_str = branch_as_md(*node_list, n)
+            if capacity_exceeded(test_md_str):
                 print(
                     f"ERROR: Child section too long for {n.data_type} {n.data_id} with {len(md_str)}"
                 )
-                # raise AssertionError(f"Child section too long for {n.data_type} {n.data_id} with {len(md_str)}")
+                raise AssertionError(
+                    f"Child section too long for {n.data_type} {n.data_id} with {len(md_str)}"
+                )
             else:
-                md_str_list.append(md_str)
+                node_list.append(n)
 
-    # If fit in single chunk
-    if md_str_list:
-        md_str = "\n\n".join(md_str_list)
+    if node_list:
+        md_str = branch_as_md(*node_list)
+        # If fit in single chunk
         if not capacity_exceeded(md_str):
             print(
                 f"YAY2: Chunked {node.data.data_id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
