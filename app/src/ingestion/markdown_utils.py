@@ -80,15 +80,23 @@ def describe_tree(tree: Tree) -> dict:
 
 
 def render_tree(tree: Tree, normalize: bool = True) -> str:
+    return render_branch(tree.system_root, normalize=normalize)
+
+
+def render_branch(node: Node, normalize: bool = True) -> str:
     """
-    Render the tree to markdown text.
-    For creating text for chunks, create small trees for each chunk and render them separately.
+    Render the node and its children to markdown text.
+    Useful for creating markdown text for chunks.
     """
     out_str = []
     render = TokenNodeData.render_token
-    for node in tree.iterator(method=IterMethod.PRE_ORDER):
+    for node in node.iterator(method=IterMethod.PRE_ORDER, add_self=True):
+        # Only render data of type TokenNodeData and its subclasses
+        if not isinstance(node.data, TokenNodeData):
+            continue
+        # Don't need to render these as their content is rendered as part of other nodes
         if node.data.type in ["Document", "HeadingSection", "TableCell"]:
-            continue  # Don't need to render these
+            continue
 
         token = node.data.token
         match node.data.type:
@@ -104,6 +112,7 @@ def render_tree(tree: Tree, normalize: bool = True) -> str:
                     out_str.append(render(token))
             case "List":
                 if intro := intro_if_needed(node):
+                    print(f"Appending Intro: {intro}")
                     out_str.append(intro)
                 if node.parent.data.type not in ["ListItem"]:
                     out_str.append("\n")
@@ -124,7 +133,7 @@ def render_tree(tree: Tree, normalize: bool = True) -> str:
             case _:
                 raise ValueError(f"Unexpected node type {node.data.type}: {node.data_id}")
 
-    md_str = "".join(out_str)
+    md_str = "".join(out_str).strip()
     if normalize:
         return normalize_markdown(md_str)
     return md_str
@@ -303,7 +312,6 @@ class TokenNodeData(MdNodeData):
         content = self.content_oneliner()
         if not content:
             if self.type in ["Heading", "Link", "TableRow"]:
-                print("RENDERING", self.id_string)
                 # Render these single-line types. Assume TableRow is a single line for now.
                 content = self.render()
             elif self.type in ["ListItem"]:
@@ -383,7 +391,6 @@ def create_heading_sections(tree: Tree) -> int:
         # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
         hsection_node = n.prepend_sibling(hs_node_data, data_id=hs_node_data.id)
         hs_node_data.node = hsection_node
-        hs_node_data["level"] = n.data.token.level
         # Get all siblings up to next Heading; these will be HeadingSection's new children
         children = list(get_siblings_up_to(n, "Heading"))
         # Move in order the Heading and associated children to the new HeadingSection node
@@ -416,7 +423,7 @@ def nest_heading_sections(tree: Tree) -> int:
     last_heading_level = 0
     for hs_node in heading_sections:
         # print(hs_node)
-        heading_level = hs_node.data.level
+        heading_level = hs_node.children[0].data.token.level
         if heading_level > last_heading_level:
             # Handle the case where a heading level skips a level, compared to last heading
             for i in range(last_heading_level + 1, heading_level):
@@ -473,7 +480,7 @@ def _add_intro_attrib(node: Node) -> bool:
             logger.info("Added intro to %s: %r", node.data_id, node.data["intro"])
             return True
         else:
-            print(f"Unexpected intro node {prev_node.data.type} {prev_node.data_id}")
+            print(f"Unexpected prev node type: {prev_node.data.type} {prev_node.data_id}")
     return False
 
 
@@ -486,92 +493,152 @@ def summarize(node: Node) -> str:
     return summary
 
 
-def get_parent_headings(node: Node) -> Iterable[MdNodeData]:
+def get_parent_headings(node: Node) -> Iterable[TokenNodeData]:
     """
-    Return the list of nested parent Headings in order of appearance in the markdown text.
-    Check headings[i]["level"] for the heading level, which may not be consecutive.
+    Return the list of node's parent Headings in order of appearance in the markdown text.
+    Check headings[i].token.level for the heading level, which may not be consecutive.
     """
-    headings: list[MdNodeData] = []
+    headings: list[TokenNodeData] = []
     while node.parent:
         if node.data.type == "HeadingSection":
             heading_node = node.children[0]
             headings.append(heading_node.data)
         node = node.parent
+    for h in headings:
+        assert isinstance(h.token.level, int), f"Expected int, got {h['level']!r}"
     return reversed(headings)
 
 
-def get_raw_parent_headings(node: Node) -> list[str]:
-    "Returns the text of nested parent headings in level order, which may not be consecutive"
+def get_parent_headings_raw(node: Node) -> list[str]:
+    "Returns the raw text of node's parent headings in level order, which may not be consecutive"
     return [h["raw_text"] for h in get_parent_headings(node)]
 
 
-CHAR_LIMIT = 512
+def get_parent_headings_md(node: Node) -> list[str]:
+    "Returns the markdown text of node's parent headings in level order, which may not be consecutive"
+    return [f"{"#" * h.token.level} {h['raw_text']}" for h in get_parent_headings(node)]
 
 
-def chunk_nodes(node: Node, memo: dict) -> None:
-    # assert node.data.is_block_token(), f"Expecting block-token, not {node.data.token}"
-    md_str = node.data.render()
-    if len(md_str) < CHAR_LIMIT:
+memo = defaultdict(list)
+chunk_counter = itertools.count(1)
+
+
+def capacity_used(markdown: str) -> float:
+    return len(markdown) / 500
+
+
+def branch_as_md(node: Node, add_context = True) -> str:
+    # Don't render Heading nodes by themselves
+    if node.data.type in ["Heading"]:
+        return ""
+
+    context_str = heading_breadcrumb_for(node) if add_context else None
+
+    node.data["force_intro"] = True
+    if context_str:
+        md = "\n--\n".join([context_str, render_branch(node)])
+    else:
+        md = render_branch(node)
+    node.data["force_intro"] = False
+    return normalize_markdown(md)
+
+def heading_breadcrumb_for(node):
+    if node.data.type == "HeadingSection":
+        node = node.first_child()
+
+    if parent_headings := get_parent_headings_md(node):
+        return "\n".join(parent_headings)
+    else:
+        return None
+
+
+def create_chunk(md_str, *nodes) -> None:
+    chunk_id = f"{next(chunk_counter)}:" + nodes[0].data.id
+    memo[chunk_id].append(md_str)
+    for node in nodes:
+        node.data["chunked"] = chunk_id
+    # TODO: Copy node and children to a chunk tree
+
+
+def chunk_nodes(node: Node, capacity_exceeded=lambda s: capacity_used(s) > 1.0) -> None:
+    assert (
+        not isinstance(node.data, TokenNodeData) or node.data.is_block_token()
+    ), f"Expecting block-token, not {node.data.token}"
+
+    md_str = branch_as_md(node)
+    if not md_str:
+        return
+
+    # Try to chunk as much content as possible
+    # Starting from the root and go down the branches
+    if not capacity_exceeded(md_str):
         print(
-            f"YAY: Chunked {node.data_id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
+            f"YAY1: Chunked {node.data.id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
         )
-        memo[node.data_id].append(md_str)
+        create_chunk(md_str, node)
         # Don't visit child nodes
         return
 
-    print(f"?? Chunking {node.data_id} with {len(md_str)}")
-    chunked_list = []
     # First iteration: chunk heading sections
     childs = (n.data.type for n in node.children)
+    print(f"{node.data.id} with {len(md_str)}: Too large to chunk, go to children")
     print("Childs", list(childs))
-    for n in (n for n in node.children if n.data.type == "HeadingSection"):
-        chunk_nodes(n, memo)
-        if n.data_id in memo or n.data_id + ".0" in memo:  # if chunked
-            chunked_list.append(n)
+    # for n in (n for n in node.children if n.data.type == "HeadingSection"):
+    for n in node.children:
+        chunk_nodes(n)
 
     # Try chunking again but with shortened heading sections
     md_str_list = []
+    if context_str := heading_breadcrumb_for(node):
+        # TODO: Refactor relative to branch_as_md() for consistency
+        md_str_list.append(context_str + "\n--\n")
     for n in node.children:
-        if n in chunked_list:
-            md_str_list.append(summarize(n))
+        if n.data["chunked"]:
+            # TODO: Refactor relative to branch_as_md() for consistency
+            summarize(n)
+            md_str_list.append(n.data["summary"])
             continue
         else:
-            md_str = n.data.render()
-            if len(md_str) > CHAR_LIMIT:
-                raise AssertionError(
-                    f"Child section too long for {n.data.type} {n.data_id} with {len(md_str)}"
+            md_str = branch_as_md(n, add_context=False)
+            if capacity_exceeded(md_str):
+                print(
+                    f"ERROR: Child section too long for {n.data.type} {n.data.id} with {len(md_str)}"
                 )
+                # raise AssertionError(f"Child section too long for {n.data.type} {n.data.id} with {len(md_str)}")
             else:
                 md_str_list.append(md_str)
 
     # If fit in single chunk
-    md_str = "\n".join(md_str_list)
-    if len(md_str) <= CHAR_LIMIT:
-        print(
-            f"YAY: Chunked {node.data_id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
-        )
-        memo[node.data_id].append(md_str)
-        return
+    if md_str_list:
+        md_str = "\n\n".join(md_str_list)
+        if not capacity_exceeded(md_str):
+            print(
+                f"YAY2: Chunked {node.data.id} with len {len(md_str)}: {md_str[:20]!r}...{md_str[-10:]!r}"
+            )
+            create_chunk(md_str, node)
+            return
 
+    return
     # Split into chunks
-    print(f"Retrying chunking {node.data_id} with {len(md_str)}")
-    counter = itertools.count()
+    print(f"Retrying chunking {node.data.id} with {len(md_str)}")
+
     md_str = ""
     for md in md_str_list:
-        if len(md_str) > CHAR_LIMIT:
+        if capacity_exceeded(md_str):
             raise AssertionError(f"Too long {len(md_str)}: {md_str}")
         next_md_str = md_str + "\n" + md
-        if len(next_md_str) > CHAR_LIMIT:
-            memo_key = node.data_id + f".{next(counter)}"
-            memo[memo_key].append(md_str)
+        if capacity_exceeded(next_md_str):
+            memo_key = node.data.id + f".{next(chunk_counter)}"
+            # memo[memo_key].append(md_str)
+            create_chunk(md_str, node)
             print(f"Chunked {memo_key} with len {len(md_str)}")
             md_str = md
     if md_str:  # Last chunk
-        memo_key = node.data_id + f".{next(counter)}"
-        memo[memo_key].append(md_str)
+        memo_key = node.data.id + f".{next(chunk_counter)}"
+        # memo[memo_key].append(md_str)
         print(f"Chunked {memo_key} with len {len(md_str)}")
 
-    if next(counter) == 0:
-        print(f"!! Overfilling chunk for {node.data_id}")  # FIXME
-        md_str = n.data.render()
-        memo[node.data_id].append(md_str)
+    if next(chunk_counter) == 0:
+        print(f"!! Overfilling chunk for {node.data.id}")  # FIXME
+        md_str = branch_as_md(n)
+        create_chunk(md_str, node)
