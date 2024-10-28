@@ -1,9 +1,11 @@
 import logging
+
 import pytest
 from nutree import Tree
 
 from src.ingestion.markdown_utils import (
     add_list_and_table_intros,
+    compare_markdowns,
     create_heading_sections,
     create_markdown_tree,
     describe_tree,
@@ -11,9 +13,7 @@ from src.ingestion.markdown_utils import (
     nest_heading_sections,
     render_tree_as_md,
     tokens_vs_tree_mismatches,
-    compare_markdowns,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +95,9 @@ def assert_content(tree: Tree):
     assert len(list_nodes[0].children) == 3
     assert len(list_nodes[1].children) == 4
     # Check sublist ListItem on line 42
-    assert tree["LI42"].render() == "* Item H1>H3.L1.subL.1\n"
+    assert tree["LI_42"].render() == "* Item H1>H3.L1.subL.1\n"
     # Indented correctly when entire list is rendered
-    assert tree["L40"].render() == (
+    assert tree["L_40"].render() == (
         "* Item H1>H3.L1.1\n"  #
         "* Item H1>H3.L1.2\n"  #
         "  * Item H1>H3.L1.subL.1\n"  #
@@ -261,9 +261,8 @@ def test_tree_preparation(markdown_text):
 
     md = render_tree_as_md(tree)
 
-    from difflib import SequenceMatcher
-    from difflib import unified_diff
     import re
+    from difflib import SequenceMatcher, unified_diff
 
     compare_markdowns(markdown_text, md)
 
