@@ -55,12 +55,17 @@ def normalize_markdown(markdown: str) -> str:
         return renderer.render(doc)
 
 
+class HeadingSection(block_token.BlockToken):
+    pass
+
 def _new_md_renderer() -> MarkdownRenderer:
     "Create a new MarkdownRenderer instance with consistent settings. Remember to use in a context manager."
     # MarkdownRenderer() calls block_token.remove_token(block_token.Footnote), so reset tokens to avoid failure
     # See https://github.com/miyuchina/mistletoe/issues/210
     block_token.reset_tokens()
-    return MarkdownRenderer(normalize_whitespace=True)
+    renderer = MarkdownRenderer(normalize_whitespace=True)
+
+    return renderer
 
 
 def _populate_nutree(parent: Node, token: Token) -> Node:
@@ -159,7 +164,7 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
 
 
 def render_tree_as_md(tree: Tree, normalize: bool = True) -> str:
-    return render_subtree_as_md(tree.system_root, normalize=normalize)
+    return render_subtree_as_md(tree.system_root.first_child(), normalize=normalize)
 
 
 def render_subtree_as_md(node: Node, normalize: bool = True) -> str:
@@ -169,57 +174,73 @@ def render_subtree_as_md(node: Node, normalize: bool = True) -> str:
     Since the structure of the tree (i.e., each node's parent and children) is independent of each Token's parent and children,
     we cannot rely on mistletoe's renderer (which is based on Tokens) to render the tree correctly. Hence, we have this function.
     """
-    out_str = []
     render = TokenNodeData.render_token
-    for n in node.iterator(method=IterMethod.PRE_ORDER, add_self=True):
-        # Only render data of type TokenNodeData and its subclasses
-        if not isinstance(n.data, TokenNodeData):
-            continue
-        # Don't need to render these as their content is rendered as part of other nodes
-        if n.data_type in ["Document", "HeadingSection", "TableCell"]:
-            continue
+    if True:
+        if node.data_type in ["Document", "HeadingSection"]:
+            print(f"--- Rendering children of {node.data_id}")
+            out_str = []
+            for c in node.children:
+                if isinstance(c.data, TokenNodeData):
+                    out_str.append(render(c.token))
+                else:
+                    out_str.append(render_subtree_as_md(c, normalize=normalize))
+            md_str = "".join(map(lambda line: line + "\n", out_str))
+        else:
+            assert isinstance(node.data, TokenNodeData)
+            md_str = render(node.token)
+                    
+    else:
+        out_str = []
+        for n in node.iterator(method=IterMethod.PRE_ORDER, add_self=True):
+            # Only render data of type TokenNodeData and its subclasses
+            if not isinstance(n.data, TokenNodeData):
+                continue
+            # Don't need to render these as their content is rendered as part of other nodes
+            if n.data_type in ["Document", "HeadingSection", "TableCell"]:
+                continue
 
-        match n.data_type:
-            case "Heading":
-                out_str.append("\n")
-                out_str.append(render(n.token))
-            case "Paragraph":
-                # Only render Paragraphs that are not rendered as part of a List or Table
-                if n.parent.data_type not in ["ListItem", "TableRow"]:
+            match n.data_type:
+                case "Heading":
                     out_str.append("\n")
                     out_str.append(render(n.token))
-            case "List":
-                if n.parent.data_type in ["ListItem"]:
-                    continue
-                if intro := intro_if_needed(n):
-                    print(f"Appending Intro: {intro}")
-                    out_str.append(intro)
-                out_str.append("\n")
-                out_str.append(render(n.token))
-            #     if n.parent.data_type not in ["ListItem"]:
-            #         # If the List is not a sublist, insert a blank line
-            #         out_str.append("\n")
-            case "ListItem":
-                pass  # TODO: handle split lists by copying list subtree, update tokens, and render nested block tokens via recursion
-            #     token2 = copy(n.token)
-            #     # Exclude children that are List so that they are not rendered as part of this ListItem
-            #     # TODO: If it's possible to have children: [Paragraph, List, Paragraph], that's not handled well.
-            #     token2.children = [c for c in token2.children if c.type != "List"]
-            #     out_str.append(render(token2))
-            case "Table":
-                if intro := intro_if_needed(n):
-                    out_str.append(intro)
-                out_str.append("\n")
-                out_str.append(render(n.token))
-                # out_str.append(render(n.token.header))
-                # out_str.append("| " + " | ".join(n.token.header.sep_line) + " |\n")
-            case "TableRow":
-                pass  # TODO: same as ListItem TODO
-                # out_str.append(render(n.token))
-            case _:
-                raise ValueError(f"Unexpected node type {n.data_type}: {n.data_id}")
+                case "Paragraph":
+                    # Only render Paragraphs that are not rendered as part of a List or Table
+                    if n.parent.data_type not in ["ListItem", "TableRow"]:
+                        out_str.append("\n")
+                        out_str.append(render(n.token))
+                case "List":
+                    if n.parent.data_type in ["ListItem"]:
+                        continue
+                    if intro := intro_if_needed(n):
+                        print(f"Appending Intro: {intro}")
+                        out_str.append(intro)
+                    out_str.append("\n")
+                    out_str.append(render(n.token))
+                #     if n.parent.data_type not in ["ListItem"]:
+                #         # If the List is not a sublist, insert a blank line
+                #         out_str.append("\n")
+                case "ListItem":
+                    pass  # TODO: handle split lists by copying list subtree, update tokens, and render nested block tokens via recursion
+                #     token2 = copy(n.token)
+                #     # Exclude children that are List so that they are not rendered as part of this ListItem
+                #     # TODO: If it's possible to have children: [Paragraph, List, Paragraph], that's not handled well.
+                #     token2.children = [c for c in token2.children if c.type != "List"]
+                #     out_str.append(render(token2))
+                case "Table":
+                    if intro := intro_if_needed(n):
+                        out_str.append(intro)
+                    out_str.append("\n")
+                    out_str.append(render(n.token))
+                    # out_str.append(render(n.token.header))
+                    # out_str.append("| " + " | ".join(n.token.header.sep_line) + " |\n")
+                case "TableRow":
+                    pass  # TODO: same as ListItem TODO
+                    # out_str.append(render(n.token))
+                case _:
+                    raise ValueError(f"Unexpected node type {n.data_type}: {n.data_id}")
 
-    md_str = "".join(out_str).strip()
+        md_str = "".join(out_str).strip()
+
     if normalize:
         return normalize_markdown(md_str)
     return md_str
