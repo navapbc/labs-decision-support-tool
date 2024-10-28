@@ -28,7 +28,10 @@ def create_markdown_tree(
     """
     if normalize_md:
         markdown = normalize_markdown(markdown)
-    doc = mistletoe.Document(markdown)
+    with _new_md_renderer():
+        # Never call Document(...) outside of a with ... as renderer block"
+        # Otherwise, markdown_renderer.BlankLine will not be created
+        doc = mistletoe.Document(markdown)
     # The shadow_attrs=True argument allows accessing node.data.age as node.age
     tree = Tree(name, shadow_attrs=True)
     _populate_nutree(tree.system_root, doc)
@@ -176,7 +179,7 @@ def render_subtree_as_md(node: Node, normalize: bool = True) -> str:
     """
     render = TokenNodeData.render_token
     if True:
-        if node.data_type in ["Document", "HeadingSection"]:
+        if node.data_type in ["HeadingSection"]:
             print(f"--- Rendering children of {node.data_id}")
             out_str = []
             for c in node.children:
@@ -617,7 +620,11 @@ def add_list_and_table_intros(tree: Tree) -> int:
 
 
 def _add_intro_attrib(node: Node) -> bool:
-    if prev_node := node.prev_sibling():
+    prev_node = node.prev_sibling()
+    while prev_node and prev_node.data_type in ["BlankLine"]:
+        prev_node = prev_node.prev_sibling()
+
+    if prev_node:
         if prev_node.data_type in ["Paragraph", "Heading"]:
             if node.data["intro"]:
                 logger.info("Skipping %s: already has intro %r", node.data_id, node.data["intro"])
@@ -629,7 +636,7 @@ def _add_intro_attrib(node: Node) -> bool:
             logger.info("Added intro to %s: %r", node.data_id, node.data["intro"])
             return True
         else:
-            print(f"Unexpected prev node type: {prev_node.data_type} {prev_node.data_id}")
+            raise ValueError(f"Unexpected prev node type: {prev_node.data_type} {prev_node.data_id}")
     return False
 
 

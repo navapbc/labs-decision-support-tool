@@ -17,6 +17,7 @@ from src.ingestion.markdown_utils import (
 
 logger = logging.getLogger(__name__)
 
+
 def create_paragraph(paragraph_id: str, sentence_count: int) -> str:
     return " ".join([f"Paragraph {paragraph_id}, sentence {i + 2}." for i in range(sentence_count)])
 
@@ -165,7 +166,7 @@ def test_create_markdown_tree(markdown_text):
     assert children_of["TableCell"] == {"RawText"}
 
     doc_node = tree.children[0]
-    assert len(doc_node.children) == 20
+    assert len(doc_node.children) == 40
     assert_content(tree)
     assert len(tokens_vs_tree_mismatches(tree)) == 0
 
@@ -213,7 +214,13 @@ def test_tree_preparation(markdown_text):
         assert parent_of["Heading"] == {"HeadingSection"}
         assert parent_of["HeadingSection"] == {"Document"}
         children_of = tree_descr["children"]
-        assert children_of["HeadingSection"] == {"Heading", "List", "Paragraph", "Table"}
+        assert children_of["HeadingSection"] == {
+            "Heading",
+            "List",
+            "Paragraph",
+            "Table",
+            "BlankLine",
+        }
 
     for run_no in range(2):
         # Step 3: Move HeadingSection nodes to be under their respective Heading parent
@@ -232,6 +239,7 @@ def test_tree_preparation(markdown_text):
             "Paragraph",
             "Table",
             "HeadingSection",
+            "BlankLine",
         }
 
     for run_no in range(2):
@@ -256,15 +264,17 @@ def test_tree_preparation(markdown_text):
     from difflib import SequenceMatcher
     from difflib import unified_diff
     import re
+
     compare_markdowns(markdown_text, md)
 
-    markdown_text = re.sub(r'^\| \-\-\-.*\|\n', '', markdown_text, flags=re.MULTILINE)
-    md = re.sub(r'^\| \-\-\-.*\|\n', '', md, flags=re.MULTILINE)
-    markdown_text = re.sub(r'^\| H3.2.T1: header 1.*\|\n', '', markdown_text, flags=re.MULTILINE)
-    md = re.sub(r'^\| H3.2.T1: header 1.*\|\n', '', md, flags=re.MULTILINE)
+    markdown_text = re.sub(r"^\| \-\-\-.*\|\n", "", markdown_text, flags=re.MULTILINE)
+    md = re.sub(r"^\| \-\-\-.*\|\n", "", md, flags=re.MULTILINE)
+    markdown_text = re.sub(r"^\| H3.2.T1: header 1.*\|\n", "", markdown_text, flags=re.MULTILINE)
+    md = re.sub(r"^\| H3.2.T1: header 1.*\|\n", "", md, flags=re.MULTILINE)
     logger.info("Markdown text:\n%s", markdown_text)
     logger.info("Rendered tree as markdown:\n%s", md)
     assert md.strip() == markdown_text.strip()
+
 
 # def test_chunk_tree(markdown_text):
 #     tree = create_markdown_tree(markdown_text)
