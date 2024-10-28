@@ -117,7 +117,9 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
     """
 
     def validate_tokens(node: Node, memo: dict) -> None:
-        if not isinstance(node.data, TokenNodeData):
+        if node.data_type == "Document":
+            return
+        if not isinstance(node.data, TokenNodeData) or not node.data.is_block_token():
             return
 
         if node.parent:
@@ -127,7 +129,7 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
                         f"Different token parent for {node.data_id}: {node.token.parent} vs {node.parent.token}"
                     )
         elif node.token.parent:
-            memo["no_parent"].append(f"No parent for {node.data_id}: {node.token.parent}")
+            memo["has_parent"].append(f"Token has parent for {node.data_id}: {node.token.parent}")
 
         if node.children:
             node_children_tokens = [
@@ -139,7 +141,9 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
                     f"Different token children for {node.data_id}: {node_children_tokens} vs {token_children}"
                 )
         elif node.token.children:
-            memo["no_parent"].append(f"No parent for {node.data_id}: {node.token.children}")
+            token_children = [c for c in node.token.children if isinstance(c, block_token.BlockToken) and c.__class__.__name__ != "TableCell"]
+            if token_children:
+                memo["has_children"].append(f"Token has block-token children for {node.data_id}: {token_children}")
 
         # TODO: check tokens w.r.t. tree structure
 
