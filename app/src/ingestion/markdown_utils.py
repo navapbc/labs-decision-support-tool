@@ -141,9 +141,15 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
                     f"Different token children for {node.data_id}: {node_children_tokens} vs {token_children}"
                 )
         elif node.token.children:
-            token_children = [c for c in node.token.children if isinstance(c, block_token.BlockToken) and c.__class__.__name__ != "TableCell"]
+            token_children = [
+                c
+                for c in node.token.children
+                if isinstance(c, block_token.BlockToken) and c.__class__.__name__ != "TableCell"
+            ]
             if token_children:
-                memo["has_children"].append(f"Token has block-token children for {node.data_id}: {token_children}")
+                memo["has_children"].append(
+                    f"Token has block-token children for {node.data_id}: {token_children}"
+                )
 
         # TODO: check tokens w.r.t. tree structure
 
@@ -194,7 +200,7 @@ def render_subtree_as_md(node: Node, normalize: bool = True) -> str:
             #         # If the List is not a sublist, insert a blank line
             #         out_str.append("\n")
             case "ListItem":
-                pass # TODO: handle split lists by copying list subtree, update tokens, and render nested block tokens via recursion
+                pass  # TODO: handle split lists by copying list subtree, update tokens, and render nested block tokens via recursion
             #     token2 = copy(n.token)
             #     # Exclude children that are List so that they are not rendered as part of this ListItem
             #     # TODO: If it's possible to have children: [Paragraph, List, Paragraph], that's not handled well.
@@ -208,7 +214,7 @@ def render_subtree_as_md(node: Node, normalize: bool = True) -> str:
                 # out_str.append(render(n.token.header))
                 # out_str.append("| " + " | ".join(n.token.header.sep_line) + " |\n")
             case "TableRow":
-                pass # TODO: same as ListItem TODO
+                pass  # TODO: same as ListItem TODO
                 # out_str.append(render(n.token))
             case _:
                 raise ValueError(f"Unexpected node type {n.data_type}: {n.data_id}")
@@ -233,9 +239,11 @@ def intro_if_needed(node: Node) -> str | None:
             return intro
     return None
 
+
 from difflib import SequenceMatcher
 from difflib import unified_diff
 import re
+
 
 def compare_markdowns(md1: str, md2: str) -> None:
     with MarkdownRenderer(normalize_whitespace=False) as renderer:
@@ -269,28 +277,8 @@ def compare_markdowns(md1: str, md2: str) -> None:
     ratio = seq_match.ratio()
     print("match ratio:", ratio)
 
-    diff = unified_diff(fixed_content, fixed_out, lineterm='')
-    print('\n'.join(list(diff)))
-
-def _create_custom_md_renderer() -> MarkdownRenderer:
-    # MarkdownRenderer cannot render individual TableRow tokens without the Table token, so create a custom renderer
-    # TODO: Rename to render_table_row() and remove unnecessary render_map["TableRow"] or subclass MarkdownRenderer
-    def custom_render_table_row(
-        self: MarkdownRenderer, token: TableRow, max_line_length: int
-    ) -> list[str]:
-        return [
-            self.table_row_to_line(
-                self.table_row_to_text(token), token.col_widths, token.column_align
-            )
-        ]
-
-    renderer = _new_md_renderer()
-    # Bind the custom method to the instance so that self is passed as the first argument
-    renderer.render_table_row = types.MethodType(custom_render_table_row, renderer)
-    # Register the custom method to render TableRow tokens
-    renderer.render_map["TableRow"] = renderer.render_table_row
-    logger.info("Created custom MarkdownRenderer: %s", renderer)
-    return renderer
+    diff = unified_diff(fixed_content, fixed_out, lineterm="")
+    print("\n".join(list(diff)))
 
 
 #  TODO: Render footnotes in Document node
@@ -353,7 +341,7 @@ class MdNodeData:
     ONELINER_CONTENT_LIMIT = 100
 
     def content_oneliner(self) -> str:
-        content = self["text_of_hidden_nodes"]
+        content = self["oneliner_of_hidden_nodes"]
         if not content:
             content = getattr(self, "content", "")[: MdNodeData.ONELINER_CONTENT_LIMIT]
         return content
@@ -411,19 +399,26 @@ class TokenNodeData(MdNodeData):
         return isinstance(self.token, block_token.BlockToken)
 
     # Use this single renderer for all instances
-    md_renderer = _create_custom_md_renderer()
+    md_renderer = _new_md_renderer()
 
     @classmethod
     def render_token(cls: type["TokenNodeData"], token: Token) -> str:
         "Render the token and its descendants using the custom MarkdownRenderer"
         # MD renderer should always be used within a context manager
         with cls.md_renderer as renderer:
+            if token.type in ["TableRow"]:
+                return renderer.table_row_to_line(
+                    renderer.table_row_to_text(token),
+                    token.col_widths,
+                    token.column_align,
+                )
             return renderer.render(token)
 
     def render(self) -> str:
         return self.render_token(self.token)
 
     def __repr__(self) -> str:
+        "Returns oneliner that is shown in tree.print()"
         oneliner = [self.id_string]
 
         # Metadata
@@ -443,9 +438,9 @@ class TokenNodeData(MdNodeData):
                 content = f"{self.render()[: self.ONELINER_CONTENT_LIMIT]!r}"
             elif self.data_type in ["Table"]:
                 # Render just the header row
-                self.render_token(self.token.header)
+                content = self.render_token(self.token.header)
             elif self.data_type in ["Paragraph", "TableCell"]:
-                # These will have RawText children that will show the content
+                # These will have RawText children that will show the content or "oneliner_of_hidden_nodes" will be used
                 content = ""
             else:  # for Document, List, etc
                 content = f"{self.token}"
@@ -481,7 +476,7 @@ def hide_span_tokens(tree: Tree) -> int:
 
         logger.info("Hiding %i children span-tokens under %s", len(node.children), data_type)
         # Create custom attribute for the hidden text so that tree.print() renders some of the text
-        node.data["text_of_hidden_nodes"] = textwrap.shorten(
+        node.data["oneliner_of_hidden_nodes"] = textwrap.shorten(
             node.data.render(), 50, placeholder="...(hidden)", drop_whitespace=False
         )
 
