@@ -24,7 +24,7 @@ def create_markdown_tree(
     Returns a tree reflecting the structure of the Tokens parsed from the markdown text.
     The tree is created using mistletoe's Tokens and the TokenNodeData class.
     Note that the structure of the tree (i.e., each node's parent and children) is independent of each Token's parent and children.
-    To render the tree to markdown text, use render_tree() and render_branch().
+    To render the tree to markdown text, use render_tree_as_md() and render_subtree_as_md().
     """
     if normalize_md:
         markdown = normalize_markdown(markdown)
@@ -60,7 +60,7 @@ def _new_md_renderer() -> MarkdownRenderer:
     # MarkdownRenderer() calls block_token.remove_token(block_token.Footnote), so reset tokens to avoid failure
     # See https://github.com/miyuchina/mistletoe/issues/210
     block_token.reset_tokens()
-    return MarkdownRenderer(normalize_whitespace=False)
+    return MarkdownRenderer(normalize_whitespace=True)
 
 
 def _populate_nutree(parent: Node, token: Token) -> Node:
@@ -91,21 +91,27 @@ def validate_tree(tree: Tree) -> None:
 
 
 def describe_tree(tree: Tree) -> dict:
-    attribs = defaultdict(set)
     parents = defaultdict(set)
     children = defaultdict(set)
+    tokens = defaultdict(set)
+    counts: dict[str, int] = defaultdict(int)
     for node in tree.iterator(method=IterMethod.POST_ORDER):
-        attribs[node.data_type].update(node.data.__dict__.keys())
-        children[node.data_type].update([child.data_type for child in node.children])
-        parents[node.data_type].add(node.data_type)
+        counts[node.data_type] += 1
+        if node.children:
+            children[node.data_type].update([child.data_type for child in node.children])
+        if node.parent:
+            parents[node.data_type].add(node.parent.data_type)
+        if isinstance(node.data, TokenNodeData):
+            tokens[node.data_type].update(node.data.token.__dict__.keys())
     return {
-        "attribs": attribs,
-        "parents": parents,
+        "counts": counts,
         "children": children,
+        "parents": parents,
+        "tokens": tokens,
     }
 
 
-def do_tokens_match_tree(tree: Tree) -> None:
+def tokens_vs_tree_mismatches(tree: Tree) -> dict:
     """
     Check the tokens' parent and children match against the tree structure.
     """
@@ -117,16 +123,11 @@ def do_tokens_match_tree(tree: Tree) -> None:
         if node.parent:
             if isinstance(node.parent.data, TokenNodeData):
                 if node.token.parent != node.parent.token:
-                    print(
-                        "Different token parent for",
-                        node.data_id,
-                        "\n",
-                        node.token.parent,
-                        "\n",
-                        node.parent.token,
+                    memo["diff_parent"].append(
+                        f"Different token parent for {node.data_id}: {node.token.parent} vs {node.parent.token}"
                     )
         elif node.token.parent:
-            print("No parent for", node.data_id, node.token.parent)
+            memo["no_parent"].append(f"No parent for {node.data_id}: {node.token.parent}")
 
         if node.children:
             node_children_tokens = [
@@ -134,25 +135,24 @@ def do_tokens_match_tree(tree: Tree) -> None:
             ]
             token_children = [c for c in node.token.children]
             if node_children_tokens != token_children:
-                print(
-                    "Different token children for",
-                    node.data_id,
-                    "\n",
-                    node_children_tokens,
-                    "\n",
-                    token_children,
+                memo["diff_children"].append(
+                    f"Different token children for {node.data_id}: {node_children_tokens} vs {token_children}"
                 )
         elif node.token.children:
-            print("No children for", node.data_id, node.token.children)
+            memo["no_parent"].append(f"No parent for {node.data_id}: {node.token.children}")
 
-    tree.visit(validate_tokens)
+        # TODO: check tokens w.r.t. tree structure
+
+    memo: dict[str, list[str]] = defaultdict(list)
+    tree.visit(validate_tokens, memo=memo)
+    return memo
 
 
-def render_tree(tree: Tree, normalize: bool = True) -> str:
-    return render_branch(tree.system_root, normalize=normalize)
+def render_tree_as_md(tree: Tree, normalize: bool = True) -> str:
+    return render_subtree_as_md(tree.system_root, normalize=normalize)
 
 
-def render_branch(node: Node, normalize: bool = True) -> str:
+def render_subtree_as_md(node: Node, normalize: bool = True) -> str:
     """
     Render the node and its descendants (a subtree) to markdown text.
     Useful for creating markdown text for chunks.
@@ -179,26 +179,33 @@ def render_branch(node: Node, normalize: bool = True) -> str:
                     out_str.append("\n")
                     out_str.append(render(n.token))
             case "List":
+                if n.parent.data_type in ["ListItem"]:
+                    continue
                 if intro := intro_if_needed(n):
                     print(f"Appending Intro: {intro}")
                     out_str.append(intro)
-                if n.parent.data_type not in ["ListItem"]:
-                    # If the List is not a sublist, insert a blank line
-                    out_str.append("\n")
+                out_str.append("\n")
+                out_str.append(render(n.token))
+            #     if n.parent.data_type not in ["ListItem"]:
+            #         # If the List is not a sublist, insert a blank line
+            #         out_str.append("\n")
             case "ListItem":
-                token2 = copy(n.token)
-                # Exclude children that are List so that they are not rendered as part of this ListItem
-                # TODO: If it's possible to have children: [Paragraph, List, Paragraph], that's not handled well.
-                token2.children = [c for c in token2.children if c.type != "List"]
-                out_str.append(render(token2))
+                pass # TODO: handle split lists by copying list subtree, update tokens, and render nested block tokens via recursion
+            #     token2 = copy(n.token)
+            #     # Exclude children that are List so that they are not rendered as part of this ListItem
+            #     # TODO: If it's possible to have children: [Paragraph, List, Paragraph], that's not handled well.
+            #     token2.children = [c for c in token2.children if c.type != "List"]
+            #     out_str.append(render(token2))
             case "Table":
                 if intro := intro_if_needed(n):
                     out_str.append(intro)
                 out_str.append("\n")
-                out_str.append(render(n.token.header))
-                out_str.append("| " + " | ".join(n.token.header.sep_line) + " |\n")
-            case "TableRow":
                 out_str.append(render(n.token))
+                # out_str.append(render(n.token.header))
+                # out_str.append("| " + " | ".join(n.token.header.sep_line) + " |\n")
+            case "TableRow":
+                pass # TODO: same as ListItem TODO
+                # out_str.append(render(n.token))
             case _:
                 raise ValueError(f"Unexpected node type {n.data_type}: {n.data_id}")
 
@@ -222,8 +229,48 @@ def intro_if_needed(node: Node) -> str | None:
             return intro
     return None
 
+from difflib import SequenceMatcher
+from difflib import unified_diff
+import re
+
+def compare_markdowns(md1: str, md2: str) -> None:
+    with MarkdownRenderer(normalize_whitespace=False) as renderer:
+        # the parsing phase is currently tightly connected with initiation and closing of a renderer.
+        # Therefore, you should never call Document(...) outside of a with ... as renderer block,
+        # unless you know what you are doing.
+        doc = mistletoe.Document(md1)
+        out_md = renderer.render(doc)
+
+    fixed_content = []
+    content = re.sub(r"\n\n ([a-zA-Z\[])", r"\n\n\1", md1.rstrip(), flags=re.MULTILINE)
+    content = re.sub(r"\n\n\n\n", "\n\n", content.rstrip(), flags=re.MULTILINE)
+    content = re.sub(r"\n\n\n", "\n\n", content.rstrip(), flags=re.MULTILINE)
+    for line in content.splitlines():
+        if line.startswith("|"):
+            continue
+        if line.startswith("|---"):
+            continue
+
+        # fix = re.sub(r"^	\+ ", "    + ", line.rstrip())
+        # fix = re.sub(r"^\t\t- ", "        - ", fix.rstrip())
+        fix = re.sub(r"^\t\t\t", r"            ", line.rstrip())
+        fix = re.sub(r"^\t\t", r"        ", fix.rstrip())
+        fix = re.sub(r"^\t", r"    ", fix.rstrip())
+        fix = re.sub(r"^\t([0-9].) ", r"    \1 ", fix.rstrip())
+        fixed_content.append(fix)
+    # fixed_content = [line.rstrip() for line in content.splitlines() if not line.startswith("|")]
+    fixed_out = [line.rstrip() for line in out_md.splitlines() if not line.startswith("|")]
+
+    seq_match = SequenceMatcher(None, fixed_content, fixed_out)
+    ratio = seq_match.ratio()
+    print("match ratio:", ratio)
+
+    diff = unified_diff(fixed_content, fixed_out, lineterm='')
+    print('\n'.join(list(diff)))
 
 def _create_custom_md_renderer() -> MarkdownRenderer:
+    # MarkdownRenderer cannot render individual TableRow tokens without the Table token, so create a custom renderer
+    # TODO: Rename to render_table_row() and remove unnecessary render_map["TableRow"] or subclass MarkdownRenderer
     def custom_render_table_row(
         self: MarkdownRenderer, token: TableRow, max_line_length: int
     ) -> list[str]:
@@ -251,6 +298,7 @@ def _create_custom_md_renderer() -> MarkdownRenderer:
 #     "List": {"start", "loose"},
 #     # loose: indicates whether the list items are separated by blank lines
 #     # leader: The prefix number or bullet point
+#     # indentation: amount of indentation of the list item to capture original indents; but not the total indentation of the list
 #     "ListItem": {"indentation", "leader", , "loose", "prepend", , },
 
 
@@ -301,7 +349,7 @@ class MdNodeData:
     ONELINER_CONTENT_LIMIT = 100
 
     def content_oneliner(self) -> str:
-        content = self["collapsed_content_str"]
+        content = self["text_of_hidden_nodes"]
         if not content:
             content = getattr(self, "content", "")[: MdNodeData.ONELINER_CONTENT_LIMIT]
         return content
@@ -322,7 +370,7 @@ class TokenNodeData(MdNodeData):
         token.type = token.__class__.__name__
 
         if token.type == "TableCell":
-            # Use lowercase "tc" prefix b/c it's typically collapsed into TableRow like a span token
+            # Use lowercase "tc" prefix b/c it's typically hided into TableRow like a span token
             _id = f"tc{next(self.counter)}"
         elif self.is_block_token():
             _id = f"{self.get_id_prefix(token)}{token.line_number}"
@@ -401,33 +449,36 @@ class TokenNodeData(MdNodeData):
         return " ".join(oneliner) + (f": {content!r}" if content else "")
 
 
-# TODO: test these multiple times and compare resulting trees to ensure idempotency
-def collapse_span_tokens(tree: Tree) -> int:
-    collapse_counter = 0
+def hide_span_tokens(tree: Tree) -> int:
+    hide_counter = 0
     for node in tree.iterator(method=IterMethod.POST_ORDER):  # Depth-first-traversal, post-order
-        if not node.children or not node.is_block_token():
+        if (
+            not node.children
+            or not isinstance(node.data, TokenNodeData)
+            or not node.is_block_token()
+        ):
             continue
 
-        # Unless node is a TableRow, if any descendant is a BlockToken, then don't collapse.
         data_type = node.data_type
+        # Unless node is a TableRow, if any descendant is a BlockToken, then don't hide.
         if data_type in ["TableRow"]:
             # TODO: Address complex tables with BlockTokens nested in TableRows.
-            #   For now, collapse TableRow assuming it has no nested BlockTokens.
+            #   For now, allow TableRow's children to be hidden assuming it has no nested BlockTokens besides TableCell.
             pass
         elif any_descendant_of_type(node, lambda n: n.is_block_token()):
             continue
 
         # Ignore these data types
         if data_type in [
-            "TableCell",  # TableCell is collapsed into TableRow already
-            "Document",  # It doesn't make sense to collapse Document
+            "TableCell",  # TableCell will be hidden when the associated TableRow is processed
+            "Document",  # It doesn't make sense to hide Document's children
         ]:
             continue
 
-        logger.info("Collapsing %s with %i children", data_type, len(node.children))
-        # Create custom attribute to store the collapsed content so that tree.print() renders nicely
-        node.data["collapsed_content_str"] = textwrap.shorten(
-            node.data.render(), 50, placeholder="...(collapsed)", drop_whitespace=False
+        logger.info("Hiding %i children span-tokens under %s", len(node.children), data_type)
+        # Create custom attribute for the hidden text so that tree.print() renders some of the text
+        node.data["text_of_hidden_nodes"] = textwrap.shorten(
+            node.data.render(), 50, placeholder="...(hidden)", drop_whitespace=False
         )
 
         # Add raw text content for Heading nodes to use the text in heading breadcrumbs
@@ -436,22 +487,20 @@ def collapse_span_tokens(tree: Tree) -> int:
             node.data["raw_text"] = raw_text_node.token.content
 
         node.remove_children()
-        collapse_counter += 1
-    return collapse_counter
+        hide_counter += 1
+    return hide_counter
 
 
 def any_descendant_of_type(node: Node, does_match: Callable[[Node], bool]) -> Node:
     "Return the first descendant node that matches the does_match function"
 
     def any_matching_node(node: Node, memo: dict) -> None | StopTraversal:
-        print("Node.any_matching_node", node)
         if does_match(node):
             memo["matching_node"] = node
             return StopTraversal
         return None
 
     memo = {"matching_node": None}
-    print("Node.visit", node)
     if node.children:
         node.visit(any_matching_node, memo=memo)
     return memo["matching_node"]
@@ -513,7 +562,6 @@ def nest_heading_sections(tree: Tree) -> int:
         for i in range(heading_level + 1, len(heading_stack)):
             heading_stack[i] = None
         logger.debug("Current headings: %s", heading_stack[1:])
-        print("Current headings: %s" % heading_stack[1:])
 
         parent_hs_node = next(hs for hs in reversed(heading_stack[:heading_level]) if hs)
         if hs_node.parent != parent_hs_node:
@@ -557,7 +605,7 @@ def _add_intro_attrib(node: Node) -> bool:
 
             intro_md = prev_node.data["raw_text"] or prev_node.data.render()
             # Limit size of intro by using only the last sentence
-            node.data["intro"] = intro_md.split(".")[-1]
+            node.data["intro"] = intro_md.split(". ")[-1]
             logger.info("Added intro to %s: %r", node.data_id, node.data["intro"])
             return True
         else:
@@ -606,10 +654,6 @@ def get_parent_headings_md(node: Node) -> list[str]:
     return [f"{"#" * h.token.level} {h['raw_text']}" for h in get_parent_headings(node)]
 
 
-memo = defaultdict(list)
-chunk_counter = itertools.count(1)
-
-
 def capacity_used(markdown: str) -> float:
     return len(markdown) / 500
 
@@ -627,7 +671,7 @@ def branch_as_md(*nodes: Node) -> str:
     for node in nodes:
         node.data["force_intro"] = True
         if not (node_md := node.data["summary"]):
-            node_md = render_branch(node)
+            node_md = render_subtree_as_md(node)
         md_list.append(node_md)
         node.data["force_intro"] = False
     return normalize_markdown("\n\n".join(md_list))
@@ -641,9 +685,12 @@ def heading_breadcrumb_for(node: Node) -> str | None:
         return None
 
 
+all_chunks: dict[str, list[str]] = defaultdict(list)
+
+
 def create_chunk(md_str: str, *nodes: Node) -> None:
-    chunk_id = f"{next(chunk_counter)}:" + nodes[0].data_id
-    memo[chunk_id].append(md_str)
+    chunk_id = f"{len(all_chunks)}:" + nodes[0].data_id
+    all_chunks[chunk_id].append(md_str)
     for node in nodes:
         node.data["chunked"] = chunk_id
     # TODO: Copy node and children to a chunk tree
