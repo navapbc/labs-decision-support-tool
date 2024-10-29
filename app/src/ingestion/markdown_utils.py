@@ -382,7 +382,9 @@ class TokenNodeData(MdNodeData):
         # Provide single-line text content for referencing back to the markdown text
         content = self.content_oneliner()
         if not content:
-            if self.data_type in ["Heading", "Link", "TableRow"]:
+            if self.data_type == "BlankLine":
+                content = ""
+            elif self.data_type in ["Heading", "Link", "TableRow"]:
                 # Render these single-line types. Assume TableRow is a single line for now.
                 content = self.render()
             elif self.data_type in ["ListItem"]:
