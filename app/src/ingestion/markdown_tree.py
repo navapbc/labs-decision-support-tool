@@ -2,7 +2,7 @@ import itertools
 import logging
 import textwrap
 from collections import defaultdict
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable
 
 import mistletoe
 from mistletoe import block_token
@@ -189,46 +189,6 @@ def _intro_if_needed(node: Node) -> str | None:
     if (intro := node.data["intro"]) and node.data["show_intro"]:
         return f"({intro.strip()})"
     return None
-
-
-import re
-from difflib import SequenceMatcher, unified_diff
-
-
-def compare_markdowns(md1: str, md2: str) -> None:
-    with MarkdownRenderer(normalize_whitespace=False) as renderer:
-        # the parsing phase is currently tightly connected with initiation and closing of a renderer.
-        # Therefore, you should never call Document(...) outside of a with ... as renderer block,
-        # unless you know what you are doing.
-        doc = mistletoe.Document(md1)
-        out_md = renderer.render(doc)
-
-    fixed_content = []
-    content = re.sub(r"\n\n ([a-zA-Z\[])", r"\n\n\1", md1.rstrip(), flags=re.MULTILINE)
-    content = re.sub(r"\n\n\n\n", "\n\n", content.rstrip(), flags=re.MULTILINE)
-    content = re.sub(r"\n\n\n", "\n\n", content.rstrip(), flags=re.MULTILINE)
-    for line in content.splitlines():
-        if line.startswith("|"):
-            continue
-        if line.startswith("|---"):
-            continue
-
-        # fix = re.sub(r"^	\+ ", "    + ", line.rstrip())
-        # fix = re.sub(r"^\t\t- ", "        - ", fix.rstrip())
-        fix = re.sub(r"^\t\t\t", r"            ", line.rstrip())
-        fix = re.sub(r"^\t\t", r"        ", fix.rstrip())
-        fix = re.sub(r"^\t", r"    ", fix.rstrip())
-        fix = re.sub(r"^\t([0-9].) ", r"    \1 ", fix.rstrip())
-        fixed_content.append(fix)
-    # fixed_content = [line.rstrip() for line in content.splitlines() if not line.startswith("|")]
-    fixed_out = [line.rstrip() for line in out_md.splitlines() if not line.startswith("|")]
-
-    seq_match = SequenceMatcher(None, fixed_content, fixed_out)
-    ratio = seq_match.ratio()
-    print("match ratio:", ratio)
-
-    diff = unified_diff(fixed_content, fixed_out, lineterm="")
-    print("\n".join(list(diff)))
 
 
 #  TODO: Render footnotes in Document node
