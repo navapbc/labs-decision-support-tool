@@ -37,7 +37,7 @@ def create_markdown_tree(
     return tree
 
 
-def describe_markdown_as_json(markdown: str) -> str:
+def markdown_tokens_as_json(markdown: str) -> str:
     """
     For the given markdown, returns mistletoe's resulting Tokens as JSON.
     Useful for examining the tokens used to create nodes in a create_markdown_tree().
@@ -49,6 +49,7 @@ def describe_markdown_as_json(markdown: str) -> str:
 
 
 def normalize_markdown(markdown: str) -> str:
+    "Normalize the markdown text to ensure consistent parsing and rendering."
     with _new_md_renderer() as renderer:
         # "the parsing phase is currently tightly connected with initiation and closing of a renderer.
         # Therefore, you should never call Document(...) outside of a with ... as renderer block"
@@ -78,6 +79,8 @@ def _populate_nutree(parent: Node, token: Token) -> Node:
 
 def validate_tree(tree: Tree) -> None:
     for node in tree:
+        assert node.data.tree is tree
+        assert node.data.node is node
         assert (
             node.data_id == node.data.data_id
         ), f"Node {node.data_id!r} has mismatched data_id: {node.data_id!r} and {node.data.data_id!r}"
@@ -116,7 +119,10 @@ def describe_tree(tree: Tree) -> dict:
 
 
 def tokens_vs_tree_mismatches(tree: Tree) -> dict:
-    "Check the tokens' parent and children match against the tree structure."
+    """
+    Return the tokens' parent-and-children mismatches compared to the tree structure.
+    Use this as a sanity check after manipulating the tree structure.
+    """
     memo: dict[str, list[str]] = defaultdict(list)
     for node in tree:
         if node.data_type == "Document":
@@ -199,6 +205,11 @@ def _intro_if_needed(node: Node) -> str | None:
 
 
 class MdNodeData:
+    """
+    Node.data points to instances of this class.
+    I
+    """
+
     def __init__(
         self,
         data_type: str,
@@ -534,9 +545,14 @@ def get_parent_headings(node: Node) -> Iterable[TokenNodeData]:
     Check headings[i].token.level for the heading level, which may not be consecutive.
     """
     assert node.tree, f"Node {node.data_id} has no tree"
-    assert (
-        "nest_heading_sections" in node.tree.system_root.meta["prep_funcs"]
-    ), f"nest_heading_sections() must be called before get_parent_headings(): {node.tree.system_root.meta}"
+    for func in [
+        "hide_span_tokens",  # copies heading text to Heading nodes
+        "create_heading_sections",  # creates HeadingSections
+        "nest_heading_sections",  # creates a hierarchy of HeadingSections
+    ]:
+        assert (
+            func in node.tree.system_root.meta["prep_funcs"]
+        ), f"{func}() must be called before get_parent_headings(): {node.tree.system_root.meta}"
 
     # If the node is a Heading and it's parent is a HeadingSection, start with the HeadingSection node instead
     # so that the node will not be included in the returned list.

@@ -1,4 +1,6 @@
+import json
 import logging
+from io import StringIO
 
 import pytest
 from nutree import Tree
@@ -8,8 +10,13 @@ from src.ingestion.markdown_tree import (
     create_heading_sections,
     create_markdown_tree,
     describe_tree,
+    get_parent_headings_md,
+    get_parent_headings_raw,
     hide_span_tokens,
+    markdown_tokens_as_json,
     nest_heading_sections,
+    render_subtree_as_md,
+    render_tree_as_md,
     tokens_vs_tree_mismatches,
 )
 
@@ -137,11 +144,8 @@ def assert_tree_structure(tree: Tree):
 
 
 def test_create_markdown_tree(markdown_text):
-    tree = create_markdown_tree(markdown_text)
-    print(markdown_text)
-    tree.print()
-
-    tree_descr = assert_tree_structure(tree)
+    _tree = create_markdown_tree(markdown_text)
+    tree_descr = assert_tree_structure(_tree)
     parent_of = tree_descr["parents"]
     # These are true initially but will change after tree preparation
     assert parent_of["Heading"] == {"Document"}
@@ -161,14 +165,34 @@ def test_create_markdown_tree(markdown_text):
     assert children_of["TableRow"] == {"TableCell"}
     assert children_of["TableCell"] == {"RawText"}
 
-    doc_node = tree.children[0]
+    doc_node = _tree.children[0]
     assert len(doc_node.children) == 40
-    assert_content(tree)
-    assert len(tokens_vs_tree_mismatches(tree)) == 0
+    assert_content(_tree)
+    assert len(tokens_vs_tree_mismatches(_tree)) == 0
 
 
-def test_tree_preparation(markdown_text):
-    tree = create_markdown_tree(markdown_text)
+@pytest.fixture
+def tree(markdown_text):
+    return create_markdown_tree(markdown_text)
+
+
+def test_markdown_tokens_as_json(markdown_text):
+    json_str = markdown_tokens_as_json(markdown_text)
+    tokens = json.loads(json_str)
+    assert tokens["type"] == "Document"
+
+    assert tokens["children"][0]["type"] == "Paragraph"
+    assert tokens["children"][0]["children"][0]["type"] == "RawText"
+    assert (
+        tokens["children"][0]["children"][0]["content"]
+        == "This is the first paragraph with no heading."
+    )
+
+    assert tokens["children"][1]["type"] == "Heading"
+    assert tokens["children"][1]["children"][0]["content"] == "Heading 1"
+
+
+def test_tree_preparation(tree):
     tree_descr = assert_tree_structure(tree)
     assert tree_descr["counts"]["RawText"] > 0
     assert tree_descr["counts"]["Strong"] > 0
@@ -254,3 +278,68 @@ def test_tree_preparation(markdown_text):
         assert table_node.data["intro"] == "Table intro:\n"
 
         assert_content(tree)
+
+
+def test_subtree_rendering(tree):
+    md = render_tree_as_md(tree)
+    # Check that various markdown elements are present in the rendered text
+    assert "This is the first paragraph with no heading." in md
+    assert "# Second H1 without a paragraph" in md
+    assert "Paragraph 1 under Heading 2 with [a link](http://to.nowhere.com)." in md
+    assert "Paragraph H3.p1, sentence 4. Last sentence." in md
+    assert "| H3.2.T1: row 2, col 3 |" in md
+    assert "* Item H1>H3.L1.2" in md
+    assert "  * Item H1>H3.L1.subL.3" in md
+    assert "Final paragraph." in md
+
+    hide_span_tokens(tree)
+    create_heading_sections(tree)
+    nest_heading_sections(tree)
+    add_list_and_table_intros(tree)
+    heading_section_md = render_subtree_as_md(tree["_S2_10"])
+    assert "## Heading 2" in heading_section_md
+    assert "under Heading 2 with [a link](http://to.nowhere.com)." in heading_section_md
+    assert "* Item H2.3.L1.1" in heading_section_md
+    assert "### Heading 3" in heading_section_md
+    assert "| H3.2.T1: header 1     | H3.2.T1: header 2" in heading_section_md
+
+
+def test_get_parent_headings(tree):
+    hide_span_tokens(tree)  # copies heading text to Heading nodes
+    create_heading_sections(tree)  # creates HeadingSections used by get_parent_headings()
+    nest_heading_sections(tree)  # creates a hierarchy of HeadingSections
+
+    table_node = tree.find_first(match=lambda n: n.data_type == "Table")
+    headings = get_parent_headings_md(tree[table_node.data_id])
+    assert headings == ["# Heading 1", "## Heading 2", "### Heading 3"]
+
+    assert tree["H3_22"].data_type == "Heading"
+    assert tree["H3_22"].token.level == 3
+    # tree["_S3_22"] is a level 3 Heading
+    headings = get_parent_headings_md(tree["H3_22"])
+    # The result should not include the level 3 Heading itself
+    assert headings == ["# Heading 1", "## Heading 2"]
+
+    headings = get_parent_headings_md(tree["LI_42"])
+    assert headings == ["# Second H1 without a paragraph", "### Skip to H3"]
+
+    headings = get_parent_headings_raw(tree["LI_42"])
+    assert headings == ["Second H1 without a paragraph", "Skip to H3"]
+
+
+def test_MdNodeData_repr(tree):
+    hide_span_tokens(tree)
+    create_heading_sections(tree)
+    nest_heading_sections(tree)
+    io = StringIO()
+    tree.print(file=io)
+    out_str = io.getvalue()
+
+    # Spot check a few lines
+    assert "Tree<'Markdown tree'>" in out_str
+    assert "╰── Document D_1:" in out_str
+    assert "    ├── Paragraph P_2 of length" in out_str
+    assert "    ├── HeadingSection _S1_4 with 7 children" in out_str
+    assert "    │   ╰── HeadingSection _S2_10 with 11 children" in out_str
+    assert "    │       ├── List L_18: '<mistletoe.block" in out_str
+    assert "    │       │   ├── ListItem LI_18: \"'* Item H2.3.L1.1" in out_str
