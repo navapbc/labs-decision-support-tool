@@ -39,3 +39,6 @@ documents/
 
 .ipynb_checkpoints
 
+# Chainlit translation files
+.chainlit/translations/*.json
+!.chainlit/translations/en-US.json

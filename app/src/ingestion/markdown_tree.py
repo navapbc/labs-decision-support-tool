@@ -2,7 +2,7 @@ import itertools
 import logging
 import textwrap
 from collections import defaultdict
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable
 
 import mistletoe
 from mistletoe import block_token
@@ -37,7 +37,7 @@ def create_markdown_tree(
     return tree
 
 
-def describe_markdown_as_json(markdown: str) -> str:
+def markdown_tokens_as_json(markdown: str) -> str:
     """
     For the given markdown, returns mistletoe's resulting Tokens as JSON.
     Useful for examining the tokens used to create nodes in a create_markdown_tree().
@@ -49,6 +49,7 @@ def describe_markdown_as_json(markdown: str) -> str:
 
 
 def normalize_markdown(markdown: str) -> str:
+    "Normalize the markdown text to ensure consistent parsing and rendering."
     with _new_md_renderer() as renderer:
         # "the parsing phase is currently tightly connected with initiation and closing of a renderer.
         # Therefore, you should never call Document(...) outside of a with ... as renderer block"
@@ -78,6 +79,8 @@ def _populate_nutree(parent: Node, token: Token) -> Node:
 
 def validate_tree(tree: Tree) -> None:
     for node in tree:
+        assert node.data.tree is tree
+        assert node.data.node is node
         assert (
             node.data_id == node.data.data_id
         ), f"Node {node.data_id!r} has mismatched data_id: {node.data_id!r} and {node.data.data_id!r}"
@@ -116,7 +119,10 @@ def describe_tree(tree: Tree) -> dict:
 
 
 def tokens_vs_tree_mismatches(tree: Tree) -> dict:
-    "Check the tokens' parent and children match against the tree structure."
+    """
+    Return the tokens' parent-and-children mismatches compared to the tree structure.
+    Use this as a sanity check after manipulating the tree structure.
+    """
     memo: dict[str, list[str]] = defaultdict(list)
     for node in tree:
         if node.data_type == "Document":
@@ -191,46 +197,6 @@ def _intro_if_needed(node: Node) -> str | None:
     return None
 
 
-import re
-from difflib import SequenceMatcher, unified_diff
-
-
-def compare_markdowns(md1: str, md2: str) -> None:
-    with MarkdownRenderer(normalize_whitespace=False) as renderer:
-        # the parsing phase is currently tightly connected with initiation and closing of a renderer.
-        # Therefore, you should never call Document(...) outside of a with ... as renderer block,
-        # unless you know what you are doing.
-        doc = mistletoe.Document(md1)
-        out_md = renderer.render(doc)
-
-    fixed_content = []
-    content = re.sub(r"\n\n ([a-zA-Z\[])", r"\n\n\1", md1.rstrip(), flags=re.MULTILINE)
-    content = re.sub(r"\n\n\n\n", "\n\n", content.rstrip(), flags=re.MULTILINE)
-    content = re.sub(r"\n\n\n", "\n\n", content.rstrip(), flags=re.MULTILINE)
-    for line in content.splitlines():
-        if line.startswith("|"):
-            continue
-        if line.startswith("|---"):
-            continue
-
-        # fix = re.sub(r"^	\+ ", "    + ", line.rstrip())
-        # fix = re.sub(r"^\t\t- ", "        - ", fix.rstrip())
-        fix = re.sub(r"^\t\t\t", r"            ", line.rstrip())
-        fix = re.sub(r"^\t\t", r"        ", fix.rstrip())
-        fix = re.sub(r"^\t", r"    ", fix.rstrip())
-        fix = re.sub(r"^\t([0-9].) ", r"    \1 ", fix.rstrip())
-        fixed_content.append(fix)
-    # fixed_content = [line.rstrip() for line in content.splitlines() if not line.startswith("|")]
-    fixed_out = [line.rstrip() for line in out_md.splitlines() if not line.startswith("|")]
-
-    seq_match = SequenceMatcher(None, fixed_content, fixed_out)
-    ratio = seq_match.ratio()
-    print("match ratio:", ratio)
-
-    diff = unified_diff(fixed_content, fixed_out, lineterm="")
-    print("\n".join(list(diff)))
-
-
 #  TODO: Render footnotes in Document node
 #     # https://www.markdownguide.org/extended-syntax/#footnotes
 #     # Footnote definitions can be found anywhere in the document,
@@ -239,6 +205,11 @@ def compare_markdowns(md1: str, md2: str) -> None:
 
 
 class MdNodeData:
+    """
+    Node.data points to instances of this class.
+    I
+    """
+
     def __init__(
         self,
         data_type: str,
@@ -574,9 +545,14 @@ def get_parent_headings(node: Node) -> Iterable[TokenNodeData]:
     Check headings[i].token.level for the heading level, which may not be consecutive.
     """
     assert node.tree, f"Node {node.data_id} has no tree"
-    assert (
-        "nest_heading_sections" in node.tree.system_root.meta["prep_funcs"]
-    ), f"nest_heading_sections() must be called before get_parent_headings(): {node.tree.system_root.meta}"
+    for func in [
+        "hide_span_tokens",  # copies heading text to Heading nodes
+        "create_heading_sections",  # creates HeadingSections
+        "nest_heading_sections",  # creates a hierarchy of HeadingSections
+    ]:
+        assert (
+            func in node.tree.system_root.meta["prep_funcs"]
+        ), f"{func}() must be called before get_parent_headings(): {node.tree.system_root.meta}"
 
     # If the node is a Heading and it's parent is a HeadingSection, start with the HeadingSection node instead
     # so that the node will not be included in the returned list.
@@ -602,4 +578,3 @@ def get_parent_headings_raw(node: Node) -> list[str]:
 def get_parent_headings_md(node: Node) -> list[str]:
     "Returns the markdown text of node's parent headings in level order, which may not be consecutive"
     return [f"{"#" * h.token.level} {h['raw_text']}" for h in get_parent_headings(node)]
-
