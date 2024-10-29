@@ -79,7 +79,7 @@ def _populate_nutree(parent: Node, token: Token) -> Node:
 
 
 def validate_tree(tree: Tree) -> None:
-    def validate_node(node: Node, memo: dict) -> None:
+    for node in tree:
         assert (
             node.data_id == node.data.data_id
         ), f"Node {node.data_id!r} has mismatched data_id: {node.data_id!r} and {node.data.data_id!r}"
@@ -94,8 +94,6 @@ def validate_tree(tree: Tree) -> None:
                 == node.data.token.type
                 == node.data.token.__class__.__name__
             ), f"Node {node.data_id!r} has mismatched data_type: {node.data.data_type!r} and {node.data.token.type!r}"
-
-    tree.visit(validate_node)
 
 
 def describe_tree(tree: Tree) -> dict:
@@ -120,15 +118,13 @@ def describe_tree(tree: Tree) -> dict:
 
 
 def tokens_vs_tree_mismatches(tree: Tree) -> dict:
-    """
-    Check the tokens' parent and children match against the tree structure.
-    """
-
-    def validate_tokens(node: Node, memo: dict) -> None:
+    "Check the tokens' parent and children match against the tree structure."
+    memo: dict[str, list[str]] = defaultdict(list)
+    for node in tree:
         if node.data_type == "Document":
-            return
+            continue
         if not isinstance(node.data, TokenNodeData) or not node.is_block_token():
-            return
+            continue
 
         if node.parent:
             if isinstance(node.parent.data, TokenNodeData):
@@ -143,10 +139,9 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
             node_children_tokens = [
                 c.token for c in node.children if isinstance(c.data, TokenNodeData)
             ]
-            token_children = [c for c in node.token.children]
-            if node_children_tokens != token_children:
+            if node_children_tokens != node.token.children:
                 memo["diff_children"].append(
-                    f"Different token children for {node.data_id}: {node_children_tokens} vs {token_children}"
+                    f"Different token children for {node.data_id}: {node_children_tokens} vs {node.token.children}"
                 )
         elif node.token.children:
             token_children = [
@@ -158,9 +153,6 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
                 memo["has_children"].append(
                     f"Token has block-token children for {node.data_id}: {token_children}"
                 )
-
-    memo: dict[str, list[str]] = defaultdict(list)
-    tree.visit(validate_tokens, memo=memo)
     return memo
 
 
@@ -425,7 +417,7 @@ def hide_span_tokens(tree: Tree) -> int:
             # TODO: Address complex tables with BlockTokens nested in TableRows.
             #   For now, allow TableRow's children to be hidden assuming it has no nested BlockTokens besides TableCell.
             pass
-        elif any_descendant_of_type(node, lambda n: n.is_block_token()):
+        elif node.find_first(match=lambda n: n.is_block_token()):
             continue
 
         # Ignore these data types
@@ -443,8 +435,9 @@ def hide_span_tokens(tree: Tree) -> int:
 
         # Add raw text content for Heading nodes to use the text in heading breadcrumbs
         if data_type == "Heading":
-            raw_text_node = any_descendant_of_type(node, lambda n: n.data_type == "RawText")
-            node.data["raw_text"] = raw_text_node.token.content
+            raw_text_nodes = node.find_all(match=lambda n: n.data_type == "RawText")
+            assert len(raw_text_nodes) == 1, f"Expected 1 RawText node for {node.data_id}"
+            node.data["raw_text"] = raw_text_nodes[0].token.content
 
         # Ensure node.token.children tokens are never removed
         node.data["freeze_token_children"] = True
@@ -453,21 +446,6 @@ def hide_span_tokens(tree: Tree) -> int:
 
     tree.system_root.meta["prep_funcs"].append("hide_span_tokens")
     return hide_counter
-
-
-def any_descendant_of_type(node: Node, does_match: Callable[[Node], bool]) -> Node:
-    "Return the first descendant node that matches the does_match function"
-
-    def any_matching_node(node: Node, memo: dict) -> None | StopTraversal:
-        if does_match(node):
-            memo["matching_node"] = node
-            return StopTraversal
-        return None
-
-    memo = {"matching_node": None}
-    if node.children:
-        node.visit(any_matching_node, memo=memo)
-    return memo["matching_node"]
 
 
 def create_heading_sections(tree: Tree) -> int:
@@ -700,12 +678,10 @@ all_chunks: dict[str, Chunk] = {}
 
 def chunk_tree(tree: Tree):
     all_chunks.clear()
-
-    def reset_chunked(n, memo):
+    for n in tree:
         n.data["chunked"] = None
         n.data["summary"] = None
 
-    tree.visit(reset_chunked)
     hierarchically_chunk_nodes(tree.first_child())
     return all_chunks
 
@@ -742,24 +718,21 @@ def copy_subtree(node: Node) -> Tree:
     # For some reason, copy_to() assigns a random data_id to the new node in subtree
     node.copy_to(subtree, deep=True)
 
-    # copy_node_data() set the data_id back to the original, along with creating copies of objects
-    def copy_node_data(node: Node, memo: dict) -> None:
-        node.set_data(copy(node.data), data_id=node.data.data_id)
-        node.data.tree = subtree
-        if isinstance(node.data, TokenNodeData):
-            are_tokens_frozen = node.data["freeze_token_children"] or find_closest_ancestor(
-                node,
-                lambda n: isinstance(n.data, TokenNodeData) and n.data["freeze_token_children"],
+    # Set the data_id back to the original, along with creating copies of objects
+    for n in subtree:
+        n.set_data(copy(n.data), data_id=n.data.data_id)
+        n.data.tree = subtree
+        if isinstance(n.data, TokenNodeData):
+            are_tokens_frozen = n.data["freeze_token_children"] or find_closest_ancestor(
+                n,
+                lambda p: isinstance(p.data, TokenNodeData) and p.data["freeze_token_children"],
             )
             # Why check for are_tokens_frozen? Because calling copy() on Paragraph tokens doesn't work.
             # Fortunately if we use "freeze_token_children", then we don't need to copy Paragraph tokens
             if not are_tokens_frozen:
-                node.data.token = copy(node.data.token)
+                n.data.token = copy(n.data.token)
 
-    subtree.visit(copy_node_data)
-    assert subtree[
-        node.data_id
-    ], f"Expected {node.data_id!r} in new tree for {subtree.first_child()}"
+    assert subtree[node.data_id], f"Expected data_id {node.data_id!r} for {subtree.first_child()}"
     # Now that node.data and node.data.token are no longer pointing to objects in the original tree, we can modify them
     update_tokens(subtree.system_root)
     return subtree
@@ -775,14 +748,11 @@ def find_closest_ancestor(node: Node, does_match: Callable[[Node], bool]) -> Nod
 
 
 def update_tokens(node: Node):
-    def update_token_children(n: Node, memo):
-        if isinstance(n.data, TokenNodeData):
-            if not n.data["freeze_token_children"]:
-                n.data.token.children = [
-                    c.token for c in n.children if isinstance(c.data, TokenNodeData)
-                ]
-
-    node.visit(update_token_children, add_self=True)
+    for n in node.iterator(add_self=True):
+        if isinstance(n.data, TokenNodeData) and not n.data["freeze_token_children"]:
+            n.data.token.children = [
+                c.token for c in n.children if isinstance(c.data, TokenNodeData)
+            ]
 
 
 def hierarchically_chunk_nodes(
