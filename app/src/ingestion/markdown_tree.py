@@ -47,7 +47,7 @@ def create_markdown_tree(
     if normalize_md:
         markdown = normalize_markdown(markdown)
     with _new_md_renderer():
-        # Never call Document(...) outside of a with ... as renderer block"
+        # "Never call Document(...) outside of a with ... as renderer block"
         # Otherwise, markdown_renderer.BlankLine will not be created
         doc = mistletoe.Document(markdown)
     # The shadow_attrs=True argument allows accessing node.data.age as node.age -- see validate_tree()
@@ -70,7 +70,7 @@ def markdown_tokens_as_json(markdown: str) -> str:
 
 
 def normalize_markdown(markdown: str) -> str:
-    "Normalize the markdown text to ensure consistent parsing and rendering."
+    "Markdown includes multiple ways of specifying headers, etc. Normalize the markdown text to a consistent standard to ensure consistent parsing and rendering."
     with _new_md_renderer() as renderer:
         # "the parsing phase is currently tightly connected with initiation and closing of a renderer.
         # Therefore, you should never call Document(...) outside of a with ... as renderer block"
@@ -228,7 +228,6 @@ def _intro_if_needed(node: Node) -> str | None:
 class MdNodeData:
     """
     Node.data points to instances of this class.
-    I
     """
 
     def __init__(
