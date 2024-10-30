@@ -1,8 +1,10 @@
+import json
 import logging
 import os
 from typing import Any
 
 from litellm import completion
+from pydantic import BaseModel
 
 from src.app_config import app_config
 
@@ -18,16 +20,29 @@ Provide answers in plain language using plainlanguage.gov guidelines.
 - Keep your answers brief, a maximum of 5 sentences.
 - Keep your answers as similar to your knowledge text as you can.
 
+If the original question is in a language other than English, please provide your answer in the language of the original question.
+
 When referencing the context, do not quote directly.
 Use the provided citation numbers (e.g., (citation-1)) to indicate when you are drawing from the context.
-To cite multiple sources at once, you can append citations like so: (citation-1)(citation-2), etc.
-Place the citations after any closing punctuation for the sentence.
-For example: 'This is a sentence that draws on information from the context. (citation-1)'
+To cite multiple sources at once, you can append citations like so: (citation-1) (citation-2), etc.
+Place the citations immediately AFTER any closing punctuation for the sentence.
+For example: 'This is a sentence that draws on information from the context.(citation-1)'
+Do NOT place the citations BEFORE the closing punctuation, or add a space between the sentence and the citation.
 
 Example Answer:
 If the client lost their job at no fault, they may be eligible for unemployment insurance benefits. For example:
-- They may qualify if they were laid off due to lack of work. (citation-1)
-- They might be eligible if their hours were significantly reduced. (citation-2)
+- They may qualify if they were laid off due to lack of work.(citation-1) (citation-2)
+- They might be eligible if their hours were significantly reduced.(citation-3)
+"""
+
+ANALYZE_MESSAGE_PROMPT = """
+Analyze the user's message to determine how to respond.
+Reply with a JSON dictionary.
+Set original_language to the language of the user's message.
+If the user's message is in English, set is_in_english to true.
+Otherwise, set is_in_english to false and set message_in_english with the translation of the query into English.
+If the question would be easier to answer with additional policy or program context (such as policy documentation), set needs_context bool to True.
+Otherwise, set needs_context to false.
 """
 
 
@@ -58,6 +73,7 @@ def generate(
     llm: str,
     system_prompt: str,
     query: str,
+    requested_language: str,
     context_text: str | None = None,
     chat_history: list[dict[str, str]] | None = None,
 ) -> str:
@@ -86,7 +102,10 @@ def generate(
         messages.extend(chat_history)
 
     messages.append({"content": query, "role": "user"})
-    logger.info("Calling %s for query: %s with context:\n%s", llm, query, context_text)
+    messages.append(
+        {"content": f"Please translate your answer into {requested_language}", "role": "system"}
+    )
+    logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
     response = completion(
         model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
     )
@@ -98,3 +117,38 @@ def completion_args(llm: str) -> dict[str, Any]:
     if llm.startswith("ollama/"):
         return {"api_base": os.environ["OLLAMA_HOST"]}
     return {}
+
+
+class MessageAttributes(BaseModel):
+    original_language: str
+    is_in_english: bool
+    message_in_english: str
+    needs_context: bool
+
+
+def analyze_message(llm: str, message: str) -> MessageAttributes:
+    response = (
+        completion(
+            model=llm,
+            messages=[
+                {
+                    "content": ANALYZE_MESSAGE_PROMPT,
+                    "role": "system",
+                },
+                {
+                    "content": message,
+                    "role": "user",
+                },
+            ],
+            response_format=MessageAttributes,
+            temperature=app_config.temperature,
+            **completion_args(llm),
+        )
+        .choices[0]
+        .message.content
+    )
+
+    logger.info("Analyzed message: %s", response)
+
+    response_as_json = json.loads(response)
+    return MessageAttributes.model_validate(response_as_json)
