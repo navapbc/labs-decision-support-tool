@@ -2,7 +2,7 @@ import logging
 import textwrap
 from copy import copy
 from dataclasses import dataclass
-from typing import Callable, Iterable, Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 from nutree import Node, Tree
 
@@ -32,6 +32,7 @@ def shorten(body: str, char_limit: int, placeholder: str = "...", max_lines: int
 
 
 def copy_subtree(node: Node) -> Tree:
+    logger.info("Creating new tree from subtree for %s", node.data_id)
     subtree = Tree(f"{node.data_id} subtree", shadow_attrs=True)
     # Copy the nodes and descendants; this does not deep-copy node.data objects
     # For some reason, copy_to() assigns a random data_id to the new node in subtree
@@ -65,6 +66,23 @@ def copy_subtree(node: Node) -> Tree:
     return subtree
 
 
+def remove_child(node: Node, child: Node) -> None:
+    logger.info("Removing child %s from %s", child.data_id, node.data_id)
+    # Update node.token.children since that's used for rendering
+    node.data.token.children.remove(child.data.token)
+    # Then remove the child from the tree
+    child.remove()
+
+
+def remove_children_from(node: Node, child_data_ids: set[str]) -> None:
+    "Remove children nodes with data_id in child_data_ids from node"
+    # Do not remove children while iterating through them
+    # Create a list of child nodes to remove, then remove them
+    nodes_to_remove = [c for c in node.children if c.data_id in child_data_ids]
+    for child_node in nodes_to_remove:
+        remove_child(node, child_node)
+
+
 def find_closest_ancestor(node: Node, does_match: Callable[[Node], bool]) -> Node:
     "Return the first parent/ancestor node that matches the does_match function"
     while node.parent:
@@ -74,22 +92,36 @@ def find_closest_ancestor(node: Node, does_match: Callable[[Node], bool]) -> Nod
     return None
 
 
+def nodes_as_markdown(nodes: Sequence[Node]) -> str:
+    # Don't render Heading nodes by themselves
+    if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
+        return ""
+
+    md_list: list[str] = []
+    for node in nodes:
+        # node.data["summary"] is set when node is chunked
+        node_md = node.data["summary"] or render_subtree_as_md(node, normalize=True)
+        md_list.append(node_md)
+    return normalize_markdown("".join(md_list))
+
+
 @dataclass
 class ProtoChunk:
+    "Temporary data structure for storing chunk data before creating a Chunk object"
     id: str
     headings: list[str]
     markdown: str  # Markdown content of the chunk
-    # to_embed: str  # string to embed
+    # to_embed: str  # TODO: create string to embed from headings and markdown
 
 
 class ChunkingConfig:
 
-    def __init__(self, max_char_length: int) -> None:
-        self.max_char_length = max_char_length
+    def __init__(self, max_length: int) -> None:
+        self.max_length = max_length
         self.chunks: dict[str, ProtoChunk] = {}
 
     def fits_in_chunk(self, markdown: str) -> bool:
-        return len(markdown) < self.max_char_length
+        return len(markdown.split()) < self.max_length
 
     def nodes_fit_in_chunk(self, nodes: Sequence[Node]) -> bool:
         return self.fits_in_chunk(nodes_as_markdown(nodes))
@@ -109,15 +141,17 @@ class ChunkingConfig:
             nodes_as_markdown(nodes),
         )
         print(
-            f"Created chunk {chunk_id}: {len(nodes)} nodes, len {len(chunk.markdown)}: {shorten(chunk.markdown, 120)!r}"
+            f"Created chunk {chunk_id}: {len(nodes)} nodes, len {len(chunk.markdown.split())}: {shorten(chunk.markdown, 120)!r}"
         )
         if not self.fits_in_chunk(chunk.markdown):
-            raise AssertionError(f"{chunk_id} Too long {len(chunk.markdown)}: {chunk.markdown}")
+            raise AssertionError(
+                f"{chunk_id} Too long {len(chunk.markdown.split())}: {chunk.markdown}"
+            )
         self.chunks[chunk.id] = chunk
         return chunk
 
     def create_chunks_for_next_nodes(self, node: Node, intro_node: Optional[Node] = None) -> None:
-        # TODO: Handle this case by splitting the 2 nodes (optional intro node + other node) into smaller chunks
+        # TODO: Splitting the contents of the 2 nodes into chunks
         raise AssertionError(
             f"{node.parent.data_id}: These node(s) cannot fit into a single chunk:"
             f" {node.data_id} {intro_node.data_id if intro_node else ''}"
@@ -130,19 +164,6 @@ class ChunkingConfig:
             shorten(node.render().splitlines()[0], 100, placeholder="...")
             + f" (SUMMARY of {node.data_id})\n"
         )
-
-
-def nodes_as_markdown(nodes: Sequence[Node]) -> str:
-    # Don't render Heading nodes by themselves
-    if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
-        return ""
-
-    md_list: list[str] = []
-    for node in nodes:
-        # node.data["summary"] is set when node is chunked
-        node_md = node.data["summary"] or render_subtree_as_md(node, normalize=True)
-        md_list.append(node_md)
-    return normalize_markdown("".join(md_list))
 
 
 def chunk_tree(tree: Tree, config: ChunkingConfig) -> None:
@@ -182,30 +203,35 @@ def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
 def split_lt_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["List", "Table"]
     print(f"Splitting into chunks: {node.id_string}")
-    # FIXME: determine size of each split using fits_in_chunk()
-    splits = _partition_list(list(map(lambda c: c.data_id, node.children)), 2)
-    for i, split in enumerate(splits):
-        # Copy the whole subtree, then remove children not in the split
+
+    def create_new_tree(children_ids: set[str]) -> Node:
+        "Create a new tree keeping only the children in children_ids"
         subtree = copy_subtree(node)
-        block_node = subtree.first_child()
+        subtree.print()
+        block_node = subtree.first_child()  # the List or Table node
         # show_intro should be True since block_node's content is being split
         block_node.data["show_intro"] = True
+        to_remove = {c.data_id for c in block_node.children} - children_ids
+        remove_children_from(block_node, to_remove)
+        assert {c.data_id for c in block_node.children} == children_ids
+        return block_node
 
-        nodes_to_remove = [
-            child_node for child_node in block_node.children if child_node.data_id not in split
-        ]
-        for not_in_split in nodes_to_remove:
-            block_node.token.children.remove(not_in_split.token)
-            not_in_split.remove()
+    chunks_to_create: list[list[Node]] = []
+    children_ids = {c.data_id for c in node.children}
+    # Copy the node's subtree, then gradually remove the last children until the content fits
+    while children_ids:  # Repeat until all the children are in some chunk
+        block_node = create_new_tree(children_ids)
+        while not config.nodes_fit_in_chunk([block_node]) and block_node.has_children():
+            remove_child(block_node, block_node.last_child())
 
-        chunk_id_suffix = f"{block_node.data_id}[{i}]:{block_node.first_child().data_id}"
-        config.create_chunk([block_node], chunk_id_suffix=chunk_id_suffix, breadcrumb_node=node)
-
-
-def _partition_list(lst: list[Node], n: int) -> Iterable[list[Node]]:
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i : i + n]
+        if block_node.has_children():
+            chunks_to_create.append([block_node])
+            for child_node in block_node.children:
+                children_ids.remove(child_node.data_id)
+        else:
+            block_node.tree.print()
+            raise AssertionError(f"{block_node.data_id} should have at least one child")
+    _create_chunks(config, node, chunks_to_create)
 
 
 def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> None:
@@ -216,7 +242,8 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
         ", ".join([c.data_id for c in node.children if c.data_type != "BlankLine"]),
     )
     # Iterate through each child node, adding them to node_buffer
-    # Before chunk capacity is exceeded, flush node_buffer to a chunk.
+    # Before chunk capacity is exceeded, designate node_buffer to be used as a chunk
+    # and assign node_buffer to a new list.
     # At any time, the contents of node_buffer should fit into a chunk,
     # so check if nodes_fit_in_chunk(node_buffer + [nodes]) before adding to node_buffer.
     node_buffer: list[Node] = []
@@ -258,22 +285,23 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                 # 1. put node_buffer in its own chunk
                 if node_buffer:
                     # Create a chunk with the current node_buffer contents
-                    chunks_to_create.append(node_buffer.copy())
-                    # and reset node_buffer
+                    chunks_to_create.append(node_buffer)
+                    # and reset node_buffer to a new list
                     node_buffer = []
 
                 # 2. Handle next_nodes
                 # Check if next_nodes can be the new node_buffer
                 if config.nodes_fit_in_chunk(next_nodes):
-                    # Reset and initialize node_buffer with next_nodes
+                    # Reset node_buffer to be next_nodes
                     node_buffer = next_nodes
                 else:  # next_nodes needs to be split into multiple chunks
+                    assert {c, intro_paragraph_node} == set(next_nodes)
                     config.create_chunks_for_next_nodes(c, intro_paragraph_node)
                     node_buffer = []
 
     if node_buffer:  # Create a chunk with the remaining nodes
         if config.nodes_fit_in_chunk(node_buffer):
-            chunks_to_create.append(node_buffer.copy())
+            chunks_to_create.append(node_buffer)
         else:
             raise AssertionError(
                 "Should not occur since nothing should be added to node_buffer that would exceed chunk capacity."
@@ -283,12 +311,20 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
 
 
 def _create_chunks(config: ChunkingConfig, node: Node, chunks_to_create: list[list[Node]]) -> None:
-    if len(chunks_to_create) > 1:
+    "Create chunks based on chunks_to_create, which are some partitioning of node's children"
+    if len(chunks_to_create) == 1:
+        config.create_chunk(chunks_to_create[0])
+    else:
         for i, chunk_nodes in enumerate(chunks_to_create):
+            # Make sure first_node is different from node. They can be the same when splitting Lists and Tables.
+            first_node_id = (
+                chunk_nodes[0].first_child().data_id
+                if chunk_nodes[0].data_id == node.data_id
+                else chunk_nodes[0].data_id
+            )
             # The chunk id identifies the node being split, the split number, and the first node in the chunk
             config.create_chunk(
-                chunk_nodes, chunk_id_suffix=f"{node.data_id}[{i}]:{chunk_nodes[0].data_id}"
+                chunk_nodes,
+                chunk_id_suffix=f"{node.data_id}[{i}]:{first_node_id}",
+                breadcrumb_node=node,
             )
-    else:
-        assert len(chunks_to_create) == 1
-        config.create_chunk(chunks_to_create[0])

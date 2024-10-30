@@ -27,9 +27,9 @@ def prepped_tree(markdown_text) -> Tree:  # noqa: F811
 
 
 def test_chunk_tree(prepped_tree):
-    config = ChunkingConfig(430)
+    config = ChunkingConfig(60)
     chunk_tree(prepped_tree, config)
     prepped_tree.print()
-    pprint(config.chunks, sort_dicts=False, width=120)
+    pprint(config.chunks, sort_dicts=False, width=160)
     print(len(config.chunks))
     sum(len(c.markdown) for c in config.chunks.values())
