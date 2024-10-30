@@ -62,6 +62,9 @@ def copy_subtree(node: Node) -> Tree:
             n.data.token.children = [
                 c.token for c in n.children if isinstance(c.data, TokenNodeData)
             ]
+            for c in n.data.token.children:
+                # token.parent was indirectly updated when token.children was set
+                assert c.parent == n.data.token
     # At this point, no object in the subtree should be pointing to objects in the original tree,
     # except for tokens associated with "freeze_token_children". We are free to modify the subtree.
     return subtree
@@ -313,7 +316,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
         if config.nodes_fit_in_chunk(node_buffer):
             chunks_to_create.append(node_buffer)
         else:
-            raise AssertionError(f"node_buffer should always fit {node_buffer}")
+            raise AssertionError(f"node_buffer should always fit: {node_buffer}")
 
     _create_chunks(config, node, chunks_to_create)
 
