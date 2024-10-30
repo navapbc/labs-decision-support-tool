@@ -102,9 +102,12 @@ def generate(
         messages.extend(chat_history)
 
     messages.append({"content": query, "role": "user"})
+
+    # Without this direction, OpenAI's GPT-4o will sometimes ignore the original language and respond in English.
     messages.append(
         {"content": f"Please translate your answer into {requested_language}", "role": "system"}
     )
+
     logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
     response = completion(
         model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
