@@ -337,9 +337,9 @@ def test_MdNodeData_repr(tree):
 
     # Spot check a few lines
     assert "Tree<'Markdown tree'>" in out_str
-    assert "╰── Document D_1:" in out_str
+    assert "╰── Document D_1 line_number=1" in out_str
     assert "    ├── Paragraph P_2 of length" in out_str
     assert "    ├── HeadingSection _S1_4 with 7 children" in out_str
     assert "    │   ╰── HeadingSection _S2_10 with 11 children" in out_str
-    assert "    │       ├── List L_18: '<mistletoe.block" in out_str
+    assert "    │       ├── List L_18 line_number=18 loose=False start=None" in out_str
     assert "    │       │   ├── ListItem LI_18: \"'* Item H2.3.L1.1" in out_str

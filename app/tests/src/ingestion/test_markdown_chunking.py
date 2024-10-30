@@ -1,4 +1,5 @@
 import logging
+
 import pytest
 from nutree import Tree
 
@@ -69,7 +70,7 @@ def test_copy_subtree(tiny_tree):
     assert list_tree["L_7"].data is not tiny_tree["L_7"].data
 
     assert len(list_tree["L_7"].children) == 2
-    for node_copy, node in zip(list_tree["L_7"].children, tiny_tree["L_7"].children):
+    for node_copy, node in zip(list_tree["L_7"].children, tiny_tree["L_7"].children, strict=True):
         assert repr(node_copy.data) == repr(node.data)
         assert node_copy.data is not node.data
 
@@ -117,7 +118,7 @@ def prepped_tree(markdown_text) -> Tree:  # noqa: F811
     return tree
 
 
-def test_chunk_tree(markdown_text, prepped_tree):
+def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     config = ChunkingConfig(60)
     chunks = chunk_tree(prepped_tree, config)
     assert len(chunks) == 13
