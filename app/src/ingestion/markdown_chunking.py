@@ -198,13 +198,14 @@ def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
         # Don't need to recurse through child nodes
         return
 
+    # The remainder of this function deals with splitting up node's content into multiple chunks
+
     if node.data_type in ["List", "Table"]:
-        # Split these specially since they have an intro sentence and markdown rendering is tricky
+        # Split these specially since they have an intro sentence (and table header) to include for each chunk
         split_lt_node_into_chunks(node, config)
         return
 
     if node.data_type in ["Document", "HeadingSection"]:
-        # The remainder of this code deals with splitting up node's content into smaller chunks
         logger.info("%s is too large for one chunk", node.data_id)
         split_heading_section_into_chunks(node, config)
         return
@@ -216,7 +217,7 @@ def split_lt_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["List", "Table"]
     logger.info("Splitting large %s into multiple chunks", node.id_string)
 
-    def create_new_tree(children_ids: set[str]) -> Node:
+    def create_new_tree_with(children_ids: set[str]) -> Node:
         "Create a new tree keeping only the children in children_ids"
         subtree = copy_subtree(node)
         block_node = subtree.first_child()  # the List or Table node
@@ -229,9 +230,9 @@ def split_lt_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
 
     chunks_to_create: list[list[Node]] = []
     children_ids = {c.data_id for c in node.children}
-    # Copy the node's subtree, then gradually remove the last children until the content fits
+    # Copy the node's subtree, then gradually remove the last child until the content fits
     while children_ids:  # Repeat until all the children are in some chunk
-        block_node = create_new_tree(children_ids)
+        block_node = create_new_tree_with(children_ids)
         while not config.nodes_fit_in_chunk([block_node]) and block_node.has_children():
             remove_child(block_node, block_node.last_child())
 
