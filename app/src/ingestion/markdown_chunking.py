@@ -8,7 +8,7 @@ from nutree import Node, Tree
 
 from src.ingestion.markdown_tree import (
     TokenNodeData,
-    get_parent_headings_md,
+    get_parent_headings_raw,
     normalize_markdown,
     render_subtree_as_md,
 )
@@ -43,9 +43,10 @@ def copy_subtree(node: Node) -> Tree:
         n.set_data(copy(n.data), data_id=n.data.data_id)
         n.data.tree = subtree
         if isinstance(n.data, TokenNodeData):
-            are_tokens_frozen = n.data["freeze_token_children"] or find_closest_ancestor(
+            are_tokens_frozen = find_closest_ancestor(
                 n,
                 lambda p: isinstance(p.data, TokenNodeData) and p.data["freeze_token_children"],
+                include_self=True,
             )
             # Why check for are_tokens_frozen? Because calling copy() on Paragraph tokens doesn't work.
             # Fortunately if we use "freeze_token_children", then we don't need to copy Paragraph tokens
@@ -79,12 +80,23 @@ def remove_children_from(node: Node, child_data_ids: set[str]) -> None:
     # Do not remove children while iterating through them
     # Create a list of child nodes to remove, then remove them
     nodes_to_remove = [c for c in node.children if c.data_id in child_data_ids]
+    if len(nodes_to_remove) != len(child_data_ids):
+        logger.warning(
+            "Expected to remove %s, but found only %s",
+            child_data_ids,
+            set(n.data_id for n in nodes_to_remove),
+        )
     for child_node in nodes_to_remove:
         remove_child(node, child_node)
 
 
-def find_closest_ancestor(node: Node, does_match: Callable[[Node], bool]) -> Node:
+def find_closest_ancestor(
+    node: Node, does_match: Callable[[Node], bool], include_self: bool = False
+) -> Node:
     "Return the first parent/ancestor node that matches the does_match function"
+    if include_self and does_match(node):
+        return node
+
     while node.parent:
         if does_match(node.parent):
             return node.parent
@@ -137,14 +149,12 @@ class ChunkingConfig:
         chunk_id = f"{len(self.chunks)}:{chunk_id_suffix}"
         chunk = ProtoChunk(
             chunk_id,
-            get_parent_headings_md(breadcrumb_node or nodes[0]),
+            get_parent_headings_raw(breadcrumb_node or nodes[0]),
             nodes_as_markdown(nodes),
         )
-        logger.info("Created chunk %s from %i nodes", chunk_id, len(nodes))
         if not self.fits_in_chunk(chunk.markdown):
-            raise AssertionError(
-                f"{chunk_id} Too long {len(chunk.markdown.split())}: {chunk.markdown}"
-            )
+            raise AssertionError(f"{chunk_id} is too large! Check before calling create_chunk()")
+        logger.info("Created chunk %s from %i nodes", chunk_id, len(nodes))
         self.chunks[chunk.id] = chunk
         return chunk
 
@@ -164,13 +174,14 @@ class ChunkingConfig:
         )
 
 
-def chunk_tree(tree: Tree, config: ChunkingConfig) -> None:
+def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     # Reset the tree for chunking
     for n in tree:
         for attr in ["summary"]:
             n.data[attr] = None
 
     hierarchically_chunk_nodes(tree.first_child(), config)
+    return config.chunks
 
 
 def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
@@ -264,7 +275,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
         candidate_node_list = node_buffer + next_nodes
         if config.nodes_fit_in_chunk(candidate_node_list):
             node_buffer.extend(next_nodes)
-        else:  # next_nodes doesn't fit, so summarize nodes that can be chunked by themselves
+        else:  # next_nodes doesn't fit, so summarize child node that can be chunked by themselves
             if c.data_type in ["HeadingSection", "List", "Table"]:
                 # For these data_types, c (and all its descendants) can be chunked by itself
                 hierarchically_chunk_nodes(c, config)
@@ -272,6 +283,8 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                 if not c.data["summary"]:
                     c.data["summary"] = config.compose_summary_text(c)
                     logger.debug("Added summary to %s: %s", c.data_id, c.data["summary"])
+            else:
+                raise AssertionError(f"Consider summarizing {c.id_string}")
 
             # Try again now that c has been chunked and has a summary.
             # nodes_to_markdown() will now use the shorter summary text instead of the full text.
@@ -294,21 +307,22 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                 else:  # next_nodes needs to be split into multiple chunks
                     assert {c, intro_paragraph_node} == set(next_nodes)
                     config.create_chunks_for_next_nodes(c, intro_paragraph_node)
-                    node_buffer = []
+                    assert not node_buffer, f"node_buffer should be empty: {node_buffer}"
 
     if node_buffer:  # Create a chunk with the remaining nodes
         if config.nodes_fit_in_chunk(node_buffer):
             chunks_to_create.append(node_buffer)
         else:
-            raise AssertionError(
-                "Should not occur since nothing should be added to node_buffer that would exceed chunk capacity."
-            )
+            raise AssertionError(f"node_buffer should always fit {node_buffer}")
 
     _create_chunks(config, node, chunks_to_create)
 
 
 def _create_chunks(config: ChunkingConfig, node: Node, chunks_to_create: list[list[Node]]) -> None:
-    "Create chunks based on chunks_to_create, which are some partitioning of node's children"
+    """
+    Create chunks based on chunks_to_create, which are some partitioning of node's children.
+    If there are multiple chunks for the node, use a different chunk_id_suffix to make it obvious.
+    """
     if len(chunks_to_create) == 1:
         config.create_chunk(chunks_to_create[0])
     else:
