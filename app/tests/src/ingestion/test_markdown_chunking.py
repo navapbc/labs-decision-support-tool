@@ -3,7 +3,7 @@ from pprint import pprint
 import pytest
 from nutree import Tree
 
-from src.ingestion.markdown_chunking import ChunkingState, chunk_tree
+from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
 from src.ingestion.markdown_tree import (
     add_list_and_table_intros,
     create_heading_sections,
@@ -27,9 +27,9 @@ def prepped_tree(markdown_text) -> Tree:  # noqa: F811
 
 
 def test_chunk_tree(prepped_tree):
-    state = ChunkingState(430)
-    chunk_tree(prepped_tree, state)
+    config = ChunkingConfig(430)
+    chunk_tree(prepped_tree, config)
     prepped_tree.print()
-    pprint(state.chunks, sort_dicts=False, width=120)
-    print(len(state.chunks))
-    sum(len(c.markdown) for c in state.chunks.values())
+    pprint(config.chunks, sort_dicts=False, width=120)
+    print(len(config.chunks))
+    sum(len(c.markdown) for c in config.chunks.values())

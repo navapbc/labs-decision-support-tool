@@ -16,10 +16,11 @@ from src.ingestion.markdown_tree import (
 logger = logging.getLogger(__name__)
 
 
-def shorten(body: str, char_limit: int, placeholder: str = "...") -> str:
+def shorten(body: str, char_limit: int, placeholder: str = "...", max_lines: int = 2) -> str:
+    "Shorten text while retaining line breaks. textwrap.shorten() removes line breaks"
     new_body = []
     char_remaining = char_limit
-    for line in body.splitlines()[:2]:
+    for line in body.splitlines()[:max_lines]:
         line = textwrap.shorten(
             line, char_remaining, placeholder=placeholder, break_long_words=False
         )
@@ -81,7 +82,7 @@ class ProtoChunk:
     # to_embed: str  # string to embed
 
 
-class ChunkingState:
+class ChunkingConfig:
 
     def __init__(self, max_char_length: int) -> None:
         self.max_char_length = max_char_length
@@ -115,7 +116,16 @@ class ChunkingState:
         self.chunks[chunk.id] = chunk
         return chunk
 
-    def compose_summary_text(self, node):
+    def create_chunks_for_next_nodes(self, node: Node, intro_node: Optional[Node] = None) -> None:
+        # TODO: Handle this case by splitting the 2 nodes (optional intro node + other node) into smaller chunks
+        raise AssertionError(
+            f"{node.parent.data_id}: These node(s) cannot fit into a single chunk:"
+            f" {node.data_id} {intro_node.data_id if intro_node else ''}"
+        )
+        # TODO: Add to self.chunks
+        # self.chunks[chunk.id] = chunk
+
+    def compose_summary_text(self, node: Node) -> str:
         return (
             shorten(node.render().splitlines()[0], 100, placeholder="...")
             + f" (SUMMARY of {node.data_id})\n"
@@ -135,41 +145,41 @@ def nodes_as_markdown(nodes: Sequence[Node]) -> str:
     return normalize_markdown("".join(md_list))
 
 
-def chunk_tree(tree: Tree, state: ChunkingState) -> None:
+def chunk_tree(tree: Tree, config: ChunkingConfig) -> None:
     # Reset the tree for chunking
     for n in tree:
         for attr in ["summary"]:
             n.data[attr] = None
 
-    hierarchically_chunk_nodes(tree.first_child(), state)
+    hierarchically_chunk_nodes(tree.first_child(), config)
 
 
-def hierarchically_chunk_nodes(node: Node, state: ChunkingState) -> None:
+def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
     assert (
         not isinstance(node.data, TokenNodeData) or node.is_block_token()
     ), f"Expecting block-token, not {node.token}"
 
     # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
-    if state.nodes_fit_in_chunk([node]):
-        state.create_chunk([node])
+    if config.nodes_fit_in_chunk([node]):
+        config.create_chunk([node])
         # Don't need to recurse through child nodes
         return
 
     if node.data_type in ["List", "Table"]:
         # Split these specially since they have an intro sentence and markdown rendering is tricky
-        split_lt_node_into_chunks(node, state)
+        split_lt_node_into_chunks(node, config)
         return
 
     if node.data_type in ["Document", "HeadingSection"]:
         # The remainder of this code deals with splitting up node's content into smaller chunks
         logger.info("%s is too large for one chunk", node.data_id)
-        split_heading_section_into_chunks(node, state)
+        split_heading_section_into_chunks(node, config)
         return
 
     raise AssertionError(f"Unexpected data_type: {node.id_string}")
 
 
-def split_lt_node_into_chunks(node: Node, state: ChunkingState) -> None:
+def split_lt_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["List", "Table"]
     print(f"Splitting into chunks: {node.id_string}")
     # FIXME: determine size of each split using fits_in_chunk()
@@ -189,7 +199,7 @@ def split_lt_node_into_chunks(node: Node, state: ChunkingState) -> None:
             not_in_split.remove()
 
         chunk_id_suffix = f"{block_node.data_id}[{i}]:{block_node.first_child().data_id}"
-        state.create_chunk([block_node], chunk_id_suffix=chunk_id_suffix, breadcrumb_node=node)
+        config.create_chunk([block_node], chunk_id_suffix=chunk_id_suffix, breadcrumb_node=node)
 
 
 def _partition_list(lst: list[Node], n: int) -> Iterable[list[Node]]:
@@ -198,7 +208,7 @@ def _partition_list(lst: list[Node], n: int) -> Iterable[list[Node]]:
         yield lst[i : i + n]
 
 
-def split_heading_section_into_chunks(node: Node, state: ChunkingState) -> None:
+def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["Document", "HeadingSection"]
     print(
         f"Splitting into chunks: {node.id_string} with children:",
@@ -206,7 +216,9 @@ def split_heading_section_into_chunks(node: Node, state: ChunkingState) -> None:
         ", ".join([c.data_id for c in node.children if c.data_type != "BlankLine"]),
     )
     # Iterate through each child node, adding them to node_buffer
-    # Before chunk capacity is exceeded, flush node_buffer to a chunk
+    # Before chunk capacity is exceeded, flush node_buffer to a chunk.
+    # At any time, the contents of node_buffer should fit into a chunk,
+    # so check if nodes_fit_in_chunk(node_buffer + [nodes]) before adding to node_buffer.
     node_buffer: list[Node] = []
     intro_paragraph_node = None
     chunks_to_create: list[list[Node]] = []
@@ -226,61 +238,57 @@ def split_heading_section_into_chunks(node: Node, state: ChunkingState) -> None:
             next_nodes = [c]
 
         candidate_node_list = node_buffer + next_nodes
-        if state.nodes_fit_in_chunk(candidate_node_list):
+        if config.nodes_fit_in_chunk(candidate_node_list):
             node_buffer.extend(next_nodes)
         else:  # next_nodes doesn't fit, so summarize nodes that can be chunked by themselves
             if c.data_type in ["HeadingSection", "List", "Table"]:
                 # For these data_types, c (and all its descendants) can be chunked by itself
-                hierarchically_chunk_nodes(c, state)
+                hierarchically_chunk_nodes(c, config)
                 # Then set a shorter summary text in a custom attribute
                 if not c.data["summary"]:
-                    c.data["summary"] = state.compose_summary_text(c)
+                    c.data["summary"] = config.compose_summary_text(c)
                     logger.debug("Added summary to %s: %s", c.data_id, c.data["summary"])
 
             # Try again now that c has been chunked and has a summary.
             # nodes_to_markdown() will now use the shorter summary text instead of the full text.
-            if state.nodes_fit_in_chunk(candidate_node_list):
+            if config.nodes_fit_in_chunk(candidate_node_list):
                 node_buffer.extend(next_nodes)
-            elif node_buffer:
-                # It still doesn't fit even using the summary, so split the children across multiple chunks
-                # Create a chunk with the current node_buffer, saving next_nodes for the new chunk
-                chunks_to_create.append(node_buffer.copy())
+            else:  # candidate_node_list still doesn't fit even using the summary!
+                # Split candidate_node_list (node_buffer + next_nodes) across multiple chunks
+                # 1. put node_buffer in its own chunk
+                if node_buffer:
+                    # Create a chunk with the current node_buffer contents
+                    chunks_to_create.append(node_buffer.copy())
+                    # and reset node_buffer
+                    node_buffer = []
 
-                # Test new node_buffer
-                if state.nodes_fit_in_chunk(node_buffer):
+                # 2. Handle next_nodes
+                # Check if next_nodes can be the new node_buffer
+                if config.nodes_fit_in_chunk(next_nodes):
                     # Reset and initialize node_buffer with next_nodes
                     node_buffer = next_nodes
-                else:
-                    split_nodes_into_chunks(node, next_nodes)
+                else:  # next_nodes needs to be split into multiple chunks
+                    config.create_chunks_for_next_nodes(c, intro_paragraph_node)
                     node_buffer = []
-            else:  # node_buffer is empty, and next_nodes' contents is too long
-                assert candidate_node_list == next_nodes
-                split_nodes_into_chunks(node, next_nodes)
-                node_buffer = []
 
     if node_buffer:  # Create a chunk with the remaining nodes
-        if state.nodes_fit_in_chunk(node_buffer):
+        if config.nodes_fit_in_chunk(node_buffer):
             chunks_to_create.append(node_buffer.copy())
         else:
-            split_nodes_into_chunks(node, node_buffer)
+            raise AssertionError(
+                "Should not occur since nothing should be added to node_buffer that would exceed chunk capacity."
+            )
 
-    _create_chunks(state, node, chunks_to_create)
+    _create_chunks(config, node, chunks_to_create)
 
 
-def _create_chunks(state: ChunkingState, node: Node, chunks_to_create: list[list[Node]]) -> None:
+def _create_chunks(config: ChunkingConfig, node: Node, chunks_to_create: list[list[Node]]) -> None:
     if len(chunks_to_create) > 1:
         for i, chunk_nodes in enumerate(chunks_to_create):
             # The chunk id identifies the node being split, the split number, and the first node in the chunk
-            state.create_chunk(
+            config.create_chunk(
                 chunk_nodes, chunk_id_suffix=f"{node.data_id}[{i}]:{chunk_nodes[0].data_id}"
             )
     else:
         assert len(chunks_to_create) == 1
-        state.create_chunk(chunks_to_create[0])
-
-
-def split_nodes_into_chunks(parent_node: Node, nodes: list[Node]) -> None:
-    raise AssertionError(
-        f"{parent_node.data_id}: These node(s) cannot fit into a chunk: {[n.data_id for n in nodes]}"
-    )
-    # TODO: Handle this case by splitting the 2 nodes (optional intro node + other node) into smaller chunks
+        config.create_chunk(chunks_to_create[0])
