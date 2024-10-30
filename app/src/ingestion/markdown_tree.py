@@ -19,9 +19,29 @@ def create_markdown_tree(
 ) -> Tree:
     """
     Returns a tree reflecting the structure of the Tokens parsed from the markdown text.
-    The tree is created using mistletoe's Tokens and the TokenNodeData class.
-    Note that the structure of the tree (i.e., each node's parent and children) is independent of each Token's parent and children.
-    To render the tree to markdown text, use render_tree_as_md() or render_subtree_as_md().
+    The tree is created using mistletoe's Tokens and our TokenNodeData class.
+
+    Tokens represents the markdown text and are for rendering the markdown text.
+    Tokens have `_parent` and `_children` attributes which are used by mistletoe.
+    (Mistletoe's MarkdownRenderer expects the structure of the tokens to be a certain way,
+    so modifications to tokens should be done carefully.)
+
+    Tree nodes are for reasoning about splitting and chunking --
+    we don't want to change the markdown text so the tokens can stay unmodified.
+    An exception to this is for a special case where we need to split up large lists/tables and
+    want to still have an intro sentence (and table header) in each split. In this case,
+    some of the List/Table's token.children need to be removed so that MarkdownRenderer
+    doesn't render the entire list/table -- it's not sufficient to remove the tree node.
+
+    Hence, the structure of the tree (i.e., each node's parent and children) is independent of
+    each Token's parent and children. The structures are initially the same at the end of this
+    function but may differ after tree preparation functions are applied.
+    For example, when nest_heading_sections() moves the tree nodes around (i.e., nesting H2 nodes under
+    corresponding H1 nodes), the tokens are unmodified (so a Heading token's children
+    does *not* include a Heading token) because MarkdownRenderer does not expect this.
+
+    To render markdown text, use render_subtree_as_md(node), which uses MarkdownRenderer on the tokens
+    wrapped inside the node desired to be rendered.
     """
     if normalize_md:
         markdown = normalize_markdown(markdown)
@@ -414,8 +434,9 @@ def hide_span_tokens(tree: Tree) -> int:
             assert len(raw_text_nodes) == 1, f"Expected 1 RawText node for {node.data_id}"
             node.data["raw_text"] = raw_text_nodes[0].token.content
 
-        # Ensure node.token.children tokens are never removed
+        # Set attribute to indicate that node.token.children tokens should never be modified
         node.data["freeze_token_children"] = True
+        # Remove the children nodes, but node.token.children tokens are still required for rendering
         node.remove_children()
         hide_counter += 1
 
