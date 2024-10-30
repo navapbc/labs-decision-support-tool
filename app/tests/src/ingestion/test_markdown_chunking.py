@@ -11,11 +11,10 @@ from src.ingestion.markdown_tree import (
     hide_span_tokens,
     nest_heading_sections,
 )
-
-# import the markdown_text fixture
 from tests.src.ingestion.test_markdown_tree import markdown_text  # noqa: F401
 
 
+# Uses the imported markdown_text fixture
 @pytest.fixture
 def prepped_tree(markdown_text) -> Tree:  # noqa: F811
     tree = create_markdown_tree(markdown_text)

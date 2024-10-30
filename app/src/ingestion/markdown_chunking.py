@@ -32,7 +32,7 @@ def shorten(body: str, char_limit: int, placeholder: str = "...", max_lines: int
 
 
 def copy_subtree(node: Node) -> Tree:
-    logger.info("Creating new tree from subtree for %s", node.data_id)
+    logger.info("Creating new tree from subtree %s", node.data_id)
     subtree = Tree(f"{node.data_id} subtree", shadow_attrs=True)
     # Copy the nodes and descendants; this does not deep-copy node.data objects
     # For some reason, copy_to() assigns a random data_id to the new node in subtree
@@ -140,9 +140,7 @@ class ChunkingConfig:
             get_parent_headings_md(breadcrumb_node or nodes[0]),
             nodes_as_markdown(nodes),
         )
-        print(
-            f"Created chunk {chunk_id}: {len(nodes)} nodes, len {len(chunk.markdown.split())}: {shorten(chunk.markdown, 120)!r}"
-        )
+        logger.info("Created chunk %s from %i nodes", chunk_id, len(nodes))
         if not self.fits_in_chunk(chunk.markdown):
             raise AssertionError(
                 f"{chunk_id} Too long {len(chunk.markdown.split())}: {chunk.markdown}"
@@ -202,12 +200,11 @@ def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
 
 def split_lt_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["List", "Table"]
-    print(f"Splitting into chunks: {node.id_string}")
+    logger.info("Splitting large %s into multiple chunks", node.id_string)
 
     def create_new_tree(children_ids: set[str]) -> Node:
         "Create a new tree keeping only the children in children_ids"
         subtree = copy_subtree(node)
-        subtree.print()
         block_node = subtree.first_child()  # the List or Table node
         # show_intro should be True since block_node's content is being split
         block_node.data["show_intro"] = True
@@ -229,15 +226,15 @@ def split_lt_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
             for child_node in block_node.children:
                 children_ids.remove(child_node.data_id)
         else:
-            block_node.tree.print()
             raise AssertionError(f"{block_node.data_id} should have at least one child")
     _create_chunks(config, node, chunks_to_create)
 
 
 def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["Document", "HeadingSection"]
-    print(
-        f"Splitting into chunks: {node.id_string} with children:",
+    logger.info(
+        "Splitting large %s into chunks given children: %s",
+        node.id_string,
         # Reduce verbosity by excluding BlankLine nodes
         ", ".join([c.data_id for c in node.children if c.data_type != "BlankLine"]),
     )
