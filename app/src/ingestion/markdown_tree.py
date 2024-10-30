@@ -31,17 +31,18 @@ def create_markdown_tree(
     An exception to this is for a special case where we need to split up large lists/tables and
     want to still have an intro sentence (and table header) in each split. In this case,
     some of the List/Table's token.children need to be removed so that MarkdownRenderer
-    doesn't render the entire list/table -- it's not sufficient to remove the tree node.
+    doesn't render the entire list/table -- it's not sufficient to remove the child tree node.
 
     Hence, the structure of the tree (i.e., each node's parent and children) is independent of
     each Token's parent and children. The structures are initially the same at the end of this
     function but may differ after tree preparation functions are applied.
-    For example, when nest_heading_sections() moves the tree nodes around (i.e., nesting H2 nodes under
-    corresponding H1 nodes), the tokens are unmodified (so a Heading token's children
-    does *not* include a Heading token) because MarkdownRenderer does not expect this.
+    For example, when nest_heading_sections() moves the tree nodes around
+    (i.e., nesting H2 nodes under corresponding H1 nodes),
+    the tokens are unmodified (so a Heading token's children does *not* include a Heading token)
+    because MarkdownRenderer does not expect this.
 
-    To render markdown text, use render_subtree_as_md(node), which uses MarkdownRenderer on the tokens
-    wrapped inside the node desired to be rendered.
+    To render markdown text, use render_subtree_as_md(node), which uses MarkdownRenderer on the
+    tokens wrapped within the node desired to be rendered.
     """
     if normalize_md:
         markdown = normalize_markdown(markdown)
