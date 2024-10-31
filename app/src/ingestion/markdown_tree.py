@@ -2,7 +2,7 @@ import itertools
 import logging
 import textwrap
 from collections import defaultdict
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 import mistletoe
 from mistletoe import block_token
@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 def create_markdown_tree(
-    markdown: str, name: str = "Markdown tree", normalize_md: bool = True
+    markdown: str, name: str = "Markdown tree", normalize_md: bool = True,
+    doc_name: Optional[str] = None
 ) -> Tree:
     """
     Returns a tree reflecting the structure of the Tokens parsed from the markdown text.
@@ -54,6 +55,9 @@ def create_markdown_tree(
     tree = Tree(name, shadow_attrs=True)
     tree.system_root.set_meta("prep_funcs", [])
     _populate_nutree(tree.system_root, doc)
+    if doc_name:
+        assert tree.first_child().data_type == "Document"
+        tree.first_child().data["name"] = doc_name
     validate_tree(tree)
     return tree
 

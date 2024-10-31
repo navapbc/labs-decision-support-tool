@@ -150,9 +150,12 @@ class ChunkingConfig:
         if not chunk_id_suffix:
             chunk_id_suffix = nodes[0].data_id
         chunk_id = f"{len(self.chunks)}:{chunk_id_suffix}"
+        headings = get_parent_headings_raw(breadcrumb_node or nodes[0])
+        if doc_name := nodes[0].tree.first_child().data["name"]:
+            headings.insert(0, doc_name)
         chunk = ProtoChunk(
             chunk_id,
-            get_parent_headings_raw(breadcrumb_node or nodes[0]),
+            headings,
             nodes_as_markdown(nodes),
         )
         if not self.fits_in_chunk(chunk.markdown):
@@ -287,8 +290,6 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                 if not c.data["summary"]:
                     c.data["summary"] = config.compose_summary_text(c)
                     logger.debug("Added summary to %s: %s", c.data_id, c.data["summary"])
-            else:
-                raise AssertionError(f"Consider summarizing {c.id_string}")
 
             # Try again now that c has been chunked and has a summary.
             # nodes_to_markdown() will now use the shorter summary text instead of the full text.
