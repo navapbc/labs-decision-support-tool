@@ -37,8 +37,8 @@ def create_markdown_tree(
     each Token's parent and children. The structures are initially the same at the end of this
     function but may differ after tree preparation functions are applied.
     For example, when nest_heading_sections() moves the tree nodes around
-    (i.e., nesting H2 nodes under corresponding H1 nodes),
-    the tokens are unmodified (so a Heading token's children does *not* include a Heading token)
+    (i.e., nesting H2 nodes under corresponding H1 nodes), the tokens are unmodified
+    (so a Heading token's children does *not* include a Heading token)
     because MarkdownRenderer does not expect this.
 
     To render markdown text, use render_subtree_as_md(node), which uses MarkdownRenderer on the
@@ -70,7 +70,10 @@ def markdown_tokens_as_json(markdown: str) -> str:
 
 
 def normalize_markdown(markdown: str) -> str:
-    "Markdown includes multiple ways of specifying headers, etc. Normalize the markdown text to a consistent standard to ensure consistent parsing and rendering."
+    """
+    Markdown includes multiple ways of specifying headers, table header separators, etc.
+    Normalize the markdown text to a consistent standard to ensure consistent parsing and rendering.
+    """
     with _new_md_renderer() as renderer:
         # "the parsing phase is currently tightly connected with initiation and closing of a renderer.
         # Therefore, you should never call Document(...) outside of a with ... as renderer block"
@@ -226,9 +229,7 @@ def _intro_if_needed(node: Node) -> str | None:
 
 
 class MdNodeData:
-    """
-    Node.data points to instances of this class.
-    """
+    "Node.data points to instances of this class or its subclass"
 
     def __init__(
         self,
@@ -367,11 +368,15 @@ class TokenNodeData(MdNodeData):
             oneliner.append(
                 f"of length {len(self.render())} across {len(self.token.children)} children"
             )
+        elif self.data_type in ["List", "Document"]:
+            for attrname in self.token.repr_attributes:
+                attrvalue = getattr(self.token, attrname)
+                oneliner.append(f"{attrname}={attrvalue}")
 
         # Provide single-line text content for referencing back to the markdown text
         content = self.content_oneliner()
         if not content:
-            if self.data_type == "BlankLine":
+            if self.data_type in ["List", "Document", "BlankLine"]:
                 content = ""
             elif self.data_type in ["Heading", "Link", "TableRow"]:
                 # Render these single-line types. Assume TableRow is a single line for now.
