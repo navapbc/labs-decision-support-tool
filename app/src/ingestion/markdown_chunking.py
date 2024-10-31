@@ -202,7 +202,7 @@ def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
 
     if node.data_type in ["List", "Table"]:
         # Split these specially since they have an intro sentence (and table header) to include for each chunk
-        split_lt_node_into_chunks(node, config)
+        split_list_or_table_node_into_chunks(node, config)
         return
 
     if node.data_type in ["Document", "HeadingSection"]:
@@ -213,7 +213,7 @@ def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
     raise AssertionError(f"Unexpected data_type: {node.id_string}")
 
 
-def split_lt_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
+def split_list_or_table_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["List", "Table"]
     logger.info("Splitting large %s into multiple chunks", node.id_string)
 
