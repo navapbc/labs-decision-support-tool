@@ -114,8 +114,12 @@ def nodes_as_markdown(nodes: Sequence[Node]) -> str:
 
     md_list: list[str] = []
     for node in nodes:
-        # node.data["summary"] is set when node is chunked
-        node_md = node.data["summary"] or render_subtree_as_md(node, normalize=True)
+        # node.data["summary"] is set when node is too large to fit with existing chunk;
+        # it may equal empty string "" (to not include summary text), so check for None
+        if node.data["summary"] is None:
+            node_md = render_subtree_as_md(node, normalize=True)
+        else:
+            node_md = node.data["summary"]
         md_list.append(node_md)
     return normalize_markdown("".join(md_list))
 
@@ -126,6 +130,7 @@ class ProtoChunk:
     id: str
     headings: list[str]
     markdown: str  # Markdown content of the chunk
+    length: int
     # to_embed: str  # TODO: create string to embed from headings and markdown
 
 
@@ -135,11 +140,11 @@ class ChunkingConfig:
         self.max_length = max_length
         self.chunks: dict[str, ProtoChunk] = {}
 
-    def fits_in_chunk(self, markdown: str) -> bool:
-        return len(markdown.split()) < self.max_length
+    def text_length(self, markdown):
+        return len(markdown.split())
 
     def nodes_fit_in_chunk(self, nodes: Sequence[Node]) -> bool:
-        return self.fits_in_chunk(nodes_as_markdown(nodes))
+        return self.text_length(nodes_as_markdown(nodes)) < self.max_length
 
     def create_chunk(
         self,
@@ -153,12 +158,14 @@ class ChunkingConfig:
         headings = get_parent_headings_raw(breadcrumb_node or nodes[0])
         if doc_name := nodes[0].tree.first_child().data["name"]:
             headings.insert(0, doc_name)
+        markdown = nodes_as_markdown(nodes)
         chunk = ProtoChunk(
             chunk_id,
             headings,
-            nodes_as_markdown(nodes),
+            markdown,
+            self.text_length(markdown),
         )
-        if not self.fits_in_chunk(chunk.markdown):
+        if not self.text_length(chunk.markdown) < self.max_length:
             raise AssertionError(f"{chunk_id} is too large! Check before calling create_chunk()")
         logger.info("Created chunk %s from %i nodes", chunk_id, len(nodes))
         self.chunks[chunk.id] = chunk
@@ -173,10 +180,23 @@ class ChunkingConfig:
         # TODO: Add to self.chunks
         # self.chunks[chunk.id] = chunk
 
+    def should_summarize(self, next_nodes: Sequence[Node], node_buffer: Sequence[Node]) -> bool:
+        next_nodes_portion = self.text_length(nodes_as_markdown(next_nodes)) / self.max_length
+        if next_nodes_portion > 0.75:
+            # Example on https://edd.ca.gov/en/jobs_and_training/FAQs_WARN/
+            # Only the 1 larger accordion is chunked by itself and summarized.
+            # The smaller accordions are included alongside other accordions.
+            return True
+
+        # node_buffer_portion = self.text_length(nodes_as_markdown(node_buffer)) / self.max_length
+        # if node_buffer_portion
+
+        return False
+
     def compose_summary_text(self, node: Node) -> str:
         return (
             shorten(node.render().splitlines()[0], 100, placeholder="...")
-            + f" (SUMMARY of {node.data_id})\n"
+            + f" (SUMMARY of {node.data_id})\n\n"
         )
 
 
@@ -282,37 +302,50 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
         candidate_node_list = node_buffer + next_nodes
         if config.nodes_fit_in_chunk(candidate_node_list):
             node_buffer.extend(next_nodes)
-        else:  # next_nodes doesn't fit, so summarize child node that can be chunked by themselves
+        else:  # candidate_node_list doesn't fit
+            # TODO: Summarize next_nodes vs add it to the next chunk
+
+            # For these data_types, if should_summarize(), then next_nodes (and its descendants)
+            # can be chunked and summarized. Use the summary
             if c.data_type in ["HeadingSection", "List", "Table"]:
-                # For these data_types, c (and all its descendants) can be chunked by itself
-                hierarchically_chunk_nodes(c, config)
-                # Then set a shorter summary text in a custom attribute
-                if not c.data["summary"]:
+                if config.should_summarize(next_nodes, node_buffer):
+                    # summarize child node that can be chunked by themselves
+                    hierarchically_chunk_nodes(c, config)
+                    # Then set a shorter summary text in a custom attribute
+                    assert c.data["summary"] is None, "Summary should not be set yet"
                     c.data["summary"] = config.compose_summary_text(c)
                     logger.debug("Added summary to %s: %s", c.data_id, c.data["summary"])
 
-            # Try again now that c has been chunked and has a summary.
-            # nodes_to_markdown() will now use the shorter summary text instead of the full text.
-            if config.nodes_fit_in_chunk(candidate_node_list):
-                node_buffer.extend(next_nodes)
-            else:  # candidate_node_list still doesn't fit even using the summary!
-                # Split candidate_node_list (node_buffer + next_nodes) across multiple chunks
-                # 1. put node_buffer in its own chunk
-                if node_buffer:
-                    # Create a chunk with the current node_buffer contents
-                    chunks_to_create.append(node_buffer)
-                    # and reset node_buffer to a new list
-                    node_buffer = []
+                    # Try again now that c has been chunked and summarized
+                    if config.nodes_fit_in_chunk(candidate_node_list):
+                        # nodes_fit_in_chunk() calls nodes_as_markdown(), which will use the shorter
+                        # summary text instead of the full text
+                        node_buffer.extend(next_nodes)
+                        continue
+                    else:
+                        # candidate_node_list still doesn't fit using the summarized next_nodes
+                        # Remove the summary since we don't want calls to nodes_as_markdown() to use it
+                        c.data["summary"] = None
 
-                # 2. Handle next_nodes
-                # Check if next_nodes can be the new node_buffer
-                if config.nodes_fit_in_chunk(next_nodes):
-                    # Reset node_buffer to be next_nodes
-                    node_buffer = next_nodes
-                else:  # next_nodes needs to be split into multiple chunks
-                    assert {c, intro_paragraph_node} == set(next_nodes)
-                    config.create_chunks_for_next_nodes(c, intro_paragraph_node)
-                    assert not node_buffer, f"node_buffer should be empty: {node_buffer}"
+            # Either no summary was created or candidate_node_list still doesn't fit using the summary
+
+            # Split candidate_node_list (node_buffer + next_nodes) across multiple chunks
+            # 1. put node_buffer in its own chunk
+            if node_buffer:
+                # Create a chunk with the current node_buffer contents
+                chunks_to_create.append(node_buffer)
+                # and reset node_buffer to a new list
+                node_buffer = []
+
+            # 2. Handle next_nodes
+            # Check if next_nodes can be the new node_buffer
+            if config.nodes_fit_in_chunk(next_nodes):
+                # Reset node_buffer to be next_nodes
+                node_buffer = next_nodes
+            else:  # next_nodes needs to be split into multiple chunks
+                assert {c, intro_paragraph_node} == set(next_nodes)
+                config.create_chunks_for_next_nodes(c, intro_paragraph_node)
+                assert not node_buffer, f"node_buffer should be empty: {node_buffer}"
 
     if node_buffer:  # Create a chunk with the remaining nodes
         if config.nodes_fit_in_chunk(node_buffer):
@@ -329,7 +362,7 @@ def _create_chunks(config: ChunkingConfig, node: Node, chunks_to_create: list[li
     If there are multiple chunks for the node, use a different chunk_id_suffix to make it obvious.
     """
     if len(chunks_to_create) == 1:
-        config.create_chunk(chunks_to_create[0])
+        config.create_chunk(chunks_to_create[0], chunk_id_suffix=f"{node.data_id}")
     else:
         for i, chunk_nodes in enumerate(chunks_to_create):
             # Make sure first_node is different from node. They can be the same when splitting Lists and Tables.
