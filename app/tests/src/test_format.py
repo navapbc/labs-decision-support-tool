@@ -182,9 +182,7 @@ def test_reify_citations():
     chunks[0].content = "This is the first chunk.\n\nWith two subsections"
     subsections = split_into_subsections(chunks, factory=CitationFactory())
 
-    assert (
-        reify_citations("This is a citation (citation-0)", []) == "This is a citation "
-    )
+    assert reify_citations("This is a citation (citation-0)", []) == "This is a citation "
 
     assert (
         reify_citations(

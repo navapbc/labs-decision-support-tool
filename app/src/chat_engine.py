@@ -92,7 +92,9 @@ class BaseEngine(ChatEngineInterface):
 
         return self._build_response(question, attributes, chat_history)
 
-    def _build_response(self, question: str, attributes: MessageAttributes, chat_history: list[dict[str, str]]) -> OnMessageResult:
+    def _build_response(
+        self, question: str, attributes: MessageAttributes, chat_history: list[dict[str, str]]
+    ) -> OnMessageResult:
         response = generate(
             self.llm,
             self.system_prompt,
@@ -103,8 +105,12 @@ class BaseEngine(ChatEngineInterface):
 
         return OnMessageResult(response, self.system_prompt)
 
-    def _build_response_with_context(self, question: str, attributes: MessageAttributes, chat_history: list[dict[str, str]]) -> OnMessageResult:
-        question_for_retrieval = question if attributes.is_in_english else attributes.message_in_english
+    def _build_response_with_context(
+        self, question: str, attributes: MessageAttributes, chat_history: list[dict[str, str]]
+    ) -> OnMessageResult:
+        question_for_retrieval = (
+            question if attributes.is_in_english else attributes.message_in_english
+        )
 
         chunks_with_scores = retrieve_with_scores(
             question_for_retrieval,
@@ -127,8 +133,6 @@ class BaseEngine(ChatEngineInterface):
         )
 
         return OnMessageResult(response, self.system_prompt, chunks_with_scores, subsections)
-
-
 
 
 class GuruMultiprogramEngine(BaseEngine):
