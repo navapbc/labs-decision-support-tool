@@ -40,8 +40,8 @@ Analyze the user's message to determine how to respond.
 Reply with a JSON dictionary.
 Set original_language to the language of the user's message.
 If the user's message is in English, set is_in_english to true.
-Otherwise, set is_in_english to false and set message_in_english with the translation of the query into English.
-If the question would be easier to answer with additional policy or program context (such as policy documentation), set needs_context bool to True.
+Otherwise, set is_in_english to false and set message_in_english to a translation of the query into English.
+If the question would be easier to answer with additional policy or program context (such as policy documentation), set needs_context to True.
 Otherwise, set needs_context to false.
 """
 
@@ -73,7 +73,6 @@ def generate(
     llm: str,
     system_prompt: str,
     query: str,
-    requested_language: str,
     context_text: str | None = None,
     chat_history: list[dict[str, str]] | None = None,
 ) -> str:
@@ -102,12 +101,6 @@ def generate(
         messages.extend(chat_history)
 
     messages.append({"content": query, "role": "user"})
-
-    # Without this direction, OpenAI's GPT-4o will sometimes ignore the original language and respond in English.
-    messages.append(
-        {"content": f"Please translate your answer into {requested_language}", "role": "system"}
-    )
-
     logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
     response = completion(
         model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
