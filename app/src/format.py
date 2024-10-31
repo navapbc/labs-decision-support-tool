@@ -375,12 +375,12 @@ def _add_citation_links(response: str, remapped_citations: dict[str, Subsection]
     # Replace (citation-<index>) with the appropriate citation
     def replace_citation(match: Match) -> str:
         citation_id = match.group(1)
-        # Leave a citation for chunks that don't exist alone
+        # Remove citation for chunks that don't exist alone
         if citation_id not in remapped_citations:
-            logger.warning(
+            logger.error(
                 "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
             )
-            return f"({citation_id})"
+            return ""
 
         chunk = remapped_citations[citation_id].chunk
         bem_link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"

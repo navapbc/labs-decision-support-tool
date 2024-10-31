@@ -21,7 +21,7 @@ psycopg = {extras = ["binary"], version = "^3.1.10"}
 pydantic-settings = "^2.0.3"
 chainlit = "1.1.306"
 sentence-transformers = "^3.0.1"
-litellm = "^1.40.25"
+litellm = "^1.51.2"
 pgvector = "^0.2.5"
 torch = "2.2.2"
 gunicorn = "^22.0.0"

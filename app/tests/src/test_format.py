@@ -161,7 +161,7 @@ def test_format_bem_subsections(chunks_with_scores):
     assert format_bem_subsections(0, 0, chunks_with_scores, subsections, "") == "<div></div>"
     assert (
         format_bem_subsections(0, 0, [], [], "Non-existant citation: (citation-0)")
-        == "<div><p>Non-existant citation: (citation-0)</p></div>"
+        == "<div><p>Non-existant citation: </p></div>"
     )
 
     assert (
@@ -182,9 +182,7 @@ def test_reify_citations():
     chunks[0].content = "This is the first chunk.\n\nWith two subsections"
     subsections = split_into_subsections(chunks, factory=CitationFactory())
 
-    assert (
-        reify_citations("This is a citation (citation-0)", []) == "This is a citation (citation-0)"
-    )
+    assert reify_citations("This is a citation (citation-0)", []) == "This is a citation "
 
     assert (
         reify_citations(
