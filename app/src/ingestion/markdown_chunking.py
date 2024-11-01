@@ -4,6 +4,7 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from nutree import Node, Tree
 
 from src.ingestion.markdown_tree import (
@@ -145,6 +146,12 @@ class ChunkingConfig:
         self.max_length = max_length
         self.chunks: dict[str, ProtoChunk] = {}
 
+        chunk_size = 7 * self.max_length  # Assume 7 characters per word
+        chunk_overlap = 7 * 20  # 20 words (average sentence) overlap between chunks
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size, chunk_overlap=chunk_overlap
+        )
+
     def text_length(self, markdown: str) -> int:
         return len(markdown.split())
 
@@ -156,14 +163,14 @@ class ChunkingConfig:
         nodes: Sequence[Node],
         chunk_id_suffix: Optional[str] = None,
         breadcrumb_node: Optional[Node] = None,
+        markdown: Optional[str] = None,
     ) -> ProtoChunk:
         if not chunk_id_suffix:
             chunk_id_suffix = nodes[0].data_id
         chunk_id = f"{len(self.chunks)}:{chunk_id_suffix}"
-        headings = get_parent_headings_raw(breadcrumb_node or nodes[0])
-        if doc_name := nodes[0].tree.first_child().data["name"]:
-            headings.insert(0, doc_name)
-        markdown = render_nodes_as_md(nodes)
+        headings = self._headings_with_doc_name(breadcrumb_node or nodes[0])
+        if not markdown:
+            markdown = render_nodes_as_md(nodes)
         chunk = ProtoChunk(
             chunk_id,
             headings,
@@ -176,34 +183,45 @@ class ChunkingConfig:
         self.chunks[chunk.id] = chunk
         return chunk
 
-    def create_chunks_for_next_nodes(self, node: Node, intro_node: Optional[Node] = None) -> None:
-        # TODO: Splitting the contents of the 2 nodes into chunks
-        # FIXME: cleanup
-        if intro_node:
-            md = render_nodes_as_md([intro_node, node])
+    def _headings_with_doc_name(self, node: Node) -> list[str]:
+        headings = get_parent_headings_raw(node)
+        document_node = node.tree.first_child()
+        assert document_node.data_type == "Document"
+        if doc_name := document_node.data["name"]:
+            headings.insert(0, doc_name)
+        return headings
+
+    def create_chunks_for_next_nodes(self, nodes: Sequence[Node]) -> None:
+        if len(nodes) == 1:
+            node = nodes[0]
+        elif len(nodes) == 2:
+            _intro_node, node = nodes
         else:
-            md = render_nodes_as_md([node])
-        logger.warning("create_chunks_for_next_nodes %s", node.id_string)
-        raise AssertionError(
-            f"{node.parent.data_id}: These node(s) cannot fit (length {self.text_length(md)}) into a single chunk:"
-            f" {intro_node.data_id if intro_node else ''} {node.data_id}"
-            f"\n {md}"
-        )
-        # TODO: Add to self.chunks
-        # self.chunks[chunk.id] = chunk
+            raise AssertionError(f"Expecting no more than 2 nodes, got %{nodes}")
+
+        assert node.data_type not in [
+            "HeadingSection",
+            "List",
+            "Table",
+        ], f"This should have been handled by hierarchically_chunk_nodes(): {node.id_string}"
+        logger.warning("If this is called often, use a better text splitter for %s", node.id_string)
+
+        markdown = render_nodes_as_md(nodes)
+        splits = self.text_splitter.split_text(markdown)
+        for i, split in enumerate(splits):
+            self.create_chunk(
+                nodes,
+                chunk_id_suffix=f"{node.data_id}[{i}]",
+                markdown=split,
+                breadcrumb_node=node,
+            )
 
     def should_summarize(self, next_nodes: Sequence[Node], node_buffer: Sequence[Node]) -> bool:
         next_nodes_portion = self.text_length(render_nodes_as_md(next_nodes)) / self.max_length
-        if next_nodes_portion > 0.75:
-            # Example on https://edd.ca.gov/en/jobs_and_training/FAQs_WARN/
-            # Only the 1 larger accordion is chunked by itself and summarized.
-            # The smaller accordions are included alongside other accordions.
-            return True
-
-        # node_buffer_portion = self.text_length(nodes_as_markdown(node_buffer)) / self.max_length
-        # if node_buffer_portion
-
-        return False
+        # Example on https://edd.ca.gov/en/jobs_and_training/FAQs_WARN/
+        # Only the 1 larger accordion is chunked by itself and summarized.
+        # The smaller accordions are included alongside other accordions.
+        return next_nodes_portion > 0.75
 
     def compose_summary_text(self, node: Node) -> str:
         return (
@@ -354,12 +372,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                 # Reset node_buffer to be next_nodes
                 node_buffer = next_nodes
             else:  # next_nodes needs to be split into multiple chunks
-                # logger.error("%s\n %s\n %s", c, intro_paragraph_node, next_nodes)
-                # FIXME: improve code; intro_paragraph_node=None at this point
-                if len(next_nodes) == 2:
-                    config.create_chunks_for_next_nodes(next_nodes[1], next_nodes[0])
-                else:
-                    config.create_chunks_for_next_nodes(next_nodes[0])
+                config.create_chunks_for_next_nodes(next_nodes)
                 assert not node_buffer, f"node_buffer should be empty: {node_buffer}"
 
     if node_buffer:  # Create a chunk with the remaining nodes

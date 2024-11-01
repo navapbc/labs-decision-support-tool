@@ -265,10 +265,8 @@ def render_nodes_as_md(nodes: Sequence[Node]) -> str:
         # node.data["summary"] is set when node is too large to fit with existing chunk;
         # it may equal empty string "" (to not include summary text), so check for None
         if node.data["summary"] is None:
-            logger.warning("Node %s has NO summary text", node.data_id)
             node_md = render_subtree_as_md(node)
         else:
-            logger.warning("%s has SUMMARY text: %r", node.data_id, node.data["summary"])
             node_md = node.data["summary"]
         # assert not node_md.endswith("\n\n\n"), f"{node.data_id} should not end with more than 2 newlines: {node_md!r}"
         # assert node_md.endswith("\n\n"), f"{node.data_id} should end with exactly 2 newlines: {node_md!r}"
@@ -642,6 +640,14 @@ def _add_intro_attrib(node: Node) -> bool:
         else:
             raise ValueError(f"Unexpected prev node type: {prev_node.id_string}")
     return False
+
+
+def prepare_tree(tree: Tree) -> None:
+    remove_blank_lines(tree)
+    hide_span_tokens(tree)
+    create_heading_sections(tree)
+    nest_heading_sections(tree)
+    add_list_and_table_intros(tree)
 
 
 def get_parent_headings(node: Node) -> Iterable[MdNodeData]:

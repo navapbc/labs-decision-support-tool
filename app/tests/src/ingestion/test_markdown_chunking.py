@@ -12,14 +12,12 @@ from src.ingestion.markdown_chunking import (
     shorten,
 )
 from src.ingestion.markdown_tree import (
-    add_list_and_table_intros,
-    create_heading_sections,
     create_markdown_tree,
     hide_span_tokens,
-    nest_heading_sections,
-    remove_blank_lines,
+    prepare_tree,
+    render_nodes_as_md,
 )
-from tests.src.ingestion.test_markdown_tree import markdown_text  # noqa: F401
+from tests.src.ingestion.test_markdown_tree import create_paragraph, markdown_text  # noqa: F401
 
 
 def test_shorten():
@@ -48,8 +46,6 @@ def test_find_closest_ancestor(str_tree):
 
 @pytest.fixture
 def tiny_tree():
-    tree = Tree("NodeData tree")
-
     test_markdown = """
 # My Heading 1
 
@@ -111,11 +107,7 @@ def test_remove_children(caplog, tiny_tree):
 @pytest.fixture
 def prepped_tree(markdown_text) -> Tree:  # noqa: F811
     tree = create_markdown_tree(markdown_text)
-    remove_blank_lines(tree)
-    hide_span_tokens(tree)
-    create_heading_sections(tree)
-    nest_heading_sections(tree)
-    add_list_and_table_intros(tree)
+    prepare_tree(tree)
     return tree
 
 
@@ -149,3 +141,35 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     chunks_wo_headings = [chunk for _id, chunk in chunks.items() if not chunk.headings]
     # 1 doc intro paragraph + 2 H1 HeadingSections
     assert len(chunks_wo_headings) == 3
+
+
+def test_create_chunks_for_next_nodes():
+    test_markdown = f"""Markdown with a very long paragraph that will trigger chunks_for_next_nodes() to be called.
+
+# Heading 1
+Sentence 1. {create_paragraph('H0.p1', 30)}
+"""
+    tree = create_markdown_tree(test_markdown, doc_name="Long paragraph doc")
+    prepare_tree(tree)
+    paragraph_node = tree["P_4"]
+    paragraph_md = render_nodes_as_md([paragraph_node])
+
+    config = ChunkingConfig(65)
+    assert not config.nodes_fit_in_chunk([paragraph_node])
+    chunks = chunk_tree(tree, config)
+
+    paragraph_chunks = [chunk for chunk in chunks.values() if "P_4" in chunk.id]
+    assert len(paragraph_chunks) == 3
+
+    joined_chunk_md = "\n".join([chunk.markdown for chunk in paragraph_chunks])
+    sentences = [sentence.strip() for sentence in paragraph_md.split(". ")]
+    sentence_counts = {sentence: joined_chunk_md.count(sentence) for sentence in sentences}
+    # Ensure all sentences in the P_4 paragraph are present in the chunked markdown
+    assert all(sentence_counts[sentence] >= 1 for sentence in sentences)
+
+    # Ensure there are repeated sentences in the chunked markdown
+    repeated_sentences = [sentence for sentence, count in sentence_counts.items() if count > 1]
+    assert len(repeated_sentences) > 9
+
+    for chunk in paragraph_chunks:
+        assert chunk.headings == ["Long paragraph doc", "Heading 1"]
