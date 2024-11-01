@@ -129,8 +129,10 @@ def build_accordions(
                 _get_breadcrumb_html(chunk.headings, chunk.document.name) if chunk.headings else ""
             )
             # only show headings if they are different
-            rendered_heading = citation_headings if rendered_heading != citation_headings else ""
-            citation_body += f"<b>{rendered_heading}</b>" if rendered_heading else ""
+            if rendered_heading != citation_headings:
+                citation_body += f"<b>{citation_headings}</b>"
+                rendered_heading = citation_headings
+
             citation_link = return_citation_link(chunk, data_source=data_source)
             for chunk_subsection in subsection_list:
                 citation_numbers.append(chunk_subsection.id)
