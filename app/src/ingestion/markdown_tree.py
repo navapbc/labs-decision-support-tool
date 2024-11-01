@@ -42,14 +42,14 @@ def create_markdown_tree(
     (so a Heading token's children does *not* include a Heading token)
     because MarkdownRenderer does not expect this.
 
-    To render markdown text, use render_subtree_as_md(node), which uses MarkdownRenderer on the
+    To render markdown text, use render_*_as_md(node), which uses MarkdownRenderer on the
     tokens wrapped within the node desired to be rendered.
     """
     if normalize_md:
         markdown = normalize_markdown(markdown)
     with _new_md_renderer():
         # "Never call Document(...) outside of a with ... as renderer block"
-        # Otherwise, markdown_renderer.BlankLine will not be created
+        # Otherwise, markdown_renderer.BlankLine, HtmlSpan, etc will not be created and possibly other features
         doc = mistletoe.Document(markdown)
     # The shadow_attrs=True argument allows accessing node.data.age as node.age -- see validate_tree()
     tree = Tree(name, shadow_attrs=True)
@@ -462,6 +462,8 @@ def create_heading_sections(tree: Tree) -> int:
         hs_node_data = MdNodeData(
             "HeadingSection", f"_S{n.token.level}_{n.token.line_number}", tree
         )
+        hs_node_data.level = n.token.level # FIXME: Add level to HeadingSection subclass
+        hs_node_data['raw_text'] = n.data["raw_text"] # FIXME: Add raw_text to HeadingSection subclass
         # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
         hs_node = n.prepend_sibling(hs_node_data, data_id=hs_node_data.data_id)
         # Get all siblings up to next Heading; these will be HeadingSection's new children
@@ -592,11 +594,11 @@ def get_parent_headings(node: Node) -> Iterable[TokenNodeData]:
     headings: list[TokenNodeData] = []
     while node := node.parent:
         if node.data_type == "HeadingSection":
-            heading_node = node.first_child()
-            headings.append(heading_node.data)
+            # heading_node = node.first_child()
+            headings.append(node.data)
 
     for h in headings:
-        assert isinstance(h.token.level, int), f"Expected int, got {h['level']!r}"
+        assert isinstance(h.level, int), f"Expected int, got {h['level']!r}"
     return reversed(headings)
 
 
@@ -607,4 +609,4 @@ def get_parent_headings_raw(node: Node) -> list[str]:
 
 def get_parent_headings_md(node: Node) -> list[str]:
     "Returns the markdown text of node's parent headings in level order, which may not be consecutive"
-    return [f"{"#" * h.token.level} {h['raw_text']}" for h in get_parent_headings(node)]
+    return [f"{"#" * h.level} {h['raw_text']}" for h in get_parent_headings(node)]

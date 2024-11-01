@@ -31,12 +31,34 @@ def shorten(body: str, char_limit: int, placeholder: str = "...", max_lines: int
     return "\n".join(new_body)
 
 
-def copy_subtree(node: Node) -> Tree:
+def copy_ancestors(node: Node, target_node: Node) -> int:
+    "Copy the ancestors of node to target_tree, returning the number of ancestors copied"
+    count = 0
+    ancestor_nodes = node.get_parent_list()
+    p_node = target_node.tree
+    for parent in ancestor_nodes:
+        p_node = parent.copy_to(p_node, deep=False)
+        count += 1
+    target_node.move_to(p_node)
+    return count
+
+def copy_subtree(node: Node, include_ancestors: bool=True) -> Tree:
+    """
+    Returns a new tree for the node, its descendants, and optionally its ancestors (to capture headings).
+    Each node's contents is deep-copied, including node.data and node.data.token.
+    """
     logger.info("Creating new tree from subtree %s", node.data_id)
     subtree = Tree(f"{node.data_id} subtree", shadow_attrs=True)
     # Copy the nodes and descendants; this does not deep-copy node.data objects
     # For some reason, copy_to() assigns a random data_id to the new node in subtree
     new_node = node.copy_to(subtree, deep=True)
+
+    # Copy the meta attributes from the original tree so that get_parent_headings() works
+    for k, v in node.tree.system_root.meta.items():
+        subtree.system_root.set_meta(k, v.copy())
+
+    if include_ancestors:
+        copy_ancestors(node, new_node)
 
     # Set the data_id back to the original, along with creating copies of objects
     for n in subtree:
@@ -53,11 +75,11 @@ def copy_subtree(node: Node) -> Tree:
             if not are_tokens_frozen:
                 n.data.token = copy(n.data.token)
 
-    assert subtree[node.data_id], f"Expected data_id {node.data_id!r} for {subtree.first_child()}"
+    assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"
 
     # Now that copies of node.data and node.data.token are created, update references to the tokens
     # Update all node.data.token.children to point to the new token objects in the subtree
-    for n in new_node.iterator(add_self=True):
+    for n in subtree:
         if isinstance(n.data, TokenNodeData) and not n.data["freeze_token_children"]:
             n.data.token.children = [
                 c.token for c in n.children if isinstance(c.data, TokenNodeData)
@@ -65,6 +87,7 @@ def copy_subtree(node: Node) -> Tree:
             for c in n.data.token.children:
                 # token.parent was indirectly updated when token.children was set
                 assert c.parent == n.data.token
+
     # At this point, no object in the subtree should be pointing to objects in the original tree,
     # except for tokens associated with "freeze_token_children". We are free to modify the subtree.
     return subtree
