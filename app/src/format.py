@@ -84,6 +84,37 @@ def format_bem_subsections(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
+    return build_accordions(subsections=subsections, raw_response=raw_response, data_source="BEM")
+
+
+def build_accordion_body(citation_body: str, source: str) -> str:
+    if source == "BEM":
+        return to_html(replace_bem_with_link(citation_body))
+    else:
+        return to_html(citation_body)
+
+
+def return_citation_link(chunk: Chunk, data_source: str) -> str:
+    if data_source == "BEM":
+        bem_url_for_page = get_bem_url(chunk.document.name)
+        if chunk.page_number:
+            bem_url_for_page += "#page=" + str(chunk.page_number)
+        return (
+            f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
+            if chunk.page_number
+            else ""
+        )
+    else:
+        if chunk.document.source:
+            return f"<p>Source: <a href={chunk.document.source!r}>{chunk.document.source}</a></p>"
+    return ""
+
+
+def build_accordions(
+    subsections: Sequence[Subsection],
+    raw_response: str,
+    data_source: str,
+) -> str:
     global _accordion_id
 
     remapped_citations = remap_citation_ids(subsections, raw_response)
@@ -92,27 +123,33 @@ def format_bem_subsections(
     for document, chunks_in_doc in citations_by_document.items():
         citation_numbers = []
         citation_body = ""
+        rendered_heading = ""
         for chunk, subsection_list in chunks_in_doc:
-            citation_headings = " → ".join(chunk.headings) if chunk.headings else ""
-            bem_url_for_page = get_bem_url(document.name)
-            if chunk.page_number:
-                bem_url_for_page += "#page=" + str(chunk.page_number)
-            citation_link = (
-                f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
-                if chunk.page_number
-                else ""
+            citation_headings = (
+                _get_breadcrumb_html(chunk.headings, chunk.document.name) if chunk.headings else ""
             )
-
+            # only show headings if they are different
+            rendered_heading = citation_headings if rendered_heading != citation_headings else ""
+            citation_body += f"<b>{rendered_heading}</b>" if rendered_heading else ""
+            citation_link = return_citation_link(chunk, data_source=data_source)
             for chunk_subsection in subsection_list:
                 citation_numbers.append(chunk_subsection.id)
                 citation_body += (
-                    f"<div>Citation #{chunk_subsection.id}: <b>{citation_headings}</b></div>"
+                    f"<div>Citation #{chunk_subsection.id}: </div>"
                     f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{chunk_subsection.text}</div>'
-                    f"<div>{citation_link}</div>"
                 )
+                # generated citation links for BEM redirect to specific pages
+                if data_source == "BEM":
+                    citation_body += f"<div>{citation_link}</div>"
+        # if webpage, return source link once
+        if data_source != "BEM":
+            citation_body += f"<div>{citation_link}</div>"
 
         _accordion_id += 1
-        formatted_citation_body = to_html(replace_bem_with_link(citation_body))
+        formatted_citation_body = build_accordion_body(
+            citation_body=citation_body,
+            source=data_source,
+        )
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -150,53 +187,7 @@ def format_web_subsections(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    global _accordion_id
-
-    remapped_citations = remap_citation_ids(subsections, raw_response)
-    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations))
-
-    citations_html = ""
-    for _, citation in remapped_citations.items():
-        _accordion_id += 1
-        chunk = citation.chunk
-        citation_headings = _get_breadcrumb_html(chunk.headings, chunk.document.name)
-        formatted_subsection = to_html(citation.text)
-
-        citation_link = ""
-        if chunk.document.source:
-            citation_link = (
-                f"<p>Source: <a href={chunk.document.source!r}>{chunk.document.source}</a></p>"
-            )
-
-        citations_html += f"""
-        <div class="usa-accordion" id=accordion-{_accordion_id}>
-            <h4 class="usa-accordion__heading">
-                <button
-                    type="button"
-                    class="usa-accordion__button"
-                    aria-expanded="false"
-                    aria-controls="a-{_accordion_id}">
-                    {citation.id}. {chunk.document.name}
-                </button>
-            </h4>
-            <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-                {citation_headings}
-                <div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{formatted_subsection}</div>
-                {citation_link}
-            </div>
-        </div>"""
-
-    # This heading is important to prevent Chainlit from embedding citations_html
-    # as the next part of a a list in response_with_citations
-    if citations_html:
-        return (
-            "<div>"
-            + response_with_citations
-            + "</div><h3>Source(s)</h3><div>"
-            + citations_html
-            + "</div>"
-        )
-    return "<div>" + response_with_citations + "</div>"
+    return build_accordions(subsections=subsections, raw_response=raw_response, data_source="EDD")
 
 
 def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> str:

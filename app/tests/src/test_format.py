@@ -12,7 +12,9 @@ from src.format import (
     format_bem_documents,
     format_bem_subsections,
     format_guru_cards,
+    format_web_subsections,
     reify_citations,
+    return_citation_link,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
@@ -248,3 +250,47 @@ def test__get_breadcrumb_html():
     # Omit headings that match doc name
     headings = ["Doc name", "Heading 2"]
     assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 2</b></div>"
+
+
+def test__return_citation_link():
+    doc = DocumentFactory.build_batch(2)
+    chunk_list = ChunkFactory.build_batch(2)
+    doc[0].name = "BEM 234"
+    doc[1].source = "webpage 1"
+
+    chunk_list[0].document = doc[0]
+    chunk_list[0].page_number = 3
+
+    chunk_list[1].document = doc[1]
+    chunk_list[1].page_number = 3
+
+    bem_link = return_citation_link(chunk_list[0], "BEM")
+
+    assert "Open document to page 3" in bem_link
+    assert "Source" not in bem_link
+
+    web_link = return_citation_link(chunk_list[1], "EDD")
+    assert "page 3" not in web_link
+    assert "Source" in web_link
+
+
+def test__format_web_subsections(chunks_with_scores):
+    subsections = to_subsections(chunks_with_scores)
+
+    assert format_web_subsections(0, 0, chunks_with_scores, subsections, "") == "<div></div>"
+    assert (
+        format_web_subsections(0, 0, [], [], "Non-existant citation: (citation-0)")
+        == "<div><p>Non-existant citation: (citation-0)</p></div>"
+    )
+
+    assert (
+        format_web_subsections(0, 0, [], [], "List intro sentence: \n- item 1\n- item 2")
+        == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
+    )
+
+    chunks_with_scores[0].chunk.document.name = "Your State Disability Insurance (SDI)"
+    chunks_with_scores[1].chunk.document.name = "Your State Disability Insurance (SDI): Another"
+    html = format_web_subsections(
+        0, 0, chunks_with_scores, subsections, "Some real citations: (citation-1) (citation-2)"
+    )
+    assert len(_unique_accordion_ids(html)) == 2
