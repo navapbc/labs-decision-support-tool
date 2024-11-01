@@ -151,7 +151,14 @@ class ChunkingConfig:
         return len(markdown.split())
 
     def nodes_fit_in_chunk(self, nodes: Sequence[Node]) -> bool:
-        return self.text_length(render_nodes_as_md(nodes)) < self.max_length
+        return self.text_length(self.nodes_to_markdown(nodes)) < self.max_length
+
+    # FIXME: add context_str arg
+    def nodes_to_markdown(self, nodes: Sequence[Node]) -> str:
+        # Don't render Heading nodes by themselves
+        if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
+            return ""
+        return render_nodes_as_md(nodes)
 
     def create_chunk(
         self,
@@ -165,7 +172,7 @@ class ChunkingConfig:
         chunk_id = f"{len(self.chunks)}:{chunk_id_suffix}"
         headings = self._headings_with_doc_name(breadcrumb_node or nodes[0])
         if not markdown:
-            markdown = render_nodes_as_md(nodes)
+            markdown = self.nodes_to_markdown(nodes)
         chunk = ProtoChunk(
             chunk_id,
             headings,
@@ -201,7 +208,7 @@ class ChunkingConfig:
         ], f"This should have been handled by hierarchically_chunk_nodes(): {node.id_string}"
         logger.warning("If this is called often, use a better text splitter for %s", node.id_string)
 
-        markdown = render_nodes_as_md(nodes)
+        markdown = self.nodes_to_markdown(nodes)
         splits = self.text_splitter.split_text(markdown)
         for i, split in enumerate(splits):
             self.create_chunk(

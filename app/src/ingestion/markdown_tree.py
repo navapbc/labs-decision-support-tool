@@ -206,16 +206,7 @@ def render_subtree_as_md(node: Node, normalize: bool = False) -> str:
     """
     if node.data_type in ["Document", "HeadingSection"]:
         # Render the Document and HeadingSection nodes specially to account for summarized child nodes
-        out_str = []
-        for c in node.children:
-            # FIXME: repeated in render_nodes_as_md
-            if c.data["summary"] is None:
-                node_md = render_subtree_as_md(c, normalize=normalize)
-            else:
-                node_md = c.data["summary"]
-            out_str.append(node_md)
-        # Each child node_md ends with exactly 2 newlines, so join without a separator
-        md_str = "".join(out_str)
+        md_str = render_nodes_as_md(node.children)
     elif isinstance(node.data, TokenNodeData):
         out_str = []
         if intro := _intro_if_needed(node):
@@ -237,12 +228,7 @@ def _intro_if_needed(node: Node) -> str | None:
     return None
 
 
-# FIXME: add context_str arg
 def render_nodes_as_md(nodes: Sequence[Node]) -> str:
-    # Don't render Heading nodes by themselves
-    if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
-        return ""
-
     md_list: list[str] = []
     for node in nodes:
         # node.data["summary"] is set when node is too large to fit with existing chunk;
@@ -252,6 +238,7 @@ def render_nodes_as_md(nodes: Sequence[Node]) -> str:
         else:
             node_md = node.data["summary"]
         md_list.append(node_md)
+    # Each child node_md ends with exactly 2 newlines, so join without a separator
     return "".join(md_list)
 
 
@@ -513,9 +500,8 @@ def create_heading_sections(tree: Tree) -> int:
             "HeadingSection", f"_S{n.token.level}_{n.token.line_number}", tree
         )
         hs_node_data["level"] = n.token.level  # FIXME: Add level to HeadingSection subclass
-        hs_node_data["raw_text"] = n.data[
-            "raw_text"
-        ]  # FIXME: Add raw_text to HeadingSection subclass
+        hs_node_data["raw_text"] = n.data["raw_text"]
+        # FIXME: Add raw_text to HeadingSection subclass
         # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
         hs_node = n.prepend_sibling(hs_node_data, data_id=hs_node_data.data_id)
         # Get all siblings up to next Heading; these will be HeadingSection's new children
