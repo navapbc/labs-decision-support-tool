@@ -204,42 +204,26 @@ def render_subtree_as_md(node: Node, normalize: bool = False) -> str:
     we cannot rely on mistletoe's renderer (which is based on Tokens) to render the tree correctly. Hence, we have this function.
     Whenever this method is called in a loop, join the result with no delimiter: `"".join(result)`
     """
-    if node.data_type == "HeadingSection":  # Render the custom HeadingSection node specially
+    if node.data_type in ["Document", "HeadingSection"]:
+        # Render the Document and HeadingSection nodes specially to account for summarized child nodes
         out_str = []
         for c in node.children:
-            # TODO: add unit test: "\n\n\n" in result after remove_blank_lines(tree)
-            # if c.data_type == "BlankLine":
-            #     continue
-
             # FIXME: repeated in render_nodes_as_md
             if c.data["summary"] is None:
                 node_md = render_subtree_as_md(c, normalize=normalize)
             else:
                 node_md = c.data["summary"]
-
             out_str.append(node_md)
-            out = out_str[-1]
-            # TODO: move this to a test; assertion requires remove_blank_lines()
-            assert not out.endswith(
-                "\n\n\n"
-            ), f"{node.data_id} should not end with more than 2 newlines: {out!r}"
-            assert out.endswith(
-                "\n\n"
-            ), f"{node.data_id} should end with exactly 2 newlines: {out!r}"
+        # Each child node_md ends with exactly 2 newlines, so join without a separator
         md_str = "".join(out_str)
     elif isinstance(node.data, TokenNodeData):
         out_str = []
         if intro := _intro_if_needed(node):
             out_str.append(intro)
         out_str.append(TokenNodeData.render_token(node.token))
-        out = out_str[-1]
-        # TODO: move this to a test
-        # assert not out.endswith("\n\n"), f"{node.data_id} should not end with multiple newlines: {out!r}"
-        # assert out.endswith("\n"), f"{node.data_id} should end with exactly 1 newline: {out!r}"
-
         # Since each element ends exactly 1 newline (see unit test TODO),
         # This join() will result in each element ending with "\n\n",
-        # which is consistent with markdown block elements.
+        # which is consistent with how markdown block elements are separated.
         md_str = "\n".join(out_str) + "\n"
     else:
         raise ValueError(f"Unexpected node type: {node.id_string}")
@@ -253,6 +237,7 @@ def _intro_if_needed(node: Node) -> str | None:
     return None
 
 
+# FIXME: add context_str arg
 def render_nodes_as_md(nodes: Sequence[Node]) -> str:
     # Don't render Heading nodes by themselves
     if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
@@ -260,16 +245,12 @@ def render_nodes_as_md(nodes: Sequence[Node]) -> str:
 
     md_list: list[str] = []
     for node in nodes:
-        # if node.data_type == "BlankLine":
-        #     continue
         # node.data["summary"] is set when node is too large to fit with existing chunk;
-        # it may equal empty string "" (to not include summary text), so check for None
+        # it may be an empty string "" (to summarize with "" as the summary text), so check for None
         if node.data["summary"] is None:
             node_md = render_subtree_as_md(node)
         else:
             node_md = node.data["summary"]
-        # assert not node_md.endswith("\n\n\n"), f"{node.data_id} should not end with more than 2 newlines: {node_md!r}"
-        # assert node_md.endswith("\n\n"), f"{node.data_id} should end with exactly 2 newlines: {node_md!r}"
         md_list.append(node_md)
     return "".join(md_list)
 

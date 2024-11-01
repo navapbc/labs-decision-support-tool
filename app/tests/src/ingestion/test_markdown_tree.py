@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from io import StringIO
 
 import pytest
@@ -312,6 +313,27 @@ def test_subtree_rendering(tree):
     assert "* Item H2.3.L1.1" in heading_section_md
     assert "### Heading 3" in heading_section_md
     assert "| H3.2.T1: header 1     | H3.2.T1: header 2" in heading_section_md
+
+    # The following relies on remove_blank_lines(tree) being called above
+    rendered_md = render_subtree_as_md(tree["D_1"])
+    assert_extra_newlines_removed(rendered_md)
+
+    rendered_md = render_subtree_as_md(tree["_S2_10"])
+    assert_extra_newlines_removed(rendered_md)
+
+
+def assert_extra_newlines_removed(markdown: str):
+    "Assert that there are no extra blank lines"
+    assert "\n\n\n" not in markdown
+    # Each block markdown element should be separated by exactly two newlines
+    # Check for extraneous newlines within blocks
+    for block_str in markdown.split("\n\n"):
+        if re.search(r"^\* ", block_str) or re.search(r"^\| ", block_str):
+            # Handle list items and table rows individually
+            list_items = block_str.split("\n")
+            assert all("\n" not in list_item for list_item in list_items)
+        else:
+            assert "\n" not in block_str
 
 
 def test_get_parent_headings(tree):
