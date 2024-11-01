@@ -1,12 +1,12 @@
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, Subsection
 from src.format import format_bem_subsections, format_guru_cards, format_web_subsections
-from src.generate import PROMPT, generate
+from src.generate import PROMPT, MessageAttributes, analyze_message, generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
 
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 class OnMessageResult:
     response: str
     system_prompt: str
-    chunks_with_scores: Sequence[ChunkWithScore]
-    subsections: Sequence[Subsection]
+    chunks_with_scores: Sequence[ChunkWithScore] = field(default_factory=list)
+    subsections: Sequence[Subsection] = field(default_factory=list)
 
 
 class ChatEngineInterface(ABC):
@@ -85,8 +85,35 @@ class BaseEngine(ChatEngineInterface):
     ]
 
     def on_message(self, question: str, chat_history: list[dict[str, str]]) -> OnMessageResult:
-        chunks_with_scores = retrieve_with_scores(
+        attributes = analyze_message(self.llm, question)
+
+        if attributes.needs_context:
+            return self._build_response_with_context(question, attributes, chat_history)
+
+        return self._build_response(question, attributes, chat_history)
+
+    def _build_response(
+        self, question: str, attributes: MessageAttributes, chat_history: list[dict[str, str]]
+    ) -> OnMessageResult:
+        response = generate(
+            self.llm,
+            self.system_prompt,
             question,
+            None,
+            chat_history,
+        )
+
+        return OnMessageResult(response, self.system_prompt)
+
+    def _build_response_with_context(
+        self, question: str, attributes: MessageAttributes, chat_history: list[dict[str, str]]
+    ) -> OnMessageResult:
+        question_for_retrieval = (
+            question if attributes.is_in_english else attributes.message_in_english
+        )
+
+        chunks_with_scores = retrieve_with_scores(
+            question_for_retrieval,
             retrieval_k=self.retrieval_k,
             retrieval_k_min_score=self.retrieval_k_min_score,
             datasets=self.datasets,
@@ -96,7 +123,15 @@ class BaseEngine(ChatEngineInterface):
         # Provide a factory to reset the citation id counter
         subsections = split_into_subsections(chunks, factory=CitationFactory())
         context_text = create_prompt_context(subsections)
-        response = generate(self.llm, self.system_prompt, question, context_text, chat_history)
+
+        response = generate(
+            self.llm,
+            self.system_prompt,
+            question,
+            context_text,
+            chat_history,
+        )
+
         return OnMessageResult(response, self.system_prompt, chunks_with_scores, subsections)
 
 
