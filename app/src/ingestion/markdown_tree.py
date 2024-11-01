@@ -2,7 +2,7 @@ import itertools
 import logging
 import textwrap
 from collections import defaultdict
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Sequence
 
 import mistletoe
 from mistletoe import block_token
@@ -11,12 +11,16 @@ from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.token import Token
 from nutree import IterMethod, Node, Tree
 
+from src.util.string_utils import remove_links
+
 logger = logging.getLogger(__name__)
 
 
 def create_markdown_tree(
-    markdown: str, name: str = "Markdown tree", normalize_md: bool = True,
-    doc_name: Optional[str] = None
+    markdown: str,
+    name: str = "Markdown tree",
+    normalize_md: bool = True,
+    doc_name: Optional[str] = None,
 ) -> Tree:
     """
     Returns a tree reflecting the structure of the Tokens parsed from the markdown text.
@@ -192,37 +196,84 @@ def render_tree_as_md(tree: Tree, normalize: bool = True) -> str:
     return render_subtree_as_md(tree.system_root.first_child(), normalize=normalize)
 
 
-def render_subtree_as_md(node: Node, normalize: bool = True) -> str:
+def render_subtree_as_md(node: Node, normalize: bool = False) -> str:
     """
     Render the node and its descendants (a subtree) to markdown text.
     Useful for creating markdown text for chunks.
     Since the structure of the tree (i.e., each node's parent and children) is independent of each Token's parent and children,
     we cannot rely on mistletoe's renderer (which is based on Tokens) to render the tree correctly. Hence, we have this function.
+    Whenever this method is called in a loop, join the result with no delimiter: `"".join(result)`
     """
     if node.data_type == "HeadingSection":  # Render the custom HeadingSection node specially
         out_str = []
         for c in node.children:
-            out_str.append(render_subtree_as_md(c, normalize=normalize))
+            # TODO: add unit test: "\n\n\n" in result after remove_blank_lines(tree)
+            # if c.data_type == "BlankLine":
+            #     continue
+
+            # FIXME: repeated in render_nodes_as_md
+            if c.data["summary"] is None:
+                node_md = render_subtree_as_md(c, normalize=normalize)
+            else:
+                node_md = c.data["summary"]
+
+            out_str.append(node_md)
+            out = out_str[-1]
+            # TODO: move this to a test; assertion requires remove_blank_lines()
+            assert not out.endswith(
+                "\n\n\n"
+            ), f"{node.data_id} should not end with more than 2 newlines: {out!r}"
+            assert out.endswith(
+                "\n\n"
+            ), f"{node.data_id} should end with exactly 2 newlines: {out!r}"
+        md_str = "".join(out_str)
     elif isinstance(node.data, TokenNodeData):
         out_str = []
         if intro := _intro_if_needed(node):
             out_str.append(intro)
-            # out_str.append("\n")
         out_str.append(TokenNodeData.render_token(node.token))
+        out = out_str[-1]
+        # TODO: move this to a test
+        # assert not out.endswith("\n\n"), f"{node.data_id} should not end with multiple newlines: {out!r}"
+        # assert out.endswith("\n"), f"{node.data_id} should end with exactly 1 newline: {out!r}"
+
+        # Since each element ends exactly 1 newline (see unit test TODO),
+        # This join() will result in each element ending with "\n\n",
+        # which is consistent with markdown block elements.
+        md_str = "\n".join(out_str) + "\n"
     else:
         raise ValueError(f"Unexpected node type: {node.id_string}")
-
-    md_str = "\n\n".join(map(lambda s: s.strip(), out_str)) + "\n"
-    if normalize:
-        return normalize_markdown(md_str)
     return md_str
 
 
 def _intro_if_needed(node: Node) -> str | None:
     "Return intro text if intro has text and show_intro is True."
     if (intro := node.data["intro"]) and node.data["show_intro"]:
-        return f"({intro.strip()})"
+        return f"({intro.strip()})\n"
     return None
+
+
+def render_nodes_as_md(nodes: Sequence[Node]) -> str:
+    # Don't render Heading nodes by themselves
+    if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
+        return ""
+
+    md_list: list[str] = []
+    for node in nodes:
+        # if node.data_type == "BlankLine":
+        #     continue
+        # node.data["summary"] is set when node is too large to fit with existing chunk;
+        # it may equal empty string "" (to not include summary text), so check for None
+        if node.data["summary"] is None:
+            logger.warning("Node %s has NO summary text", node.data_id)
+            node_md = render_subtree_as_md(node)
+        else:
+            logger.warning("%s has SUMMARY text: %r", node.data_id, node.data["summary"])
+            node_md = node.data["summary"]
+        # assert not node_md.endswith("\n\n\n"), f"{node.data_id} should not end with more than 2 newlines: {node_md!r}"
+        # assert node_md.endswith("\n\n"), f"{node.data_id} should end with exactly 2 newlines: {node_md!r}"
+        md_list.append(node_md)
+    return "".join(md_list)
 
 
 #  TODO: Render footnotes in Document node
@@ -410,7 +461,15 @@ def remove_blank_lines(tree: Tree) -> int:
         blank_line_counter += 1
 
     tree.system_root.meta["prep_funcs"].append("remove_blank_lines")
-    return blank_line_counter    
+    return blank_line_counter
+
+
+def remove_child(node: Node, child: Node) -> None:
+    logger.info("Removing child %s from %s", child.data_id, node.data_id)
+    # Update node.token.children since that's used for rendering
+    node.data.token.children.remove(child.data.token)
+    # Then remove the child from the tree
+    child.remove()
 
 
 def hide_span_tokens(tree: Tree) -> int:
@@ -442,7 +501,7 @@ def hide_span_tokens(tree: Tree) -> int:
         logger.info("Hiding %i children span-tokens under %s", len(node.children), data_type)
         # Create custom attribute for the hidden text so that tree.print() renders some of the text
         node.data["oneliner_of_hidden_nodes"] = textwrap.shorten(
-            node.render(), 50, placeholder="...(hidden)", drop_whitespace=False
+            remove_links(node.render()), 50, placeholder="...(hidden)", drop_whitespace=False
         )
 
         # Add raw text content for Heading nodes to use the text in heading breadcrumbs
@@ -474,8 +533,10 @@ def create_heading_sections(tree: Tree) -> int:
         hs_node_data = MdNodeData(
             "HeadingSection", f"_S{n.token.level}_{n.token.line_number}", tree
         )
-        hs_node_data.level = n.token.level # FIXME: Add level to HeadingSection subclass
-        hs_node_data['raw_text'] = n.data["raw_text"] # FIXME: Add raw_text to HeadingSection subclass
+        hs_node_data["level"] = n.token.level  # FIXME: Add level to HeadingSection subclass
+        hs_node_data["raw_text"] = n.data[
+            "raw_text"
+        ]  # FIXME: Add raw_text to HeadingSection subclass
         # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
         hs_node = n.prepend_sibling(hs_node_data, data_id=hs_node_data.data_id)
         # Get all siblings up to next Heading; these will be HeadingSection's new children
@@ -583,10 +644,10 @@ def _add_intro_attrib(node: Node) -> bool:
     return False
 
 
-def get_parent_headings(node: Node) -> Iterable[TokenNodeData]:
+def get_parent_headings(node: Node) -> Iterable[MdNodeData]:
     """
-    Return the list of node's parent Headings in order of appearance in the markdown text.
-    Check headings[i].token.level for the heading level, which may not be consecutive.
+    Return the list of node's parent HeadingSections in order of appearance in the markdown text.
+    Check headings[i]["level"] for the heading level, which may not be consecutive.
     """
     assert node.tree, f"Node {node.data_id} has no tree"
     for func in [
@@ -603,14 +664,13 @@ def get_parent_headings(node: Node) -> Iterable[TokenNodeData]:
     if node.data_type == "Heading" and node.parent.data_type == "HeadingSection":
         node = node.parent
 
-    headings: list[TokenNodeData] = []
+    headings: list[MdNodeData] = []
     while node := node.parent:
         if node.data_type == "HeadingSection":
-            # heading_node = node.first_child()
             headings.append(node.data)
 
     for h in headings:
-        assert isinstance(h.level, int), f"Expected int, got {h['level']!r}"
+        assert isinstance(h["level"], int), f"Expected int, got {h['level']!r}"
     return reversed(headings)
 
 
@@ -621,4 +681,4 @@ def get_parent_headings_raw(node: Node) -> list[str]:
 
 def get_parent_headings_md(node: Node) -> list[str]:
     "Returns the markdown text of node's parent headings in level order, which may not be consecutive"
-    return [f"{"#" * h.level} {h['raw_text']}" for h in get_parent_headings(node)]
+    return [f"{"#" * h['level']} {h['raw_text']}" for h in get_parent_headings(node)]

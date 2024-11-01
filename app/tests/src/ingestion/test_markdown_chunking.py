@@ -16,8 +16,8 @@ from src.ingestion.markdown_tree import (
     create_heading_sections,
     create_markdown_tree,
     hide_span_tokens,
-    remove_blank_lines,
     nest_heading_sections,
+    remove_blank_lines,
 )
 from tests.src.ingestion.test_markdown_tree import markdown_text  # noqa: F401
 
@@ -120,9 +120,15 @@ def prepped_tree(markdown_text) -> Tree:  # noqa: F811
 
 
 def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
-    config = ChunkingConfig(60)
+    config = ChunkingConfig(65)
     chunks = chunk_tree(prepped_tree, config)
     assert len(chunks) == 13
+
+    for _id, chunk in chunks.items():
+        print("-------")
+        print(len(chunk.markdown.split()))
+        print(chunk.markdown)
+        assert len(chunk.markdown.split()) <= config.max_length
 
     table_chunks = [chunk for id, chunk in chunks.items() if ":T_" in id]
     table_context = (

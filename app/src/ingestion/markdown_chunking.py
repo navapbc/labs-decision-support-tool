@@ -9,9 +9,10 @@ from nutree import Node, Tree
 from src.ingestion.markdown_tree import (
     TokenNodeData,
     get_parent_headings_raw,
-    normalize_markdown,
-    render_subtree_as_md,
+    remove_child,
+    render_nodes_as_md,
 )
+from src.util.string_utils import remove_links
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,8 @@ def copy_ancestors(node: Node, target_node: Node) -> int:
     target_node.move_to(p_node)
     return count
 
-def copy_subtree(node: Node, include_ancestors: bool=True) -> Tree:
+
+def copy_subtree(node: Node, include_ancestors: bool = True) -> Tree:
     """
     Returns a new tree for the node, its descendants, and optionally its ancestors (to capture headings).
     Each node's contents is deep-copied, including node.data and node.data.token.
@@ -90,15 +92,7 @@ def copy_subtree(node: Node, include_ancestors: bool=True) -> Tree:
 
     # At this point, no object in the subtree should be pointing to objects in the original tree,
     # except for tokens associated with "freeze_token_children". We are free to modify the subtree.
-    return subtree
-
-
-def remove_child(node: Node, child: Node) -> None:
-    logger.info("Removing child %s from %s", child.data_id, node.data_id)
-    # Update node.token.children since that's used for rendering
-    node.data.token.children.remove(child.data.token)
-    # Then remove the child from the tree
-    child.remove()
+    return new_node
 
 
 def remove_children_from(node: Node, child_data_ids: set[str]) -> None:
@@ -127,24 +121,12 @@ def find_closest_ancestor(
         if does_match(node.parent):
             return node.parent
         node = node.parent
+    # FIXME: check if this works:
+    # while node := node.parent:
+    #     if does_match(node):
+    #         return node
+
     return None
-
-
-def nodes_as_markdown(nodes: Sequence[Node]) -> str:
-    # Don't render Heading nodes by themselves
-    if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
-        return ""
-
-    md_list: list[str] = []
-    for node in nodes:
-        # node.data["summary"] is set when node is too large to fit with existing chunk;
-        # it may equal empty string "" (to not include summary text), so check for None
-        if node.data["summary"] is None:
-            node_md = render_subtree_as_md(node, normalize=True)
-        else:
-            node_md = node.data["summary"]
-        md_list.append(node_md)
-    return normalize_markdown("".join(md_list))
 
 
 @dataclass
@@ -163,11 +145,11 @@ class ChunkingConfig:
         self.max_length = max_length
         self.chunks: dict[str, ProtoChunk] = {}
 
-    def text_length(self, markdown):
+    def text_length(self, markdown: str) -> int:
         return len(markdown.split())
 
     def nodes_fit_in_chunk(self, nodes: Sequence[Node]) -> bool:
-        return self.text_length(nodes_as_markdown(nodes)) < self.max_length
+        return self.text_length(render_nodes_as_md(nodes)) < self.max_length
 
     def create_chunk(
         self,
@@ -181,7 +163,7 @@ class ChunkingConfig:
         headings = get_parent_headings_raw(breadcrumb_node or nodes[0])
         if doc_name := nodes[0].tree.first_child().data["name"]:
             headings.insert(0, doc_name)
-        markdown = nodes_as_markdown(nodes)
+        markdown = render_nodes_as_md(nodes)
         chunk = ProtoChunk(
             chunk_id,
             headings,
@@ -196,15 +178,22 @@ class ChunkingConfig:
 
     def create_chunks_for_next_nodes(self, node: Node, intro_node: Optional[Node] = None) -> None:
         # TODO: Splitting the contents of the 2 nodes into chunks
+        # FIXME: cleanup
+        if intro_node:
+            md = render_nodes_as_md([intro_node, node])
+        else:
+            md = render_nodes_as_md([node])
+        logger.warning("create_chunks_for_next_nodes %s", node.id_string)
         raise AssertionError(
-            f"{node.parent.data_id}: These node(s) cannot fit into a single chunk:"
-            f" {node.data_id} {intro_node.data_id if intro_node else ''}"
+            f"{node.parent.data_id}: These node(s) cannot fit (length {self.text_length(md)}) into a single chunk:"
+            f" {intro_node.data_id if intro_node else ''} {node.data_id}"
+            f"\n {md}"
         )
         # TODO: Add to self.chunks
         # self.chunks[chunk.id] = chunk
 
     def should_summarize(self, next_nodes: Sequence[Node], node_buffer: Sequence[Node]) -> bool:
-        next_nodes_portion = self.text_length(nodes_as_markdown(next_nodes)) / self.max_length
+        next_nodes_portion = self.text_length(render_nodes_as_md(next_nodes)) / self.max_length
         if next_nodes_portion > 0.75:
             # Example on https://edd.ca.gov/en/jobs_and_training/FAQs_WARN/
             # Only the 1 larger accordion is chunked by itself and summarized.
@@ -218,7 +207,7 @@ class ChunkingConfig:
 
     def compose_summary_text(self, node: Node) -> str:
         return (
-            shorten(node.render().splitlines()[0], 100, placeholder="...")
+            shorten(remove_links(node.render()).splitlines()[0], 100, placeholder="...")
             + f" (SUMMARY of {node.data_id})\n\n"
         )
 
@@ -265,8 +254,7 @@ def split_list_or_table_node_into_chunks(node: Node, config: ChunkingConfig) -> 
 
     def create_new_tree_with(children_ids: set[str]) -> Node:
         "Create a new tree keeping only the children in children_ids"
-        subtree = copy_subtree(node)
-        block_node = subtree.first_child()  # the List or Table node
+        block_node = copy_subtree(node)  # the List or Table node
         # show_intro should be True since block_node's content is being split
         block_node.data["show_intro"] = True
         to_remove = {c.data_id for c in block_node.children} - children_ids
@@ -337,7 +325,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                     # Then set a shorter summary text in a custom attribute
                     assert c.data["summary"] is None, "Summary should not be set yet"
                     c.data["summary"] = config.compose_summary_text(c)
-                    logger.debug("Added summary to %s: %s", c.data_id, c.data["summary"])
+                    logger.info("Added summary to %s: %r", c.data_id, c.data["summary"])
 
                     # Try again now that c has been chunked and summarized
                     if config.nodes_fit_in_chunk(candidate_node_list):
@@ -366,8 +354,12 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                 # Reset node_buffer to be next_nodes
                 node_buffer = next_nodes
             else:  # next_nodes needs to be split into multiple chunks
-                assert {c, intro_paragraph_node} == set(next_nodes)
-                config.create_chunks_for_next_nodes(c, intro_paragraph_node)
+                # logger.error("%s\n %s\n %s", c, intro_paragraph_node, next_nodes)
+                # FIXME: improve code; intro_paragraph_node=None at this point
+                if len(next_nodes) == 2:
+                    config.create_chunks_for_next_nodes(next_nodes[1], next_nodes[0])
+                else:
+                    config.create_chunks_for_next_nodes(next_nodes[0])
                 assert not node_buffer, f"node_buffer should be empty: {node_buffer}"
 
     if node_buffer:  # Create a chunk with the remaining nodes
@@ -398,5 +390,6 @@ def _create_chunks(config: ChunkingConfig, node: Node, chunks_to_create: list[li
             config.create_chunk(
                 chunk_nodes,
                 chunk_id_suffix=f"{node.data_id}[{i}]:{first_node_id}",
-                breadcrumb_node=node,
+                # The headings breadcrumb should reflect the first item in chunk_nodes
+                breadcrumb_node=chunk_nodes[0],
             )
