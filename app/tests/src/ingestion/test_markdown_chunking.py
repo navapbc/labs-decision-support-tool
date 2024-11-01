@@ -16,6 +16,7 @@ from src.ingestion.markdown_tree import (
     create_heading_sections,
     create_markdown_tree,
     hide_span_tokens,
+    remove_blank_lines,
     nest_heading_sections,
 )
 from tests.src.ingestion.test_markdown_tree import markdown_text  # noqa: F401
@@ -110,6 +111,7 @@ def test_remove_children(caplog, tiny_tree):
 @pytest.fixture
 def prepped_tree(markdown_text) -> Tree:  # noqa: F811
     tree = create_markdown_tree(markdown_text)
+    remove_blank_lines(tree)
     hide_span_tokens(tree)
     create_heading_sections(tree)
     nest_heading_sections(tree)

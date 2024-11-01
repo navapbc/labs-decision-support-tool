@@ -401,6 +401,18 @@ class TokenNodeData(MdNodeData):
         return " ".join(oneliner) + (f": {content!r}" if content else "")
 
 
+# TODO: add unit test
+def remove_blank_lines(tree: Tree) -> int:
+    "Remove BlankLine nodes from the tree"
+    blank_line_counter = 0
+    for node in tree.find_all(match=lambda n: n.data_type == "BlankLine"):
+        remove_child(node.parent, node)
+        blank_line_counter += 1
+
+    tree.system_root.meta["prep_funcs"].append("remove_blank_lines")
+    return blank_line_counter    
+
+
 def hide_span_tokens(tree: Tree) -> int:
     hide_counter = 0
     for node in tree.iterator(method=IterMethod.POST_ORDER):  # Depth-first-traversal, post-order

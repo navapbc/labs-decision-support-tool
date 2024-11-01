@@ -15,6 +15,7 @@ from src.ingestion.markdown_tree import (
     hide_span_tokens,
     markdown_tokens_as_json,
     nest_heading_sections,
+    remove_blank_lines,
     render_subtree_as_md,
     render_tree_as_md,
     tokens_vs_tree_mismatches,
@@ -200,6 +201,8 @@ def test_tree_preparation(tree):
     assert tree_descr["counts"]["Link"] == 1
     assert tree_descr["counts"]["TableCell"] == 12
 
+    # FIXME: test remove_blank_lines(tree)
+
     # Run multiple times to ensure idempotency
     for run_no in range(2):
         # Step 1: Hide all span-level tokens to simplify the tree
@@ -292,6 +295,7 @@ def test_subtree_rendering(tree):
     assert "  * Item H1>H3.L1.subL.3" in md
     assert "Final paragraph." in md
 
+    remove_blank_lines(tree)
     hide_span_tokens(tree)
     create_heading_sections(tree)
     nest_heading_sections(tree)
