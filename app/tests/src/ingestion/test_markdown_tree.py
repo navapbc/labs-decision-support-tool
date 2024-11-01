@@ -201,7 +201,15 @@ def test_tree_preparation(tree):
     assert tree_descr["counts"]["Link"] == 1
     assert tree_descr["counts"]["TableCell"] == 12
 
-    # FIXME: test remove_blank_lines(tree)
+    for run_no in range(2):
+        # Step 0: Remove BlankLine nodes
+        removed_count = remove_blank_lines(tree)
+        if run_no == 0:
+            assert removed_count > 0
+        else:
+            assert removed_count == 0
+        bl_nodes = tree.find_all(match=lambda n: n.data_type == "BlankLine")
+        assert len(bl_nodes) == 0
 
     # Run multiple times to ensure idempotency
     for run_no in range(2):
@@ -242,7 +250,6 @@ def test_tree_preparation(tree):
             "List",
             "Paragraph",
             "Table",
-            "BlankLine",
         }
 
     for run_no in range(2):
@@ -262,7 +269,6 @@ def test_tree_preparation(tree):
             "Paragraph",
             "Table",
             "HeadingSection",
-            "BlankLine",
         }
 
     for run_no in range(2):

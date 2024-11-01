@@ -118,14 +118,9 @@ def find_closest_ancestor(
     if include_self and does_match(node):
         return node
 
-    while node.parent:
-        if does_match(node.parent):
-            return node.parent
-        node = node.parent
-    # FIXME: check if this works:
-    # while node := node.parent:
-    #     if does_match(node):
-    #         return node
+    while node := node.parent:
+        if does_match(node):
+            return node
 
     return None
 
