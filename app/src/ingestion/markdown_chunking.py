@@ -132,7 +132,6 @@ class ProtoChunk:
     headings: list[str]
     markdown: str  # Markdown content of the chunk
     length: int
-    # to_embed: str  # TODO: create string to embed from headings and markdown
 
 
 class ChunkingConfig:
@@ -334,7 +333,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
         if config.nodes_fit_in_chunk(candidate_node_list):
             node_buffer.extend(next_nodes)
         else:  # candidate_node_list doesn't fit
-            # TODO: Summarize next_nodes vs add it to the next chunk
+            # Determine whether to summarize next_nodes or add it to the next chunk
 
             # For these data_types, if should_summarize(), then next_nodes (and its descendants)
             # can be chunked and summarized. Use the summary

@@ -304,6 +304,23 @@ class MdNodeData:
         return content
 
 
+class HeadingSectionNodeData(MdNodeData):
+    def __init__(self, heading_node: Node, tree: Tree):
+        assert isinstance(heading_node.token, block_token.Heading)
+        self.heading_node = heading_node
+
+        data_id = f"_S{self.level}_{heading_node.token.line_number}"
+        super().__init__("HeadingSection", data_id, tree)
+
+    @property
+    def level(self) -> int:
+        return self.heading_node.token.level
+
+    @property
+    def raw_text(self) -> str:
+        return self.heading_node.data["raw_text"]
+
+
 class TokenNodeData(MdNodeData):
     counter = itertools.count()
 
@@ -418,7 +435,6 @@ class TokenNodeData(MdNodeData):
         return " ".join(oneliner) + (f": {content!r}" if content else "")
 
 
-# TODO: add unit test
 def remove_blank_lines(tree: Tree) -> int:
     "Remove BlankLine nodes from the tree"
     blank_line_counter = 0
@@ -496,12 +512,7 @@ def create_heading_sections(tree: Tree) -> int:
             continue
 
         hsection_counter += 1
-        hs_node_data = MdNodeData(
-            "HeadingSection", f"_S{n.token.level}_{n.token.line_number}", tree
-        )
-        hs_node_data["level"] = n.token.level  # FIXME: Add level to HeadingSection subclass
-        hs_node_data["raw_text"] = n.data["raw_text"]
-        # FIXME: Add raw_text to HeadingSection subclass
+        hs_node_data = HeadingSectionNodeData(n, tree)
         # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
         hs_node = n.prepend_sibling(hs_node_data, data_id=hs_node_data.data_id)
         # Get all siblings up to next Heading; these will be HeadingSection's new children
@@ -538,7 +549,7 @@ def nest_heading_sections(tree: Tree) -> int:
     last_heading_level = 0
     for hs_node in heading_sections:
         # Traverse the headings in order and update the heading_stack
-        heading_level = hs_node.first_child().token.level
+        heading_level = hs_node.level
         if heading_level > last_heading_level:
             # Handle the case where a heading level skips a level, compared to last heading
             for i in range(last_heading_level + 1, heading_level):
@@ -617,10 +628,10 @@ def prepare_tree(tree: Tree) -> None:
     add_list_and_table_intros(tree)
 
 
-def get_parent_headings(node: Node) -> Iterable[MdNodeData]:
+def get_parent_headings(node: Node) -> Iterable[HeadingSectionNodeData]:
     """
     Return the list of node's parent HeadingSections in order of appearance in the markdown text.
-    Check headings[i]["level"] for the heading level, which may not be consecutive.
+    Check headings[i].level for the heading level, which may not be consecutive.
     """
     assert node.tree, f"Node {node.data_id} has no tree"
     for func in [
@@ -637,21 +648,21 @@ def get_parent_headings(node: Node) -> Iterable[MdNodeData]:
     if node.data_type == "Heading" and node.parent.data_type == "HeadingSection":
         node = node.parent
 
-    headings: list[MdNodeData] = []
+    headings: list[HeadingSectionNodeData] = []
     while node := node.parent:
-        if node.data_type == "HeadingSection":
+        if isinstance(node.data, HeadingSectionNodeData):
             headings.append(node.data)
 
     for h in headings:
-        assert isinstance(h["level"], int), f"Expected int, got {h['level']!r}"
+        assert isinstance(h.level, int), f"Expected int, got {h.level!r}"
     return reversed(headings)
 
 
 def get_parent_headings_raw(node: Node) -> list[str]:
     "Returns the raw text of node's parent headings in level order, which may not be consecutive"
-    return [h["raw_text"] for h in get_parent_headings(node)]
+    return [h.raw_text for h in get_parent_headings(node)]
 
 
 def get_parent_headings_md(node: Node) -> list[str]:
     "Returns the markdown text of node's parent headings in level order, which may not be consecutive"
-    return [f"{"#" * h['level']} {h['raw_text']}" for h in get_parent_headings(node)]
+    return [f"{"#" * h.level} {h['raw_text']}" for h in get_parent_headings(node)]
