@@ -278,7 +278,7 @@ def test__format_web_subsections(chunks_with_scores):
     assert format_web_subsections(0, 0, chunks_with_scores, subsections, "") == "<div></div>"
     assert (
         format_web_subsections(0, 0, [], [], "Non-existant citation: (citation-0)")
-        == "<div><p>Non-existant citation: (citation-0)</p></div>"
+        == "<div><p>Non-existant citation: </p></div>"
     )
 
     assert (
