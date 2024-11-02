@@ -129,9 +129,11 @@ def find_closest_ancestor(
 class ProtoChunk:
     "Temporary data structure for storing chunk data before creating a Chunk object"
     id: str
+    nodes: list[Node]
     headings: list[str]
     markdown: str  # Markdown content of the chunk
-    length: int
+    embedding_str: str  # String used to create embedding
+    length: int  # Length of embedding_str
 
 
 class ChunkingConfig:
@@ -140,28 +142,38 @@ class ChunkingConfig:
         self.max_length = max_length
         self.chunks: dict[str, ProtoChunk] = {}
 
-        chunk_size = 7 * self.max_length  # Assume 7 characters per word
+        chunk_size = 5 * self.max_length  # Assume a low 5 characters per word
         chunk_overlap = 7 * 20  # 20 words (average sentence) overlap between chunks
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
 
+    def validate_chunks(self) -> None:
+        pass
+        # for chunk in self.chunks.values():
+        #     if not chunk.length < self.max_length:
+        #         raise AssertionError(f"{chunk.id} is too large! {chunk.length} > {self.max_length}")
+
     def text_length(self, markdown: str) -> int:
         return len(markdown.split())
 
-    def nodes_fit_in_chunk(self, nodes: Sequence[Node]) -> bool:
-        return self.text_length(self.nodes_to_markdown(nodes)) < self.max_length
+    def nodes_fit_in_chunk(self, nodes: list[Node]) -> bool:
+        chunk = self.create_protochunk(nodes)
+        return chunk.length < self.max_length
 
-    # FIXME: add context_str arg
-    def nodes_to_markdown(self, nodes: Sequence[Node]) -> str:
-        # Don't render Heading nodes by themselves
-        if len(nodes) == 1 and nodes[0].data_type in ["Heading"]:
-            return ""
-        return render_nodes_as_md(nodes)
+    def add_chunk(self, chunk: ProtoChunk) -> None:
+        # Don't add Heading nodes by themselves
+        if len(chunk.nodes) == 1 and chunk.nodes[0].data_type in ["Heading"]:
+            raise AssertionError(f"Unexpected single Heading node: {chunk.nodes[0].id_string}")
 
-    def create_chunk(
+        if not chunk.length < self.max_length:
+            raise AssertionError(f"{chunk.id} is too large! {chunk.length} > {self.max_length}")
+        logger.info("Adding chunk %s created from: %s", chunk.id, [c.data_id for c in chunk.nodes])
+        self.chunks[chunk.id] = chunk
+
+    def create_protochunk(
         self,
-        nodes: Sequence[Node],
+        nodes: list[Node],
         chunk_id_suffix: Optional[str] = None,
         breadcrumb_node: Optional[Node] = None,
         markdown: Optional[str] = None,
@@ -169,19 +181,21 @@ class ChunkingConfig:
         if not chunk_id_suffix:
             chunk_id_suffix = nodes[0].data_id
         chunk_id = f"{len(self.chunks)}:{chunk_id_suffix}"
-        headings = self._headings_with_doc_name(breadcrumb_node or nodes[0])
+
         if not markdown:
-            markdown = self.nodes_to_markdown(nodes)
+            markdown = render_nodes_as_md(nodes)
+        headings = self._headings_with_doc_name(breadcrumb_node or nodes[0])
+        context_str = "\n".join(headings)
+        embedding_str = f"{context_str.strip()}\n\n{markdown}"
+
         chunk = ProtoChunk(
             chunk_id,
+            nodes,
             headings,
             markdown,
-            self.text_length(markdown),
+            embedding_str,
+            self.text_length(embedding_str),
         )
-        if not self.text_length(chunk.markdown) < self.max_length:
-            raise AssertionError(f"{chunk_id} is too large! Check before calling create_chunk()")
-        logger.info("Created chunk %s from %i nodes", chunk_id, len(nodes))
-        self.chunks[chunk.id] = chunk
         return chunk
 
     def _headings_with_doc_name(self, node: Node) -> list[str]:
@@ -192,7 +206,7 @@ class ChunkingConfig:
             headings.insert(0, doc_name)
         return headings
 
-    def create_chunks_for_next_nodes(self, nodes: Sequence[Node]) -> None:
+    def create_chunks_for_next_nodes(self, nodes: list[Node]) -> None:
         if len(nodes) == 1:
             node = nodes[0]
         elif len(nodes) == 2:
@@ -204,17 +218,19 @@ class ChunkingConfig:
             "HeadingSection",
             "List",
             "Table",
-        ], f"This should have been handled by hierarchically_chunk_nodes(): {node.id_string}"
+        ], f"This should have been handled by hierarchically_chunk_nodes(): {node.id_string} {node.data['summary']!r}"
         logger.warning("If this is called often, use a better text splitter for %s", node.id_string)
 
-        markdown = self.nodes_to_markdown(nodes)
-        splits = self.text_splitter.split_text(markdown)
+        chunk = self.create_protochunk(nodes, breadcrumb_node=node)
+        splits = self.text_splitter.split_text(chunk.embedding_str)
         for i, split in enumerate(splits):
-            self.create_chunk(
-                nodes,
-                chunk_id_suffix=f"{node.data_id}[{i}]",
-                markdown=split,
-                breadcrumb_node=node,
+            self.add_chunk(
+                self.create_protochunk(
+                    nodes,
+                    chunk_id_suffix=f"{node.data_id}[{i}]",
+                    markdown=split,
+                    breadcrumb_node=node,
+                )
             )
 
     def should_summarize(self, next_nodes: Sequence[Node], node_buffer: Sequence[Node]) -> bool:
@@ -238,6 +254,7 @@ def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
             n.data[attr] = None
 
     hierarchically_chunk_nodes(tree.first_child(), config)
+    config.validate_chunks()
     return config.chunks
 
 
@@ -248,7 +265,7 @@ def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
 
     # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
     if config.nodes_fit_in_chunk([node]):
-        config.create_chunk([node])
+        config.add_chunk(config.create_protochunk([node]))
         # Don't need to recurse through child nodes
         return
 
@@ -312,21 +329,24 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
     # At any time, the contents of node_buffer should fit into a chunk,
     # so check if nodes_fit_in_chunk(node_buffer + [nodes]) before adding to node_buffer.
     node_buffer: list[Node] = []
-    intro_paragraph_node = None
+    intro_node = None
     chunks_to_create: list[list[Node]] = []
     for c in node.children:
         logger.debug("%s: Adding child node %s", node.data_id, c.data_id)
 
         if c.data["is_intro"] and c.data_type == "Paragraph":
-            intro_paragraph_node = c
+            intro_node = c
+            continue
+        if c.data_type == "Heading":
+            intro_node = c
             continue
 
-        if intro_paragraph_node:
-            # Keep the (previous) intro paragraph with c
-            next_nodes = [intro_paragraph_node, c]
-            intro_paragraph_node = None
+        if intro_node:
+            # Keep the (previous) intro paragraph/heading with c
+            next_nodes = [intro_node, c]
+            intro_node = None
         else:
-            # No intro paragraph, so only need to assess adding c
+            # Assess adding only c
             next_nodes = [c]
 
         candidate_node_list = node_buffer + next_nodes
@@ -348,14 +368,13 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
 
                     # Try again now that c has been chunked and summarized
                     if config.nodes_fit_in_chunk(candidate_node_list):
-                        # nodes_fit_in_chunk() calls nodes_as_markdown(), which will use the shorter
+                        # nodes_fit_in_chunk() calls render_nodes_as_md(), which will use the shorter
                         # summary text instead of the full text
                         node_buffer.extend(next_nodes)
                         continue
                     else:
                         # candidate_node_list still doesn't fit using the summarized next_nodes
-                        # Remove the summary since we don't want calls to nodes_as_markdown() to use it
-                        c.data["summary"] = None
+                        pass
 
             # Either no summary was created or candidate_node_list still doesn't fit using the summary
 
@@ -391,7 +410,8 @@ def _create_chunks(config: ChunkingConfig, node: Node, chunks_to_create: list[li
     If there are multiple chunks for the node, use a different chunk_id_suffix to make it obvious.
     """
     if len(chunks_to_create) == 1:
-        config.create_chunk(chunks_to_create[0], chunk_id_suffix=f"{node.data_id}")
+        chunk = config.create_protochunk(chunks_to_create[0], chunk_id_suffix=f"{node.data_id}")
+        config.add_chunk(chunk)
     else:
         for i, chunk_nodes in enumerate(chunks_to_create):
             # Make sure first_node is different from node. They can be the same when splitting Lists and Tables.
@@ -401,9 +421,10 @@ def _create_chunks(config: ChunkingConfig, node: Node, chunks_to_create: list[li
                 else chunk_nodes[0].data_id
             )
             # The chunk id identifies the node being split, the split number, and the first node in the chunk
-            config.create_chunk(
+            chunk = config.create_protochunk(
                 chunk_nodes,
                 chunk_id_suffix=f"{node.data_id}[{i}]:{first_node_id}",
                 # The headings breadcrumb should reflect the first item in chunk_nodes
                 breadcrumb_node=chunk_nodes[0],
             )
+            config.add_chunk(chunk)
