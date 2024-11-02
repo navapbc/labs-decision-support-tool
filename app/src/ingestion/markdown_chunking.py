@@ -1,5 +1,6 @@
 import logging
 import textwrap
+from functools import cached_property
 from copy import copy
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
@@ -131,6 +132,7 @@ class ProtoChunk:
     id: str
     nodes: list[Node]
     headings: list[str]
+    context_str: str  # Headings breadcrumb
     markdown: str  # Markdown content of the chunk
     embedding_str: str  # String used to create embedding
     length: int  # Length of embedding_str
@@ -142,17 +144,15 @@ class ChunkingConfig:
         self.max_length = max_length
         self.chunks: dict[str, ProtoChunk] = {}
 
-        chunk_size = 5 * self.max_length  # Assume a low 5 characters per word
-        chunk_overlap = 7 * 20  # 20 words (average sentence) overlap between chunks
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    @cached_property
+    def text_splitter(self) -> RecursiveCharacterTextSplitter:
+        return RecursiveCharacterTextSplitter(
+            chunk_size=5 * self.max_length,  # Assume a low 5 characters per word
+            chunk_overlap=7 * 20,  # 20 words (average sentence) overlap between chunks
         )
 
-    def validate_chunks(self) -> None:
-        pass
-        # for chunk in self.chunks.values():
-        #     if not chunk.length < self.max_length:
-        #         raise AssertionError(f"{chunk.id} is too large! {chunk.length} > {self.max_length}")
+    def reset(self) -> None:
+        self.chunks = {}
 
     def text_length(self, markdown: str) -> int:
         return len(markdown.split())
@@ -184,14 +184,17 @@ class ChunkingConfig:
 
         if not markdown:
             markdown = render_nodes_as_md(nodes)
+        markdown = markdown.strip()
+
         headings = self._headings_with_doc_name(breadcrumb_node or nodes[0])
         context_str = "\n".join(headings)
-        embedding_str = f"{context_str.strip()}\n\n{markdown}"
+        embedding_str = f"{context_str.strip()}\n\n{remove_links(markdown)}"
 
         chunk = ProtoChunk(
             chunk_id,
             nodes,
             headings,
+            context_str,
             markdown,
             embedding_str,
             self.text_length(embedding_str),
@@ -218,7 +221,7 @@ class ChunkingConfig:
             "HeadingSection",
             "List",
             "Table",
-        ], f"This should have been handled by hierarchically_chunk_nodes(): {node.id_string} {node.data['summary']!r}"
+        ], f"This should have been handled by split_heading_section_into_chunks(): {node.id_string} {node.data['summary']!r}"
         logger.warning("If this is called often, use a better text splitter for %s", node.id_string)
 
         chunk = self.create_protochunk(nodes, breadcrumb_node=node)
@@ -238,6 +241,7 @@ class ChunkingConfig:
         # Example on https://edd.ca.gov/en/jobs_and_training/FAQs_WARN/
         # Only the 1 larger accordion is chunked by itself and summarized.
         # The smaller accordions are included alongside other accordions.
+        # logger.debug("should_summarize: %f %s", next_nodes_portion, [n.data_id for n in next_nodes])
         return next_nodes_portion > 0.75
 
     def compose_summary_text(self, node: Node) -> str:
@@ -248,13 +252,20 @@ class ChunkingConfig:
 
 
 def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
+    config.reset()
     # Reset the tree for chunking
     for n in tree:
         for attr in ["summary"]:
             n.data[attr] = None
 
-    hierarchically_chunk_nodes(tree.first_child(), config)
-    config.validate_chunks()
+    node = tree.first_child()
+    # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
+    if config.nodes_fit_in_chunk([node]):
+        config.add_chunk(config.create_protochunk([node]))
+        # Don't need to recurse through child nodes
+    else:
+        # node is a Document node and structurally similar to a HeadingSection node
+        split_heading_section_into_chunks(node, config)
     return config.chunks
 
 
@@ -263,60 +274,65 @@ def hierarchically_chunk_nodes(node: Node, config: ChunkingConfig) -> None:
         not isinstance(node.data, TokenNodeData) or node.is_block_token()
     ), f"Expecting block-token, not {node.token}"
 
-    # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
-    if config.nodes_fit_in_chunk([node]):
-        config.add_chunk(config.create_protochunk([node]))
-        # Don't need to recurse through child nodes
-        return
 
-    # The remainder of this function deals with splitting up node's content into multiple chunks
-
-    if node.data_type in ["List", "Table"]:
-        # Split these specially since they have an intro sentence (and table header) to include for each chunk
-        split_list_or_table_node_into_chunks(node, config)
-        return
-
-    if node.data_type in ["Document", "HeadingSection"]:
-        logger.info("%s is too large for one chunk", node.data_id)
-        split_heading_section_into_chunks(node, config)
-        return
-
-    raise AssertionError(f"Unexpected data_type: {node.id_string}")
-
-
-def split_list_or_table_node_into_chunks(node: Node, config: ChunkingConfig) -> None:
+def split_list_or_table_node_into_chunks(
+    node: Node, config: ChunkingConfig, intro_node: Optional[Node] = None
+) -> None:
     assert node.data_type in ["List", "Table"]
     logger.info("Splitting large %s into multiple chunks", node.id_string)
 
-    def create_new_tree_with(children_ids: set[str]) -> Node:
+    def create_new_tree_with(
+        children_ids: set[str], intro_node: Optional[Node] = None
+    ) -> tuple[Node, Optional[Node]]:
         "Create a new tree keeping only the children in children_ids"
         block_node = copy_subtree(node)  # the List or Table node
-        # show_intro should be True since block_node's content is being split
-        block_node.data["show_intro"] = True
+        if intro_node:
+            assert intro_node.data[
+                "freeze_token_children"
+            ], f"Non-frozen intro_node {intro_node.id_string} will need its data and token copied to avoid modifying the original tree"
+            intro_node_copy = intro_node.copy_to(block_node.parent, before=block_node, deep=True)
+            assert not block_node.data["show_intro"]
+        else:
+            intro_node_copy = None
+            # Since intro_node is not provided, set show_intro=True so that
+            # the block_node.data["intro"] is rendered in place of intro_node
+            block_node.data["show_intro"] = True
         to_remove = {c.data_id for c in block_node.children} - children_ids
         remove_children_from(block_node, to_remove)
         assert {c.data_id for c in block_node.children} == children_ids
-        return block_node
+        return (block_node, intro_node_copy)
 
     chunks_to_create: list[list[Node]] = []
     children_ids = {c.data_id for c in node.children}
     # Copy the node's subtree, then gradually remove the last child until the content fits
+    # The first subtree will have the intro_node, if it exists
+    block_node, intro_node_copy = create_new_tree_with(children_ids, intro_node)
+    # Put the intro node before block_node
+    candidate_node_list = [intro_node_copy, block_node]
     while children_ids:  # Repeat until all the children are in some chunk
-        block_node = create_new_tree_with(children_ids)
-        while not config.nodes_fit_in_chunk([block_node]) and block_node.has_children():
+        while not config.nodes_fit_in_chunk(candidate_node_list) and block_node.has_children():
             remove_child(block_node, block_node.last_child())
 
         if block_node.has_children():
-            chunks_to_create.append([block_node])
+            chunks_to_create.append(candidate_node_list)
             for child_node in block_node.children:
                 children_ids.remove(child_node.data_id)
         else:
             raise AssertionError(f"{block_node.data_id} should have at least one child")
+
+        if not children_ids:
+            break
+
+        block_node, intro_node_copy = create_new_tree_with(children_ids)
+        # Subsequent subtrees will not have an intro_node
+        candidate_node_list = [block_node]
+
     _create_chunks(config, node, chunks_to_create)
 
 
 def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["Document", "HeadingSection"]
+
     logger.info(
         "Splitting large %s into chunks given children: %s",
         node.id_string,
@@ -360,7 +376,23 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
             if c.data_type in ["HeadingSection", "List", "Table"]:
                 if config.should_summarize(next_nodes, node_buffer):
                     # summarize child node that can be chunked by themselves
-                    hierarchically_chunk_nodes(c, config)
+                    # hierarchically_chunk_nodes(c, config)
+
+                    # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
+                    if config.nodes_fit_in_chunk(next_nodes):
+                        config.add_chunk(config.create_protochunk(next_nodes))
+                    elif c.data_type in ["HeadingSection"]:
+                        logger.info("%s is too large for one chunk", c.data_id)
+                        split_heading_section_into_chunks(c, config)
+                    elif c.data_type in ["List", "Table"]:
+                        # Split these specially since they have an intro sentence (and table header) to include for each chunk
+                        if len(next_nodes) == 2:
+                            split_list_or_table_node_into_chunks(c, config, next_nodes[0])
+                        else:
+                            split_list_or_table_node_into_chunks(c, config)
+                    else:
+                        raise AssertionError(f"Unexpected data_type: {c.id_string}")
+
                     # Then set a shorter summary text in a custom attribute
                     assert c.data["summary"] is None, "Summary should not be set yet"
                     c.data["summary"] = config.compose_summary_text(c)

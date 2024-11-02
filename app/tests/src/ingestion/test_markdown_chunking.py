@@ -119,18 +119,16 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     prepped_tree.print()
     chunks = chunk_tree(prepped_tree, config)
     pprint(list(chunks.values()), sort_dicts=False, width=140)
-    assert len(chunks) == 12
+    assert len(chunks) == 13
 
     for _id, chunk in chunks.items():
         assert chunk.length <= config.max_length
 
     table_chunks = [chunk for id, chunk in chunks.items() if ":T_" in id]
-    table_context = (
-        "(Table intro:)\n\n"
-        "| H3.2.T1: header 1     | H3.2.T1: header 2     | H3.2.T1: header 3     | H3.2.T1: header 4     |\n"
-    )
-    for chunk in table_chunks:
-        assert chunk.markdown.startswith(table_context)
+    table_heading = "| H3.2.T1: header 1     | H3.2.T1: header 2     | H3.2.T1: header 3     | H3.2.T1: header 4     |\n"
+    for i, chunk in enumerate(table_chunks):
+        table_intro = "Table intro:\n\n" if i==0 else "(Table intro:)\n\n"
+        assert chunk.markdown.startswith(table_intro+table_heading)
         assert chunk.headings == ["Heading 1", "Heading 2", "Heading 3"]
 
     # Ensure all lines in the original markdown text are present in the chunked markdown
@@ -143,7 +141,6 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     chunks_wo_headings = [chunk for _id, chunk in chunks.items() if not chunk.headings]
     # 1 doc intro paragraph + 2 H1 HeadingSections
     assert len(chunks_wo_headings) == 3
-    assert False
 
 
 def test_create_chunks_for_next_nodes():
@@ -177,4 +174,3 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
 
     for chunk in paragraph_chunks:
         assert chunk.headings == ["Long paragraph doc", "Heading 1"]
-    assert False

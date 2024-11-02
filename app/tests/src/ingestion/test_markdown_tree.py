@@ -283,7 +283,9 @@ def test_tree_preparation(tree):
 
         list_nodes = tree.find_all(match=lambda n: n.data_type == "List")
         assert list_nodes[0].data["intro"] == "List intro:\n"
-        assert list_nodes[1].data["intro"] == "Following list has *this last sentence* as the intro.\n"
+        assert (
+            list_nodes[1].data["intro"] == "Following list has *this last sentence* as the intro.\n"
+        )
         table_node = tree.find_first(match=lambda n: n.data_type == "Table")
         assert table_node.data["intro"] == "Table intro:\n"
 
