@@ -632,8 +632,11 @@ def _add_intro_attrib(node: Node) -> bool:
             # Mark the node being used as the intro as a hint when chunking to keep intro with the List/Table
             prev_node.data["is_intro"] = True
             return True
+        elif prev_node.data_type in ["List", "BlockCode", "ThematicBreak"]:
+            # ThematicBreak example: horizontal rule
+            pass
         else:
-            raise ValueError(f"Unexpected prev node type: {prev_node.id_string}")
+            raise ValueError(f"{node.data_id} Unexpected prev node type: {prev_node.id_string}")
     return False
 
 
