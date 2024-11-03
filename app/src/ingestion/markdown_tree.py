@@ -308,6 +308,7 @@ class HeadingSectionNodeData(MdNodeData):
     def __init__(self, heading_node: Node, tree: Tree):
         assert isinstance(heading_node.token, block_token.Heading)
         self.heading_node = heading_node
+        # heading_node.data["rendered_text"] = render_nodes_as_md(heading_node.children)
 
         data_id = f"_S{self.level}_{heading_node.token.line_number}"
         super().__init__("HeadingSection", data_id, tree)
@@ -320,6 +321,9 @@ class HeadingSectionNodeData(MdNodeData):
     def raw_text(self) -> str:
         return self.heading_node.data["raw_text"]
 
+    @property
+    def rendered_text(self) -> str:
+        return self.heading_node.render()
 
 class TokenNodeData(MdNodeData):
     counter = itertools.count()
@@ -384,7 +388,7 @@ class TokenNodeData(MdNodeData):
     @classmethod
     def render_token(cls: type["TokenNodeData"], token: Token) -> str:
         "Render the token and its descendants using the custom MarkdownRenderer"
-        # MD renderer should always be used within a context manager
+        # md_renderer should always be used within a context manager
         with cls.md_renderer as renderer:
             if token.type in ["TableRow"]:
                 return renderer.table_row_to_line(
@@ -447,7 +451,7 @@ def remove_blank_lines(tree: Tree) -> int:
 
 
 def remove_child(node: Node, child: Node) -> None:
-    logger.info("Removing child %s from %s", child.data_id, node.data_id)
+    logger.debug("Removing child %s from %s", child.data_id, node.data_id)
     # Update node.token.children since that's used for rendering
     node.data.token.children.remove(child.data.token)
     # Then remove the child from the tree
@@ -488,9 +492,9 @@ def hide_span_tokens(tree: Tree) -> int:
 
         # Add raw text content for Heading nodes to use the text in heading breadcrumbs
         if data_type == "Heading":
+            # Do this before removing the children
             raw_text_nodes = node.find_all(match=lambda n: n.data_type == "RawText")
-            assert len(raw_text_nodes) == 1, f"Expected 1 RawText node for {node.data_id}"
-            node.data["raw_text"] = raw_text_nodes[0].token.content
+            node.data["raw_text"] = "".join([n.token.content for n in raw_text_nodes])
 
         # Set attribute to indicate that node.token.children tokens should never be modified
         node.data["freeze_token_children"] = True
@@ -608,6 +612,7 @@ def _add_intro_attrib(node: Node) -> bool:
                 logger.info("Skipping %s: already has intro %r", node.data_id, node.data["intro"])
                 return False  # Don't override existing intro
 
+            # Use the unformatted raw_text (for Heading nodes)
             intro_md = prev_node.data["raw_text"] or prev_node.render()
             # Limit size of intro by using only the last sentence
             node.data["intro"] = intro_md.split(". ")[-1]
@@ -648,21 +653,18 @@ def get_parent_headings(node: Node) -> Iterable[HeadingSectionNodeData]:
     if node.data_type == "Heading" and node.parent.data_type == "HeadingSection":
         node = node.parent
 
-    headings: list[HeadingSectionNodeData] = []
+    hsections: list[HeadingSectionNodeData] = []
     while node := node.parent:
         if isinstance(node.data, HeadingSectionNodeData):
-            headings.append(node.data)
-
-    for h in headings:
-        assert isinstance(h.level, int), f"Expected int, got {h.level!r}"
-    return reversed(headings)
+            hsections.append(node.data)
+    return reversed(hsections)
 
 
 def get_parent_headings_raw(node: Node) -> list[str]:
     "Returns the raw text of node's parent headings in level order, which may not be consecutive"
-    return [h.raw_text for h in get_parent_headings(node)]
+    return [hs.raw_text.strip() for hs in get_parent_headings(node)]
 
 
 def get_parent_headings_md(node: Node) -> list[str]:
     "Returns the markdown text of node's parent headings in level order, which may not be consecutive"
-    return [f"{"#" * h.level} {h['raw_text']}" for h in get_parent_headings(node)]
+    return [hs.rendered_text.strip() for hs in get_parent_headings(node)]
