@@ -51,7 +51,6 @@ def copy_subtree(node: Node, include_ancestors: bool = True) -> Tree:
     Returns a new tree for the node, its descendants, and optionally its ancestors (to capture headings).
     Each node's contents is deep-copied, including node.data and node.data.token.
     """
-    logger.info("Creating new tree from subtree %s", node.data_id)
     subtree = Tree(f"{node.data_id} subtree", shadow_attrs=True)
     # Copy the nodes and descendants; this does not deep-copy node.data objects
     # For some reason, copy_to() assigns a random data_id to the new node in subtree
@@ -154,9 +153,11 @@ class ChunkingConfig:
 
     @cached_property
     def text_splitter(self) -> RecursiveCharacterTextSplitter:
+        chars_per_word = 4  # Assume a low 4 characters per word
+        overlapping_words = 15  # 15 words overlap between chunks
         return RecursiveCharacterTextSplitter(
-            chunk_size=5 * self.max_length,  # Assume a low 5 characters per word
-            chunk_overlap=7 * 20,  # 20 words (average sentence) overlap between chunks
+            chunk_size=chars_per_word * (self.max_length - overlapping_words),
+            chunk_overlap=chars_per_word * overlapping_words,
         )
 
     def reset(self) -> None:
@@ -189,6 +190,7 @@ class ChunkingConfig:
         if not chunk_id_suffix:
             chunk_id_suffix = nodes[0].data_id
         chunk_id = f"{len(self.chunks)}:{chunk_id_suffix}"
+        logger.info("Creating protochunk for %s using %s", chunk_id, [c.data_id for c in nodes])
 
         if not markdown:
             markdown = render_nodes_as_md(nodes)
@@ -296,6 +298,7 @@ def split_list_or_table_node_into_chunks(
         children_ids: set[str], intro_node: Optional[Node] = None
     ) -> tuple[Node, Optional[Node]]:
         "Create a new tree keeping only the children in children_ids"
+        logger.debug("Creating new tree with %s", children_ids)
         block_node = copy_subtree(node)  # the List or Table node
         if intro_node:
             assert intro_node.data[
@@ -318,8 +321,11 @@ def split_list_or_table_node_into_chunks(
     # Copy the node's subtree, then gradually remove the last child until the content fits
     # The first subtree will have the intro_node, if it exists
     block_node, intro_node_copy = create_new_tree_with(children_ids, intro_node)
-    # Put the intro node before block_node
-    candidate_node_list = [intro_node_copy, block_node]
+    if intro_node:
+        # Put the intro node before block_node
+        candidate_node_list = [intro_node_copy, block_node]
+    else:
+        candidate_node_list = [block_node]
     while children_ids:  # Repeat until all the children are in some chunk
         while not config.nodes_fit_in_chunk(candidate_node_list) and block_node.has_children():
             remove_child(block_node, block_node.last_child())
@@ -408,7 +414,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
             else:  # node_with_intro needs to be split into multiple chunks
                 config.create_chunks_for_next_nodes(node_with_intro)
 
-    assert not intro_node, f"intro_node {intro_node.data_id} should have been added to node_with_intro"
+    assert not intro_node, f"Was intro_node {intro_node.data_id} added to a node_buffer?"
     if node_buffer:  # Create a chunk with the remaining nodes
         if config.nodes_fit_in_chunk(node_buffer):
             chunks_to_create.append(node_buffer)
@@ -455,12 +461,10 @@ def _create_chunks(config: ChunkingConfig, node: Node, chunks_to_create: list[li
         if len(chunk_nodes) == 1 and chunk_nodes[0].data_type in ["Heading"]:
             # Don't chunk lone heading nodes
             return
-        logger.info("Creating %s chunk for %s: %s", len(chunks_to_create), node.data_id, [c.data_id for c in chunk_nodes])
         chunk = config.create_protochunk(chunk_nodes, chunk_id_suffix=f"{node.data_id}")
         config.add_chunk(chunk)
     else:
         for i, chunk_nodes in enumerate(chunks_to_create):
-            logger.info("Creating %s chunks for %s: %s", len(chunk_nodes), node.data_id, [c.data_id for c in chunk_nodes])
             # Make sure first_node is different from node. They can be the same when splitting Lists and Tables.
             first_node_id = (
                 chunk_nodes[0].first_child().data_id
