@@ -127,8 +127,8 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     table_chunks = [chunk for id, chunk in chunks.items() if ":T_" in id]
     table_heading = "| H3.2.T1: header 1     | H3.2.T1: header 2     | H3.2.T1: header 3     | H3.2.T1: header 4     |\n"
     for i, chunk in enumerate(table_chunks):
-        table_intro = "Table intro:\n\n" if i==0 else "(Table intro:)\n\n"
-        assert chunk.markdown.startswith(table_intro+table_heading)
+        table_intro = "Table intro:\n\n" if i == 0 else "(Table intro:)\n\n"
+        assert chunk.markdown.startswith(table_intro + table_heading)
         assert chunk.headings == ["Heading 1", "Heading 2", "Heading 3"]
 
     # Ensure all lines in the original markdown text are present in the chunked markdown

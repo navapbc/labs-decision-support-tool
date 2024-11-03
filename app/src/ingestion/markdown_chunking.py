@@ -1,8 +1,8 @@
 import logging
 import textwrap
-from functools import cached_property
 from copy import copy
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Callable, NamedTuple, Optional, Sequence
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -209,18 +209,18 @@ class ChunkingConfig:
             self.text_length(embedding_str),
         )
         return chunk
-    
+
     def _replace_table_separators(self, markdown: str) -> str:
         "Workaround for tokenizers that count each dash in a table separator as a token"
         if "| ---" not in markdown:
             return markdown
-        
+
         lines = markdown.splitlines()
         for i, line in enumerate(lines):
             if line.startswith("| ---"):
-                cols = line.count(' |') -1
-                lines[i] = '| ' +  '--- | ' * cols
-        return '\n'.join(lines)
+                cols = line.count(" |") - 1
+                lines[i] = "| " + "--- | " * cols
+        return "\n".join(lines)
 
     def _headings_with_doc_name(self, node: Node) -> list[str]:
         headings = get_parent_headings_raw(node)
