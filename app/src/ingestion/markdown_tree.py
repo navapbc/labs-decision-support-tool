@@ -56,7 +56,7 @@ def create_markdown_tree(
         # Otherwise, markdown_renderer.BlankLine, HtmlSpan, etc will not be created and possibly other features
         doc = mistletoe.Document(markdown)
     # The shadow_attrs=True argument allows accessing node.data.age as node.age -- see validate_tree()
-    tree = Tree(name, shadow_attrs=True)
+    tree = Tree(name, shadow_attrs=True, calc_data_id=_get_node_data_id)
     tree.system_root.set_meta("prep_funcs", [])
     _populate_nutree(tree.system_root, doc)
     if doc_name:
@@ -64,6 +64,18 @@ def create_markdown_tree(
         tree.first_child().data["name"] = doc_name
     validate_tree(tree)
     return tree
+
+
+def _get_node_data_id(_tree: Tree, data: Any) -> str:
+    """
+    In addition to being used to set the data_id of a node, this is called by nutree to find a node
+    e.g., tree['H1_2'] and tree[node.token]
+    """
+    if isinstance(data, MdNodeData):
+        return data.data_id
+    elif isinstance(data, Token):
+        return data.data_id
+    raise ValueError("Cannot found node with data: {data!r}")
 
 
 def markdown_tokens_as_json(markdown: str) -> str:
@@ -101,7 +113,7 @@ def _new_md_renderer() -> MarkdownRenderer:
 
 def _populate_nutree(parent: Node, token: Token) -> Node:
     data = TokenNodeData(token, parent.tree)
-    node = parent.add(data, data_id=data.data_id)
+    node = parent.add(data)
     if token.children:
         # Recurse to create children nodes
         for child_token in token.children:
@@ -518,7 +530,7 @@ def create_heading_sections(tree: Tree) -> int:
         hsection_counter += 1
         hs_node_data = HeadingSectionNodeData(n, tree)
         # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
-        hs_node = n.prepend_sibling(hs_node_data, data_id=hs_node_data.data_id)
+        hs_node = n.prepend_sibling(hs_node_data)
         # Get all siblings up to next Heading; these will be HeadingSection's new children
         children = list(get_siblings_up_to(n, "Heading"))
         # Move in order the Heading and associated children to the new HeadingSection node
