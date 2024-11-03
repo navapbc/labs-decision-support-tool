@@ -132,6 +132,9 @@ class NodeWithIntro:
         self.intro_node = intro_node
         self.as_list = [intro_node, node] if intro_node else [node]
 
+    def __str__(self) -> str:
+        return f"{self.node.data_id}{f' with intro {self.intro_node.data_id}' if self.intro_node else ''}"
+
 
 @dataclass
 class ProtoChunk:
@@ -167,6 +170,7 @@ class ChunkingConfig:
         return len(markdown.split())
 
     def nodes_fit_in_chunk(self, nodes: list[Node]) -> bool:
+        logger.debug("Checking fit: %s", [n.data_id for n in nodes])
         chunk = self.create_protochunk(nodes)
         return chunk.length < self.max_length
 
@@ -190,7 +194,7 @@ class ChunkingConfig:
         if not chunk_id_suffix:
             chunk_id_suffix = nodes[0].data_id
         chunk_id = f"{len(self.chunks)}:{chunk_id_suffix}"
-        logger.info("Creating protochunk for %s using %s", chunk_id, [c.data_id for c in nodes])
+        # logger.info("Creating protochunk %s using %s", chunk_id, [c.data_id for c in nodes])
 
         if not markdown:
             markdown = render_nodes_as_md(nodes)
@@ -253,7 +257,7 @@ class ChunkingConfig:
                 )
             )
 
-    def should_summarize(self, node_with_intro: NodeWithIntro, node_buffer: Sequence[Node]) -> bool:
+    def should_summarize(self, node_with_intro: NodeWithIntro) -> bool:
         next_nodes_portion = (
             self.text_length(render_nodes_as_md(node_with_intro.as_list)) / self.max_length
         )
@@ -273,6 +277,7 @@ class ChunkingConfig:
 def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     config.reset()
     # Reset the tree for chunking
+    # FIXME: move to reset()?
     for n in tree:
         for attr in ["summary"]:
             n.data[attr] = None
@@ -288,67 +293,135 @@ def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     return config.chunks
 
 
+def _create_new_tree_with(
+    orig_node: Node, children_ids: dict[str,Node], intro_node: Optional[Node] = None
+) -> NodeWithIntro:
+    "Create a new tree keeping only the children in children_ids"
+    logger.debug("Creating new tree with %s", [f"{id},{c.data['summary']}" for id,c in children_ids.items()])
+    block_node = copy_subtree(orig_node)  # the List or Table node
+    if intro_node:
+        assert intro_node.data[
+            "freeze_token_children"
+        ], f"Non-frozen intro_node {intro_node.id_string} will need its data and token copied to avoid modifying the original tree"
+        intro_node_copy = intro_node.copy_to(block_node.parent, before=block_node, deep=True)
+        assert not block_node.data["show_intro"]
+    else:
+        intro_node_copy = None
+        # Since intro_node is not provided, set show_intro=True so that
+        # the block_node.data["intro"] is rendered in place of intro_node
+        block_node.data["show_intro"] = True
+    to_remove = {c.data_id for c in block_node.children} - children_ids.keys()
+    remove_children_from(block_node, to_remove)
+    
+    assert {c.data_id for c in block_node.children} == children_ids.keys()
+    return NodeWithIntro(block_node, intro_node_copy)
+
+import pdb
+
 def split_list_or_table_node_into_chunks(
     node: Node, config: ChunkingConfig, intro_node: Optional[Node] = None
 ) -> None:
     assert node.data_type in ["List", "Table"]
+    assert node.children, f"{node.id_string} should have children to split"
     logger.info("Splitting large %s into multiple chunks", node.id_string)
 
-    def create_new_tree_with(
-        children_ids: set[str], intro_node: Optional[Node] = None
-    ) -> tuple[Node, Optional[Node]]:
-        "Create a new tree keeping only the children in children_ids"
-        logger.debug("Creating new tree with %s", children_ids)
-        block_node = copy_subtree(node)  # the List or Table node
-        if intro_node:
-            assert intro_node.data[
-                "freeze_token_children"
-            ], f"Non-frozen intro_node {intro_node.id_string} will need its data and token copied to avoid modifying the original tree"
-            intro_node_copy = intro_node.copy_to(block_node.parent, before=block_node, deep=True)
-            assert not block_node.data["show_intro"]
-        else:
-            intro_node_copy = None
-            # Since intro_node is not provided, set show_intro=True so that
-            # the block_node.data["intro"] is rendered in place of intro_node
-            block_node.data["show_intro"] = True
-        to_remove = {c.data_id for c in block_node.children} - children_ids
-        remove_children_from(block_node, to_remove)
-        assert {c.data_id for c in block_node.children} == children_ids
-        return (block_node, intro_node_copy)
-
     chunks_to_create: list[list[Node]] = []
-    children_ids = {c.data_id for c in node.children}
+    children_ids = {c.data_id:c for c in node.children}
     # Copy the node's subtree, then gradually remove the last child until the content fits
-    # The first subtree will have the intro_node, if it exists
-    block_node, intro_node_copy = create_new_tree_with(children_ids, intro_node)
-    if intro_node:
-        # Put the intro node before block_node
-        candidate_node_list = [intro_node_copy, block_node]
-    else:
-        candidate_node_list = [block_node]
+    # If that doesn't work, start summarize the each sublist
+
+    # Only the first subtree will have the intro_node, if it exists
+    candidate_node = _create_new_tree_with(node, children_ids, intro_node)
     while children_ids:  # Repeat until all the children are in some chunk
-        while not config.nodes_fit_in_chunk(candidate_node_list) and block_node.has_children():
+        block_node = candidate_node.node
+        logger.info("Trying to fit %s into a chunk by gradually removing children: %s", block_node.data_id,
+                    [c.data_id for c in block_node.children])
+        while not config.nodes_fit_in_chunk(candidate_node.as_list) and block_node.has_children():
             remove_child(block_node, block_node.last_child())
 
         if block_node.has_children():
-            chunks_to_create.append(candidate_node_list)
+            logger.info("Fits into a chunk: %s", [c.data_id for c in block_node.children])
+            chunks_to_create.append(candidate_node.as_list)
+            # Don't need intro_node for subsequent subtrees
+            intro_node = None
             for child_node in block_node.children:
-                children_ids.remove(child_node.data_id)
-        else:
-            raise AssertionError(f"{block_node.data_id} should have at least one child")
+                del children_ids[child_node.data_id]
+        else:  # List doesn't fit with any children
+            # Reset the tree (restore children) and try to summarize the sublists
+            candidate_node = _create_new_tree_with(node, children_ids, intro_node)
+            if _summarize_big_listitems(candidate_node, config):
+              logger.info("Summarized big list items")
+              continue  # Try again with the reset tree and candidate_node
+            else:
+                # TODO: Fall back to use RecursiveCharacterTextSplitter
+                raise AssertionError(f"{block_node.data_id} should have at least one child")
 
-        if not children_ids:
-            break
-
-        block_node, _no_intro_node = create_new_tree_with(children_ids)
-        # Subsequent subtrees will not have an intro_node
-        candidate_node_list = [block_node]
+        if children_ids:  # Prep for the next loop iteration
+            # Subsequent subtrees don't need an intro_node
+            candidate_node = _create_new_tree_with(node, children_ids)
 
     _create_chunks(config, node, chunks_to_create)
 
 
+def _summarize_big_listitems(candidate_node: NodeWithIntro, config: ChunkingConfig) -> bool:
+    summarized = False
+    for li in reversed(candidate_node.node.children):
+        li_candidate = NodeWithIntro(li)
+        if config.should_summarize(li_candidate):
+            logger.info("Summarizing big list item %s", li.data_id)
+            _chunk_and_summarize_next_nodes(config, li_candidate)
+
+            paragraph_child = li.find_first(match=lambda n: n.data_type == "Paragraph")
+            to_remove = {c.data_id for c in li.children if c != paragraph_child}
+            remove_children_from(li, to_remove)
+            paragraph_child.token.content = li.data["summary"]
+
+            summarized = True
+    return summarized
+    sublists = {}
+    for li in reversed(node.children):
+        list_children = li.find_all(match=lambda n: n.data_type == "List")
+        assert len(list_children) <= 1, f"Unexpected multiple List children: {li.data_id}"
+        if not list_children:
+            continue
+        list_child = list_children[0]
+        # not yet summarized
+        if not list_child.data["summary"]:
+            prev_sibling = list_child.prev_sibling()
+            sublist_intro_node = (
+                prev_sibling if prev_sibling and prev_sibling.data["is_intro"] else None
+            )
+            sublists[li.data_id] = NodeWithIntro(list_child, sublist_intro_node)
+    logger.info(
+        "Sublists: %s",
+        [
+            f"{sublist_id} => {sublist_with_intro}"
+            for sublist_id, sublist_with_intro in sublists.items()
+        ],
+    )
+    if sublists:
+        # Summarize sublist starting from the last child
+        summarized = False
+        for sublist_id, sublist_with_intro in sublists.items():
+            sublist = sublist_with_intro.node.parent
+            if config.should_summarize(sublist_with_intro):
+                logger.info("Summarizing sublist %s", sublist_with_intro)
+                # sublist doesn't need an intro_node
+                # sublist_node = NodeWithIntro(sublist, p_node)
+                # Recurse: _chunk_and_summarize_next_nodes() will call split_list_or_table_node_into_chunks()
+                _chunk_and_summarize_next_nodes(config, sublist_with_intro)
+                # Try again now that sublist_node has been chunked and summarized.
+                # # nodes_fit_in_chunk() calls render_nodes_as_md(), which will use the shorter
+                # # summary text instead of the full text
+                # if config.nodes_fit_in_chunk(candidate_node_buffer):
+                #     node_buffer = candidate_node_buffer
+                #     continue
+                summarized = True
+        return summarized
+    return False
+
 def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> None:
-    assert node.data_type in ["Document", "HeadingSection"]
+    assert node.data_type in ["Document", "HeadingSection", "ListItem"]
 
     logger.info(
         "Splitting large %s into chunks given children: %s",
@@ -386,7 +459,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
 
             # For these data_types, node_with_intro (and its descendants) can be chunked and summarized
             can_summarize = node_with_intro.node.data_type in ["HeadingSection", "List", "Table"]
-            if can_summarize and config.should_summarize(node_with_intro, node_buffer):
+            if can_summarize and config.should_summarize(node_with_intro):
                 _chunk_and_summarize_next_nodes(config, node_with_intro)
                 # Try again now that node_with_intro has been chunked and summarized.
                 # nodes_fit_in_chunk() calls render_nodes_as_md(), which will use the shorter
@@ -429,7 +502,7 @@ def _chunk_and_summarize_next_nodes(config, node_with_intro: NodeWithIntro):
     # See if the node's contents fit, including descendants
     if config.nodes_fit_in_chunk(node_with_intro.as_list):
         config.add_chunk(config.create_protochunk(node_with_intro.as_list))
-    elif node.data_type in ["HeadingSection"]:
+    elif node.data_type in ["HeadingSection", "ListItem"]:
         logger.info("%s is too large for one chunk", node.data_id)
         split_heading_section_into_chunks(node, config)
     elif node.data_type in ["List", "Table"]:

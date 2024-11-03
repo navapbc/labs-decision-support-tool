@@ -124,7 +124,11 @@ def _populate_nutree(parent: Node, token: Token) -> Node:
 def validate_tree(tree: Tree) -> None:
     for node in tree:
         assert node.data.tree is tree
-        assert node.data.node is node
+        if node.data.node is not node:
+            nodes = tree.find_all(data_id=node.data_id)
+            print(f"Found {len(nodes)} nodes with data_id {node.data_id}")
+            # FIXME: 
+            assert node.data.node is node, f"Node {node.data_id!r} has mismatched node: {node.data.node!r} and {node!r}"
         assert (
             node.data_id == node.data.data_id
         ), f"Node {node.data_id!r} has mismatched data_id: {node.data_id!r} and {node.data.data_id!r}"
@@ -336,6 +340,7 @@ class HeadingSectionNodeData(MdNodeData):
     @property
     def rendered_text(self) -> str:
         return self.heading_node.render()
+
 
 class TokenNodeData(MdNodeData):
     counter = itertools.count()
