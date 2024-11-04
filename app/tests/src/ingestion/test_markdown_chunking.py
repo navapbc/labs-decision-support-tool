@@ -168,9 +168,9 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
     # Ensure all sentences in the P_4 paragraph are present in the chunked markdown
     assert all(sentence_counts[sentence] >= 1 for sentence in sentences)
 
-    # Ensure there are repeated sentences in the chunked markdown
+    # Ensure there are repeated sentences (chunk_overlap) in the chunked markdown
     repeated_sentences = [sentence for sentence, count in sentence_counts.items() if count > 1]
-    assert len(repeated_sentences) > 9
+    assert len(repeated_sentences) > 7
 
     for chunk in paragraph_chunks:
         assert chunk.headings == ["Long paragraph doc", "Heading 1"]

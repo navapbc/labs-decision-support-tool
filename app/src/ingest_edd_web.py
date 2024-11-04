@@ -2,7 +2,7 @@ import json
 import logging
 import re
 import sys
-from typing import Sequence
+from typing import Optional, Sequence
 
 from smart_open import open as smart_open
 
@@ -39,8 +39,12 @@ def _ingest_edd_web(
         sum(len(chunks) for _, chunks, _ in all_chunks),
     )
     for document, chunks, splits in all_chunks:
+        if not chunks:
+            logger.warning("No chunks for %r", document.source)
+            continue
         logger.info("Adding embeddings for %r", document.source)
         # Next, add embeddings to each chunk (slow)
+        # TODO: Kevin mentioned adding column chunk.embedding_str; set it to s.text_to_encode
         add_embeddings(chunks, [s.text_to_encode for s in splits])
         logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
 
@@ -51,10 +55,19 @@ def _ingest_edd_web(
 
 class SplitWithContextText:
 
-    def __init__(self, headings: Sequence[str], text: str, context_str: str):
+    def __init__(
+        self,
+        headings: Sequence[str],
+        text: str,
+        context_str: str,
+        text_to_encode: Optional[str] = None,
+    ):
         self.headings = headings
         self.text = text
-        self.text_to_encode = f"{context_str}\n\n" + remove_links(text)
+        if text_to_encode:
+            self.text_to_encode = text_to_encode
+        else:
+            self.text_to_encode = f"{context_str.strip()}\n\n" + remove_links(text)
         self.token_count = len(tokenize(self.text_to_encode))
 
     def add_if_within_limit(self, paragraph: str, delimiter: str = "\n\n") -> bool:
@@ -99,14 +112,75 @@ def _create_chunks(
     return result
 
 
+USE_MARKDOWN_TREE = True
+
+from nutree import Node
+
+from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree, shorten
+from src.ingestion.markdown_tree import create_markdown_tree, prepare_tree
+
+
+class EddChunkingConfig(ChunkingConfig):
+    def __init__(self):
+        super().__init__(app_config.sentence_transformer.max_seq_length)
+
+    def text_length(self, text: str) -> int:
+        return len(tokenize(text))
+
+    def compose_summary_text(self, node: Node) -> str:
+        if node.data_type not in ["Heading", "HeadingSection", "List", "ListItem"]:
+            return ""
+        if not (md:=node.render()):
+            logger.warning("No markdown for %s: children=%s", node, [c.data_id for c in node.children])
+
+        summary = shorten(remove_links(md.splitlines()[0]), 200, placeholder="...")
+        return f"({summary})\n\n"
+
+
+# chunking_config: Optional[EddChunkingConfig] = None
+
+from pprint import pprint
+
+
 def _chunk_page(
     document: Document, content: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     splits: list[SplitWithContextText] = []
-    for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
-        # Start a new split for each heading
-        section_splits = _split_heading_section(headings, text)
-        splits.extend(section_splits)
+    if USE_MARKDOWN_TREE:
+        if document.source.startswith("https://edd.ca.gov/en/uibdg"):
+            return [], []
+        # if document.source != "https://edd.ca.gov/en/uibdg/Trade_Dispute_TD_280/":
+        #     return [], []
+        # global chunking_config
+        # if not chunking_config:
+        chunking_config = EddChunkingConfig()
+
+        # Fix markdown formatting that causes markdown parsing errors
+        # '. . .' is parsed as sublists on the same line
+        content = content.replace('. . .', '...')  # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
+        # '. * ' is parsed as sublists; incorrect markdown from scraping
+        content = content.replace('. *\n', '. \n')  # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
+        # nested sublist '+' created without parent list; incorrect markdown from scraping?
+        content = content.replace('* + ', '    + ') # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
+
+        tree = create_markdown_tree(content, doc_name=document.name)
+        print(document.name)
+        # tree.print()
+        prepare_tree(tree)
+        # tree.print()
+        tree_chunks = chunk_tree(tree, chunking_config)
+        # pprint(list(tree_chunks.values()), sort_dicts=False, width=140)
+        for _id, chunk in tree_chunks.items():
+            splits.append(
+                SplitWithContextText(
+                    chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
+                )
+            )
+    else:
+        for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
+            # Start a new split for each heading
+            section_splits = _split_heading_section(headings, text)
+            splits.extend(section_splits)
 
     chunks = [
         Chunk(
