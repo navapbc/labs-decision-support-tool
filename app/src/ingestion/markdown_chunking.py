@@ -144,6 +144,7 @@ class ProtoChunk:
     "Temporary data structure for storing chunk data before creating a Chunk object"
     id: str
     nodes: list[Node]
+    data_ids: list[str]
     headings: list[str]
     context_str: str  # Headings breadcrumb
     markdown: str  # Markdown content of the chunk
@@ -211,6 +212,7 @@ class ChunkingConfig:
         chunk = ProtoChunk(
             chunk_id,
             nodes,
+            [n.data_id for n in nodes],
             headings,
             context_str,
             markdown,
@@ -245,7 +247,7 @@ class ChunkingConfig:
             "HeadingSection",
             "List",
             "Table",
-        ], f"This should have been handled by split_heading_section_into_chunks(): {node.id_string} {node.data['summary']!r}"
+        ], f"This should have been handled by split_heading_section_into_chunks(): {node.id_string}"
         logger.warning("If this is called often, use a better text splitter for %s", node.id_string)
 
         temp_chunk = self.create_protochunk(node_with_intro.as_list, breadcrumb_node=node)
@@ -297,7 +299,7 @@ def _create_new_tree_with(
 ) -> NodeWithIntro:
     "Create a new tree keeping only the children in children_ids"
     logger.debug(
-        "Creating new tree with children: %s", [f"{id}(summary {c.data['summary']!r})" for id, c in children_ids.items()]
+        "Creating new tree with children: %s", children_ids.keys()
     )
     block_node = copy_subtree(orig_node)  # the List or Table node
     if intro_node:
@@ -361,7 +363,8 @@ def split_list_or_table_node_into_chunks(
             if summarized_node:
                 logger.info("Summarized big list items into %s", summarized_node)
                 logger.debug("children_ids: %s", children_ids.keys())
-                summarized_items = list(candidate_node.node.children)
+                candidate_node.node.tree.print()
+                # summarized_items = list(candidate_node.node.children)
                 # for n in summarized_items:
                 #     del children_ids[n.data_id]
                 # logger.debug("New children_ids: %s", children_ids.keys())
@@ -381,38 +384,13 @@ def _summarize_big_listitems(candidate_node: NodeWithIntro, config: ChunkingConf
     assert (
         candidate_node.node.data_type == "List"
     ), f"Unexpected data_type {candidate_node.node.data_type}"
-    for li in reversed(candidate_node.node.children):
+    # TODO: This summarizes ALL list items, not just the big ones. Make this smarter.
+    for li in list(candidate_node.node.children):
         assert li.data_type == "ListItem", f"Unexpected child {li.id_string}"
         li_candidate = NodeWithIntro(li)
         if config.should_summarize(li_candidate):
             logger.info("Summarizing big list item %s", li.data_id)
             li_candidate = _chunk_and_summarize_next_nodes(config, li_candidate)
-
-            # paragraph_child = li.find_first(match=lambda n: n.data_type == "Paragraph")
-            # to_remove = {c.data_id for c in li.children if c != paragraph_child}
-            # remove_children_from(li, to_remove)
-            # paragraph_child.token.content = li.data["summary"]
-
-            # FIXME: this modifies the paragraph token in the orig tree!
-            # paragraph_child.token.content = li.id_string + f" summary:{li.data['summary']!r}\n\n"
-            # p=block_token.Paragraph(lines=["some\\n", "continuous\\n", "lines\\n"])
-            # p.line_number = 0
-
-            # Since li_candidate has been chunked, set its summary text so that a shorter version is used
-            # FIXME: When it's rendered, the summary text is not used b/c render_nodes_as_md() 
-            # calls render_subtree_as_md(), which calls TokenNodeData.render_token() which doesn't use the "summary"
-
-            # node.data["summary"] is only used if it's one of the node args to render_nodes_as_md()
-            # or render_subtree_as_md()
-            # FIXME: This doesn't work well because the summary can be buried/nested in the tree.
-            # Either 1. create a new tree when modifying/removing nodes.
-            # or 2. Modify the MdRenderer to use the summary text AND update tokens
-            # for child_node in list(li.children):
-            #     remove_child(child_node)
-
-            # nd=TokenNodeData(p, li.tree)
-            # li.add_child(nd)
-
             return li_candidate
     return None
 
@@ -525,7 +503,6 @@ def _chunk_and_summarize_next_nodes(config, node_with_intro: NodeWithIntro) -> N
     summary = config.compose_summary_text(node)
     logger.info("Added summary to %s: %r", node.data_id, summary)
 
-    # FIXME: Create better summary of a list with sublist items
     p=block_token.Paragraph(lines=[f"{summary}\n"])
     if isinstance(node.data, TokenNodeData):
         p.line_number = node.token.line_number
@@ -536,20 +513,21 @@ def _chunk_and_summarize_next_nodes(config, node_with_intro: NodeWithIntro) -> N
     p_nodedata = TokenNodeData(p, node.tree)
 
     if node.data_type in ["List", "HeadingSection", "ListItem"]:
+        # Replace all children and add Paragraph summary as the only child
         for c in list(node_with_intro.node.children):
             remove_child(c)
 
-        # FIXME: add summary Paragraph
+        # add summary Paragraph
         node.add_child(p_nodedata)
         if isinstance(node.data, TokenNodeData):
             node.token.children = [c.token for c in node.children if isinstance(c.data, TokenNodeData)]
         logger.debug("%s children %s", node.data_id, [c.data_id for c in node.children])
 
-        # FIXME:
+        # FIXME: do something with the intro_node
         # if node_with_intro.intro_node:
         #     remove_child(node_with_intro.intro_node)
         return node_with_intro
-    elif node.data_type == "Table":
+    elif node.data_type == "Table": # Replace Table with Paragraph summary
         parent = node.parent
         p_node=parent.add_child(p_nodedata, before=node)
         node.remove()
