@@ -127,8 +127,9 @@ def validate_tree(tree: Tree) -> None:
         if node.data.node is not node:
             nodes = tree.find_all(data_id=node.data_id)
             print(f"Found {len(nodes)} nodes with data_id {node.data_id}")
-            # FIXME: 
-            assert node.data.node is node, f"Node {node.data_id!r} has mismatched node: {node.data.node!r} and {node!r}"
+            assert (
+                node.data.node is node
+            ), f"Node {node.data_id!r} has mismatched node: {node.data.node!r} and {node!r}"
         assert (
             node.data_id == node.data.data_id
         ), f"Node {node.data_id!r} has mismatched data_id: {node.data_id!r} and {node.data.data_id!r}"
@@ -249,10 +250,10 @@ def render_nodes_as_md(nodes: Sequence[Node]) -> str:
     for node in nodes:
         # node.data["summary"] is set when node is too large to fit with existing chunk;
         # it may be an empty string "" (to summarize with "" as the summary text), so check for None
-        if node.data["summary"] is None:
-            node_md = render_subtree_as_md(node)
-        else:
-            node_md = node.data["summary"]
+        # if node.data["summary"] is None:
+        node_md = render_subtree_as_md(node)
+        # else:
+        #     node_md = node.data["summary"]
         md_list.append(node_md)
     # Each child node_md ends with exactly 2 newlines, so join without a separator
     return "".join(md_list)
@@ -332,6 +333,10 @@ class HeadingSectionNodeData(MdNodeData):
     @property
     def level(self) -> int:
         return self.heading_node.token.level
+
+    @property
+    def line_number(self) -> int:
+        return self.heading_node.token.line_number
 
     @property
     def raw_text(self) -> str:
@@ -460,17 +465,20 @@ def remove_blank_lines(tree: Tree) -> int:
     "Remove BlankLine nodes from the tree"
     blank_line_counter = 0
     for node in tree.find_all(match=lambda n: n.data_type == "BlankLine"):
-        remove_child(node.parent, node)
+        remove_child(node)
         blank_line_counter += 1
 
     tree.system_root.meta["prep_funcs"].append("remove_blank_lines")
     return blank_line_counter
 
 
-def remove_child(node: Node, child: Node) -> None:
+def remove_child(child: Node, node: Optional[Node] = None) -> None:
+    if not node:
+        node = child.parent
     logger.debug("Removing child %s from %s", child.data_id, node.data_id)
-    # Update node.token.children since that's used for rendering
-    node.data.token.children.remove(child.data.token)
+    if isinstance(node.data, TokenNodeData):
+        # Update node.token.children since that's used for rendering
+        node.data.token.children.remove(child.data.token)
     # Then remove the child from the tree
     child.remove()
 
@@ -510,12 +518,13 @@ def hide_span_tokens(tree: Tree) -> int:
         # Add raw text content for Heading nodes to use the text in heading breadcrumbs
         if data_type == "Heading":
             # Do this before removing the children
+            # It's easier to do using tree node.find_all() now than to lazily recurse through token.children later
             raw_text_nodes = node.find_all(match=lambda n: n.data_type == "RawText")
             node.data["raw_text"] = "".join([n.token.content for n in raw_text_nodes])
 
         # Set attribute to indicate that node.token.children tokens should never be modified
         node.data["freeze_token_children"] = True
-        # Remove the children nodes, but node.token.children tokens are still required for rendering
+        # Remove the children nodes, but node.token.children tokens are still retained for rendering
         node.remove_children()
         hide_counter += 1
 
