@@ -75,7 +75,7 @@ def _get_node_data_id(_tree: Tree, data: Any) -> str:
         return data.data_id
     elif isinstance(data, Token):
         return data.data_id
-    raise ValueError("Cannot found node with data: {data!r}")
+    raise ValueError(f"Cannot found node with data: {data!r}")
 
 
 def markdown_tokens_as_json(markdown: str) -> str:
@@ -278,6 +278,7 @@ class MdNodeData:
         self.data_type = data_type
         self.data_id = data_id
         self.tree = tree
+        # self.chunked = False
 
     # Allow adding custom attributes to this node data object; useful during tree manipulation or chunking
     def __setitem__(self, key: str, value: Any) -> None:
@@ -327,6 +328,12 @@ class HeadingSectionNodeData(MdNodeData):
         self.heading_node = heading_node
         # heading_node.data["rendered_text"] = render_nodes_as_md(heading_node.children)
 
+        if True: #FIXME: assumes hide_span_tokens() has been called
+            self.raw_text = heading_node.data["raw_text"]
+        else:
+            raw_text_nodes = heading_node.find_all(match=lambda n: n.data_type == "RawText")
+            self.raw_text = "".join([n.token.content for n in raw_text_nodes])
+
         data_id = f"_S{self.level}_{heading_node.token.line_number}"
         super().__init__("HeadingSection", data_id, tree)
 
@@ -337,10 +344,6 @@ class HeadingSectionNodeData(MdNodeData):
     @property
     def line_number(self) -> int:
         return self.heading_node.token.line_number
-
-    @property
-    def raw_text(self) -> str:
-        return self.heading_node.data["raw_text"]
 
     @property
     def rendered_text(self) -> str:
@@ -519,6 +522,7 @@ def hide_span_tokens(tree: Tree) -> int:
         if data_type == "Heading":
             # Do this before removing the children
             # It's easier to do using tree node.find_all() now than to lazily recurse through token.children later
+            # FIXME: This code is duplicated in HeadingSectionNodeData
             raw_text_nodes = node.find_all(match=lambda n: n.data_type == "RawText")
             node.data["raw_text"] = "".join([n.token.content for n in raw_text_nodes])
 
