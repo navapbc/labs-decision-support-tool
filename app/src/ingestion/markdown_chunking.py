@@ -322,6 +322,13 @@ def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     config.add_chunk(config.create_protochunk([doc_node]))
     return config.chunks
 
+def _update_tokens(chunking_tree):
+    "Do this after copying a node to chunking_tree"
+    for n in chunking_tree:
+        if isinstance(n.data, TokenNodeData):
+            n.data.token.children = [c.token for c in node.children if isinstance(c.data, TokenNodeData)]
+
+
 def _gradually_chunk_tree_nodes(node: Node, config: ChunkingConfig):
     chunk_buffer_orig_nodes: list[Node] = []
     chunk_buffer: list[Node] = []
@@ -339,7 +346,8 @@ def _gradually_chunk_tree_nodes(node: Node, config: ChunkingConfig):
         next_node = NodeWithIntro(node, intro_node)
         intro_node=None
         logger.info("Next: %s", next_node)
-        if config.nodes_fit_in_chunk(chunk_buffer + next_node.as_list):
+        if config.nodes_fit_in_chunk([chunking_tree.first_child()] + next_node.as_list):
+            logger.info("Fits! Adding %s", next_node)
             # Copy next_node.node to chunking_tree
             if not (new_node:=chunking_tree.find(match=lambda n: n.data_id == next_node.node.data_id)):
                 new_parent_node = copy_ancestors(next_node.node, chunking_tree)
@@ -359,6 +367,7 @@ def _gradually_chunk_tree_nodes(node: Node, config: ChunkingConfig):
             chunk_buffer.extend(copied_next_node.as_list)
             chunk_buffer_orig_nodes.extend(next_node.as_list)
 
+            _update_tokens(chunking_tree)
             node = node.next_sibling()
 
             # NO! Do not remove/summarize until add_chunk() -- Modify tree to reflect chunking
@@ -366,20 +375,23 @@ def _gradually_chunk_tree_nodes(node: Node, config: ChunkingConfig):
             # _summarize_nodes(next_node.as_list, config)
             continue
 
-        # cand no fit
+        # does not fit
+        logger.info("Does not fit: %s + %s", [n.data_id for n in chunking_tree], next_node.as_list)
         if not node.has_children() and not config.nodes_fit_in_chunk(next_node.as_list):
             assert node.data_type in ["Paragraph"], f"Unexpected data_type {node.data_type} for leaf node"
+            logger.info("Splitting Paragraph %s into multiple chunks", next_node)
             # must split Paragraph n into multiple chunks; doesn't make sense to mix parts of it with other chunks
             _split_paragraph_into_chunks(next_node, config)
-        elif full_enough_to_flush(chunk_buffer, config):
-            logger.info("Full enough! %s", [n.data_id for n in chunk_buffer])
+        elif full_enough_to_flush([chunking_tree.first_child()], config):
+            logger.info("Full enough! %s", [n.data_id for n in chunking_tree])
             # Flush the chunk_buffer to a chunk
-            config.add_chunk(pc:=config.create_protochunk(chunk_buffer))
+            config.add_chunk(pc:=config.create_protochunk([chunking_tree.first_child()]))
             logger.debug("Added chunk %s:\n%s", pc.id, pc.markdown)
             # TODO: del chunk_tree
             _summarize_nodes(chunk_buffer_orig_nodes, config)
         elif want_to_go_deeper(chunk_buffer_orig_nodes, next_node, config):
             node = node.first_child()
+            logger.info("Go deeper to %s", node.data_id)
             continue
         else:
             assert node.data_type in ["ListItem", "List", "Table"], f"Unexpected data_type {node.data_type}"
