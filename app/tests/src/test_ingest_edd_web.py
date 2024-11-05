@@ -4,6 +4,7 @@ import logging
 import pytest
 from sqlalchemy import delete, select
 
+from src import ingest_edd_web
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
 from src.ingest_edd_web import _ingest_edd_web
@@ -103,6 +104,7 @@ doc_attribs = {
 def test__ingest_edd(
     caplog, app_config, db_session, edd_web_local_file, edd_web_s3_file, file_location
 ):
+    ingest_edd_web.USE_MARKDOWN_TREE = False
     # Force a short max_seq_length to test chunking
     app_config_for_test.sentence_transformer.max_seq_length = 47
 
@@ -216,3 +218,72 @@ def test__ingest_edd(
             "The Northern Job Fairs and Workshops",
             "Scheduled Events",
         ]
+
+
+@pytest.mark.parametrize("file_location", ["local", "s3"])
+def test__ingest_edd_using_md_tree(
+    caplog, app_config, db_session, edd_web_local_file, edd_web_s3_file, file_location
+):
+    ingest_edd_web.USE_MARKDOWN_TREE = True
+    # Force a short max_seq_length to test chunking
+    app_config_for_test.sentence_transformer.max_seq_length = 47
+
+    db_session.execute(delete(Document))
+
+    with caplog.at_level(logging.WARNING):
+        if file_location == "local":
+            _ingest_edd_web(db_session, edd_web_local_file, doc_attribs)
+        else:
+            _ingest_edd_web(db_session, edd_web_s3_file, doc_attribs)
+
+    documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
+    assert len(documents) == 4
+
+    assert (
+        "Skipping duplicate URL: https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
+        in caplog.messages[0]
+    )
+
+    assert documents[0].name == "Nonindustrial Disability Insurance FAQs"
+    assert documents[0].source == "https://edd.ca.gov/en/disability/nonindustrial/faqs/"
+    assert documents[1].name == "Options to File for Disability Insurance Benefits"
+    assert (
+        documents[1].source == "https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
+    )
+    assert documents[2].name == "State Unemployment Tax Act Dumping"
+    assert documents[2].source == "https://edd.ca.gov/en/payroll_taxes/suta_dumping/"
+    assert documents[3].name == "The Northern Job Fairs and Workshops"
+    assert documents[3].source == "https://edd.ca.gov/en/jobs_and_training/northern_region/"
+
+    assert len(documents[0].chunks) == 4
+
+    # for i, ch in enumerate(documents[0].chunks):
+    #     print(i, ch.content)
+    assert (
+        documents[0].chunks[1].content
+        == "## Nonindustrial Disability Insurance\n\nGet answers to FAQs about Nonindustrial Disability Insurance (NDI) and Nonindustrial Disability Insurance-Family Care Leave (NDI-FCL)."
+    )
+    assert documents[0].chunks[1].headings == ["Nonindustrial Disability Insurance FAQs"]
+
+    # print("1: ", documents[1].name)
+    # for i, ch in enumerate(documents[1].chunks):
+    #     print(i, ch.content)
+    assert len(documents[1].chunks) == 1
+    assert (
+        documents[1].chunks[0].content
+        == "Disability Insurance (DI) provides short-term, partial wage replacement ...\n\nIf you think you are eligible to [file a claim](/en/disability/apply/), review ..."
+    )
+    assert documents[1].chunks[0].headings == ["Options to File for Disability Insurance Benefits"]
+
+    # Document[2] has a list
+    print("2: ", documents[2].name)
+    for i, ch in enumerate(documents[2].chunks):
+        print(i, ch.content)
+    assert len(documents[2].chunks) == 4
+    assert (
+        documents[2].chunks[2].content
+        == "### SUTA Dumping Hurts Everyone\n\nEmployers, employees, and taxpayers make up the difference in higher taxes, lost jobs, lost profits, lower wages, and higher costs for goods and services."
+    )
+    assert documents[2].chunks[2].headings == ["State Unemployment Tax Act Dumping"]
+
+    assert False

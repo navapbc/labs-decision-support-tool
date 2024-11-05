@@ -119,7 +119,7 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     prepped_tree.print()
     chunks = chunk_tree(prepped_tree, config)
     pprint(list(chunks.values()), sort_dicts=False, width=140)
-    assert len(chunks) == 13
+    assert len(chunks) == 10
 
     for _id, chunk in chunks.items():
         assert chunk.length <= config.max_length
@@ -174,3 +174,53 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
 
     for chunk in paragraph_chunks:
         assert chunk.headings == ["Long paragraph doc", "Heading 1"]
+
+from src.ingest_edd_web import EddChunkingConfig
+from src.ingestion.markdown_chunking import split_list_or_table_node_into_chunks
+import re
+def test_big_sublist_chunking():
+    test_markdown = f"""Markdown with a list with very big sublists.
+
+# Heading 1
+
+List intro:
+- Sublist 1
+    * Sublist item 1.1. {create_paragraph('item 1.1', 30)}
+    * Sublist item 1.2. {create_paragraph('item 1.2', 20)}
+      Continued item 1.2 {create_paragraph('continued item 1.2', 10)}
+"""
+    print(test_markdown)
+
+    if False:
+        tree = create_markdown_tree(test_markdown, doc_name="Long paragraph doc")
+        prepare_tree(tree)
+        tree.print()
+
+        config = EddChunkingConfig()
+
+        node = tree['L_6']
+        intro_node = tree['H1_3']
+        split_list_or_table_node_into_chunks(node, config, intro_node)
+        list_md = render_nodes_as_md([node])
+
+        # paragraph_node = tree["P_4"]
+        chunks = config.chunks.values()
+        pprint(list(chunks), sort_dicts=False, width=140)
+
+        joined_chunk_md = "\n".join([chunk.markdown for chunk in chunks])
+        sentences = [sentence.strip() for sentence in re.split(r"(\. |\n)", list_md)]
+        sentence_counts = {sentence: joined_chunk_md.count(sentence) for sentence in sentences}
+        # Ensure all sentences in the P_4 paragraph are present in the chunked markdown
+        # pprint(sentence_counts)
+        assert all(sentence_counts[sentence] >= 1 for sentence in sentences)
+
+    if True:
+        config = ChunkingConfig(170)
+        tree = create_markdown_tree(test_markdown, doc_name="Long paragraph doc")
+        prepare_tree(tree)
+        tree.print()
+        chunks = chunk_tree(tree, config)
+        chunks = config.chunks.values()
+        pprint(list(chunks), sort_dicts=False, width=140)
+
+    assert False

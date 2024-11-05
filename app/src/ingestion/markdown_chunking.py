@@ -47,7 +47,7 @@ def copy_ancestors(node: Node, target_tree: Tree) -> Node:
         if existing_p_node:
             p_node = existing_p_node
         else:
-            logger.info("Copying %s to parent %s", parent.data_id, p_node.data_id)
+            logger.info("Copying %s to parent %s", parent.data_id, p_node)
             p_node = parent.copy_to(p_node, deep=False)
             # Remember to call update_copied_tree() since we skip: p_node.set_data(copy(parent.data), data_id=parent.data_id)
 
@@ -179,7 +179,7 @@ class ChunkingConfig:
 
     @cached_property
     def text_splitter(self) -> RecursiveCharacterTextSplitter:
-        chars_per_word = 6  # Assume a low 4 characters per word
+        chars_per_word = 4  # Assume a low 4 characters per word
         overlapping_words = 15  # 15 words overlap between chunks
         return RecursiveCharacterTextSplitter(
             chunk_size=chars_per_word * self.max_length,
@@ -202,9 +202,10 @@ class ChunkingConfig:
         if len(chunk.nodes) == 1 and chunk.nodes[0].data_type in ["Heading"]:
             raise AssertionError(f"Unexpected single Heading node: {chunk.nodes[0].id_string}")
 
-        if not chunk.length < self.max_length:
+        if chunk.length > self.max_length:
             logger.error("Chunk %s is too large! %s > %s", chunk.id, chunk.length, self.max_length)
-            # FIXME: raise AssertionError(f"{chunk.id} is too large! {chunk.length} > {self.max_length}")
+            # FIXME:
+            raise AssertionError(f"{chunk.id} is too large! {chunk.length} > {self.max_length}")
         logger.info("Adding chunk %s created from: %s", chunk.id, [c.data_id for c in chunk.nodes])
         self.chunks[chunk.id] = chunk
 
@@ -219,6 +220,7 @@ class ChunkingConfig:
             chunk_id_suffix = nodes[0].data_id
         chunk_id = f"{len(self.chunks)}:{chunk_id_suffix}"
         # logger.info("Creating protochunk %s using %s", chunk_id, [c.data_id for c in nodes])
+        assert all(n for n in nodes), f"Unexpected None in {nodes}"
 
         if not markdown:
             markdown = render_nodes_as_md(nodes)
@@ -298,23 +300,29 @@ class ChunkingConfig:
     #         + f" (SUMMARY of {node.data_id})\n\n"
     #     )
     def compose_summary_text(self, node: Node) -> str:
-        if node.data_type not in ["Heading", "HeadingSection", "List", "ListItem"]:
-            return f"(SUMMARIZED {node.data_id})\n\n"
+        if node.data_type not in ["Heading", "HeadingSection", "List", "ListItem", "Table"]:
+            return "(SUMMARY)"
         if not (md := node.render()):
             logger.warning(
                 "No markdown for %s: children=%s", node, [c.data_id for c in node.children]
             )
 
         if node.data_type == "List":
-            items = [line for line in md.splitlines() if line.startswith("* ")]
-            items = [
-                shorten(remove_links(line), int(200 / len(items)), placeholder="...")
-                for line in items
-            ]
-            summary = "\n".join(items)
-            return f"(\n{summary}\n)\n\n"
+            # FIXME: if summary is presented like a list but is in a Paragraph,
+            # when it is copy_tree()ed, the list Paragraph is interpreted as a List L_*, 
+            # in which case the "chunked" attrib won't be copied over!
+
+            # return f"* (SUMMARIZED LIST {node.data_id})\n\n"
+            summary = shorten(remove_links(md.splitlines()[0]), 120, placeholder="...")
+            if not summary:
+                pass
+            assert summary, f"Unexpected empty summary for {node.data_id}"
+            return f"{summary}\n\n"
+        elif node.data_type == "Table":
+            return f"(SUMMARIZED TABLE {node.data_id})\n\n"
         else:
-            summary = shorten(remove_links(md.splitlines()[0]), 140, placeholder="...")
+            summary = shorten(remove_links(md.splitlines()[0]), 200, placeholder="...")
+            assert summary, f"Unexpected empty summary for {node.data_id}"
             return f"({summary})\n\n"
 
 
@@ -333,17 +341,25 @@ def chunk_tree(in_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     # 3. (transactional) WORKING: copied original working tree: copy of the original tree, but nodes can be removed to reflect (uncommitted) chunk_buffer
     #    used to assess tree wrt BUFFER
 
-    doc_node = copy_tree(in_tree).first_child()  # COMMITTED tree
+    doc_node = copy_subtree(in_tree.first_child())  # COMMITTED tree
 
     # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
-    while not config.nodes_fit_in_chunk([doc_node]):
-        logger.info("======= Document node %s is too large for one chunk", doc_node.data_id)
-        # a Document node is structurally similar to a HeadingSection node
-        # split_heading_section_into_chunks(doc_node, config)
-        n = doc_node.first_child()
-        _gradually_chunk_tree_nodes(n, config)
+    try:
+        while not config.nodes_fit_in_chunk([doc_node]):
+            logger.info("======= Document node %s is too large for one chunk", doc_node.data_id)
+            # a Document node is structurally similar to a HeadingSection node
+            # split_heading_section_into_chunks(doc_node, config)
+            n = doc_node.first_child()
+            _gradually_chunk_tree_nodes(n, config)
+            # Workaround to ensure this tree can be copied correctly; basically a way to normalize the tree
+            # doc_node = copy_tree(doc_node.tree, copy_data_attribs=True).first_child()
+            # doc_node = copy_tree(doc_node.tree, copy_data_attribs=True).first_child()
+    except EOFError:
+        logger.info("No more nodes to chunk")
 
-    config.add_chunk(config.create_protochunk([doc_node]))
+    next_node = NodeWithIntro(doc_node)
+    _chunk_and_summarize_next_nodes(config, next_node)
+    # config.add_chunk(config.create_protochunk([doc_node]))
     return config.chunks
 
 
@@ -366,13 +382,13 @@ def _update_tokens(chunking_tree):
 
 def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
     committed_tree = orig_node.tree
-    logger.info("CommittedTree: %s", committed_tree.format())
-    logger.info(
-        "Committed MD: %s", config.create_protochunk([committed_tree.first_child()]).markdown
-    )
+    # logger.info("CommittedTree: %s", committed_tree.format())
+    # logger.info(
+    #     "Committed MD: %s", config.create_protochunk([committed_tree.first_child()]).markdown
+    # )
 
     # Transaction trees
-    working_tree = copy_tree(committed_tree, copy_data_attribs=True)
+    working_tree = copy_subtree(committed_tree.first_child()).tree
     node = working_tree[orig_node.data_id]
 
     # Empty chunking data structures
@@ -384,27 +400,33 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
     intro_node: Node | None = None
     while node:
         if node.data["chunked"]:
-            # and node.data_type == "Paragraph":
             logger.info("Skipping chunked Paragraph node %s", node.data_id)
-            node = node.next_sibling()
+            p_node = node
+            node = _next_node(node)
+            if p_node.data_type == "Paragraph":
+                p_node.remove()
+                logger.info("nodes %i", working_tree.count)
+            if not node:
+                raise EOFError("No more nodes")
             continue
 
         # keep-with-next for intro nodes
         if node.data["is_intro"]:
             intro_node = node
             node = node.next_sibling()
+            assert node, f"Expected next node after intro node {intro_node.data_id}"
             continue
 
         next_node = NodeWithIntro(node, intro_node)
         logger.info("Next: %s", next_node)
-        logger.info("ChunkingTree: %s", chunking_tree.format())
-        logger.info(
-            "Chunking MD: %s", config.create_protochunk([chunking_tree.first_child()]).markdown
-        )
-        logger.info("WorkingTree: %s", working_tree.format())
-        logger.info(
-            "Working MD: %s", config.create_protochunk([working_tree.first_child()]).markdown
-        )
+        # logger.info("ChunkingTree: %s", chunking_tree.format())
+        # logger.info(
+        #     "Chunking MD: %s", config.create_protochunk([chunking_tree.first_child()]).markdown
+        # )
+        # logger.info("WorkingTree: %s", working_tree.format())
+        # logger.info(
+        #     "Working MD: %s", config.create_protochunk([working_tree.first_child()]).markdown
+        # )
         if config.nodes_fit_in_chunk([chunking_tree.first_child()] + next_node.as_list):
             logger.info("Fits! Adding %s", next_node)
             # Update WORKING tree
@@ -451,8 +473,12 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             # Since intro_node is included in chunk_buffer, reset it
             intro_node = None
             # _update_tokens(chunking_tree)
-            node = node.next_sibling()
+            node = _next_node(node)
+            # logger.info("Next node: %s", node)
+            if not node:
+                raise EOFError("No more nodes")
 
+            # logger.info("Updated ChunkingTree: %s", chunking_tree.format())
             # This will remove node
             _summarize_nodes(next_node.as_list, config)
             continue
@@ -462,11 +488,19 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
         # It may modify the COMMITTED tree and RETURN
         # chunking_tree is used to flush the chunk_buffer to create a chunk
         logger.info("Does not fit: %s + %s", chunking_tree.first_child().data_id, next_node)
-        if not node.has_children() and not config.nodes_fit_in_chunk(next_node.as_list):
+        if node.data_type == "Table":
+            # Summarize the next node
+            # update COMMITTED tree
+            orig_next_node = NodeWithIntro(
+                committed_tree[next_node.node.data_id],
+                committed_tree[next_node.intro_node.data_id] if next_node.intro_node else None,
+            )
+            _chunk_and_summarize_next_nodes(config, orig_next_node)
+        elif not node.has_children() and full_enough_to_flush(next_node.as_list, config):
             assert node.data_type in [
-                "Paragraph"
+                "Paragraph", "BlockCode"
             ], f"Unexpected data_type {node.data_type} for leaf node"
-            logger.info("Splitting Paragraph %s into multiple chunks", next_node)
+
             # must split Paragraph n into multiple chunks; doesn't make sense to mix parts of it with other chunks
 
             # update COMMITTED tree
@@ -475,8 +509,17 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                 committed_tree[next_node.intro_node.data_id] if next_node.intro_node else None,
             )
             # _chunk_and_summarize_next_nodes(config, node_with_intro)
-            # split_paragraph_into_chunks
-            config.create_chunks_for_next_nodes(orig_next_node)
+            if config.nodes_fit_in_chunk(next_node.as_list):
+                logger.info("Putting Paragraph %s into separate chunk", next_node)
+                config.add_chunk(pc := config.create_protochunk(next_node.as_list))
+                logger.debug("Added chunk %s:\n%s", pc.id, pc.markdown)
+                if next_node.node.data_id == 'P_47':
+                    pass
+                    # exit(1)
+            else:
+                # split_paragraph_into_chunks
+                logger.info("Splitting Paragraph %s into multiple chunks", next_node)
+                config.create_chunks_for_next_nodes(orig_next_node)
             _summarize_nodes(orig_next_node.as_list, config)
         elif full_enough_to_flush([chunking_tree.first_child()], config):
             logger.info("Full enough! %s", [n.data_id for n in chunking_tree])
@@ -501,6 +544,8 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                 "ListItem",
                 "List",
                 "Table",
+                "Paragraph",
+                "BlockCode",
             ], f"Unexpected data_type {node.data_type}"
             # Summarize the next node
             # update COMMITTED tree
@@ -511,6 +556,12 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             _chunk_and_summarize_next_nodes(config, orig_next_node)
         return
 
+def _next_node(node):
+    while not (next_s := node.next_sibling()):
+        if not (node := node.parent):
+            break
+    return next_s
+
 
 def full_enough_to_flush(chunk_buffer: list[Node], config: ChunkingConfig):
     chunk = config.create_protochunk(chunk_buffer)
@@ -520,7 +571,7 @@ def full_enough_to_flush(chunk_buffer: list[Node], config: ChunkingConfig):
     # Only the 1 larger accordion is chunked by itself and summarized.
     # The smaller accordions are included alongside other accordions.
     # logger.debug("should_summarize: %f %s", next_nodes_portion, [n.data_id for n in node_with_intro])
-    return next_nodes_portion > 0.75
+    return next_nodes_portion > 0.65
 
 
 def want_to_go_deeper(working_tree: Tree, next: NodeWithIntro, config: ChunkingConfig):
@@ -681,13 +732,13 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
             # For these data_types, node_with_intro (and its descendants) can be chunked and summarized
             can_summarize = node_with_intro.node.data_type in ["HeadingSection", "List", "Table"]
             if can_summarize and config.should_summarize(node_with_intro):
-                logger.warning(
-                    "This logic should be handled in _add_to_buffer_or_summarize() %s",
-                    node_with_intro,
-                )
-                assert (
-                    False
-                ), f"This logic should be handled in _add_to_buffer_or_summarize() {node_with_intro}"
+                # logger.warning(
+                #     "This logic should be handled in _add_to_buffer_or_summarize() %s",
+                #     node_with_intro,
+                # )
+                # assert (
+                #     False
+                # ), f"This logic should be handled in _add_to_buffer_or_summarize() {node_with_intro}"
                 node_with_intro = _chunk_and_summarize_next_nodes(config, node_with_intro)
                 # logger.info("RETURNING from _chunk_and_summarize_next_nodes %s", node_with_intro)
                 # return
@@ -733,7 +784,7 @@ def _chunk_and_summarize_next_nodes(config, node_with_intro: NodeWithIntro) -> N
     # See if the node's contents fit, including descendants
     if config.nodes_fit_in_chunk(node_with_intro.as_list):
         config.add_chunk(config.create_protochunk(node_with_intro.as_list))
-    elif node.data_type in ["HeadingSection", "ListItem"]:
+    elif node.data_type in ["Document", "HeadingSection", "ListItem"]:
         # ListItem can have similar children as HeadingSection
         logger.info("%s is too large for one chunk", node.data_id)
         split_heading_section_into_chunks(node, config)
@@ -755,7 +806,7 @@ def _chunk_and_summarize_next_nodes(config, node_with_intro: NodeWithIntro) -> N
     # Then set a shorter summary text in a custom attribute
     # assert node.data["summary"] is None, "Summary should not be set yet"
     # node.data["summary"]
-    return _summarize_node(node, config)
+    return _summarize_node(NodeWithIntro(node), config)
 
 
 def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> NodeWithIntro:
@@ -771,7 +822,10 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
         raise AssertionError(f"Unexpected node.data type: {node.data_type}")
     p_nodedata = _create_paragraph_node_data(line_number, summary, node.tree)
 
-    if node.data_type in ["List", "HeadingSection", "ListItem"]:
+    if node.data_id == 'L_48':
+        pass
+
+    if node.data_type in ["Document", "List", "HeadingSection", "ListItem"]:
         # Replace all children and add Paragraph summary as the only child
         for c in list(node_with_intro.node.children):
             remove_child(c)
@@ -782,13 +836,15 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
             node.token.children = [
                 c.token for c in node.children if isinstance(c.data, TokenNodeData)
             ]
-        logger.debug("%s children %s", node.data_id, [c.data_id for c in node.children])
+        logger.info("%s children %s", node.data_id, [c.data_id for c in node.children])
 
+        # Mark the node as chunked so it can be skipped in future chunking
+        node.data["chunked"] = True
         # FIXME: do something with the intro_node
         # if node_with_intro.intro_node:
         #     remove_child(node_with_intro.intro_node)
         return node_with_intro
-    elif node.data_type == "Table":  # Replace Table with Paragraph summary
+    elif node.data_type in ["Table", "Paragraph", "BlockCode"]:  # Replace Table with Paragraph summary
         parent = node.parent
         p_node = parent.add_child(p_nodedata, before=node)
         node.remove()
@@ -805,27 +861,27 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
         raise AssertionError(f"Unexpected data type: {node.data_type}")
 
 
-def _insert_summary_node(node: Node, config: ChunkingConfig) -> Node:
-    logger.info("_insert_summary_node for %s", node.data_id)
-    summary = f"(CHUNKED: {node.data_id})"  # config.compose_summary_text(node)
-    logger.info("Added SUMMARY to %s: %r", node.data_id, summary)
+# def _insert_summary_node(node: Node, config: ChunkingConfig) -> Node:
+#     logger.info("_insert_summary_node for %s", node.data_id)
+#     summary = f"(CHUNKED: {node.data_id})"  # config.compose_summary_text(node)
+#     logger.info("Added SUMMARY to %s: %r", node.data_id, summary)
 
-    p_nodedata = _create_paragraph_node_data(node.token.line_number, summary, node.tree)
+#     p_nodedata = _create_paragraph_node_data(node.token.line_number, summary, node.tree)
 
-    # Insert nodes with Paragraph summary
-    parent = node.parent
-    p_node = parent.add_child(p_nodedata, before=node)
-    if isinstance(parent.data, TokenNodeData):
-        assert parent.data_type in ["Document", "ListItem", "List", "Table"]
-        parent.token.children = [
-            c.token for c in parent.children if isinstance(c.data, TokenNodeData)
-        ]
-    elif isinstance(parent.data, HeadingSectionNodeData):
-        pass
-    else:
-        raise AssertionError(f"Unexpected parent.data type: {parent.data_type}")
-    # return NodeWithIntro(p_node, node_with_intro.intro_node)
-    return p_node
+#     # Insert nodes with Paragraph summary
+#     parent = node.parent
+#     p_node = parent.add_child(p_nodedata, before=node)
+#     if isinstance(parent.data, TokenNodeData):
+#         assert parent.data_type in ["Document", "ListItem", "List", "Table"]
+#         parent.token.children = [
+#             c.token for c in parent.children if isinstance(c.data, TokenNodeData)
+#         ]
+#     elif isinstance(parent.data, HeadingSectionNodeData):
+#         pass
+#     else:
+#         raise AssertionError(f"Unexpected parent.data type: {parent.data_type}")
+#     # return NodeWithIntro(p_node, node_with_intro.intro_node)
+#     return p_node
 
 
 def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
@@ -837,17 +893,30 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
             n.data_id for n in nodes if n != node
         ] == [], f"Unexpected nodes: {[n.data_id for n in nodes if n != node]}"
         return node
+    if node.data_type == "List":
+        logger.info("Skipping summarization of List node %s", node.data_id)
+        parent = node.parent
+        for c in nodes:
+            c.remove()
+        if isinstance(parent.data, TokenNodeData):
+            assert parent.data_type in ["Document", "ListItem", "List", "Table"]
+            parent.token.children = [
+                c.token for c in parent.children if isinstance(c.data, TokenNodeData)
+            ]
+        return node
 
-    logger.info("Summarizing %s with %s", node.data_id, [n.data_id for n in nodes if n != node])
+
+    logger.debug("Summarizing %s with %s", node.data_id, [n.data_id for n in nodes if n != node])
     # assert all(n.parent == nodes[0].parent for n in nodes), f"Nodes should have the same parent {[n.parent.data_id for n in nodes]}"
-    summary = f"(CHUNKED: {node.data_id} with {[n.data_id for n in nodes if n != node]})"  # config.compose_summary_text(node)
-    if node.data_type == "ListItem":
-        summary = "* " + summary  # FIXME: generalize this
-    logger.info("Added SUMMARY to %s: %r", node.data_id, summary)
+    # summary = f"(CHUNKED: {node.data_id} with {[n.data_id for n in nodes if n != node]})"  # config.compose_summary_text(node)
+    summary = config.compose_summary_text(node)
+    # if node.data_type == "ListItem":
+    #     summary = "* " + summary  # FIXME: generalize this
+    logger.debug("Added SUMMARY to %s: %r", node.data_id, summary)
 
     # Replace all nodes with Paragraph summary
 
-    p_nodedata = _create_paragraph_node_data(node.token.line_number, summary, node.tree)
+    p_nodedata = _create_paragraph_node_data(node.data.line_number, summary, node.tree)
 
     parent = node.parent
     p_node = parent.add_child(p_nodedata, before=node)

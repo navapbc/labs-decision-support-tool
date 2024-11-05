@@ -75,7 +75,7 @@ def _get_node_data_id(_tree: Tree, data: Any) -> str:
         return data.data_id
     elif isinstance(data, Token):
         return data.data_id
-    raise ValueError(f"Cannot found node with data: {data!r}")
+    raise ValueError(f"Cannot find node: {data!r}")
 
 
 def markdown_tokens_as_json(markdown: str) -> str:
@@ -102,35 +102,40 @@ def normalize_markdown(markdown: str) -> str:
 
 
 def copy_tree(tree: Tree, copy_data_attribs: bool = False) -> Tree:
-    with _new_md_renderer() as renderer:
-        # "the parsing phase is currently tightly connected with initiation and closing of a renderer.
-        # Therefore, you should never call Document(...) outside of a with ... as renderer block"
-        # markdown = renderer.render(tree.first_child().data.token)
-        markdown = render_tree_as_md(tree)
-    tree_copy = create_markdown_tree(
-        markdown,
-        f"Deep copy of {tree.name}",
-        normalize_md=False,
-        doc_name=tree.first_child().data["name"],
-    )
+    if False:
+        with _new_md_renderer() as renderer:
+            # "the parsing phase is currently tightly connected with initiation and closing of a renderer.
+            # Therefore, you should never call Document(...) outside of a with ... as renderer block"
+            # markdown = renderer.render(tree.first_child().data.token)
+            markdown = render_tree_as_md(tree)
+        tree_copy = create_markdown_tree(
+            markdown,
+            f"Deep copy of {tree.name}",
+            normalize_md=False,
+            doc_name=tree.first_child().data["name"],
+        )
 
-    prepare_tree(tree_copy)
-    # TODO: run the same prep_funcs on the tree_copy as on the original tree
+        prepare_tree(tree_copy)
+        # TODO: run the same prep_funcs on the tree_copy as on the original tree
+
+        if copy_data_attribs:
+            # Copy node attributes from the original tree to the copy
+            # This only works if tree and tree_copy are perfectly matched
+            for n in tree:
+                node_copy = tree_copy[n.data_id]
+                for k, v in vars(n.data).items():
+                    if v and node_copy.data[k] is None:
+                        logger.info("Copying %s[%s]=%r", n.data_id, k, v)
+                        node_copy.data[k] = v
+
+    tree_copy = tree.copy(f"Deep copy of {tree.name}")
+
     # # Copy the meta attributes from the original tree so that get_parent_headings() works
-    # for k, v in tree.system_root.meta.items():
-    #     tree_copy.system_root.set_meta(k, v.copy())
+    for k, v in tree.system_root.meta.items():
+        tree_copy.system_root.set_meta(k, v.copy())
     tree.print()
     tree_copy.print()
 
-    if copy_data_attribs:
-        # Copy node attributes from the original tree to the copy
-        # This only works if tree and tree_copy are perfectly matched
-        for n in tree:
-            node_copy = tree_copy[n.data_id]
-            for k, v in vars(n.data).items():
-                if v and node_copy.data[k] is None:
-                    logger.info("Copying %s[%s]=%r", n.data_id, k, v)
-                    node_copy.data[k] = v
 
     return tree_copy
 
@@ -481,7 +486,9 @@ class TokenNodeData(MdNodeData):
         # Provide single-line text content for referencing back to the markdown text
         content = self.content_oneliner()
         if not content:
-            if self.data_type in ["List", "Document", "BlankLine"]:
+            if self.data_type in ["Document"]:
+                content = f"{self['name']!r}"
+            elif self.data_type in ["List", "BlankLine"]:
                 content = ""
             elif self.data_type in ["Heading", "Link", "TableRow"]:
                 # Render these single-line types. Assume TableRow is a single line for now.
@@ -517,7 +524,7 @@ def remove_child(child: Node, node: Optional[Node] = None) -> None:
     if not node:
         node = child.parent
     logger.debug("Removing child %s from %s", child.data_id, node.data_id)
-    if isinstance(node.data, TokenNodeData):
+    if isinstance(node.data, TokenNodeData) and isinstance(child.data, TokenNodeData):
         # Update node.token.children since that's used for rendering
         node.data.token.children.remove(child.data.token)
     # Then remove the child from the tree
@@ -550,7 +557,7 @@ def hide_span_tokens(tree: Tree) -> int:
         ]:
             continue
 
-        logger.info("Hiding %i children span-tokens under %s", len(node.children), data_type)
+        logger.debug("Hiding %i children span-tokens under %s", len(node.children), data_type)
         # Create custom attribute for the hidden text so that tree.print() renders some of the text
         node.data["oneliner_of_hidden_nodes"] = textwrap.shorten(
             remove_links(node.render()), 50, placeholder="...(hidden)", drop_whitespace=False
@@ -593,7 +600,7 @@ def create_heading_sections(tree: Tree) -> int:
         n.move_to(hs_node)
         for body in children:
             body.move_to(hs_node)
-        logger.info("Created new %s", hs_node.data)
+        logger.debug("Created new %s", hs_node.data)
 
     tree.system_root.meta["prep_funcs"].append("create_heading_sections")
     return hsection_counter
@@ -635,7 +642,7 @@ def nest_heading_sections(tree: Tree) -> int:
         # Find the parent HeadingSection node to move hs_node under
         parent_hs_node = next(hs for hs in reversed(heading_stack[:heading_level]) if hs)
         if hs_node.parent != parent_hs_node:
-            logger.info("Moving %r under parent %r", hs_node.id_string, parent_hs_node.id_string)
+            logger.debug("Moving %r under parent %r", hs_node.id_string, parent_hs_node.id_string)
             hs_node.move_to(parent_hs_node)
             move_counter += 1
 
@@ -677,14 +684,14 @@ def _add_intro_attrib(node: Node) -> bool:
     if prev_node:
         if prev_node.data_type in ["Paragraph", "Heading"]:
             if node.data["intro"]:
-                logger.info("Skipping %s: already has intro %r", node.data_id, node.data["intro"])
+                logger.debug("Skipping %s: already has intro %r", node.data_id, node.data["intro"])
                 return False  # Don't override existing intro
 
             # Use the unformatted raw_text (for Heading nodes)
             intro_md = prev_node.data["raw_text"] or prev_node.render()
             # Limit size of intro by using only the last sentence
             node.data["intro"] = intro_md.split(". ")[-1]
-            logger.info("Added intro to %s: %r", node.data_id, node.data["intro"])
+            logger.debug("Added intro to %s: %r", node.data_id, node.data["intro"])
             # Mark the node being used as the intro as a hint when chunking to keep intro with the List/Table
             prev_node.data["is_intro"] = True
             return True

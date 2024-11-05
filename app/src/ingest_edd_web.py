@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import sys
+import os
 from typing import Optional, Sequence
 
 from smart_open import open as smart_open
@@ -33,7 +34,7 @@ def _ingest_edd_web(
 
     # First, split all json_items into chunks (fast) to debug any issues quickly
     all_chunks = _create_chunks(json_items, doc_attribs)
-    logger.info(
+    logger.warning(
         "Done splitting %d webpages into %d chunks",
         len(json_items),
         sum(len(chunks) for _, chunks, _ in all_chunks),
@@ -42,7 +43,8 @@ def _ingest_edd_web(
         if not chunks:
             logger.warning("No chunks for %r", document.source)
             continue
-        logger.info("Adding embeddings for %r", document.source)
+        logger.warning("Adding embeddings for %r", document.source)
+        exit(0)
         # Next, add embeddings to each chunk (slow)
         # TODO: Kevin mentioned adding column chunk.embedding_str; set it to s.text_to_encode
         add_embeddings(chunks, [s.text_to_encode for s in splits])
@@ -100,7 +102,7 @@ def _create_chunks(
             continue
 
         name = item["title"]
-        logger.info("Processing: %s (%s)", name, item["url"])
+        logger.warning("Processing: %s (%s)", name, item["url"])
         urls_processed.add(item["url"])
 
         content = item.get("main_content", item.get("main_primary"))
@@ -108,6 +110,7 @@ def _create_chunks(
 
         document = Document(name=name, content=content, source=item["url"], **doc_attribs)
         chunks, splits = _chunk_page(document, content)
+        logger.warning("Split into %d chunks for %r", len(chunks), document.source)
         result.append((document, chunks, splits))
     return result
 
@@ -127,14 +130,20 @@ class EddChunkingConfig(ChunkingConfig):
     def text_length(self, text: str) -> int:
         return len(tokenize(text))
 
-    def compose_summary_text(self, node: Node) -> str:
-        if node.data_type not in ["Heading", "HeadingSection", "List", "ListItem"]:
-            return ""
-        if not (md:=node.render()):
-            logger.warning("No markdown for %s: children=%s", node, [c.data_id for c in node.children])
+    # def compose_summary_text(self, node: Node) -> str:
+    #     if node.data_type not in ["Heading", "HeadingSection", "List", "ListItem", "Table"]:
+    #         return "(SUMMARY)"
+    #     if not (md:=node.render()):
+    #         logger.warning("No markdown for %s: children=%s", node, [c.data_id for c in node.children])
 
-        summary = shorten(remove_links(md.splitlines()[0]), 200, placeholder="...")
-        return f"({summary})\n\n"
+    #     if node.data_type == "List":
+    #         items = [line for line in md.splitlines() if line.startswith("* ")]
+    #         items = [shorten(remove_links(line), int(200/len(items)), placeholder="...") for line in items]
+    #         summary = "\n".join(items)
+    #         return f"(\n{summary}\n)\n\n"
+    #     else:
+    #         summary = shorten(remove_links(md.splitlines()[0]), 200, placeholder="...")
+    #         return f"({summary})\n\n"
 
 
 # chunking_config: Optional[EddChunkingConfig] = None
@@ -147,9 +156,30 @@ def _chunk_page(
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     splits: list[SplitWithContextText] = []
     if USE_MARKDOWN_TREE:
-        if document.source.startswith("https://edd.ca.gov/en/uibdg"):
-            return [], []
-        # if document.source != "https://edd.ca.gov/en/uibdg/Trade_Dispute_TD_280/":
+        # if document.source.startswith("https://edd.ca.gov/en/uibdg"):
+        #     return [], []
+
+        # if document.source not in [
+        #     # too long
+        #     "https://edd.ca.gov/en/jobs_and_training/Information_Notices/",
+        #     "https://edd.ca.gov/en/uibdg/Suitable_Work_SW_5/",
+        #     "https://edd.ca.gov/en/payroll_taxes/forms_and_publications/",
+        #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_5/",
+        #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_15/",
+        # ]:
+        #     return [], []
+        
+        # if document.source != "https://edd.ca.gov/en/disability/Contact_SDI/":
+        #     return [], []
+        # if document.source not in [
+        #     "https://edd.ca.gov/en/jobs_and_training/Active_Directives/",
+            # "https://edd.ca.gov/en/jobs_and_training/Information_Notices/", # too long
+
+        #     "https://edd.ca.gov/en/payroll_taxes/FAQ_-_e-Services_for_Business/", # # Infinite loop
+        #     # "https://edd.ca.gov/en/uibdg/Misconduct_MC_270/",  # Infinite loop
+        #     "https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/"
+        #     "https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_-_table_of_contents/",# Takes too long?
+        # ]:
         #     return [], []
         # global chunking_config
         # if not chunking_config:
@@ -157,25 +187,45 @@ def _chunk_page(
 
         # Fix markdown formatting that causes markdown parsing errors
         # '. . .' is parsed as sublists on the same line
-        content = content.replace('. . .', '...')  # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
+        content = content.replace(
+            ". . .", "..."
+        )  # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
         # '. * ' is parsed as sublists; incorrect markdown from scraping
-        content = content.replace('. *\n', '. \n')  # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
+        content = content.replace(
+            ". *\n", ". \n"
+        )  # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
         # nested sublist '+' created without parent list; incorrect markdown from scraping?
-        content = content.replace('* + ', '    + ') # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
+        content = content.replace(
+            "* + ", "    + "
+        )  # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
 
-        tree = create_markdown_tree(content, doc_name=document.name)
-        print(document.name)
-        # tree.print()
-        prepare_tree(tree)
-        # tree.print()
-        tree_chunks = chunk_tree(tree, chunking_config)
-        # pprint(list(tree_chunks.values()), sort_dicts=False, width=140)
-        for _id, chunk in tree_chunks.items():
-            splits.append(
-                SplitWithContextText(
+        try:
+            tree = create_markdown_tree(content, doc_name=document.name)
+            print(document.name)
+            # tree.print()
+            prepare_tree(tree)
+            # tree.print()
+            tree_chunks = chunk_tree(tree, chunking_config)
+            # pprint(list(tree_chunks.values()), sort_dicts=False, width=140)
+
+            for _id, chunk in tree_chunks.items():
+                split = SplitWithContextText(
                     chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
                 )
-            )
+                split.chunk_id = chunk.id
+                split.url = document.source
+                assert split.token_count == chunk.length
+                splits.append(split)
+            assert document.source
+            file_path = "edd-chunks/" + document.source.replace("https://edd.ca.gov/en/", "").rstrip("/")
+            folders = file_path.split("/")
+            os.makedirs("/".join(folders[:-1]), exist_ok=True)
+            with smart_open(file_path + ".json", "w") as file:
+                file.write(json.dumps([split.__dict__ for split in splits], indent=2))
+            logger.warning("Split into %d chunks for %r", len(tree_chunks), document.source)
+        except (Exception,KeyboardInterrupt) as e:
+            logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
+            raise e
     else:
         for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
             # Start a new split for each heading

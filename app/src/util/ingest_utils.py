@@ -25,7 +25,7 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
 
     # Print INFO messages since this is often run from the terminal
     # during local development
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")
 
     if len(argv[1:]) != 4:
         logger.warning(
@@ -43,7 +43,7 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
     benefit_region = args[2]
     pdf_file_dir = args[3]
 
-    logger.info(
+    logger.warning(
         f"Processing files {dataset_id} at {pdf_file_dir} for {benefit_program} in {benefit_region}"
     )
 

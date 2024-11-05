@@ -19,7 +19,9 @@ from src.ingestion.markdown_tree import (
     remove_blank_lines,
     render_subtree_as_md,
     render_tree_as_md,
+    render_nodes_as_md,
     tokens_vs_tree_mismatches,
+    prepare_tree
 )
 
 logger = logging.getLogger(__name__)
@@ -360,6 +362,20 @@ def test_get_parent_headings(tree):
     headings = get_parent_headings_raw(tree["LI_42"])
     assert headings == ["Second H1 without a paragraph", "Skip to H3"]
 
+def test_render_raw():
+    test_markdown = f"""
+# Heading with [a link](google.com)
+
+Sentence 1.
+"""
+    tree = create_markdown_tree(test_markdown, doc_name="Test doc")
+    prepare_tree(tree)
+    tree.print()
+    node = tree["H1_2"]
+    assert node.data["raw_text"] == "Heading with a link"
+
+    with pytest.raises(ValueError):
+        tree['nonexistent_id']
 
 def test_MdNodeData_repr(tree):
     hide_span_tokens(tree)
