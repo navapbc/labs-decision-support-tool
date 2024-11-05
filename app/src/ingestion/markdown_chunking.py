@@ -16,7 +16,6 @@ from src.ingestion.markdown_tree import (
     render_nodes_as_md,
     HeadingSectionNodeData,
     _get_node_data_id,
-    copy_tree,
 )
 from src.util.string_utils import remove_links
 
@@ -203,8 +202,6 @@ class ChunkingConfig:
             raise AssertionError(f"Unexpected single Heading node: {chunk.nodes[0].id_string}")
 
         if chunk.length > self.max_length:
-            logger.error("Chunk %s is too large! %s > %s", chunk.id, chunk.length, self.max_length)
-            # FIXME:
             raise AssertionError(f"{chunk.id} is too large! {chunk.length} > {self.max_length}")
         logger.info("Adding chunk %s created from: %s", chunk.id, [c.data_id for c in chunk.nodes])
         self.chunks[chunk.id] = chunk
@@ -308,10 +305,6 @@ class ChunkingConfig:
             )
 
         if node.data_type == "List":
-            # FIXME: if summary is presented like a list but is in a Paragraph,
-            # when it is copy_tree()ed, the list Paragraph is interpreted as a List L_*, 
-            # in which case the "chunked" attrib won't be copied over!
-
             # return f"* (SUMMARIZED LIST {node.data_id})\n\n"
             summary = shorten(remove_links(md.splitlines()[0]), 120, placeholder="...")
             if not summary:
@@ -665,7 +658,7 @@ def split_list_or_table_node_into_chunks(
                 # logger.debug("New children_ids: %s", children_ids.keys())
                 continue  # Try again with the reset tree and candidate_node
             else:
-                # FIXME: Fall back to use RecursiveCharacterTextSplitter
+                # TODO: Fall back to use RecursiveCharacterTextSplitter
                 raise AssertionError(f"{block_node.data_id} should have at least one child")
 
         if children_ids:  # Prep for the next loop iteration
@@ -822,8 +815,11 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
         raise AssertionError(f"Unexpected node.data type: {node.data_type}")
     p_nodedata = _create_paragraph_node_data(line_number, summary, node.tree)
 
-    if node.data_id == 'L_48':
-        pass
+    # TODO: remove the intro_node? First, check if it's been included in a chunk; Actually,
+    # FIXME: we should mark nodes as they are added into a chunk, then check that before they are removed and at the end.
+    # ListItem's should already have an "intro" attribute set.
+    # if node_with_intro.intro_node:
+    #     remove_child(node_with_intro.intro_node)
 
     if node.data_type in ["Document", "List", "HeadingSection", "ListItem"]:
         # Replace all children and add Paragraph summary as the only child
@@ -840,9 +836,6 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
 
         # Mark the node as chunked so it can be skipped in future chunking
         node.data["chunked"] = True
-        # FIXME: do something with the intro_node
-        # if node_with_intro.intro_node:
-        #     remove_child(node_with_intro.intro_node)
         return node_with_intro
     elif node.data_type in ["Table", "Paragraph", "BlockCode"]:  # Replace Table with Paragraph summary
         parent = node.parent
@@ -907,11 +900,9 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
 
 
     logger.debug("Summarizing %s with %s", node.data_id, [n.data_id for n in nodes if n != node])
-    # assert all(n.parent == nodes[0].parent for n in nodes), f"Nodes should have the same parent {[n.parent.data_id for n in nodes]}"
-    # summary = f"(CHUNKED: {node.data_id} with {[n.data_id for n in nodes if n != node]})"  # config.compose_summary_text(node)
+    assert all(n.parent == nodes[0].parent for n in nodes), f"Nodes should have the same parent {[n.parent.data_id for n in nodes]}"
+    # summary = f"(CHUNKED: {node.data_id} with {[n.data_id for n in nodes if n != node]})"
     summary = config.compose_summary_text(node)
-    # if node.data_type == "ListItem":
-    #     summary = "* " + summary  # FIXME: generalize this
     logger.debug("Added SUMMARY to %s: %r", node.data_id, summary)
 
     # Replace all nodes with Paragraph summary

@@ -216,12 +216,13 @@ def _chunk_page(
                 split.url = document.source
                 assert split.token_count == chunk.length
                 splits.append(split)
-            assert document.source
-            file_path = "edd-chunks/" + document.source.replace("https://edd.ca.gov/en/", "").rstrip("/")
-            folders = file_path.split("/")
-            os.makedirs("/".join(folders[:-1]), exist_ok=True)
-            with smart_open(file_path + ".json", "w") as file:
-                file.write(json.dumps([split.__dict__ for split in splits], indent=2))
+            if False:
+                assert document.source
+                file_path = "edd-chunks/" + document.source.replace("https://edd.ca.gov/en/", "").rstrip("/")
+                folders = file_path.split("/")
+                os.makedirs("/".join(folders[:-1]), exist_ok=True)
+                with smart_open(file_path + ".json", "w") as file:
+                    file.write(json.dumps([split.__dict__ for split in splits], indent=2))
             logger.warning("Split into %d chunks for %r", len(tree_chunks), document.source)
         except (Exception,KeyboardInterrupt) as e:
             logger.error("Error chunking %s (%s): %s", document.name, document.source, e)

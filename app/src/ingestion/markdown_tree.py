@@ -101,45 +101,6 @@ def normalize_markdown(markdown: str) -> str:
         return renderer.render(doc)
 
 
-def copy_tree(tree: Tree, copy_data_attribs: bool = False) -> Tree:
-    if False:
-        with _new_md_renderer() as renderer:
-            # "the parsing phase is currently tightly connected with initiation and closing of a renderer.
-            # Therefore, you should never call Document(...) outside of a with ... as renderer block"
-            # markdown = renderer.render(tree.first_child().data.token)
-            markdown = render_tree_as_md(tree)
-        tree_copy = create_markdown_tree(
-            markdown,
-            f"Deep copy of {tree.name}",
-            normalize_md=False,
-            doc_name=tree.first_child().data["name"],
-        )
-
-        prepare_tree(tree_copy)
-        # TODO: run the same prep_funcs on the tree_copy as on the original tree
-
-        if copy_data_attribs:
-            # Copy node attributes from the original tree to the copy
-            # This only works if tree and tree_copy are perfectly matched
-            for n in tree:
-                node_copy = tree_copy[n.data_id]
-                for k, v in vars(n.data).items():
-                    if v and node_copy.data[k] is None:
-                        logger.info("Copying %s[%s]=%r", n.data_id, k, v)
-                        node_copy.data[k] = v
-
-    tree_copy = tree.copy(f"Deep copy of {tree.name}")
-
-    # # Copy the meta attributes from the original tree so that get_parent_headings() works
-    for k, v in tree.system_root.meta.items():
-        tree_copy.system_root.set_meta(k, v.copy())
-    tree.print()
-    tree_copy.print()
-
-
-    return tree_copy
-
-
 def _new_md_renderer() -> MarkdownRenderer:
     "Create a new MarkdownRenderer instance with consistent settings. Remember to use in a context manager."
     # MarkdownRenderer() calls block_token.remove_token(block_token.Footnote), so reset tokens to avoid failure
@@ -361,17 +322,25 @@ class MdNodeData:
         return content
 
 
+def _extract_raw_text(node: Node) -> str:
+    """
+    Returns a join of all the content in all descendant RawText nodes under the node,
+    excluding any formatting like bold, italics, etc.
+    """
+    raw_text_nodes = node.find_all(match=lambda n: n.data_type == "RawText")
+    return "".join([n.token.content for n in raw_text_nodes])
+
+
 class HeadingSectionNodeData(MdNodeData):
     def __init__(self, heading_node: Node, tree: Tree):
         assert isinstance(heading_node.token, block_token.Heading)
         self.heading_node = heading_node
         # heading_node.data["rendered_text"] = render_nodes_as_md(heading_node.children)
 
-        if True:  # FIXME: assumes hide_span_tokens() has been called
-            self.raw_text = heading_node.data["raw_text"]
-        else:
-            raw_text_nodes = heading_node.find_all(match=lambda n: n.data_type == "RawText")
-            self.raw_text = "".join([n.token.content for n in raw_text_nodes])
+        # "raw_text" is set if hide_span_tokens() has been called
+        self.raw_text = heading_node.data["raw_text"]
+        if self.raw_text is None:
+            self.raw_text = _extract_raw_text(heading_node)
 
         data_id = f"_S{self.level}_{heading_node.token.line_number}"
         super().__init__("HeadingSection", data_id, tree)
@@ -566,10 +535,7 @@ def hide_span_tokens(tree: Tree) -> int:
         # Add raw text content for Heading nodes to use the text in heading breadcrumbs
         if data_type == "Heading":
             # Do this before removing the children
-            # It's easier to do using tree node.find_all() now than to lazily recurse through token.children later
-            # FIXME: This code is duplicated in HeadingSectionNodeData
-            raw_text_nodes = node.find_all(match=lambda n: n.data_type == "RawText")
-            node.data["raw_text"] = "".join([n.token.content for n in raw_text_nodes])
+            node.data["raw_text"] = _extract_raw_text(node)
 
         # Set attribute to indicate that node.token.children tokens should never be modified
         node.data["freeze_token_children"] = True
