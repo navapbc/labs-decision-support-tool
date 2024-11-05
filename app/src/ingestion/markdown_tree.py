@@ -221,7 +221,7 @@ def render_subtree_as_md(node: Node, normalize: bool = False) -> str:
     we cannot rely on mistletoe's renderer (which is based on Tokens) to render the tree correctly. Hence, we have this function.
     Whenever this method is called in a loop, join the result with no delimiter: `"".join(result)`
     """
-    if node.data_type in ["Document", "HeadingSection"]:
+    if node.data_type in ["Document", "HeadingSection", "ListItem"]:
         # Render the Document and HeadingSection nodes specially to account for summarized child nodes
         md_str = render_nodes_as_md(node.children)
     elif isinstance(node.data, TokenNodeData):
