@@ -16,6 +16,7 @@ from src.ingestion.markdown_tree import (
     render_nodes_as_md,
     HeadingSectionNodeData,
     _get_node_data_id,
+    copy_tree,
 )
 from src.util.string_utils import remove_links
 
@@ -46,7 +47,10 @@ def copy_ancestors(node: Node, target_tree: Tree) -> Node:
         if existing_p_node:
             p_node = existing_p_node
         else:
+            logger.info("Copying %s to parent %s", parent.data_id, p_node.data_id)
             p_node = parent.copy_to(p_node, deep=False)
+            # Remember to call update_copied_tree() since we skip: p_node.set_data(copy(parent.data), data_id=parent.data_id)
+
     return p_node
 
 
@@ -70,10 +74,20 @@ def copy_subtree(
         new_parent_node = copy_ancestors(node, new_node.tree)
         new_node.move_to(new_parent_node)
 
+    assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"
+
+    update_copied_tree(subtree)
+
+    # At this point, no object in the subtree should be pointing to objects in the original tree,
+    # except for tokens associated with "freeze_token_children". We are free to modify the subtree.
+    return new_node
+
+
+def update_copied_tree(tree: Tree) -> None:
     # Set the data_id back to the original, along with creating copies of objects
-    for n in subtree:
+    for n in tree:
         n.set_data(copy(n.data), data_id=n.data.data_id)
-        n.data.tree = subtree
+        n.data.tree = tree
         if isinstance(n.data, TokenNodeData):
             are_tokens_frozen = find_closest_ancestor(
                 n,
@@ -88,11 +102,9 @@ def copy_subtree(
                 ), f"Unexpected Paragraph node {n.id_string}; should be frozen"
                 n.data.token = copy(n.data.token)
 
-    assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"
-
     # Now that copies of node.data and node.data.token are created, update references to the tokens
     # Update all node.data.token.children to point to the new token objects in the subtree
-    for n in subtree:
+    for n in tree:
         if isinstance(n.data, TokenNodeData) and not n.data["freeze_token_children"]:
             n.data.token.children = [
                 c.token for c in n.children if isinstance(c.data, TokenNodeData)
@@ -100,10 +112,6 @@ def copy_subtree(
             for c in n.data.token.children:
                 # token.parent was indirectly updated when token.children was set
                 assert c.parent == n.data.token
-
-    # At this point, no object in the subtree should be pointing to objects in the original tree,
-    # except for tokens associated with "freeze_token_children". We are free to modify the subtree.
-    return new_node
 
 
 def remove_children_from(node: Node, child_data_ids: set[str]) -> None:
@@ -178,7 +186,7 @@ class ChunkingConfig:
             chunk_overlap=chars_per_word * overlapping_words,
         )
 
-    def reset(self, tree: Tree) -> None:
+    def reset(self) -> None:
         self.chunks = {}
 
     def text_length(self, markdown: str) -> int:
@@ -310,9 +318,9 @@ class ChunkingConfig:
             return f"({summary})\n\n"
 
 
-def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
+def chunk_tree(in_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     # Reset the tree for chunking
-    config.reset(tree)
+    config.reset()
 
     # 2 trees:
     # 1. The original tree is used to create the chunks from chunk_buffer
@@ -325,7 +333,7 @@ def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     # 3. (transactional) WORKING: copied original working tree: copy of the original tree, but nodes can be removed to reflect (uncommitted) chunk_buffer
     #    used to assess tree wrt BUFFER
 
-    doc_node = tree.first_child()  # COMMITTED tree
+    doc_node = copy_tree(in_tree).first_child()  # COMMITTED tree
 
     # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
     while not config.nodes_fit_in_chunk([doc_node]):
@@ -338,33 +346,49 @@ def chunk_tree(tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     config.add_chunk(config.create_protochunk([doc_node]))
     return config.chunks
 
+
 RELEVANT_TYPES = ["HeadingSection", "Heading", "List", "Table", "ListItem", "Paragraph"]
+
 
 def _update_tokens(chunking_tree):
     "Do this after copying a node to chunking_tree"
     for n in chunking_tree:
         if isinstance(n.data, TokenNodeData):
-            child_tokens = [
-                c.token for c in n.children if isinstance(c.data, TokenNodeData)
-            ]
+            child_tokens = [c.token for c in n.children if isinstance(c.data, TokenNodeData)]
             # Ensure ordering is retained
-            n.data.token.children =[c for c in n.data.token.children if not hasattr(c, "type") or c in child_tokens]
+            n.data.token.children = [
+                c for c in n.data.token.children if not hasattr(c, "type") or c in child_tokens
+            ]
             n.data.token.children += [c for c in child_tokens if c not in n.data.token.children]
 
             logger.info("Updated tokens for %s: %s", n.data_id, [c for c in n.data.token.children])
 
+
 def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
     committed_tree = orig_node.tree
     logger.info("CommittedTree: %s", committed_tree.format())
-    logger.info("Committed MD: %s", config.create_protochunk([committed_tree.first_child()]).markdown)
+    logger.info(
+        "Committed MD: %s", config.create_protochunk([committed_tree.first_child()]).markdown
+    )
+
     # Transaction trees
-    working_tree = copy_subtree(committed_tree.first_child()).tree
+    working_tree = copy_tree(committed_tree, copy_data_attribs=True)
     node = working_tree[orig_node.data_id]
-    chunking_tree = copy_subtree(node, include_descendants=False, include_ancestors=True).tree
-    chunk_buffer: list[Node] = []  # in chunking_tree
-    chunk_buffer_in_working_tree: list[Node] = []  # in working_tree
+
+    # Empty chunking data structures
+    assert node.parent.data_type == "Document"
+    chunking_tree = copy_subtree(
+        node.parent, include_descendants=False, include_ancestors=True
+    ).tree
+    chunk_buffer: list[NodeWithIntro] = []  # in chunking_tree
     intro_node: Node | None = None
     while node:
+        if node.data["chunked"]:
+            # and node.data_type == "Paragraph":
+            logger.info("Skipping chunked Paragraph node %s", node.data_id)
+            node = node.next_sibling()
+            continue
+
         # keep-with-next for intro nodes
         if node.data["is_intro"]:
             intro_node = node
@@ -374,62 +398,86 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
         next_node = NodeWithIntro(node, intro_node)
         logger.info("Next: %s", next_node)
         logger.info("ChunkingTree: %s", chunking_tree.format())
-        logger.info("Chunking MD: %s", config.create_protochunk([chunking_tree.first_child()]).markdown)
+        logger.info(
+            "Chunking MD: %s", config.create_protochunk([chunking_tree.first_child()]).markdown
+        )
         logger.info("WorkingTree: %s", working_tree.format())
-        logger.info("Working MD: %s", config.create_protochunk([working_tree.first_child()]).markdown)
+        logger.info(
+            "Working MD: %s", config.create_protochunk([working_tree.first_child()]).markdown
+        )
         if config.nodes_fit_in_chunk([chunking_tree.first_child()] + next_node.as_list):
             logger.info("Fits! Adding %s", next_node)
-            # Copy next_node.node to chunking_tree
-            if not (
-                new_node := chunking_tree.find(match=lambda n: n.data_id == next_node.node.data_id)
-            ):
-                new_parent_node = copy_ancestors(next_node.node, chunking_tree)
-                # For some reason, copy_to() assigns a random data_id to the new node in subtree
-                new_node = next_node.node.copy_to(new_parent_node, deep=True)
-                new_node.set_data(copy(new_node.data), data_id=next_node.node.data_id)
+            # Update WORKING tree
+            # DON'T update COMMITTED tree
 
+            # Copy next_node.intro_node branch to chunking_tree BEFORE copying next_node.node branch
+            # intro_node may be a parent (e.g., ListItem) of node (e.g., List)
             new_intro_node = None
             if next_node.intro_node:
+                # There is no one structural relationship: assert next_node.intro_node.parent == next_node.node.parent
                 if not (
                     new_intro_node := chunking_tree.find(
                         match=lambda n: n.data_id == next_node.intro_node.data_id
                     )
                 ):
-                    # Copy next_node.intro_node to chunking_tree
-                    new_intro_parent_node = copy_ancestors(next_node.intro_node, chunking_tree)
-                    new_intro_node = next_node.intro_node.copy_to(new_intro_parent_node, deep=True)
-                    new_intro_node.set_data(
-                        copy(new_intro_node.data), data_id=next_node.intro_node.data_id
+                    # Copy next_node.intro_node branch to chunking_tree
+                    logger.info(
+                        "Copying next_node.intro_node %s to chunking_tree",
+                        next_node.intro_node.data_id,
                     )
+                    new_intro_parent_node = copy_ancestors(next_node.intro_node, chunking_tree)
+                    # copy then remove in _summarize_nodes() => move
+                    new_intro_node = next_node.intro_node.copy_to(new_intro_parent_node, deep=True)
+                    # new_intro_node.set_data(
+                    #     copy(new_intro_node.data), data_id=next_node.intro_node.data_id
+                    # )
+
+            # Copy next_node.node branch to chunking_tree
+            if not (
+                new_node := chunking_tree.find(match=lambda n: n.data_id == next_node.node.data_id)
+            ):
+                logger.info("Copying next_node.node %s to chunking_tree", next_node.node.data_id)
+                new_parent_node = copy_ancestors(next_node.node, chunking_tree)
+                # For some reason, copy_to() assigns a random data_id to the new node in subtree
+                # copy then remove in _summarize_nodes() => move
+                new_node = next_node.node.copy_to(new_parent_node, deep=True)
+                # new_node.set_data(copy(new_node.data), data_id=next_node.node.data_id)
+
+            update_copied_tree(chunking_tree)
 
             copied_next_node = NodeWithIntro(new_node, new_intro_node)
-            chunk_buffer.extend(copied_next_node.as_list)
-            chunk_buffer_in_working_tree.extend(next_node.as_list)
+            chunk_buffer.append(copied_next_node)
 
-            # Since intro_node is included in next_node, reset it
+            # Since intro_node is included in chunk_buffer, reset it
             intro_node = None
-            _update_tokens(chunking_tree)
+            # _update_tokens(chunking_tree)
             node = node.next_sibling()
 
-            # DON'T update COMMITTED tree
-            # Update WORKING tree
+            # This will remove node
             _summarize_nodes(next_node.as_list, config)
             continue
 
         # does not fit
-        logger.info("Does not fit: %s + %s", [n.data_id for n in chunking_tree], next_node)
+        # Following does not modify the working tree or chunk_buffer
+        # It may modify the COMMITTED tree and RETURN
+        # chunking_tree is used to flush the chunk_buffer to create a chunk
+        logger.info("Does not fit: %s + %s", chunking_tree.first_child().data_id, next_node)
         if not node.has_children() and not config.nodes_fit_in_chunk(next_node.as_list):
             assert node.data_type in [
                 "Paragraph"
             ], f"Unexpected data_type {node.data_type} for leaf node"
             logger.info("Splitting Paragraph %s into multiple chunks", next_node)
             # must split Paragraph n into multiple chunks; doesn't make sense to mix parts of it with other chunks
+
             # update COMMITTED tree
             orig_next_node = NodeWithIntro(
                 committed_tree[next_node.node.data_id],
                 committed_tree[next_node.intro_node.data_id] if next_node.intro_node else None,
             )
-            _split_paragraph_into_chunks(orig_next_node, config)
+            # _chunk_and_summarize_next_nodes(config, node_with_intro)
+            # split_paragraph_into_chunks
+            config.create_chunks_for_next_nodes(orig_next_node)
+            _summarize_nodes(orig_next_node.as_list, config)
         elif full_enough_to_flush([chunking_tree.first_child()], config):
             logger.info("Full enough! %s", [n.data_id for n in chunking_tree])
             # Flush the chunk_buffer to a chunk
@@ -438,11 +486,13 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             # TODO: del chunk_tree
 
             # update COMMITTED tree
-            orig_nodes = [
-                committed_tree.find_first(data_id=n.data_id) for n in chunk_buffer
-            ]
-            _summarize_nodes(orig_nodes, config)
-        elif want_to_go_deeper(chunk_buffer_in_working_tree, next_node, config):
+            for nwi in chunk_buffer:
+                orig_nodes = NodeWithIntro(
+                    committed_tree[nwi.node.data_id],
+                    committed_tree[nwi.intro_node.data_id] if nwi.intro_node else None,
+                )
+                _summarize_nodes(orig_nodes.as_list, config)
+        elif want_to_go_deeper(working_tree, next_node, config):
             node = node.first_child()
             logger.info("Go deeper to %s", node.data_id)
             continue
@@ -462,12 +512,6 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
         return
 
 
-def _split_paragraph_into_chunks(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> None:
-    # _chunk_and_summarize_next_nodes(config, node_with_intro)
-    config.create_chunks_for_next_nodes(node_with_intro)
-    _summarize_nodes(node_with_intro.as_list, config)
-
-
 def full_enough_to_flush(chunk_buffer: list[Node], config: ChunkingConfig):
     chunk = config.create_protochunk(chunk_buffer)
     next_nodes_portion = chunk.length / config.max_length
@@ -479,7 +523,7 @@ def full_enough_to_flush(chunk_buffer: list[Node], config: ChunkingConfig):
     return next_nodes_portion > 0.75
 
 
-def want_to_go_deeper(chunk_buffer: list[Node], next: NodeWithIntro, config: ChunkingConfig):
+def want_to_go_deeper(working_tree: Tree, next: NodeWithIntro, config: ChunkingConfig):
     if next.node.data_type in "HeadingSection":
         return True
     if next.node.data_type == "List":
@@ -761,20 +805,56 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
         raise AssertionError(f"Unexpected data type: {node.data_type}")
 
 
-def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
-    logger.info("Summarizing %s", [n.data_id for n in nodes])
-    node = nodes[0]
-    summary = f"(CHUNKED: {[n.data_id for n in nodes]})"  # config.compose_summary_text(node)
+def _insert_summary_node(node: Node, config: ChunkingConfig) -> Node:
+    logger.info("_insert_summary_node for %s", node.data_id)
+    summary = f"(CHUNKED: {node.data_id})"  # config.compose_summary_text(node)
     logger.info("Added SUMMARY to %s: %r", node.data_id, summary)
 
     p_nodedata = _create_paragraph_node_data(node.token.line_number, summary, node.tree)
 
+    # Insert nodes with Paragraph summary
+    parent = node.parent
+    p_node = parent.add_child(p_nodedata, before=node)
+    if isinstance(parent.data, TokenNodeData):
+        assert parent.data_type in ["Document", "ListItem", "List", "Table"]
+        parent.token.children = [
+            c.token for c in parent.children if isinstance(c.data, TokenNodeData)
+        ]
+    elif isinstance(parent.data, HeadingSectionNodeData):
+        pass
+    else:
+        raise AssertionError(f"Unexpected parent.data type: {parent.data_type}")
+    # return NodeWithIntro(p_node, node_with_intro.intro_node)
+    return p_node
+
+
+def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
+    "Assumes nodes are at the same level in the tree, ie have the same parent"
+    node = nodes[-1]
+    if node.data_type == "Heading":
+        logger.info("Skipping summarization of lone Heading node %s", node.data_id)
+        assert [
+            n.data_id for n in nodes if n != node
+        ] == [], f"Unexpected nodes: {[n.data_id for n in nodes if n != node]}"
+        return node
+
+    logger.info("Summarizing %s with %s", node.data_id, [n.data_id for n in nodes if n != node])
+    # assert all(n.parent == nodes[0].parent for n in nodes), f"Nodes should have the same parent {[n.parent.data_id for n in nodes]}"
+    summary = f"(CHUNKED: {node.data_id} with {[n.data_id for n in nodes if n != node]})"  # config.compose_summary_text(node)
+    if node.data_type == "ListItem":
+        summary = "* " + summary  # FIXME: generalize this
+    logger.info("Added SUMMARY to %s: %r", node.data_id, summary)
+
     # Replace all nodes with Paragraph summary
+
+    p_nodedata = _create_paragraph_node_data(node.token.line_number, summary, node.tree)
+
     parent = node.parent
     p_node = parent.add_child(p_nodedata, before=node)
     for c in nodes:
         c.remove()
     if isinstance(parent.data, TokenNodeData):
+        assert parent.data_type in ["Document", "ListItem", "List", "Table"]
         parent.token.children = [
             c.token for c in parent.children if isinstance(c.data, TokenNodeData)
         ]
@@ -794,6 +874,8 @@ def _create_paragraph_node_data(line_number, summary, tree):
     p_nodedata["oneliner_of_hidden_nodes"] = textwrap.shorten(
         remove_links(summary), 50, placeholder="...(hidden)", drop_whitespace=False
     )
+    p_nodedata["chunked"] = True
+    p_nodedata["is_summary"] = 1
     return p_nodedata
 
 

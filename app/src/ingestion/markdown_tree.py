@@ -101,6 +101,40 @@ def normalize_markdown(markdown: str) -> str:
         return renderer.render(doc)
 
 
+def copy_tree(tree: Tree, copy_data_attribs: bool = False) -> Tree:
+    with _new_md_renderer() as renderer:
+        # "the parsing phase is currently tightly connected with initiation and closing of a renderer.
+        # Therefore, you should never call Document(...) outside of a with ... as renderer block"
+        # markdown = renderer.render(tree.first_child().data.token)
+        markdown = render_tree_as_md(tree)
+    tree_copy = create_markdown_tree(
+        markdown,
+        f"Deep copy of {tree.name}",
+        normalize_md=False,
+        doc_name=tree.first_child().data["name"],
+    )
+
+    prepare_tree(tree_copy)
+    # TODO: run the same prep_funcs on the tree_copy as on the original tree
+    # # Copy the meta attributes from the original tree so that get_parent_headings() works
+    # for k, v in tree.system_root.meta.items():
+    #     tree_copy.system_root.set_meta(k, v.copy())
+    tree.print()
+    tree_copy.print()
+
+    if copy_data_attribs:
+        # Copy node attributes from the original tree to the copy
+        # This only works if tree and tree_copy are perfectly matched
+        for n in tree:
+            node_copy = tree_copy[n.data_id]
+            for k, v in vars(n.data).items():
+                if v and node_copy.data[k] is None:
+                    logger.info("Copying %s[%s]=%r", n.data_id, k, v)
+                    node_copy.data[k] = v
+
+    return tree_copy
+
+
 def _new_md_renderer() -> MarkdownRenderer:
     "Create a new MarkdownRenderer instance with consistent settings. Remember to use in a context manager."
     # MarkdownRenderer() calls block_token.remove_token(block_token.Footnote), so reset tokens to avoid failure
@@ -221,7 +255,7 @@ def render_subtree_as_md(node: Node, normalize: bool = False) -> str:
     we cannot rely on mistletoe's renderer (which is based on Tokens) to render the tree correctly. Hence, we have this function.
     Whenever this method is called in a loop, join the result with no delimiter: `"".join(result)`
     """
-    if node.data_type in ["Document", "HeadingSection", "ListItem"]:
+    if node.data_type in ["Document", "HeadingSection", "ListItem"]:  # container_types
         # Render the Document and HeadingSection nodes specially to account for summarized child nodes
         md_str = render_nodes_as_md(node.children)
     elif isinstance(node.data, TokenNodeData):
@@ -328,7 +362,7 @@ class HeadingSectionNodeData(MdNodeData):
         self.heading_node = heading_node
         # heading_node.data["rendered_text"] = render_nodes_as_md(heading_node.children)
 
-        if True: #FIXME: assumes hide_span_tokens() has been called
+        if True:  # FIXME: assumes hide_span_tokens() has been called
             self.raw_text = heading_node.data["raw_text"]
         else:
             raw_text_nodes = heading_node.find_all(match=lambda n: n.data_type == "RawText")
@@ -384,6 +418,10 @@ class TokenNodeData(MdNodeData):
 
     def is_block_token(self) -> bool:
         return isinstance(self.token, block_token.BlockToken)
+
+    @property
+    def line_number(self) -> int:
+        return self.token.line_number
 
     def _init_for_table(self) -> None:
         t = self.token
