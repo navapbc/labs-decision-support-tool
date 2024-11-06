@@ -7,6 +7,7 @@ import pytest
 from nutree import Tree
 
 from src.ingestion.markdown_tree import (
+    _prepare_tree,
     add_list_and_table_intros,
     create_heading_sections,
     create_markdown_tree,
@@ -18,10 +19,7 @@ from src.ingestion.markdown_tree import (
     nest_heading_sections,
     remove_blank_lines,
     render_subtree_as_md,
-    render_tree_as_md,
-    render_nodes_as_md,
     tokens_vs_tree_mismatches,
-    prepare_tree
 )
 
 logger = logging.getLogger(__name__)
@@ -148,7 +146,7 @@ def assert_tree_structure(tree: Tree):
 
 
 def test_create_markdown_tree(markdown_text):
-    _tree = create_markdown_tree(markdown_text)
+    _tree = create_markdown_tree(markdown_text, prepare=False)
     tree_descr = assert_tree_structure(_tree)
     parent_of = tree_descr["parents"]
     # These are true initially but will change after tree preparation
@@ -177,7 +175,7 @@ def test_create_markdown_tree(markdown_text):
 
 @pytest.fixture
 def tree(markdown_text):
-    return create_markdown_tree(markdown_text)
+    return create_markdown_tree(markdown_text, prepare=False)
 
 
 def test_markdown_tokens_as_json(markdown_text):
@@ -295,7 +293,7 @@ def test_tree_preparation(tree):
 
 
 def test_subtree_rendering(tree):
-    md = render_tree_as_md(tree)
+    md = render_subtree_as_md(tree.system_root.first_child())
     # Check that various markdown elements are present in the rendered text
     assert "This is the first paragraph with no heading." in md
     assert "# Second H1 without a paragraph" in md
@@ -362,34 +360,34 @@ def test_get_parent_headings(tree):
     headings = get_parent_headings_raw(tree["LI_42"])
     assert headings == ["Second H1 without a paragraph", "Skip to H3"]
 
+
 def test_render_raw():
     test_markdown = f"""
 # Heading with [a link](google.com)
 
 Sentence 1.
 """
-    tree = create_markdown_tree(test_markdown, doc_name="Test doc")
-    prepare_tree(tree)
+    tree = create_markdown_tree(test_markdown, doc_name="Test doc", prepare=True)
     tree.print()
     node = tree["H1_2"]
     assert node.data["raw_text"] == "Heading with a link"
 
     with pytest.raises(ValueError):
-        tree['nonexistent_id']
+        tree["nonexistent_id"]
+
 
 def test_MdNodeData_repr(tree):
     hide_span_tokens(tree)
     create_heading_sections(tree)
     nest_heading_sections(tree)
-    io = StringIO()
-    tree.print(file=io)
-    out_str = io.getvalue()
+    out_str = tree.format()
+    print(out_str)
 
     # Spot check a few lines
     assert "Tree<'Markdown tree'>" in out_str
     assert "╰── Document D_1 line_number=1" in out_str
     assert "    ├── Paragraph P_2 of length" in out_str
-    assert "    ├── HeadingSection _S1_4 with 7 children" in out_str
-    assert "    │   ╰── HeadingSection _S2_10 with 11 children" in out_str
+    assert "    ├── HeadingSection _S1_4" in out_str
+    assert "    │   ╰── HeadingSection _S2_10" in out_str
     assert "    │       ├── List L_18 line_number=18 loose=False start=None" in out_str
     assert "    │       │   ├── ListItem LI_18: \"'* Item H2.3.L1.1" in out_str

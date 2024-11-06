@@ -1,8 +1,8 @@
 import json
 import logging
+import os
 import re
 import sys
-import os
 from typing import Optional, Sequence
 
 from smart_open import open as smart_open
@@ -120,7 +120,7 @@ USE_MARKDOWN_TREE = True
 from nutree import Node
 
 from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree, shorten
-from src.ingestion.markdown_tree import create_markdown_tree, prepare_tree
+from src.ingestion.markdown_tree import _prepare_tree, create_markdown_tree
 
 
 class EddChunkingConfig(ChunkingConfig):
@@ -160,20 +160,21 @@ def _chunk_page(
         #     return [], []
 
         # if document.source not in [
-        #     # too long
-        #     "https://edd.ca.gov/en/jobs_and_training/Information_Notices/",
-        #     "https://edd.ca.gov/en/uibdg/Suitable_Work_SW_5/",
-        #     "https://edd.ca.gov/en/payroll_taxes/forms_and_publications/",
-        #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_5/",
-        #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_15/",
+        #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_85/",
+        # #     # too long
+        # #     "https://edd.ca.gov/en/jobs_and_training/Information_Notices/",
+        # #     "https://edd.ca.gov/en/uibdg/Suitable_Work_SW_5/",
+        # #     "https://edd.ca.gov/en/payroll_taxes/forms_and_publications/",
+        # #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_5/",
+        # #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_15/",
         # ]:
         #     return [], []
-        
+
         # if document.source != "https://edd.ca.gov/en/disability/Contact_SDI/":
         #     return [], []
         # if document.source not in [
         #     "https://edd.ca.gov/en/jobs_and_training/Active_Directives/",
-            # "https://edd.ca.gov/en/jobs_and_training/Information_Notices/", # too long
+        # "https://edd.ca.gov/en/jobs_and_training/Information_Notices/", # too long
 
         #     "https://edd.ca.gov/en/payroll_taxes/FAQ_-_e-Services_for_Business/", # # Infinite loop
         #     # "https://edd.ca.gov/en/uibdg/Misconduct_MC_270/",  # Infinite loop
@@ -203,8 +204,6 @@ def _chunk_page(
             tree = create_markdown_tree(content, doc_name=document.name)
             print(document.name)
             # tree.print()
-            prepare_tree(tree)
-            # tree.print()
             tree_chunks = chunk_tree(tree, chunking_config)
             # pprint(list(tree_chunks.values()), sort_dicts=False, width=140)
 
@@ -212,19 +211,19 @@ def _chunk_page(
                 split = SplitWithContextText(
                     chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
                 )
-                split.chunk_id = chunk.id
-                split.url = document.source
                 assert split.token_count == chunk.length
                 splits.append(split)
-            if False:
+                if os.environ.get("SAVE_CHUNKS"):
+                    split.chunk_id = chunk.id
+                    split.url = document.source
+            if os.environ.get("SAVE_CHUNKS"):
                 assert document.source
-                file_path = "edd-chunks/" + document.source.replace("https://edd.ca.gov/en/", "").rstrip("/")
-                folders = file_path.split("/")
-                os.makedirs("/".join(folders[:-1]), exist_ok=True)
-                with smart_open(file_path + ".json", "w") as file:
+                url_path = document.source.lstrip("https://edd.ca.gov/en/").rstrip("/")
+                os.makedirs(os.path.dirname(url_path), exist_ok=True)
+                with smart_open(f"edd-chunks/{url_path}.json", "w", encoding="utf-8") as file:
                     file.write(json.dumps([split.__dict__ for split in splits], indent=2))
             logger.warning("Split into %d chunks for %r", len(tree_chunks), document.source)
-        except (Exception,KeyboardInterrupt) as e:
+        except (Exception, KeyboardInterrupt) as e:
             logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
             raise e
     else:
