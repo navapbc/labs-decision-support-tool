@@ -7,12 +7,12 @@ from src.ingestion.markdown_chunking import (
     ChunkingConfig,
     chunk_tree,
     copy_subtree,
-    find_closest_ancestor,
     remove_children_from,
     shorten,
 )
 from src.ingestion.markdown_tree import (
     create_markdown_tree,
+    find_closest_ancestor,
     hide_span_tokens,
     render_nodes_as_md,
 )
@@ -60,7 +60,7 @@ List intro:
 
 
 def test_copy_subtree(tiny_tree):
-    list_tree = copy_subtree(tiny_tree["L_7"]).tree
+    list_tree = copy_subtree("TINY", tiny_tree["L_7"]).tree
     assert list_tree["L_7"] == list_tree["L_7"]
     assert repr(list_tree["L_7"].data) == repr(tiny_tree["L_7"].data)
     assert list_tree["L_7"].data is not tiny_tree["L_7"].data
@@ -72,13 +72,13 @@ def test_copy_subtree(tiny_tree):
 
 
 def test_copy_one_node_subtree(tiny_tree):
-    p_node = copy_subtree(tiny_tree["P_4"])
+    p_node = copy_subtree("TINY", tiny_tree["P_4"])
     assert len(p_node.children) == 0
     assert repr(p_node.data) == repr(tiny_tree["P_4"].data)
 
 
 def test_remove_children(caplog, tiny_tree):
-    list_node = copy_subtree(tiny_tree["L_7"])
+    list_node = copy_subtree("TINY", tiny_tree["L_7"])
     assert [c.data_id for c in list_node.children] == ["LI_7", "LI_8"]
     # Remove the first child
     remove_children_from(list_node, {"LI_7"})
@@ -89,7 +89,7 @@ def test_remove_children(caplog, tiny_tree):
     assert len(list_node.children) == 0
 
     # Restart with a fresh copy
-    list_node = copy_subtree(tiny_tree["L_7"])
+    list_node = copy_subtree("TINY", tiny_tree["L_7"])
     with caplog.at_level(logging.WARNING):
         remove_children_from(list_node, {"LI_nonexistant"})
         assert [c.data_id for c in list_node.children] == ["LI_7", "LI_8"]

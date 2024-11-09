@@ -1,8 +1,10 @@
 import itertools
 import logging
 import textwrap
+from copy import copy
 from collections import defaultdict
 from typing import Any, Callable, Iterable, Optional, Sequence
+from contextlib import contextmanager
 
 import mistletoe
 from mistletoe import block_token
@@ -10,6 +12,7 @@ from mistletoe.ast_renderer import AstRenderer
 from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.token import Token
 from nutree import IterMethod, Node, Tree
+from nutree.common import DataIdType
 
 from src.util.string_utils import remove_links
 
@@ -23,6 +26,105 @@ logger = logging.getLogger(__name__)
 #     # to in the text (and will not be shown if they are not referenced).
 
 
+# region ##### Custom tree node to handle updates to mistletoe tokens
+
+
+class TokenAwareNode(Node):
+    def __init__(self, data, **kwargs):
+        super().__init__(data, **kwargs)
+        if self.copying_data():
+            logger.warning("Copying data for new node %s in %s", self.data_id, self.tree.name)
+            self.set_data(copy(data))
+            # data.tree = self.tree
+            if self.has_token():
+                # Why check for frozen token? Because calling copy() on Paragraph tokens doesn't work.
+                # Fortunately if we use "freeze_token_children", then we don't need to copy Paragraph tokens
+                if not self.is_token_frozen():
+                    assert (
+                        self.data_type != "Paragraph"
+                    ), f"Unexpected Paragraph node {self.id_string}; should be frozen"
+                    logger.warning("Copying token for new node %s in %s", self.data_id, self.tree.name)
+                    self.data.token = copy(self.data.token)
+
+    def add_child(self, child: Node | Tree | Any, **kwargs) -> Node:
+        # logger.warning("TokenAwareNode.add_child: %s", self.data_id)
+        child_node = super().add_child(child, **kwargs)
+
+        if not self.sync_token() and self.has_token() and child_node.has_token():
+            self.assert_token_modifiable()
+            if child_node.data.token not in self.data.token.children:
+                logger.warning("Updating token.children %s in %s", self.data_id, self.tree.name)
+                self.data.token.children += (child_node.data.token,)
+
+        return child_node
+
+    # Many tree and node  methods call add()
+    add = add_child
+
+    def copying_data(self)-> bool:
+        return self.tree.system_root.get_meta("data_and_token_copying")
+
+
+    def sync_token(self)->bool:
+        return self.tree.system_root.get_meta("sync_token")
+
+    def has_token(self) -> bool:
+        return isinstance(self.data, TokenNodeData)
+
+    def assert_token_modifiable(self) -> None:
+        # logger.info("assert_token_modifiable %s", self.data_id)
+        # if self.has_token() and self.data_type in ["Paragraph", "Heading"]:
+        #     return
+        assert self.has_token() and not self.is_token_frozen(), f"Cannot modify node {self.data_id}"
+
+    def is_token_frozen(self) -> bool:
+        # logger.info("is_token_frozen %s", self.data_id)
+        return bool(find_closest_ancestor(
+            self,
+            lambda p: p.has_token() and p.data["freeze_token_children"],
+            include_self=True,
+        ))
+
+    def remove(self, *, keep_children=False, with_clones=False) -> None:
+        logger.warning("Removing %s from %s", self.data_id, self.tree.name)
+
+        if self.sync_token() and self.has_token():
+            if self.parent and self.parent.has_token():
+                child_tokens = list(self.parent.data.token.children)
+                if self.data.token in child_tokens:
+                    # Parent token must be modifiable
+                    self.parent.assert_token_modifiable()
+                    logger.warning("Removing token %s from %s", self.data_id, self.tree.name)
+                    child_tokens.remove(self.data.token)
+                    self.parent.data.token.children = tuple(child_tokens)
+
+                if keep_children:
+                    # Parent token must be modifiable
+                    self.parent.assert_token_modifiable()
+                    logger.warning("Moving grandchildren to be children when removing %s", self.data_id)
+                    self.parent.token.children += self.data.token.children
+
+        return super().remove(keep_children=keep_children, with_clones=with_clones)
+
+    def remove_children(self) -> None:
+        if self.sync_token() and self.has_token():
+            if not self.is_token_frozen():
+                self.assert_token_modifiable() # FIXED: To remove P, nutree removes all children, which isn't allowed with this assertion
+                logger.warning("Removing all children tokens for %s in %s", self.data_id, self.tree.name)
+                self.data.token.children = None
+
+        return super().remove_children()
+        
+
+# FIXME: remove once TokenAwareNode works
+def update_token_children(n: Node):
+    if n.has_token() and not n.data["freeze_token_children"]:
+        n.data.token.children = [c.token for c in n.children if c.has_token()]
+        for c in n.data.token.children:
+            # token.parent was indirectly updated when token.children was set
+            assert c.parent == n.data.token
+
+# endregion
 # region ##### Tree creation and validation functions
 
 
@@ -67,25 +169,44 @@ def create_markdown_tree(
         # Otherwise, markdown_renderer.BlankLine, HtmlSpan, etc will not be created and possibly other features
         doc = mistletoe.Document(markdown)
     # The shadow_attrs=True argument allows accessing node.data.age as node.age -- see validate_tree()
-    tree = new_tree(name)
-    tree.system_root.set_meta("prep_funcs", [])
-    _populate_nutree(tree.system_root, doc)
-    if doc_name:
-        assert tree.first_child().data_type == "Document"
-        tree.first_child().data["name"] = doc_name
-    validate_tree(tree)
-    assert not tokens_vs_tree_mismatches(tree)
+    with new_tree(name) as tree:
+        _populate_nutree(tree.system_root, doc)
+        if doc_name:
+            assert tree.first_child().data_type == "Document"
+            tree.first_child().data["name"] = doc_name
 
+    tree.system_root.set_meta("prep_funcs", [])
     if prepare:
         _prepare_tree(tree)
+        # update_tokens(tree)
+        update_token_children(tree.first_child())
+        assert not tokens_vs_tree_mismatches(tree)
     return tree
 
-
-def new_tree(name: str) -> Tree:
+# FIXME: create context
+@contextmanager
+def new_tree(name):
     # Setting calc_data_id allows the data_id to be correctly set for nodes created
     # by functions that don't take a data_id argument, like node.copy_to().
     # Otherwise, copy_to() assigns a random data_id to the new node.
-    return Tree(name, calc_data_id=_get_node_data_id, shadow_attrs=True)
+    tree = Tree(name, factory=TokenAwareNode, calc_data_id=_get_node_data_id, shadow_attrs=True)
+    tree.system_root.set_meta("sync_token", False)
+    yield tree
+    validate_tree(tree)
+    if tokens_vs_tree_mismatches(tree):
+        tree.system_root.set_meta("sync_token", True)
+
+@contextmanager
+def ignore_token_updates(tree: Tree):
+    tree.system_root.set_meta("sync_token", False)
+    yield tree
+    tree.system_root.set_meta("sync_token", True)
+
+@contextmanager
+def data_and_token_copying(tree: Tree):
+    tree.system_root.set_meta("data_and_token_copying", True)
+    yield tree
+    tree.system_root.set_meta("data_and_token_copying", False)
 
 
 def _get_node_data_id(_tree: Tree, data: Any) -> str:
@@ -138,7 +259,8 @@ def _populate_nutree(parent: Node, token: Token) -> Node:
     node = parent.add(data)
     if token.children:
         # Recurse to create children nodes
-        for child_token in token.children:
+        # Since parent.add() will modify token.children, create the list now
+        for child_token in list(token.children):
             _populate_nutree(node, child_token)
     return node
 
@@ -154,7 +276,7 @@ def describe_tree(tree: Tree) -> dict:
             children[node.data_type].update([child.data_type for child in node.children])
         if node.parent:
             parents[node.data_type].add(node.parent.data_type)
-        if isinstance(node.data, TokenNodeData):
+        if node.has_token():
             tokens[node.data_type].update(node.token.__dict__.keys())
     return {
         "counts": counts,
@@ -182,7 +304,7 @@ def validate_tree(tree: Tree) -> None:
             node.data_type == node.data.data_type
         ), f"Node {node.data_id!r} has mismatched data_type: {node.data.data_type!r} and {node.data.token.type!r}"
 
-        if isinstance(node.data, TokenNodeData):
+        if node.has_token():
             # Check token data_id
             assert (
                 node.data_id == node.data.token.data_id
@@ -204,12 +326,12 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
         if node.tree is not tree:
             mismatches["wrong_tree"].append(f"{node.data_id}: {node.tree} is not {tree}")
 
-        if not isinstance(node.data, TokenNodeData) or not node.is_block_token():
+        if not node.has_token() or not node.is_block_token():
             continue
 
         if node.parent:
             if (
-                isinstance(node.parent.data, TokenNodeData)
+                node.parent.has_token()
                 and node.token.parent != node.parent.token
             ):
                 mismatches["diff_parent"].append(
@@ -222,7 +344,7 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
 
         if node.children:
             node_children_tokens = [
-                c.token for c in node.children if isinstance(c.data, TokenNodeData)
+                c.token for c in node.children if c.has_token()
             ]
             if node_children_tokens != node.token.children:
                 mismatches["diff_children"].append(
@@ -242,6 +364,12 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
     return mismatches
 
 
+def update_tokens(tree: Tree):
+    # Update all node.data.token.children to point to the new token objects in the subtree
+    for n in tree:
+        update_token_children(n)
+
+
 # endregion
 # region ##### Rendering functions
 
@@ -258,6 +386,7 @@ def render_subtree_as_md(node: Node) -> str:
     we cannot rely on mistletoe's renderer (which is based on Tokens) to render the tree correctly. Hence, we have this function.
     Whenever this method is called in a loop, join the result with no delimiter: `"".join(result)`
     """
+    logger.warning("render_subtree_as_md %s in %s", node.data_id, node.tree.name)
     if node.data_type in [
         "HeadingSection",  # Doesn't have mistletoe's token for rendering
         "Document",  # Its token.children reference all headings and many paragraphs, which are now under HeadingSection nodes
@@ -266,7 +395,7 @@ def render_subtree_as_md(node: Node) -> str:
         # For these data_types, use node.children for rendering instead of relying on node.data.token.children
         # A result from render_subtree_as_md() ends with exactly 2 newlines, so join without a separator
         md_str = "".join([render_subtree_as_md(node) for node in node.children])
-    elif isinstance(node.data, TokenNodeData):
+    elif node.has_token():
         out_str = []
         if intro := _intro_if_needed(node):
             out_str.append(intro)
@@ -302,7 +431,7 @@ class MdNodeData:
     ):
         self.data_type = data_type
         self.data_id = data_id
-        self.tree = tree
+        # self.tree = tree
         # self.chunked = False
 
     # Allow adding custom attributes to this node data object; useful during tree manipulation or chunking
@@ -485,7 +614,7 @@ class TokenNodeData(MdNodeData):
 
 
 # endregion
-# region ##### Following are tree preparation functions
+# region ##### Tree preparation functions
 
 
 def _prepare_tree(tree: Tree) -> None:
@@ -507,12 +636,12 @@ def remove_blank_lines(tree: Tree) -> int:
     tree.system_root.meta["prep_funcs"].append("remove_blank_lines")
     return blank_line_counter
 
-
+# FIXME: remove in favor of TokenAwareNode
 def remove_child(child: Node, node: Optional[Node] = None) -> None:
     if not node:
         node = child.parent
     logger.debug("Removing child %s from %s", child.data_id, node.data_id)
-    if isinstance(node.data, TokenNodeData) and isinstance(child.data, TokenNodeData):
+    if node.has_token() and child.has_token():
         # Update node.token.children since that's used for rendering
         node.data.token.children.remove(child.data.token)
     # Then remove the child from the tree
@@ -540,9 +669,7 @@ def hide_span_tokens(tree: Tree) -> int:
     for node in tree.iterator(method=IterMethod.POST_ORDER):  # Depth-first-traversal, post-order
         if (
             not node.has_children()  # Node should have children to hide
-            or not isinstance(
-                node.data, TokenNodeData
-            )  # Only TokenNodeData have token.children to render
+            or not node.has_token()  # Only TokenNodeData have token.children to render
             or not node.is_block_token()  # Only block tokens have children span tokens that can be hidden
         ):
             continue
@@ -576,7 +703,8 @@ def hide_span_tokens(tree: Tree) -> int:
             node.data["raw_text"] = _extract_raw_text(node)
 
         # Remove the children nodes, but node.token.children tokens are still retained for rendering
-        node.remove_children()
+        with ignore_token_updates(tree):
+            node.remove_children()
 
         # Set attribute to indicate that node.token.children tokens should never be modified
         # since they've been hidden/removed from the tree.
@@ -607,22 +735,23 @@ def create_heading_sections(tree: Tree) -> int:
     "Create custom HeadingSection nodes for each Heading node and its associated content"
     hsection_counter = 0
     heading_nodes = tree.find_all(match=lambda n: n.data_type == "Heading")
-    for n in heading_nodes:
-        if n.parent.data_type == "HeadingSection":
-            # Skip if the Heading is already part of a HeadingSection
-            continue
+    with ignore_token_updates(tree):
+        for n in heading_nodes:
+            if n.parent.data_type == "HeadingSection":
+                # Skip if the Heading is already part of a HeadingSection
+                continue
 
-        hsection_counter += 1
-        hs_node_data = HeadingSectionNodeData(n, tree)
-        # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
-        hs_node = n.prepend_sibling(hs_node_data)
-        # Get all siblings up to next Heading; these will be HeadingSection's new children
-        children = list(_siblings_up_to(n, "Heading"))
-        # Move in order the Heading and associated children to the new HeadingSection node
-        n.move_to(hs_node)
-        for body in children:
-            body.move_to(hs_node)
-        logger.debug("Created new %s", hs_node.data)
+            hsection_counter += 1
+            hs_node_data = HeadingSectionNodeData(n, tree)
+            # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
+            hs_node = n.prepend_sibling(hs_node_data)
+            # Get all siblings up to next Heading; these will be HeadingSection's new children
+            children = list(_siblings_up_to(n, "Heading"))
+            # Move in order the Heading and associated children to the new HeadingSection node
+            n.move_to(hs_node)
+            for body in children:
+                body.move_to(hs_node)
+            logger.debug("Created new %s", hs_node.data)
 
     tree.system_root.meta["prep_funcs"].append("create_heading_sections")
     return hsection_counter
@@ -648,27 +777,28 @@ def nest_heading_sections(tree: Tree) -> int:
     ]
     move_counter = 0
     last_heading_level = 0
-    for hs_node in heading_sections:
-        # Traverse the headings in order and update the heading_stack
-        heading_level = hs_node.level
-        if heading_level > last_heading_level:
-            # Handle the case where a heading level skips a level, compared to last heading
-            for i in range(last_heading_level + 1, heading_level):
+    with ignore_token_updates(tree):
+        for hs_node in heading_sections:
+            # Traverse the headings in order and update the heading_stack
+            heading_level = hs_node.level
+            if heading_level > last_heading_level:
+                # Handle the case where a heading level skips a level, compared to last heading
+                for i in range(last_heading_level + 1, heading_level):
+                    heading_stack[i] = None
+            heading_stack[heading_level] = hs_node
+            # Fill in levels higher than heading_level with None
+            for i in range(heading_level + 1, len(heading_stack)):
                 heading_stack[i] = None
-        heading_stack[heading_level] = hs_node
-        # Fill in levels higher than heading_level with None
-        for i in range(heading_level + 1, len(heading_stack)):
-            heading_stack[i] = None
-        logger.debug("Current headings: %s", heading_stack[1:])
+            logger.debug("Current headings: %s", heading_stack[1:])
 
-        # Find the parent HeadingSection node to move hs_node under
-        parent_hs_node = next(hs for hs in reversed(heading_stack[:heading_level]) if hs)
-        if hs_node.parent != parent_hs_node:
-            logger.debug("Moving %r under parent %r", hs_node.id_string, parent_hs_node.id_string)
-            hs_node.move_to(parent_hs_node)
-            move_counter += 1
+            # Find the parent HeadingSection node to move hs_node under
+            parent_hs_node = next(hs for hs in reversed(heading_stack[:heading_level]) if hs)
+            if hs_node.parent != parent_hs_node:
+                logger.debug("Moving %r under parent %r", hs_node.id_string, parent_hs_node.id_string)
+                hs_node.move_to(parent_hs_node)
+                move_counter += 1
 
-        last_heading_level = heading_level
+            last_heading_level = heading_level
 
     tree.system_root.meta["prep_funcs"].append("nest_heading_sections")
     return move_counter

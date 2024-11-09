@@ -117,10 +117,9 @@ def _create_chunks(
 
 USE_MARKDOWN_TREE = True
 
-from nutree import Node
-
-from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree, shorten
-from src.ingestion.markdown_tree import _prepare_tree, create_markdown_tree
+from pprint import pprint
+from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
+from src.ingestion.markdown_tree import create_markdown_tree
 
 
 class EddChunkingConfig(ChunkingConfig):
@@ -129,26 +128,6 @@ class EddChunkingConfig(ChunkingConfig):
 
     def text_length(self, text: str) -> int:
         return len(tokenize(text))
-
-    # def compose_summary_text(self, node: Node) -> str:
-    #     if node.data_type not in ["Heading", "HeadingSection", "List", "ListItem", "Table"]:
-    #         return "(SUMMARY)"
-    #     if not (md:=node.render()):
-    #         logger.warning("No markdown for %s: children=%s", node, [c.data_id for c in node.children])
-
-    #     if node.data_type == "List":
-    #         items = [line for line in md.splitlines() if line.startswith("* ")]
-    #         items = [shorten(remove_links(line), int(200/len(items)), placeholder="...") for line in items]
-    #         summary = "\n".join(items)
-    #         return f"(\n{summary}\n)\n\n"
-    #     else:
-    #         summary = shorten(remove_links(md.splitlines()[0]), 200, placeholder="...")
-    #         return f"({summary})\n\n"
-
-
-# chunking_config: Optional[EddChunkingConfig] = None
-
-from pprint import pprint
 
 
 def _chunk_page(
@@ -188,17 +167,15 @@ def _chunk_page(
 
         # Fix markdown formatting that causes markdown parsing errors
         # '. . .' is parsed as sublists on the same line
-        content = content.replace(
-            ". . .", "..."
-        )  # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
+        # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
+        content = content.replace(". . .", "...")
+
         # '. * ' is parsed as sublists; incorrect markdown from scraping
-        content = content.replace(
-            ". *\n", ". \n"
-        )  # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
+        # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
+        content = content.replace(". *\n", ". \n")
         # nested sublist '+' created without parent list; incorrect markdown from scraping?
-        content = content.replace(
-            "* + ", "    + "
-        )  # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
+        # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
+        content = content.replace("* + ", "    + ")
 
         try:
             tree = create_markdown_tree(content, doc_name=document.name)
