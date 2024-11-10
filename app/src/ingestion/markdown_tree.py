@@ -12,7 +12,6 @@ from mistletoe.ast_renderer import AstRenderer
 from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.token import Token
 from nutree import IterMethod, Node, Tree
-from nutree.common import DataIdType
 
 import pprint
 
@@ -56,7 +55,7 @@ class TokenAwareNode(Node):
         # logger.warning("Should update tokens: %s, %s", self.sync_token())
 
         if self.sync_token() and self.has_token() and child_node.has_token():
-            self.assert_token_modifiable()
+            self.assert_unfrozen_token()
             if self.data.token.children is None:
                 self.data.token.children = []
             if child_node.data.token not in self.data.token.children:
@@ -78,10 +77,7 @@ class TokenAwareNode(Node):
     def has_token(self) -> bool:
         return isinstance(self.data, TokenNodeData)
 
-    def assert_token_modifiable(self) -> None:
-        # logger.info("assert_token_modifiable %s", self.data_id)
-        # if self.has_token() and self.data_type in ["Paragraph", "Heading"]:
-        #     return
+    def assert_unfrozen_token(self) -> None:
         assert self.has_token() and not self.is_token_frozen(), f"Cannot modify node {self.data_id}"
 
     def is_token_frozen(self) -> bool:
@@ -100,14 +96,14 @@ class TokenAwareNode(Node):
                 child_tokens = list(self.parent.data.token.children)
                 if self.data.token in child_tokens:
                     # Parent token must be modifiable
-                    self.parent.assert_token_modifiable()
+                    self.parent.assert_unfrozen_token()
                     logger.warning("Removing token %s from %s", self.data_id, self.tree.name)
                     child_tokens.remove(self.data.token)
                     self.parent.data.token.children = list(child_tokens)
 
                 if keep_children:
                     # Parent token must be modifiable
-                    self.parent.assert_token_modifiable()
+                    self.parent.assert_unfrozen_token()
                     logger.warning("Moving grandchildren to be children when removing %s", self.data_id)
                     self.parent.token.children += self.data.token.children
 
@@ -116,20 +112,19 @@ class TokenAwareNode(Node):
     def remove_children(self) -> None:
         if self.sync_token() and self.has_token():
             if not self.is_token_frozen():
-                self.assert_token_modifiable() # FIXED: To remove P, nutree removes all children, which isn't allowed with this assertion
+                self.assert_unfrozen_token() # FIXED: To remove P, nutree removes all children, which isn't allowed with this assertion
                 logger.warning("Removing all children tokens for %s in %s", self.data_id, self.tree.name)
                 self.data.token.children = None
 
         return super().remove_children()
         
 
-# FIXME: remove once TokenAwareNode works
 def update_token_children(n: Node):
-    if n.has_token() and not n.data["freeze_token_children"]:
-        n.data.token.children = [c.token for c in n.children if c.has_token()]
-        for c in n.data.token.children:
-            # token.parent was indirectly updated when token.children was set
-            assert c.parent == n.data.token
+    n.assert_unfrozen_token()
+    n.data.token.children = [c.token for c in n.children if c.has_token()]
+    for c in n.data.token.children:
+        # token.parent was indirectly updated when token.children was set
+        assert c.parent == n.data.token
 
 # endregion
 # region ##### Tree creation and validation functions
@@ -178,9 +173,10 @@ def create_markdown_tree(
     # The shadow_attrs=True argument allows accessing node.data.age as node.age -- see validate_tree()
     with new_tree(name) as tree:
         _populate_nutree(tree.system_root, doc)
+        doc_node = tree.first_child()
         if doc_name:
-            assert tree.first_child().data_type == "Document"
-            tree.first_child().data["name"] = doc_name
+            assert doc_node.data_type == "Document"
+            doc_node.data["name"] = doc_name
 
     # if (mismatches := tokens_vs_tree_mismatches(tree)):
     #     logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
@@ -189,8 +185,7 @@ def create_markdown_tree(
     tree.system_root.set_meta("prep_funcs", [])
     if prepare:
         _prepare_tree(tree)
-        # update_tokens(tree)
-        update_token_children(tree.first_child())
+        update_token_children(doc_node)
         assert not tokens_vs_tree_mismatches(tree)
     return tree
 
@@ -204,7 +199,6 @@ def new_tree(name):
     yield tree
     validate_tree(tree)
     # After all node are copied over, update tokens
-    # update_tokens(tree)
     if (mismatches := tokens_vs_tree_mismatches(tree)):
         logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
     assert not tokens_vs_tree_mismatches(tree)
@@ -219,12 +213,8 @@ def ignore_token_updates(tree: Tree):
     tree.system_root.set_meta("sync_token", True)
 
 @contextmanager
-def data_and_token_copying(tree: Tree):
-    tree.system_root.set_meta("data_and_token_copying", True)
+def assert_no_mismatches(tree: Tree):
     yield tree
-    # No reason to turn it off?
-    # tree.system_root.set_meta("data_and_token_copying", False)
-    # update_tokens(tree)
     if (mismatches := tokens_vs_tree_mismatches(tree)):
         logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
     assert not tokens_vs_tree_mismatches(tree)

@@ -16,14 +16,11 @@ from src.ingestion.markdown_tree import (
     data_ids_for,
     get_parent_headings_raw,
     new_tree,
-    remove_child,
     remove_children_from,
     render_nodes_as_md,
     tokens_vs_tree_mismatches,
     next_renderable_node,
-    # update_tokens,
-    ignore_token_updates,
-    data_and_token_copying
+    assert_no_mismatches
 )
 from src.util.string_utils import remove_links
 
@@ -72,16 +69,16 @@ def copy_subtree(name:str,
     Returns a new tree for the node, its descendants, and optionally its ancestors (to capture headings).
     Each node's contents is deep-copied, including node.data and node.data.token.
     """
-    # Replace with data_and_token_copying()
-    # Copy data AND sync_tokens
     with new_tree(f"{name}:{node.data_id}") as subtree:
         logger.warning("COPY SUBTREE %s", subtree.name)
-        # Modify meta BEFORE or AFTER `with data_and_token_copying(subtree)`
         # Copy the meta attributes from the original tree so that get_parent_headings() works
         for k, v in node.tree.system_root.meta.items():
             subtree.system_root.set_meta(k, copy(v))
+        # Modify meta BEFORE or AFTER `data_and_token_copying`
+        # Copy data AND sync_tokens
+        subtree.system_root.set_meta("data_and_token_copying", True)
 
-        with data_and_token_copying(subtree):
+        with assert_no_mismatches(subtree):
             # Ancestors are needed to get_parent_headings()
             new_parent = copy_ancestors(node, subtree) if include_ancestors else subtree.system_root
 
@@ -104,27 +101,6 @@ def can_modify_tree(tree: Tree) -> bool:
     "Call this to make sure that modifiable node.data and node.data.token are not pointing to the original tree"
     mismatches = tokens_vs_tree_mismatches(tree)
     return not mismatches and tree.system_root.get_meta("needs_copy_data_and_tokens") is None
-
-
-# TODO: do this for each node operation
-def _copy_data_and_tokens(tree: Tree) -> None:
-    "Call this after adding a node into a tree"
-    # First, create copies of node.data and node.data.token objects
-    for n in tree:
-        n.set_data(copy(n.data))
-        # n.data.tree = tree
-        if n.has_token():
-            # Why check for frozen token? Because calling copy() on Paragraph tokens doesn't work.
-            # Fortunately if we use "freeze_token_children", then we don't need to copy Paragraph tokens
-            if not n.is_token_frozen():
-                assert (
-                    n.data_type != "Paragraph"
-                ), f"Unexpected Paragraph node {n.id_string}; should be frozen"
-                n.data.token = copy(n.data.token)
-
-    # Now that copies of node.data and node.data.token are created, update references to the tokens
-    # update_tokens(tree)
-    tree.system_root.set_meta("needs_copy_data_and_tokens", None)
 
 
 # endregion
@@ -416,7 +392,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             # DON'T update COMMITTED tree
 
             # Copy data AND sync_tokens
-            with data_and_token_copying(chunking_tree): # Create new context to copy tokens
+            with assert_no_mismatches(chunking_tree): # Create new context to copy tokens
 
                 # Copy next_node.intro_node branch to chunking_tree BEFORE copying next_node.node branch
                 # intro_node may be a parent (e.g., ListItem) of node (e.g., List)
@@ -795,8 +771,6 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
 
         # add summary Paragraph
         node.add_child(p_nodedata)
-        # if node.has_token():
-        #     node.token.children = tuple([c.token for c in node.children if c.has_token()])
         logger.info("%s children %s", node.data_id, data_ids_for(node.children))
 
         # Mark the node as chunked so it can be skipped in future chunking
@@ -812,7 +786,6 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
         node.remove()
         if parent.has_token():
             pass
-            # parent.token.children = [c.token for c in parent.children if c.has_token()]
         elif isinstance(parent.data, HeadingSectionNodeData):
             pass
         else:
@@ -857,9 +830,6 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
         c.remove()
     if parent.has_token():
         assert parent.data_type in ["Document", "ListItem", "List", "Table"]
-        # parent.token.children = [
-        #     c.token for c in parent.children if c.has_token()
-        # ]
     elif isinstance(parent.data, HeadingSectionNodeData):
         pass
     else:
