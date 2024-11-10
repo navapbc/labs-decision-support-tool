@@ -3,6 +3,7 @@ import textwrap
 from copy import copy
 from dataclasses import dataclass
 from typing import Optional
+import itertools
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from mistletoe import block_token
@@ -74,19 +75,23 @@ def copy_subtree(name:str,
     # Replace with data_and_token_copying()
     # Copy data AND sync_tokens
     with new_tree(f"{name}:{node.data_id}") as subtree:
+        logger.warning("COPY SUBTREE %s", subtree.name)
+        # Modify meta BEFORE or AFTER `with data_and_token_copying(subtree)`
+        # Copy the meta attributes from the original tree so that get_parent_headings() works
+        for k, v in node.tree.system_root.meta.items():
+            subtree.system_root.set_meta(k, copy(v))
+
         with data_and_token_copying(subtree):
             # Ancestors are needed to get_parent_headings()
             new_parent = copy_ancestors(node, subtree) if include_ancestors else subtree.system_root
-
-            # Copy the meta attributes from the original tree so that get_parent_headings() works
-            for k, v in node.tree.system_root.meta.items():
-                subtree.system_root.set_meta(k, copy(v))
 
             # Copy the nodes and descendants but node.data will point to original objects
             # _copy_data_and_tokens() will deep-copy node.data objects
             new_node = node.copy_to(new_parent, deep=include_descendants)
             assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"
             # _copy_data_and_tokens(subtree)
+            logger.warning("Done copying subtree %s", subtree.name)
+        
 
 
     # At this point, no object in the subtree should be pointing to objects in the original tree,
@@ -866,11 +871,11 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
     # return NodeWithIntro(p_node, node_with_intro.intro_node)
     return p_node
 
-
+summary_counter = itertools.count()
 def _create_paragraph_node_data(line_number, summary, tree):
     p = block_token.Paragraph(lines=[f"{summary}\n"])
     p.line_number = line_number
-    p_nodedata = TokenNodeData(p, tree, id_suffix="_summ")
+    p_nodedata = TokenNodeData(p, tree, id_suffix=f"_summ{next(summary_counter)}")
     p_nodedata["freeze_token_children"] = True
     p_nodedata["oneliner_of_hidden_nodes"] = textwrap.shorten(
         remove_links(summary), 50, placeholder="...(hidden)", drop_whitespace=False

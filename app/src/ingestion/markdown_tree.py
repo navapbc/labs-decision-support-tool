@@ -53,9 +53,6 @@ class TokenAwareNode(Node):
     def add_child(self, child: Node | Tree | Any, **kwargs) -> Node:
         logger.warning("%s add_child: %s", self.data_id, child.data_id)
         child_node = super().add_child(child, **kwargs)
-        if child.data_id == "LI_40":
-            pass
-
         # logger.warning("Should update tokens: %s, %s", self.sync_token())
 
         if self.sync_token() and self.has_token() and child_node.has_token():
@@ -183,11 +180,15 @@ def create_markdown_tree(
             assert tree.first_child().data_type == "Document"
             tree.first_child().data["name"] = doc_name
 
+    # if (mismatches := tokens_vs_tree_mismatches(tree)):
+    #     logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
+    # assert not tokens_vs_tree_mismatches(tree)
+
     tree.system_root.set_meta("prep_funcs", [])
     if prepare:
         _prepare_tree(tree)
         # update_tokens(tree)
-        # update_token_children(tree.first_child())
+        update_token_children(tree.first_child())
         assert not tokens_vs_tree_mismatches(tree)
     return tree
 
@@ -219,7 +220,8 @@ def ignore_token_updates(tree: Tree):
 def data_and_token_copying(tree: Tree):
     tree.system_root.set_meta("data_and_token_copying", True)
     yield tree
-    tree.system_root.set_meta("data_and_token_copying", False)
+    # No reason to turn it off?
+    # tree.system_root.set_meta("data_and_token_copying", False)
     # update_tokens(tree)
     if (mismatches := tokens_vs_tree_mismatches(tree)):
         logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))

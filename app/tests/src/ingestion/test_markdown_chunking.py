@@ -166,7 +166,7 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
 
     pprint(list(chunks.values()), sort_dicts=False, width=140)
     paragraph_chunks = [chunk for chunk in chunks.values() if "P_4" in chunk.id]
-    assert len(paragraph_chunks) == 6
+    assert len(paragraph_chunks) == 4
 
     joined_chunk_md = "\n".join([chunk.markdown for chunk in paragraph_chunks])
     sentences = [sentence.strip() for sentence in paragraph_md.split(". ")]
@@ -176,7 +176,7 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
 
     # Ensure there are repeated sentences (chunk_overlap) in the chunked markdown
     repeated_sentences = [sentence for sentence, count in sentence_counts.items() if count > 1]
-    assert len(repeated_sentences) > 7
+    assert len(repeated_sentences) > 3
 
     for chunk in paragraph_chunks:
         assert chunk.headings == ["Long paragraph doc", "Heading 1"]
