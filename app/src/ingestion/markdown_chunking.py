@@ -458,7 +458,6 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
 
             # Since intro_node is included in chunk_buffer, reset it
             intro_node = None
-            # _update_tokens(chunking_tree)
             node = next_renderable_node(node)
             # logger.info("Next node: %s", node)
             if not node:
@@ -597,7 +596,7 @@ def split_list_or_table_node_into_chunks(
             data_ids_for(block_node.children),
         )
         while not config.nodes_fit_in_chunk(candidate_node.as_list) and block_node.has_children():
-            remove_child(block_node.last_child())
+            block_node.last_child().remove()
 
         if block_node.has_children():
             logger.info("Fits into a chunk: %s", data_ids_for(block_node.children))
@@ -786,12 +785,13 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
     # FIXME: we should mark nodes as they are added into a chunk, then check that before they are removed and at the end.
     # ListItem's should already have an "intro" attribute set.
     # if node_with_intro.intro_node:
-    #     remove_child(node_with_intro.intro_node)
+    #     node_with_intro.intro_node.remove()
 
     if node.data_type in ["Document", "List", "HeadingSection", "ListItem"]:
         # Replace all children and add Paragraph summary as the only child
-        for c in list(node_with_intro.node.children):
-            remove_child(c)
+        # for c in list(node_with_intro.node.children):
+            # c.remove()
+        node_with_intro.node.remove_children()
 
         # add summary Paragraph
         node.add_child(p_nodedata)
@@ -840,10 +840,6 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
             c.remove()
         if parent.has_token():
             assert parent.data_type in ["Document", "ListItem", "List", "Table"]
-            pass
-            # parent.token.children = [
-            #     c.token for c in parent.children if c.has_token()
-            # ]
         return node
 
     logger.debug("Summarizing %s with %s", node.data_id, [n.data_id for n in nodes if n != node])

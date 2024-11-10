@@ -57,6 +57,8 @@ class TokenAwareNode(Node):
 
         if self.sync_token() and self.has_token() and child_node.has_token():
             self.assert_token_modifiable()
+            if self.data.token.children is None:
+                self.data.token.children = []
             if child_node.data.token not in self.data.token.children:
                 logger.warning("Updating token.children %s in %s", self.data_id, self.tree.name)
                 self.data.token.children += [child_node.data.token]
@@ -385,12 +387,6 @@ def tokens_vs_tree_mismatches(tree: Tree) -> dict:
     return mismatches
 
 
-def _update_tokens(tree: Tree):
-    # Update all node.data.token.children to point to the new token objects in the subtree
-    for n in tree:
-        update_token_children(n)
-
-
 # endregion
 # region ##### Rendering functions
 
@@ -652,22 +648,11 @@ def remove_blank_lines(tree: Tree) -> int:
     "Remove BlankLine nodes from the tree"
     blank_line_counter = 0
     for node in tree.find_all(match=lambda n: n.data_type == "BlankLine"):
-        remove_child(node)
+        node.remove()
         blank_line_counter += 1
 
     tree.system_root.meta["prep_funcs"].append("remove_blank_lines")
     return blank_line_counter
-
-# FIXME: remove in favor of TokenAwareNode
-def remove_child(child: Node, node: Optional[Node] = None) -> None:
-    # if not node:
-    #     node = child.parent
-    # logger.debug("Removing child %s from %s", child.data_id, node.data_id)
-    # if node.has_token() and child.has_token():
-    #     # Update node.token.children since that's used for rendering
-    #     node.data.token.children.remove(child.data.token)
-    # Then remove the child from the tree
-    child.remove()
 
 
 def remove_children_from(node: Node, child_data_ids: set[str]) -> None:
@@ -682,7 +667,7 @@ def remove_children_from(node: Node, child_data_ids: set[str]) -> None:
             [n.data_id for n in nodes_to_remove],
         )
     for child_node in nodes_to_remove:
-        remove_child(child_node)
+        child_node.remove()
 
 
 def hide_span_tokens(tree: Tree) -> int:
