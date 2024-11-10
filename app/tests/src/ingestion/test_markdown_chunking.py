@@ -18,6 +18,8 @@ from src.ingestion.markdown_tree import (
 )
 from tests.src.ingestion.test_markdown_tree import create_paragraph, markdown_text  # noqa: F401
 
+logger = logging.getLogger(__name__)
+
 
 def test_shorten():
     assert shorten("This is a test.", 10) == "This is..."
@@ -113,7 +115,7 @@ from pprint import pprint
 
 def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     config = ChunkingConfig(170)
-    prepped_tree.print()
+    logger.info(prepped_tree.format())
     chunks = chunk_tree(prepped_tree, config)
     pprint(list(chunks.values()), sort_dicts=False, width=140)
     assert len(chunks) == 9

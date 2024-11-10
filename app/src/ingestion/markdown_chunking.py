@@ -20,7 +20,7 @@ from src.ingestion.markdown_tree import (
     render_nodes_as_md,
     tokens_vs_tree_mismatches,
     next_renderable_node,
-    update_tokens,
+    # update_tokens,
     ignore_token_updates,
     data_and_token_copying
 )
@@ -72,19 +72,21 @@ def copy_subtree(name:str,
     Each node's contents is deep-copied, including node.data and node.data.token.
     """
     # Replace with data_and_token_copying()
+    # Copy data AND sync_tokens
     with new_tree(f"{name}:{node.data_id}") as subtree:
-        # Ancestors are needed to get_parent_headings()
-        new_parent = copy_ancestors(node, subtree) if include_ancestors else subtree.system_root
+        with data_and_token_copying(subtree):
+            # Ancestors are needed to get_parent_headings()
+            new_parent = copy_ancestors(node, subtree) if include_ancestors else subtree.system_root
 
-        # Copy the meta attributes from the original tree so that get_parent_headings() works
-        for k, v in node.tree.system_root.meta.items():
-            subtree.system_root.set_meta(k, copy(v))
+            # Copy the meta attributes from the original tree so that get_parent_headings() works
+            for k, v in node.tree.system_root.meta.items():
+                subtree.system_root.set_meta(k, copy(v))
 
-        # Copy the nodes and descendants but node.data will point to original objects
-        # _copy_data_and_tokens() will deep-copy node.data objects
-        new_node = node.copy_to(new_parent, deep=include_descendants)
-        assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"
-        _copy_data_and_tokens(subtree)
+            # Copy the nodes and descendants but node.data will point to original objects
+            # _copy_data_and_tokens() will deep-copy node.data objects
+            new_node = node.copy_to(new_parent, deep=include_descendants)
+            assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"
+            # _copy_data_and_tokens(subtree)
 
 
     # At this point, no object in the subtree should be pointing to objects in the original tree,
@@ -105,7 +107,7 @@ def _copy_data_and_tokens(tree: Tree) -> None:
     # First, create copies of node.data and node.data.token objects
     for n in tree:
         n.set_data(copy(n.data))
-        n.data.tree = tree
+        # n.data.tree = tree
         if n.has_token():
             # Why check for frozen token? Because calling copy() on Paragraph tokens doesn't work.
             # Fortunately if we use "freeze_token_children", then we don't need to copy Paragraph tokens
@@ -116,7 +118,7 @@ def _copy_data_and_tokens(tree: Tree) -> None:
                 n.data.token = copy(n.data.token)
 
     # Now that copies of node.data and node.data.token are created, update references to the tokens
-    update_tokens(tree)
+    # update_tokens(tree)
     tree.system_root.set_meta("needs_copy_data_and_tokens", None)
 
 
@@ -173,8 +175,8 @@ class ChunkingConfig:
         return self.text_splitter._length_function(markdown)
 
     def nodes_fit_in_chunk(self, nodes: list[Node]) -> bool:
-        logger.debug("Checking fit: %s", data_ids_for(nodes))
         chunk = self.create_protochunk(nodes)
+        logger.info("Checking fit %s: %s", chunk.length, data_ids_for(nodes))
         return chunk.length < self.max_length
 
     def add_chunk(self, chunk: ProtoChunk) -> None:
@@ -408,6 +410,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             # Update WORKING tree
             # DON'T update COMMITTED tree
 
+            # Copy data AND sync_tokens
             with data_and_token_copying(chunking_tree): # Create new context to copy tokens
 
                 # Copy next_node.intro_node branch to chunking_tree BEFORE copying next_node.node branch
@@ -443,7 +446,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                     new_node = next_node.node.copy_to(new_parent_node, deep=True)
                     # new_node.set_data(copy(new_node.data), data_id=next_node.node.data_id)
 
-                _copy_data_and_tokens(chunking_tree)
+                # _copy_data_and_tokens(chunking_tree)
 
             copied_next_node = NodeWithIntro(new_node, new_intro_node)
             chunk_buffer.append(copied_next_node)
@@ -456,8 +459,11 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             if not node:
                 raise EOFError("No more nodes")
 
+            pc = config.create_protochunk([chunking_tree.first_child()])
+            logger.info("Added to chunking tree %s: %i\n%s", pc.id, pc.length, pc.markdown)
+
             # logger.info("Updated ChunkingTree: %s", chunking_tree.format())
-            # This will remove node
+            # This will remove node in TXN tree
             _summarize_nodes(next_node.as_list, config)
             continue
 
@@ -501,7 +507,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             logger.info("Full enough! %s", [n.data_id for n in chunking_tree])
             # Flush the chunk_buffer to a chunk
             config.add_chunk(pc := config.create_protochunk([chunking_tree.first_child()]))
-            logger.debug("Added chunk %s:\n%s", pc.id, pc.markdown)
+            logger.info("Added chunk %s:\n%s", pc.id, pc.markdown)
             # TODO: del chunk_tree
 
             # update COMMITTED tree
@@ -784,8 +790,8 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
 
         # add summary Paragraph
         node.add_child(p_nodedata)
-        if node.has_token():
-            node.token.children = [c.token for c in node.children if c.has_token()]
+        # if node.has_token():
+        #     node.token.children = tuple([c.token for c in node.children if c.has_token()])
         logger.info("%s children %s", node.data_id, data_ids_for(node.children))
 
         # Mark the node as chunked so it can be skipped in future chunking
@@ -800,7 +806,8 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
         p_node = parent.add_child(p_nodedata, before=node)
         node.remove()
         if parent.has_token():
-            parent.token.children = [c.token for c in parent.children if c.has_token()]
+            pass
+            # parent.token.children = [c.token for c in parent.children if c.has_token()]
         elif isinstance(parent.data, HeadingSectionNodeData):
             pass
         else:
@@ -828,9 +835,10 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
             c.remove()
         if parent.has_token():
             assert parent.data_type in ["Document", "ListItem", "List", "Table"]
-            parent.token.children = [
-                c.token for c in parent.children if c.has_token()
-            ]
+            pass
+            # parent.token.children = [
+            #     c.token for c in parent.children if c.has_token()
+            # ]
         return node
 
     logger.debug("Summarizing %s with %s", node.data_id, [n.data_id for n in nodes if n != node])
@@ -848,9 +856,9 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
         c.remove()
     if parent.has_token():
         assert parent.data_type in ["Document", "ListItem", "List", "Table"]
-        parent.token.children = [
-            c.token for c in parent.children if c.has_token()
-        ]
+        # parent.token.children = [
+        #     c.token for c in parent.children if c.has_token()
+        # ]
     elif isinstance(parent.data, HeadingSectionNodeData):
         pass
     else:
@@ -862,7 +870,7 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
 def _create_paragraph_node_data(line_number, summary, tree):
     p = block_token.Paragraph(lines=[f"{summary}\n"])
     p.line_number = line_number
-    p_nodedata = TokenNodeData(p, tree)
+    p_nodedata = TokenNodeData(p, tree, id_suffix="_summ")
     p_nodedata["freeze_token_children"] = True
     p_nodedata["oneliner_of_hidden_nodes"] = textwrap.shorten(
         remove_links(summary), 50, placeholder="...(hidden)", drop_whitespace=False
