@@ -694,7 +694,7 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
         line_number = node.data.line_number
     else:
         raise AssertionError(f"Unexpected node.data type: {node.data_type}")
-    p_nodedata = _create_paragraph_node_data(line_number, summary, node.tree)
+    p_nodedata = _create_paragraph_node_data(line_number, summary)
 
     # TODO: remove the intro_node? First, check if it's been included in a chunk; Actually,
     # FIXME: we should mark nodes as they are added into a chunk, then check that before they are removed and at the end.
@@ -761,7 +761,7 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
 
     # Replace all nodes with Paragraph summary
 
-    p_nodedata = _create_paragraph_node_data(node.data.line_number, summary, node.tree)
+    p_nodedata = _create_paragraph_node_data(node.data.line_number, summary)
 
     parent = node.parent
     p_node = parent.add_child(p_nodedata, before=node)
@@ -780,10 +780,10 @@ def _summarize_nodes(nodes: list[Node], config: ChunkingConfig) -> Node:
 summary_counter = itertools.count()
 
 
-def _create_paragraph_node_data(line_number, summary, tree):
+def _create_paragraph_node_data(line_number, summary):
     p = block_token.Paragraph(lines=[f"{summary}\n"])
     p.line_number = line_number
-    p_nodedata = TokenNodeData(p, tree, id_suffix=f"_summ{next(summary_counter)}")
+    p_nodedata = TokenNodeData(p, id_suffix=f"_summ{next(summary_counter)}")
     p_nodedata["freeze_token_children"] = True
     p_nodedata["oneliner_of_hidden_nodes"] = textwrap.shorten(
         remove_links(summary), 50, placeholder="...(hidden)", drop_whitespace=False

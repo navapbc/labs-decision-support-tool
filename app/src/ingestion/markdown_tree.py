@@ -296,7 +296,7 @@ def _new_md_renderer() -> MarkdownRenderer:
 
 
 def _populate_nutree(parent: Node, token: Token) -> Node:
-    data = TokenNodeData(token, parent.tree)
+    data = TokenNodeData(token)
     node = parent.add(data)
     if isinstance(node.token.children, tuple):
         # Some token.children are tuples; convert them into lists
@@ -513,13 +513,10 @@ class MdNodeData:
     def __init__(
         self,
         data_type: str,
-        data_id: str,
-        tree: Tree,
+        data_id: str
     ):
         self.data_type = data_type
         self.data_id = data_id
-        # self.tree = tree
-        # self.chunked = False
 
     # Allow adding custom attributes to this node data object; useful during tree manipulation or chunking
     def __setitem__(self, key: str, value: Any) -> None:
@@ -556,7 +553,7 @@ class MdNodeData:
 class HeadingSectionNodeData(MdNodeData):
     "HeadingSection nodes have a Heading node and other nodes (including other HeadingSection nodes) as children"
 
-    def __init__(self, heading_node: Node, tree: Tree):
+    def __init__(self, heading_node: Node):
         assert isinstance(heading_node.token, block_token.Heading)
         self.heading_node = heading_node
 
@@ -566,7 +563,7 @@ class HeadingSectionNodeData(MdNodeData):
             self.raw_text = _extract_raw_text(heading_node)
 
         data_id = f"_S{self.level}_{heading_node.token.line_number}"
-        super().__init__("HeadingSection", data_id, tree)
+        super().__init__("HeadingSection", data_id)
 
     @property
     def level(self) -> int:
@@ -590,7 +587,7 @@ class TokenNodeData(MdNodeData):
             return f"H{token.level}"
         return "".join(char for char in token.type if char.isupper())
 
-    def __init__(self, token: Token, tree: Tree, id_suffix: str = ""):
+    def __init__(self, token: Token, id_suffix: str = ""):
         self.token = token
         # Add 'type' attribute to token object for consistently referencing a token's and MdNodeData's type
         token.type = token.__class__.__name__
@@ -604,7 +601,7 @@ class TokenNodeData(MdNodeData):
         else:  # Span tokens use a lower case prefix; they can be ignored and are hidden by hide_span_tokens()
             _id = f"s.{next(self.counter)}"
         _id += id_suffix
-        super().__init__(token.type, _id, tree)
+        super().__init__(token.type, _id)
 
         # Add 'data_id' attribute to the token object for easy cross-referencing -- see validate_tree()
         token.data_id = self.data_id
@@ -819,7 +816,7 @@ def create_heading_sections(tree: Tree) -> int:
                 continue
 
             hsection_counter += 1
-            hs_node_data = HeadingSectionNodeData(n, tree)
+            hs_node_data = HeadingSectionNodeData(n)
             # Create tree node and insert so that markdown rendering of tree is consistent with original markdown
             hs_node = n.prepend_sibling(hs_node_data)
             # Get all siblings up to next Heading; these will be HeadingSection's new children
