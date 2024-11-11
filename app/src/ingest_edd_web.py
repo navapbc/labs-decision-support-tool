@@ -34,7 +34,7 @@ def _ingest_edd_web(
 
     # First, split all json_items into chunks (fast) to debug any issues quickly
     all_chunks = _create_chunks(json_items, doc_attribs)
-    logger.warning(
+    logger.info(
         "Done splitting %d webpages into %d chunks",
         len(json_items),
         sum(len(chunks) for _, chunks, _ in all_chunks),
@@ -43,7 +43,7 @@ def _ingest_edd_web(
         if not chunks:
             logger.warning("No chunks for %r", document.source)
             continue
-        logger.warning("Adding embeddings for %r", document.source)
+        logger.info("Adding embeddings for %r", document.source)
         exit(0)
         # Next, add embeddings to each chunk (slow)
         # TODO: Kevin mentioned adding column chunk.embedding_str; set it to s.text_to_encode
@@ -98,11 +98,11 @@ def _create_chunks(
     for item in json_items:
         if item["url"] in urls_processed:
             # Workaround for duplicate items from web scraping
-            logger.warning("Skipping duplicate URL: %s", item["url"])
+            logger.info("Skipping duplicate URL: %s", item["url"])
             continue
 
         name = item["title"]
-        logger.warning("Processing: %s (%s)", name, item["url"])
+        logger.info("Processing: %s (%s)", name, item["url"])
         urls_processed.add(item["url"])
 
         content = item.get("main_content", item.get("main_primary"))
@@ -110,7 +110,7 @@ def _create_chunks(
 
         document = Document(name=name, content=content, source=item["url"], **doc_attribs)
         chunks, splits = _chunk_page(document, content)
-        logger.warning("Split into %d chunks for %r", len(chunks), document.source)
+        logger.info("Split into %d chunks for %r", len(chunks), document.source)
         result.append((document, chunks, splits))
     return result
 
@@ -118,6 +118,7 @@ def _create_chunks(
 USE_MARKDOWN_TREE = True
 
 from pprint import pprint
+
 from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
 
@@ -179,7 +180,7 @@ def _chunk_page(
 
         try:
             tree = create_markdown_tree(content, doc_name=document.name)
-            print(document.name)
+            # print(document.name)
             # tree.print()
             tree_chunks = chunk_tree(tree, chunking_config)
             # pprint(list(tree_chunks.values()), sort_dicts=False, width=140)
@@ -199,7 +200,7 @@ def _chunk_page(
                 os.makedirs(os.path.dirname(url_path), exist_ok=True)
                 with smart_open(f"edd-chunks/{url_path}.json", "w", encoding="utf-8") as file:
                     file.write(json.dumps([split.__dict__ for split in splits], indent=2))
-            logger.warning("Split into %d chunks for %r", len(tree_chunks), document.source)
+            logger.info("Split into %d chunks for %r", len(tree_chunks), document.source)
         except (Exception, KeyboardInterrupt) as e:
             logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
             raise e

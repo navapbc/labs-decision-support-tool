@@ -1,9 +1,9 @@
+import itertools
 import logging
 import textwrap
 from copy import copy
 from dataclasses import dataclass
 from typing import Optional
-import itertools
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from mistletoe import block_token
@@ -12,16 +12,17 @@ from nutree import Node, Tree
 from src.ingestion.markdown_tree import (
     HeadingSectionNodeData,
     TokenNodeData,
-    data_ids_for,
-    get_parent_headings_raw,
-    copy_ancestors,
+    assert_no_mismatches,
+    copy_subtree,
     copy_with_ancestors,
+    data_ids_for,
+    find_data_type_nodes,
+    find_node,
+    get_parent_headings_raw,
+    next_renderable_node,
     remove_children_from,
     render_nodes_as_md,
     tokens_vs_tree_mismatches,
-    next_renderable_node,
-    assert_no_mismatches,
-    copy_subtree,
 )
 from src.util.string_utils import remove_links
 
@@ -230,7 +231,7 @@ class ChunkingConfig:
         if next.node.data_type in "HeadingSection":
             return True
         if next.node.data_type == "List":
-            sublists = next.node.find_all(match=lambda n: n.data_type == "List")
+            sublists = find_data_type_nodes(next.node, "List")
             if sublists:
                 return True
         if next.node.has_children():
@@ -345,7 +346,9 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                 new_intro_node = None
                 if next_node.intro_node:
                     # There is no one structural relationship: assert next_node.intro_node.parent == next_node.node.parent
-                    if not (new_intro_node := chunking_tree[next_node.intro_node.data_id]):
+                    if not (
+                        new_intro_node := find_node(chunking_tree, next_node.intro_node.data_id)
+                    ):
                         # Copy next_node.intro_node branch to chunking_tree
                         logger.info(
                             "Copying next_node.intro_node %s to chunking_tree",
@@ -356,7 +359,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                         )
 
                 # Copy next_node.node branch to chunking_tree
-                if not (new_node := chunking_tree[next_node.node.data_id]):
+                if not (new_node := find_node(chunking_tree, next_node.node.data_id)):
                     logger.info(
                         "Copying next_node.node %s to chunking_tree", next_node.node.data_id
                     )
