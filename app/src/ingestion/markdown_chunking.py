@@ -102,8 +102,8 @@ class ChunkingConfig:
     def text_length(self, markdown: str) -> int:
         return self.text_splitter._length_function(markdown)
 
-    def nodes_fit_in_chunk(self, nodes: list[Node]) -> bool:
-        chunk = self.create_protochunk(nodes)
+    def nodes_fit_in_chunk(self, nodes: list[Node], breadcrumb_node) -> bool:
+        chunk = self.create_protochunk(nodes, breadcrumb_node=breadcrumb_node)
         logger.info("Checking fit %s: %s", chunk.length, data_ids_for(nodes))
         return chunk.length < self.max_length
 
@@ -121,6 +121,7 @@ class ChunkingConfig:
     def create_protochunk(
         self,
         nodes: list[Node],
+        *,
         chunk_id_suffix: Optional[str] = None,
         breadcrumb_node: Optional[Node] = None,
         markdown: Optional[str] = None,
@@ -185,11 +186,17 @@ class ChunkingConfig:
             )
 
     def compose_summary_text(self, node: Node) -> str:
-        if node.data_type not in ["Heading", "List", "ListItem", "Table"]:
-            return "(SUMMARY)\n\n"
+        if node.data_type == "Paragraph":
+            return "(...)\n\n"
 
         if isinstance(node.data, HeadingSectionNodeData):
             return f"(SUMMARIZED {node.data.rendered_text})\n\n"
+        
+        if node.data_type == "Heading":
+            raise AssertionError(f"Unexpected Heading node {node.data_id}")
+
+        if node.data_type not in ["List", "Table", "ListItem"]:
+            return "(SUMMARY)\n\n"
 
         if not node.has_token() or not (md := node.render()):
             raise AssertionError(f"No summary for {node.data_id}")
@@ -217,8 +224,8 @@ class ChunkingConfig:
         # logger.debug("should_summarize: %f %s", next_nodes_portion, [n.data_id for n in node_with_intro])
         return next_nodes_portion > 0.75
 
-    def full_enough_to_flush(self, chunk_buffer: list[Node]):
-        chunk = self.create_protochunk(chunk_buffer)
+    def full_enough_to_flush(self, chunk_buffer: list[Node], breadcrumb_node):
+        chunk = self.create_protochunk(chunk_buffer, breadcrumb_node=breadcrumb_node)
         next_nodes_portion = chunk.length / self.max_length
         logger.info("next_nodes_portion = %s", next_nodes_portion)
         # Example on https://edd.ca.gov/en/jobs_and_training/FAQs_WARN/
@@ -271,7 +278,7 @@ def chunk_tree(in_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
 
     # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
     try:
-        while not config.nodes_fit_in_chunk([doc_node]):
+        while not config.nodes_fit_in_chunk([doc_node], doc_node):
             logger.info("======= Document node %s is too large for one chunk", doc_node.data_id)
             # a Document node is structurally similar to a HeadingSection node
             # split_heading_section_into_chunks(doc_node, config)
@@ -306,10 +313,11 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
     intro_node: Node | None = None
     while node:
         if node.data["chunked"]:
-            logger.info("Skipping chunked Paragraph node %s", node.data_id)
+            logger.info("Skipping chunked node %s", node.data_id)
             p_node = node
             node = next_renderable_node(node)
             if p_node.data_type == "Paragraph":
+                committed_tree[p_node.data_id].remove()
                 p_node.remove()
                 logger.info("nodes %i", working_tree.count)
             if not node:
@@ -333,7 +341,8 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
         # logger.info(
         #     "Working MD: %s", config.create_protochunk([working_tree.first_child()]).markdown
         # )
-        if config.nodes_fit_in_chunk([chunking_tree.first_child()] + next_node.as_list):
+        breadcrumb_node = chunk_buffer[0].node if chunk_buffer else None
+        if config.nodes_fit_in_chunk([chunking_tree.first_child()] + next_node.as_list, breadcrumb_node):
             logger.info("Fits! Adding %s", next_node)
             # Update WORKING tree
             # DON'T update COMMITTED tree
@@ -378,7 +387,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             if not node:
                 raise EOFError("No more nodes")
 
-            pc = config.create_protochunk([chunking_tree.first_child()])
+            pc = config.create_protochunk([chunking_tree.first_child()], breadcrumb_node=breadcrumb_node)
             logger.info("Added to chunking tree %s: %i\n%s", pc.id, pc.length, pc.markdown)
 
             # logger.info("Updated ChunkingTree: %s", chunking_tree.format())
@@ -399,7 +408,17 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                 committed_tree[next_node.intro_node.data_id] if next_node.intro_node else None,
             )
             _chunk_and_summarize_next_nodes(config, orig_next_node)
-        elif not node.has_children() and config.full_enough_to_flush(next_node.as_list):
+        elif node.data_type == "HeadingSection" and config.full_enough_to_flush(next_node.as_list, breadcrumb_node) and config.nodes_fit_in_chunk(next_node.as_list, breadcrumb_node):
+            # update COMMITTED tree
+            orig_next_node = NodeWithIntro(
+                committed_tree[next_node.node.data_id],
+                committed_tree[next_node.intro_node.data_id] if next_node.intro_node else None,
+            )
+            logger.info("Putting HeadingSection %s into separate chunk", next_node)
+            config.add_chunk(pc := config.create_protochunk(next_node.as_list, breadcrumb_node=breadcrumb_node))
+            logger.debug("Added chunk %s:\n%s", pc.id, pc.markdown)
+            _summarize_nodes(orig_next_node.as_list, config)
+        elif not node.has_children() and config.full_enough_to_flush(next_node.as_list, breadcrumb_node):
             assert node.data_type in [
                 "Paragraph",
                 "BlockCode",
@@ -413,19 +432,19 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                 committed_tree[next_node.intro_node.data_id] if next_node.intro_node else None,
             )
             # _chunk_and_summarize_next_nodes(config, node_with_intro)
-            if config.nodes_fit_in_chunk(next_node.as_list):
+            if config.nodes_fit_in_chunk(next_node.as_list, breadcrumb_node):
                 logger.info("Putting Paragraph %s into separate chunk", next_node)
-                config.add_chunk(pc := config.create_protochunk(next_node.as_list))
+                config.add_chunk(pc := config.create_protochunk(next_node.as_list, breadcrumb_node=breadcrumb_node))
                 logger.debug("Added chunk %s:\n%s", pc.id, pc.markdown)
             else:
                 # split_paragraph_into_chunks
                 logger.info("Splitting Paragraph %s into multiple chunks", next_node)
                 config.create_chunks_for_next_nodes(orig_next_node)
             _summarize_nodes(orig_next_node.as_list, config)
-        elif config.full_enough_to_flush([chunking_tree.first_child()]):
+        elif config.full_enough_to_flush([chunking_tree.first_child()], breadcrumb_node):
             logger.info("Full enough! %s", [n.data_id for n in chunking_tree])
             # Flush the chunk_buffer to a chunk
-            config.add_chunk(pc := config.create_protochunk([chunking_tree.first_child()]))
+            config.add_chunk(pc := config.create_protochunk([chunking_tree.first_child()], breadcrumb_node=breadcrumb_node))
             logger.info("Added chunk %s:\n%s", pc.id, pc.markdown)
             # TODO: del chunk_tree
 
@@ -510,7 +529,7 @@ def split_list_or_table_node_into_chunks(
             block_node.data_id,
             data_ids_for(block_node.children),
         )
-        while not config.nodes_fit_in_chunk(candidate_node.as_list) and block_node.has_children():
+        while not config.nodes_fit_in_chunk(candidate_node.as_list, block_node) and block_node.has_children():
             block_node.last_child().remove()
 
         if block_node.has_children():
@@ -595,7 +614,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
         intro_node = None
 
         candidate_node_buffer = node_buffer + node_with_intro.as_list
-        if config.nodes_fit_in_chunk(candidate_node_buffer):
+        if config.nodes_fit_in_chunk(candidate_node_buffer, candidate_node_buffer[0]):
             node_buffer = candidate_node_buffer
         else:  # candidate_node_buffer doesn't fit
             # Determine whether to summarize node_with_intro or add it to the next chunk
@@ -617,7 +636,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                 # nodes_fit_in_chunk() calls render_nodes_as_md(), which will use the shorter
                 # summary text instead of the full text
                 candidate_node_buffer = node_buffer + node_with_intro.as_list
-                if config.nodes_fit_in_chunk(candidate_node_buffer):
+                if config.nodes_fit_in_chunk(candidate_node_buffer, candidate_node_buffer[0]):
                     node_buffer = candidate_node_buffer
                     continue
 
@@ -634,7 +653,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
 
             # 2. Handle node_with_intro
             # Check if node_with_intro can be the new node_buffer
-            if config.nodes_fit_in_chunk(node_with_intro.as_list):
+            if config.nodes_fit_in_chunk(node_with_intro.as_list, node_with_intro.node):
                 # Reset node_buffer to be node_with_intro
                 node_buffer = node_with_intro.as_list.copy()
             else:  # node_with_intro needs to be split into multiple chunks
@@ -642,7 +661,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
 
     assert not intro_node, f"Was intro_node {intro_node.data_id} added to a node_buffer?"
     if node_buffer:  # Create a chunk with the remaining nodes
-        if config.nodes_fit_in_chunk(node_buffer):
+        if config.nodes_fit_in_chunk(node_buffer, node_buffer[0]):
             chunks_to_create.append(node_buffer)
         else:
             raise AssertionError(f"node_buffer should always fit: {node_buffer}")
@@ -653,7 +672,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
 def _chunk_and_summarize_next_nodes(config, node_with_intro: NodeWithIntro) -> NodeWithIntro:
     node = node_with_intro.node
     # See if the node's contents fit, including descendants
-    if config.nodes_fit_in_chunk(node_with_intro.as_list):
+    if config.nodes_fit_in_chunk(node_with_intro.as_list, node_with_intro.node):
         config.add_chunk(config.create_protochunk(node_with_intro.as_list))
     elif node.data_type in ["Document", "HeadingSection", "ListItem"]:
         # ListItem can have similar children as HeadingSection
