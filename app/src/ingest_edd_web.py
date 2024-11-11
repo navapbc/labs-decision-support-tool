@@ -191,14 +191,15 @@ def _chunk_page(
                 )
                 assert split.token_count == chunk.length
                 splits.append(split)
-                if os.environ.get("SAVE_CHUNKS"):
+                if os.path.exists("SAVE_CHUNKS"):
                     split.chunk_id = chunk.id
                     split.url = document.source
-            if os.environ.get("SAVE_CHUNKS"):
+            if os.path.exists("SAVE_CHUNKS"):
                 assert document.source
-                url_path = document.source.lstrip("https://edd.ca.gov/en/").rstrip("/")
+                url_path = "edd-chunks/" + document.source.removeprefix("https://edd.ca.gov/en/").rstrip("/")
                 os.makedirs(os.path.dirname(url_path), exist_ok=True)
-                with smart_open(f"edd-chunks/{url_path}.json", "w", encoding="utf-8") as file:
+                # logger.warning("Saving JSON chunks for %r to %s", document.source, url_path)
+                with open(f"{url_path}.json", "w", encoding="utf-8") as file:
                     file.write(json.dumps([split.__dict__ for split in splits], indent=2))
             logger.info("Split into %d chunks for %r", len(tree_chunks), document.source)
         except (Exception, KeyboardInterrupt) as e:
