@@ -126,6 +126,7 @@ def update_token_children(n: Node):
         # token.parent was indirectly updated when token.children was set
         assert c.parent == n.data.token
 
+
 # endregion
 # region ##### Tree creation and validation functions
 
@@ -172,45 +173,21 @@ def create_markdown_tree(
         doc = mistletoe.Document(markdown)
     # The shadow_attrs=True argument allows accessing node.data.age as node.age -- see validate_tree()
     with new_tree(name) as tree:
+        # Disable token copying since we don't need to copy them
+        # for the initial population of the tree
+        tree.system_root.set_meta("data_and_token_copying", False)
         _populate_nutree(tree.system_root, doc)
         doc_node = tree.first_child()
         if doc_name:
             assert doc_node.data_type == "Document"
             doc_node.data["name"] = doc_name
 
-    # if (mismatches := tokens_vs_tree_mismatches(tree)):
-    #     logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
-    # assert not tokens_vs_tree_mismatches(tree)
-
     tree.system_root.set_meta("prep_funcs", [])
     if prepare:
-        _prepare_tree(tree)
-        update_token_children(doc_node)
-        assert not tokens_vs_tree_mismatches(tree)
+        with assert_no_mismatches(tree):
+            _prepare_tree(tree)
+            update_token_children(doc_node)
     return tree
-
-@contextmanager
-def new_tree(name):
-    # Setting calc_data_id allows the data_id to be correctly set for nodes created
-    # by functions that don't take a data_id argument, like node.copy_to().
-    # Otherwise, copy_to() assigns a random data_id to the new node.
-    tree = Tree(name, factory=TokenAwareNode, calc_data_id=_get_node_data_id, shadow_attrs=True)
-    # tree.system_root.set_meta("sync_token", False)
-    yield tree
-    validate_tree(tree)
-    # After all node are copied over, update tokens
-    if (mismatches := tokens_vs_tree_mismatches(tree)):
-        logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
-    assert not tokens_vs_tree_mismatches(tree)
-    # Now that tree is populated, turn on syncing
-    tree.system_root.set_meta("sync_token", True)
-
-@contextmanager
-def ignore_token_updates(tree: Tree):
-    "Only used for tree preparation. Normally tokens are synced"
-    tree.system_root.set_meta("sync_token", False)
-    yield tree
-    tree.system_root.set_meta("sync_token", True)
 
 @contextmanager
 def assert_no_mismatches(tree: Tree):
@@ -218,6 +195,27 @@ def assert_no_mismatches(tree: Tree):
     if (mismatches := tokens_vs_tree_mismatches(tree)):
         logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
     assert not tokens_vs_tree_mismatches(tree)
+
+@contextmanager
+def new_tree(name):
+    # Setting calc_data_id allows the data_id to be correctly set for nodes created
+    # by functions that don't take a data_id argument, like node.copy_to().
+    # Otherwise, copy_to() assigns a random data_id to the new node.
+    tree = Tree(name, factory=TokenAwareNode, calc_data_id=_get_node_data_id, shadow_attrs=True)
+    tree.system_root.set_meta("data_and_token_copying", True)
+    # tree.system_root.set_meta("sync_token", False)
+    with assert_no_mismatches(tree):
+        yield tree
+        validate_tree(tree)
+    # Now that tree is populated, turn on syncing
+    tree.system_root.set_meta("sync_token", True)
+
+@contextmanager
+def _ignore_token_updates(tree: Tree):
+    "Only used for tree preparation. Normally tokens are synced"
+    tree.system_root.set_meta("sync_token", False)
+    yield tree
+    tree.system_root.set_meta("sync_token", True)
 
 
 
@@ -700,7 +698,7 @@ def hide_span_tokens(tree: Tree) -> int:
             node.data["raw_text"] = _extract_raw_text(node)
 
         # Remove the children nodes, but node.token.children tokens are still retained for rendering
-        with ignore_token_updates(tree):
+        with _ignore_token_updates(tree):
             node.remove_children()
 
         # Set attribute to indicate that node.token.children tokens should never be modified
@@ -732,7 +730,7 @@ def create_heading_sections(tree: Tree) -> int:
     "Create custom HeadingSection nodes for each Heading node and its associated content"
     hsection_counter = 0
     heading_nodes = tree.find_all(match=lambda n: n.data_type == "Heading")
-    with ignore_token_updates(tree):
+    with _ignore_token_updates(tree):
         for n in heading_nodes:
             if n.parent.data_type == "HeadingSection":
                 # Skip if the Heading is already part of a HeadingSection
@@ -774,7 +772,7 @@ def nest_heading_sections(tree: Tree) -> int:
     ]
     move_counter = 0
     last_heading_level = 0
-    with ignore_token_updates(tree):
+    with _ignore_token_updates(tree):
         for hs_node in heading_sections:
             # Traverse the headings in order and update the heading_stack
             heading_level = hs_node.level

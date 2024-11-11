@@ -71,25 +71,22 @@ def copy_subtree(name:str,
     """
     with new_tree(f"{name}:{node.data_id}") as subtree:
         logger.warning("COPY SUBTREE %s", subtree.name)
+        subtree.system_root.set_meta("sync_token", True)
+        # Ancestors are needed to get_parent_headings()
+        new_parent = copy_ancestors(node, subtree) if include_ancestors else subtree.system_root
+
+        # Copy the nodes and descendants but node.data will point to original objects
+        # _copy_data_and_tokens() will deep-copy node.data objects
+        new_node = node.copy_to(new_parent, deep=include_descendants)
+        assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"
+        # _copy_data_and_tokens(subtree)
+        logger.warning("Done copying subtree %s", subtree.name)
+
         # Copy the meta attributes from the original tree so that get_parent_headings() works
+        # Do this after populating tree so meta values don't interfere
         for k, v in node.tree.system_root.meta.items():
-            subtree.system_root.set_meta(k, copy(v))
-        # Modify meta BEFORE or AFTER `data_and_token_copying`
-        # Copy data AND sync_tokens
-        subtree.system_root.set_meta("data_and_token_copying", True)
-
-        with assert_no_mismatches(subtree):
-            # Ancestors are needed to get_parent_headings()
-            new_parent = copy_ancestors(node, subtree) if include_ancestors else subtree.system_root
-
-            # Copy the nodes and descendants but node.data will point to original objects
-            # _copy_data_and_tokens() will deep-copy node.data objects
-            new_node = node.copy_to(new_parent, deep=include_descendants)
-            assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"
-            # _copy_data_and_tokens(subtree)
-            logger.warning("Done copying subtree %s", subtree.name)
-        
-
+            if not subtree.system_root.get_meta(k):
+                subtree.system_root.set_meta(k, copy(v))
 
     # At this point, no object in the subtree should be pointing to objects in the original tree,
     # except for tokens associated with "freeze_token_children".
