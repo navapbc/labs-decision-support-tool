@@ -118,7 +118,7 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     logger.info(prepped_tree.format())
     chunks = chunk_tree(prepped_tree, config)
     pprint(list(chunks.values()), sort_dicts=False, width=140)
-    assert len(chunks) == 9
+    assert len(chunks) == 8
 
     for _id, chunk in chunks.items():
         assert chunk.length <= config.max_length
@@ -148,6 +148,7 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     chunks_wo_headings = [chunk for _id, chunk in chunks.items() if not chunk.headings]
     # 1 doc intro paragraph + 2 H1 HeadingSections
     # assert len(chunks_wo_headings) == 3
+    assert False
 
 
 def test_create_chunks_for_next_nodes():
@@ -161,7 +162,7 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
     paragraph_md = render_nodes_as_md([paragraph_node])
 
     config = ChunkingConfig(165)
-    assert not config.nodes_fit_in_chunk([paragraph_node])
+    assert not config.nodes_fit_in_chunk([paragraph_node], paragraph_node)
     chunks = chunk_tree(tree, config)
 
     pprint(list(chunks.values()), sort_dicts=False, width=140)

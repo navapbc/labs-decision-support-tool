@@ -32,6 +32,19 @@ logger = logging.getLogger(__name__)
 
 
 class TokenAwareNode(Node):
+    """
+    block_types = container_types + list_types
+    container_types = "Document", "HeadingSection", "ListItem", and probably "TableCell"
+        - we have to update token.children (to render partials) based on tree structure;
+    list_types = "List", "Table"
+        - List has "ListItem"s
+        - Table has "TableRow"s (which has "TableCell"s)
+        - we have to update token.children (to render partials) based on tree structure
+
+    leaf_types = non-block_types = no children = "Paragraph", "Heading"
+        - we don't modify token.children; these tokens are frozen as indicated by node.data["freeze_token_children"]
+    """
+
     def __init__(self, data, **kwargs):
         super().__init__(data, **kwargs)
         if self._copy_data_flag():
@@ -192,6 +205,7 @@ def create_markdown_tree(
     name: str = "Markdown tree",
     normalize_md: bool = True,
     doc_name: Optional[str] = None,
+    doc_source: Optional[str] = None,
     prepare: bool = True,
 ) -> Tree:
     """
@@ -234,6 +248,8 @@ def create_markdown_tree(
         if doc_name:
             assert doc_node.data_type == "Document"
             doc_node.data["name"] = doc_name
+        if doc_source:
+            doc_node.data["source"] = doc_source
 
     # Now that tree is populated, enable syncing of tokens to ensure no token mismatches
     tree.system_root.set_meta("sync_token", True)
@@ -320,7 +336,7 @@ def validate_tree(tree: Tree) -> None:
         # Check data_id
         if tree[node.data_id] is not node:
             nodes = tree.find_all(data_id=node.data_id)
-            print(f"Found {len(nodes)} nodes with data_id {node.data_id}")
+            logger.error("Found %d nodes with data_id %r", len(nodes), node.data_id)
             raise AssertionError(
                 f"Node {node.data_id!r} has mismatched node: {tree[node.data_id]} != {node!r}"
             )
@@ -412,8 +428,6 @@ def describe_tree(tree: Tree) -> dict:
 # endregion
 # region ##### Tree and node copy functions
 
-# region ###### Tree manipulation functions
-
 
 def copy_subtree(name: str, node: Node, include_descendants: bool = True) -> Tree:
     """
@@ -438,7 +452,8 @@ def copy_subtree(name: str, node: Node, include_descendants: bool = True) -> Tre
     return new_node
 
 
-def copy_with_ancestors(node, tree, include_descendants: bool = True):
+def copy_with_ancestors(node: Node, tree: Tree, include_descendants: bool = True):
+    logger.debug("copy_with_ancestors %s to %s", node.data_id, tree.name)
     # Ancestors are needed to get_parent_headings()
     new_parent = copy_ancestors(node, tree)
     # Copy the nodes and descendants
@@ -1014,7 +1029,7 @@ def data_ids_for(nodes: Iterable[Node]) -> list[str]:
     return [n.data_id for n in nodes]
 
 
-def next_renderable_node(node):
+def next_renderable_node(node) -> Node | None:
     "Return the next node that would be rendered as markdown text"
     while not (next_s := node.next_sibling()):
         if not (node := node.parent):
