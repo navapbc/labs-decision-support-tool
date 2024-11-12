@@ -1,5 +1,7 @@
+import csv
 import json
 import logging
+import os
 import re
 import sys
 from typing import Sequence
@@ -9,6 +11,7 @@ from smart_open import open as smart_open
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
+from src.generate import GENERATE_QUESTION_ANSWER_PROMPT, generate
 from src.util.ingest_utils import (
     add_embeddings,
     deconstruct_list,
@@ -108,8 +111,9 @@ def _chunk_page(
         section_splits = _split_heading_section(headings, text)
         splits.extend(section_splits)
 
-    chunks = [
-        Chunk(
+    chunks = []
+    for index, split in enumerate(splits):
+        chunk = Chunk(
             document=document,
             content=split.text,
             headings=split.headings,
@@ -117,8 +121,26 @@ def _chunk_page(
             split_index=index,
             tokens=split.token_count,
         )
-        for index, split in enumerate(splits)
-    ]
+
+        q_a_json = generate_question_answer_pair(chunk=chunk)
+
+        fields = ["question", "answer", "document_name", "document_source", "content"]
+        needs_header = (
+            True
+            if os.path.exists("question_answer_pairs.csv")
+            and os.stat("question_answer_pairs.csv").st_size == 0
+            or not os.path.exists("question_answer_pairs.csv")
+            else False
+        )
+
+        with open("question_answer_pairs.csv", "a", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fields)
+            if needs_header:
+                writer.writeheader()
+            for question in q_a_json:
+                writer.writerow(question)
+
+        chunks.append(chunk)
     return chunks, splits
 
 
@@ -236,6 +258,17 @@ def _split_large_text_block(
             raise ValueError(
                 f"Cannot split long ({split.token_count} tokens) text_block: {split.text}"
             )
+
+
+def generate_question_answer_pair(chunk: Chunk):
+    q_a_json = generate(
+        llm="gpt-4o",
+        system_prompt=GENERATE_QUESTION_ANSWER_PROMPT,
+        query="Please use the information to generate a question and answer.",
+        context_text=f"Content: {chunk.content}, full document content: {chunk.document.content}, document name: {chunk.document.name}, document source: {chunk.document.source}",
+    )
+
+    return json.loads(q_a_json)
 
 
 def main() -> None:

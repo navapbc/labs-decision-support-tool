@@ -45,6 +45,17 @@ If the question would be easier to answer with additional policy or program cont
 Otherwise, set needs_context to false.
 """
 
+GENERATE_QUESTION_ANSWER_PROMPT = """
+Using the provided chunk, generate 2-3 unique questions and answers, avoid rephrasing the question and saying 'according to the document'. 
+Respond with a list of JSON dictionaries in the following format  (do not wrap in JSON markers):
+
+question: The generated question based on the content.
+answer: The answer to the question, derived from the content.
+document_name: The name of the document.
+document_source: The source or URL of the document.
+content: The provided content for context.
+"""
+
 
 def get_models() -> dict[str, str]:
     """
