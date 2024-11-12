@@ -5,11 +5,10 @@ import textwrap
 from collections import defaultdict
 from contextlib import contextmanager
 from copy import copy
-from typing import Any, Callable, Iterator, Iterable, Optional, Sequence
+from typing import Any, Callable, Iterable, Iterator, Optional, Sequence
 
 import mistletoe
 from mistletoe import block_token
-from mistletoe import span_token
 from mistletoe import token as token_cls
 from mistletoe.ast_renderer import AstRenderer
 from mistletoe.markdown_renderer import MarkdownRenderer
@@ -134,13 +133,13 @@ class TokenAwareNode(Node):
         )
 
     def remove(self, *, keep_children=False, with_clones=False) -> None:
-        logger.info("Removing %s from %s", self.data_id, self.tree.name)
+        logger.debug("Removing %s from %s", self.data_id, self.tree.name)
         if self._sync_token_applicable() and self.parent and self.parent.has_token():
             parent_token = self.parent.data.token
             if self.data.token in parent_token.children:
                 # Parent token must be modifiable
                 self.parent.assert_unfrozen_token()
-                logger.info("Removing token %s from %s", self.data_id, self.tree.name)
+                logger.debug("Removing token %s from %s", self.data_id, self.tree.name)
                 parent_token.children.remove(self.data.token)
 
             if keep_children:
@@ -435,7 +434,7 @@ def copy_subtree(name: str, node: Node, include_descendants: bool = True) -> Tre
     Each node's contents is deep-copied, including node.data and node.data.token.
     """
     with new_tree(f"{name}:{node.data_id}", copying_tree=True) as subtree:
-        logger.info("Copying to subtree %r", subtree.name)
+        logger.debug("Copying to subtree %r", subtree.name)
         # Copy the nodes and descendants
         new_node = copy_with_ancestors(node, subtree, include_descendants=include_descendants)
         assert new_node.data_id == node.data_id, f"Expected data_id {node.data_id!r} for {new_node}"

@@ -6,10 +6,13 @@ import sys
 from typing import Optional, Sequence
 
 from smart_open import open as smart_open
+from nutree import Tree
 
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
+from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
+from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
     add_embeddings,
     deconstruct_list,
@@ -44,9 +47,7 @@ def _ingest_edd_web(
             logger.warning("No chunks for %r", document.source)
             continue
         logger.info("Adding embeddings for %r", document.source)
-        exit(0)
         # Next, add embeddings to each chunk (slow)
-        # TODO: Kevin mentioned adding column chunk.embedding_str; set it to s.text_to_encode
         add_embeddings(chunks, [s.text_to_encode for s in splits])
         logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
 
@@ -98,7 +99,7 @@ def _create_chunks(
     for item in json_items:
         if item["url"] in urls_processed:
             # Workaround for duplicate items from web scraping
-            logger.info("Skipping duplicate URL: %s", item["url"])
+            logger.warning("Skipping duplicate URL: %s", item["url"])
             continue
 
         name = item["title"]
@@ -117,11 +118,6 @@ def _create_chunks(
 
 USE_MARKDOWN_TREE = True
 
-from pprint import pprint
-
-from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
-from src.ingestion.markdown_tree import create_markdown_tree
-
 
 class EddChunkingConfig(ChunkingConfig):
     def __init__(self):
@@ -136,34 +132,6 @@ def _chunk_page(
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     splits: list[SplitWithContextText] = []
     if USE_MARKDOWN_TREE:
-        # if document.source.startswith("https://edd.ca.gov/en/uibdg"):
-        #     return [], []
-
-        # if document.source not in [
-        #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_85/",
-        # #     # too long
-        # #     "https://edd.ca.gov/en/jobs_and_training/Information_Notices/",
-        # #     "https://edd.ca.gov/en/uibdg/Suitable_Work_SW_5/",
-        # #     "https://edd.ca.gov/en/payroll_taxes/forms_and_publications/",
-        # #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_5/",
-        # #     "https://edd.ca.gov/en/uibdg/Miscellaneous_MI_15/",
-        # ]:
-        #     return [], []
-
-        # if document.source != "https://edd.ca.gov/en/disability/Contact_SDI/":
-        #     return [], []
-        # if document.source not in [
-        #     "https://edd.ca.gov/en/jobs_and_training/Active_Directives/",
-        # "https://edd.ca.gov/en/jobs_and_training/Information_Notices/", # too long
-
-        #     "https://edd.ca.gov/en/payroll_taxes/FAQ_-_e-Services_for_Business/", # # Infinite loop
-        #     # "https://edd.ca.gov/en/uibdg/Misconduct_MC_270/",  # Infinite loop
-        #     "https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/"
-        #     "https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_-_table_of_contents/",# Takes too long?
-        # ]:
-        #     return [], []
-        # global chunking_config
-        # if not chunking_config:
         chunking_config = EddChunkingConfig()
 
         # Fix markdown formatting that causes markdown parsing errors
@@ -179,11 +147,8 @@ def _chunk_page(
         content = content.replace("* + ", "    + ")
 
         try:
-            tree = create_markdown_tree(content, doc_name=document.name)
-            # print(document.name)
-            # tree.print()
+            tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
             tree_chunks = chunk_tree(tree, chunking_config)
-            # pprint(list(tree_chunks.values()), sort_dicts=False, width=140)
 
             for _id, chunk in tree_chunks.items():
                 split = SplitWithContextText(
@@ -193,15 +158,10 @@ def _chunk_page(
                 splits.append(split)
                 if os.path.exists("SAVE_CHUNKS"):
                     split.chunk_id = chunk.id
-                    split.url = document.source
+                    split.data_ids = ", ".join(chunk.data_ids)
             if os.path.exists("SAVE_CHUNKS"):
                 assert document.source
-                url_path = "edd-chunks/" + document.source.removeprefix("https://edd.ca.gov/en/").rstrip("/")
-                os.makedirs(os.path.dirname(url_path), exist_ok=True)
-                # logger.warning("Saving JSON chunks for %r to %s", document.source, url_path)
-                with open(f"{url_path}.json", "w", encoding="utf-8") as file:
-                    file.write(json.dumps([split.__dict__ for split in splits], indent=2))
-            logger.info("Split into %d chunks for %r", len(tree_chunks), document.source)
+                _save_splits_to_files(document.source, content, splits, tree)
         except (Exception, KeyboardInterrupt) as e:
             logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
             raise e
@@ -223,6 +183,26 @@ def _chunk_page(
         for index, split in enumerate(splits)
     ]
     return chunks, splits
+
+def _save_splits_to_files(uri: str, content: str, splits: list[SplitWithContextText], tree: Tree):
+    url_path = "chunks-log/" + uri.removeprefix(
+                    "https://edd.ca.gov/en/"
+                ).rstrip("/")
+    os.makedirs(os.path.dirname(url_path), exist_ok=True)
+    with open(f"{url_path}.json", "w", encoding="utf-8") as file:
+        file.write(f"{uri} => {len(splits)} chunks\n")
+        file.write("\n")
+        for split in splits:
+            file.write(f">>> {split.chunk_id!r} (length {split.token_count}) {split.headings}\n")
+            file.write(split.text)
+            file.write("\n--------------------------------------------------\n")
+        file.write("\n\n")
+        json_str = json.dumps([split.__dict__ for split in splits], indent=2)
+        file.write(json_str)
+        file.write("\n\n")
+        file.write(tree.format())
+        file.write("\n\n")
+        file.write(content)
 
 
 # MarkdownHeaderTextSplitter splits text by "\n" then calls aggregate_lines_to_chunks() to reaggregate
