@@ -56,19 +56,43 @@ class TokenAwareNode(Node):
         else:
             self.data.token = copy(self.data.token)
 
-    def add_child(self, child: Node | Tree | Any, **kwargs) -> Node:
+    def add_child(
+        self,
+        child: Node | Tree | Any,
+        *,
+        before: Node | None = None,
+        deep: bool | None = None,
+        data_id=None,
+        node_id=None,
+    ) -> Node:
         logger.debug("%s add_child: %s", self.data_id, child.data_id)
-        child_node = super().add_child(child, **kwargs)
+        child_node = super().add_child(
+            child, before=before, deep=deep, data_id=data_id, node_id=node_id
+        )
 
         if self._sync_token_applicable() and child_node.has_token():
             self.assert_unfrozen_token()
             if self.data.token.children is None:
                 self.data.token.children = []
             if child_node.data.token not in self.data.token.children:
-                logger.debug("Updating token.children %s in %s", self.data_id, self.tree.name)
-                self.data.token.children += [child_node.data.token]
-
+                logger.debug("Updating token.children of %s in %s", self.data_id, self.tree.name)
+                if before:
+                    self._add_child_token(child_node, before)
+                else:
+                    self.data.token.children += [child_node.data.token]
         return child_node
+
+    def _add_child_token(self, child_node: Node, before: Node):
+        while not before.has_token() and before.next_sibling():
+            before = before.next_sibling()
+        if before.has_token():
+            children = list(self.data.token.children)
+            index = children.index(before.data.token)
+            children.insert(index, child_node.data.token)
+            self.data.token.children = children
+        else:
+            logger.debug("Before-node %r has no token; appending to the end", before.data_id)
+            self.data.token.children += [child_node.data.token]
 
     # Many tree and node  methods call add()
     add = add_child
@@ -97,13 +121,13 @@ class TokenAwareNode(Node):
         )
 
     def remove(self, *, keep_children=False, with_clones=False) -> None:
-        logger.debug("Removing %s from %s", self.data_id, self.tree.name)
+        logger.info("Removing %s from %s", self.data_id, self.tree.name)
         if self._sync_token_applicable() and self.parent and self.parent.has_token():
             parent_token = self.parent.data.token
             if self.data.token in parent_token.children:
                 # Parent token must be modifiable
                 self.parent.assert_unfrozen_token()
-                logger.debug("Removing token %s from %s", self.data_id, self.tree.name)
+                logger.info("Removing token %s from %s", self.data_id, self.tree.name)
                 parent_token.children.remove(self.data.token)
 
             if keep_children:
@@ -123,7 +147,9 @@ class TokenAwareNode(Node):
         return super().remove_children()
 
 
-def _copy_paragraph_token(token: block_token.Paragraph, doc_token: block_token.Document) -> block_token.Paragraph:
+def _copy_paragraph_token(
+    token: block_token.Paragraph, doc_token: block_token.Document
+) -> block_token.Paragraph:
     assert token.type == "Paragraph", f"Expected Paragraph, got {token.type}"
     assert doc_token, "doc_token not provided"
     # Paragraph tokens can have children, so rather than recursively copying them,
@@ -225,7 +251,7 @@ def assert_no_mismatches(tree: Tree) -> Iterator[Tree]:
     yield tree
     if mismatches := tokens_vs_tree_mismatches(tree):
         logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
-    assert not tokens_vs_tree_mismatches(tree)
+    assert not mismatches, "Mismatches found in tree"
 
 
 @contextmanager

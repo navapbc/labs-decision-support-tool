@@ -44,12 +44,6 @@ def shorten(body: str, char_limit: int, placeholder: str = "...", max_lines: int
     return "\n".join(new_body)
 
 
-def can_modify_tree(tree: Tree) -> bool:
-    "Call this to make sure that modifiable node.data and node.data.token are not pointing to the original tree"
-    mismatches = tokens_vs_tree_mismatches(tree)
-    return not mismatches and tree.system_root.get_meta("needs_copy_data_and_tokens") is None
-
-
 # endregion
 # region ###### Classes
 
@@ -264,33 +258,29 @@ class ChunkingConfig:
 #     - we don't modify token.children; these tokens are frozen as indicated by node.data["freeze_token_children"]
 
 
-def chunk_tree(in_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
+def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
     config.reset()
 
-    # 4 trees:
-    # 0. ORIGINAL input tree
-    # 1. COMMITTED: original tree: only updated when add_chunk() is called
-    # 2. (transactional) BUFFER: chunking_tree: reflect (uncommitted) chunk_buffer
-    # 3. (transactional) WORKING: copied original working tree: copy of the original tree, but nodes can be removed to reflect (uncommitted) chunk_buffer
-    #    used to assess tree wrt BUFFER
+    # 3 main trees besides the original input tree
+    # 1. COMMITTED tree reflects chunked text; summaries replace chunked text; only updated when config.add_chunk() is called
+    # 2. (transactional) BUFFER tree contains (uncommitted) possible content for the next chunk
+    # 3. (transactional) Transaction (TXN) tree: copy of COMMITTED tree; summaries replace (uncommitted) content in the BUFFER tree
 
-    doc_node = copy_subtree("COMMITTED", in_tree.first_child())  # COMMITTED tree
-
-    # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
+    # Initialize the COMMITTED tree as a full copy of input_tree
+    doc_node = copy_subtree("COMMITTED", input_tree.first_child())
     try:
+        # Try to chunk as much content as possible, so see if the node's contents fit, including descendants
         while not config.nodes_fit_in_chunk([doc_node], doc_node):
-            logger.info("======= Document node %s is too large for one chunk", doc_node.data_id)
-            # a Document node is structurally similar to a HeadingSection node
-            # split_heading_section_into_chunks(doc_node, config)
-            n = doc_node.first_child()
-            _gradually_chunk_tree_nodes(n, config)
-            can_modify_tree(doc_node.tree)
+            with assert_no_mismatches(doc_node.tree):
+                logger.info("======= Document node %s is too large for one chunk", doc_node.data_id)
+                # Start with the first child of the Document node
+                n = doc_node.first_child()
+                _gradually_chunk_tree_nodes(n, config)
     except EOFError:
         logger.info("No more nodes to chunk")
 
     next_node = NodeWithIntro(doc_node)
     _chunk_and_summarize_next_nodes(config, next_node)
-    # config.add_chunk(config.create_protochunk([doc_node]))
     return config.chunks
 
 
@@ -301,15 +291,15 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
     #     "Committed MD: %s", config.create_protochunk([committed_tree.first_child()]).markdown
     # )
 
-    # Transaction trees
-    working_tree = copy_subtree("TXN", committed_tree.first_child()).tree
-    node = working_tree[orig_node.data_id]
+    # Transaction tree
+    txn_tree = copy_subtree("TXN", committed_tree.first_child()).tree
+    node = txn_tree[orig_node.data_id]
 
     # Empty chunking data structures
     assert node.parent.data_type == "Document"
-    chunking_tree = copy_subtree("CHUNKING", node.parent, include_descendants=False).tree
-    assert chunking_tree.count == 1
-    chunk_buffer: list[NodeWithIntro] = []  # in chunking_tree
+    buffer_tree = copy_subtree("BUFFER", node.parent, include_descendants=False).tree
+    assert buffer_tree.count == 1
+    buffer: list[NodeWithIntro] = []  # in chunking_tree
     intro_node: Node | None = None
     while node:
         if node.data["chunked"]:
@@ -319,7 +309,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             if p_node.data_type == "Paragraph":
                 committed_tree[p_node.data_id].remove()
                 p_node.remove()
-                logger.info("nodes %i", working_tree.count)
+                logger.info("nodes %i", txn_tree.count)
             if not node:
                 raise EOFError("No more nodes")
             continue
@@ -341,14 +331,14 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
         # logger.info(
         #     "Working MD: %s", config.create_protochunk([working_tree.first_child()]).markdown
         # )
-        breadcrumb_node = chunk_buffer[0].node if chunk_buffer else None
-        if config.nodes_fit_in_chunk([chunking_tree.first_child()] + next_node.as_list, breadcrumb_node):
+        breadcrumb_node = buffer[0].node if buffer else None
+        if config.nodes_fit_in_chunk([buffer_tree.first_child()] + next_node.as_list, breadcrumb_node):
             logger.info("Fits! Adding %s", next_node)
             # Update WORKING tree
             # DON'T update COMMITTED tree
 
             # Copy data AND sync_tokens
-            with assert_no_mismatches(chunking_tree):  # Create new context to copy tokens
+            with assert_no_mismatches(buffer_tree):  # Create new context to copy tokens
 
                 # Copy next_node.intro_node branch to chunking_tree BEFORE copying next_node.node branch
                 # intro_node may be a parent (e.g., ListItem) of node (e.g., List)
@@ -356,7 +346,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                 if next_node.intro_node:
                     # There is no one structural relationship: assert next_node.intro_node.parent == next_node.node.parent
                     if not (
-                        new_intro_node := find_node(chunking_tree, next_node.intro_node.data_id)
+                        new_intro_node := find_node(buffer_tree, next_node.intro_node.data_id)
                     ):
                         # Copy next_node.intro_node branch to chunking_tree
                         logger.info(
@@ -364,21 +354,21 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                             next_node.intro_node.data_id,
                         )
                         new_intro_node = copy_with_ancestors(
-                            next_node.intro_node, chunking_tree, include_descendants=True
+                            next_node.intro_node, buffer_tree, include_descendants=True
                         )
 
                 # Copy next_node.node branch to chunking_tree
-                if not (new_node := find_node(chunking_tree, next_node.node.data_id)):
+                if not (new_node := find_node(buffer_tree, next_node.node.data_id)):
                     logger.info(
                         "Copying next_node.node %s to chunking_tree", next_node.node.data_id
                     )
                     # copy then remove in _summarize_nodes() => move
                     new_node = copy_with_ancestors(
-                        next_node.node, chunking_tree, include_descendants=True
+                        next_node.node, buffer_tree, include_descendants=True
                     )
 
             copied_next_node = NodeWithIntro(new_node, new_intro_node)
-            chunk_buffer.append(copied_next_node)
+            buffer.append(copied_next_node)
 
             # Since intro_node is included in chunk_buffer, reset it
             intro_node = None
@@ -387,7 +377,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
             if not node:
                 raise EOFError("No more nodes")
 
-            pc = config.create_protochunk([chunking_tree.first_child()], breadcrumb_node=breadcrumb_node)
+            pc = config.create_protochunk([buffer_tree.first_child()], breadcrumb_node=breadcrumb_node)
             logger.info("Added to chunking tree %s: %i\n%s", pc.id, pc.length, pc.markdown)
 
             # logger.info("Updated ChunkingTree: %s", chunking_tree.format())
@@ -399,7 +389,7 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
         # Following does not modify the working tree or chunk_buffer
         # It may modify the COMMITTED tree and RETURN
         # chunking_tree is used to flush the chunk_buffer to create a chunk
-        logger.info("Does not fit: %s + %s", chunking_tree.first_child().data_id, next_node)
+        logger.info("Does not fit: %s + %s", buffer_tree.first_child().data_id, next_node)
         if node.data_type == "Table":
             # Summarize the next node
             # update COMMITTED tree
@@ -441,22 +431,22 @@ def _gradually_chunk_tree_nodes(orig_node: Node, config: ChunkingConfig):
                 logger.info("Splitting Paragraph %s into multiple chunks", next_node)
                 config.create_chunks_for_next_nodes(orig_next_node)
             _summarize_nodes(orig_next_node.as_list, config)
-        elif config.full_enough_to_flush([chunking_tree.first_child()], breadcrumb_node):
-            logger.info("Full enough! %s", [n.data_id for n in chunking_tree])
+        elif config.full_enough_to_flush([buffer_tree.first_child()], breadcrumb_node):
+            logger.info("Full enough! %s", [n.data_id for n in buffer_tree])
             # Flush the chunk_buffer to a chunk
-            config.add_chunk(pc := config.create_protochunk([chunking_tree.first_child()], breadcrumb_node=breadcrumb_node))
+            config.add_chunk(pc := config.create_protochunk([buffer_tree.first_child()], breadcrumb_node=breadcrumb_node))
             logger.info("Added chunk %s:\n%s", pc.id, pc.markdown)
             # TODO: del chunk_tree
 
             # update COMMITTED tree
-            for nwi in chunk_buffer:
+            for nwi in buffer:
                 orig_nodes = NodeWithIntro(
                     committed_tree[nwi.node.data_id],
                     committed_tree[nwi.intro_node.data_id] if nwi.intro_node else None,
                 )
                 _summarize_nodes(orig_nodes.as_list, config)
         elif next_node.node.has_children() and config.should_examine_children(
-            next_node, working_tree
+            next_node, txn_tree
         ):
             node = node.first_child()
             logger.info("Go to child to %s", node.data_id)
