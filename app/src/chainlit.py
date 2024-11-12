@@ -5,15 +5,30 @@ from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Select, Slider, TextInput
+from src.batch_process import batch_process
 from src import chat_engine
 from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.generate import get_models
 from src.login import require_login
 
+import os
+
 logger = logging.getLogger(__name__)
 
 require_login()
+
+import asyncio 
+async def sleep_for_60_then_respond():
+    await cl.Message(
+        author="backend",
+        content=f"Sleeping...",
+    ).send()
+    await asyncio.sleep(10)
+    await cl.Message(
+        author="backend",
+        content=f"Woke up.",
+    ).send()
 
 
 @cl.on_chat_start
@@ -175,6 +190,17 @@ async def on_message(message: cl.Message) -> None:
     chat_history = get_raw_chat_history(chat_context)
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+
+    if message.content == "Batch processing":
+        await _batch_proccessing()
+        return
+    
+    if message.content == "sleep":
+        await cl.Message(author="backend",content=f"Received sleep command...",).send()
+        asyncio.create_task(sleep_for_60_then_respond())
+        await cl.Message(author="backend",content=f"Invoked sleep command...",).send()
+        return
+
     try:
         result = await cl.make_async(
             lambda: engine.on_message(question=message.content, chat_history=chat_history)
@@ -225,3 +251,38 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
         ],
         "raw_response": result.response,
     }
+
+
+async def _batch_proccessing():
+    files = await cl.AskFileMessage(
+        content="Please upload a CSV file with a `question` column.",
+        accept=["text/csv"],
+        max_size_mb=20,
+        timeout=180,
+    ).send()
+
+    if not files:
+        return
+
+    await cl.Message(
+            author="backend",
+            content=f"Processing...",
+        ).send()
+
+    try:
+        engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+        result_file_path = await batch_process(files[0].path, engine)
+
+        # E.g., "abcd.csv" to "abcd_results.csv"
+        result_file_name = files[0].name.rsplit('.csv', 1)[0] + '_results.csv'
+
+        await cl.Message(
+            content="Download results", elements=[cl.File(name=result_file_name, path=result_file_path)]
+        ).send()
+
+    except ValueError as err:
+        await cl.Message(
+            author="backend",
+            metadata={"error_class": err.__class__.__name__, "error": str(err)},
+            content=f"{err.__class__.__name__}: {err}",
+        ).send()

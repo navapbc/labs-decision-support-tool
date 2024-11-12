@@ -21,3 +21,6 @@
 
 # Override that enables app/.env to be read for local development
 docker-compose.override.yml
+
+# Temporary files created in the container by batch processing
+.files*
