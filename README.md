@@ -70,6 +70,6 @@ question
 "What types of support does the program offer for individuals recovering from an illness or injury?"
 ```
 
-Then, in the chat interface, send the message `Batch processing` and upload the .csv file when requested.
+Then, in the chat interface, submit the message `Batch processing` to the chatbot and upload the .csv file when prompted.
 
 The input file can have additional columns beyond `question`. These will be preserved in the output file.
