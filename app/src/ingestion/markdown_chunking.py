@@ -265,7 +265,7 @@ class ChunkingConfig:
 
 
 # endregion
-# region ###### Chunking functions
+# region ###### Chunking functions that operate on multiple trees -- see TreeTransaction
 
 
 def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
@@ -298,7 +298,7 @@ def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk
         logger.debug("No more nodes to chunk")
 
     next_node = NodeWithIntro(doc_node)
-    _add_chunks_and_summarize_node(config, next_node)
+    _add_chunks_and_summarize_node(next_node, config)
 
     # Ensure all nodes are in some chunk
     input_nodes = {n.data_id for n in input_tree.iterator()} - {doc_node.data_id}
@@ -377,9 +377,6 @@ def _gradually_chunk_tree_nodes(committed_tree: Tree, config: ChunkingConfig):
             "TXN tree:\n%s\n%r (length %i)\n%s",
             *_format_tree_and_markdown(txn_tree, config),
         )
-
-        if node.data_id == "T_25":
-            pass
 
         # Set the breadcrumb node from which the headings for the chunk will be extracted
         breadcrumb_node = buffer[0].node if buffer else node
@@ -475,7 +472,7 @@ def _handle_does_not_fit(
         # For a Table node that doesn't fit when appended to the buffer, just chunk it by itself and summarize it.
         # We can revisit this to determine if a Table should be included with other nodes in the buffer.
         # Update COMMITTED tree
-        _add_chunks_and_summarize_node(config, cache.committed_nodes)
+        _add_chunks_and_summarize_node(cache.committed_nodes, config, cache)
     elif (
         data_type == "HeadingSection"
         and cache.next_node_alone_fits
@@ -533,7 +530,7 @@ def _handle_does_not_fit(
         ], f"Unexpected data_type {data_type}"
         # Chunk and summarize next_node, splitting as needed
         # Update COMMITTED tree
-        _add_chunks_and_summarize_node(config, cache.committed_nodes)
+        _add_chunks_and_summarize_node(cache.committed_nodes, config, cache)
     return True
 
 
@@ -557,9 +554,11 @@ def _copy_next_node_to(buffer_tree: Tree, next_node: NodeWithIntro) -> NodeWithI
         return NodeWithIntro(new_node, new_intro_node)
 
 
-def split_list_or_table_node_into_chunks(
-    node_with_intro: NodeWithIntro, config: ChunkingConfig
-) -> None:
+# endregion
+# region ###### Chunking functions that only operate on a single tree
+
+
+def _add_chunks_for_list_or_table(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> None:
     """
     Copy the node's subtree, then gradually remove the last child until the content fits.
     If that doesn't work, summarize each sublist.
@@ -598,7 +597,7 @@ def split_list_or_table_node_into_chunks(
         else:  # List doesn't fit with any children
             # Reset the tree (restore children) and try to summarize the sublists
             candidate_node = _new_tree_for_partials("PARTIAL", node, children_ids, intro_node)
-            summarized_node = _summarize_big_listitems(candidate_node, config)
+            summarized_node = _add_chunks_and_summarize_big_listitems(candidate_node, config)
             if summarized_node:
                 logger.debug(
                     "Summarized big list items into %s: children_ids=%s",
@@ -646,7 +645,7 @@ def _new_tree_for_partials(
     return NodeWithIntro(block_node, intro_node_copy)
 
 
-def _summarize_big_listitems(
+def _add_chunks_and_summarize_big_listitems(
     candidate_node: NodeWithIntro, config: ChunkingConfig
 ) -> NodeWithIntro | None:
     assert candidate_node.node.data_type in [
@@ -659,12 +658,12 @@ def _summarize_big_listitems(
         li_candidate = NodeWithIntro(li)
         if config.full_enough_to_commit([li], breadcrumb_node=candidate_node.node):
             logger.debug("Summarizing big list item %s", li.data_id)
-            li_candidate = _add_chunks_and_summarize_node(config, li_candidate)
+            li_candidate = _add_chunks_and_summarize_node(li_candidate, config)
             return li_candidate
     return None
 
 
-def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> None:
+def _add_chunks_for_heading_section(node: Node, config: ChunkingConfig) -> None:
     assert node.data_type in ["Document", "HeadingSection", "ListItem"]
     logger.debug(
         "Splitting large %s into chunks: children nodes=%s",
@@ -708,7 +707,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
             if is_summarizable_type and config.full_enough_to_commit(
                 node_with_intro.as_list, breadcrumb_node=node
             ):
-                node_with_intro = _add_chunks_and_summarize_node(config, node_with_intro)
+                node_with_intro = _add_chunks_and_summarize_node(node_with_intro, config)
                 # Try again now that node_with_intro has been chunked and summarized.
                 # nodes_fit_in_chunk() calls render_nodes_as_md(), which will use the shorter
                 # summary text instead of the full text
@@ -747,35 +746,42 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
 
 
 def _add_chunks_and_summarize_node(
-    config: ChunkingConfig, node_with_intro: NodeWithIntro
+    node_with_intro: NodeWithIntro, config: ChunkingConfig, cache: Optional[NextNodeCache] = None
 ) -> NodeWithIntro:
     "Creates chunk(s) and may split node_with_intro into multiple chunks"
+    if cache:
+        assert (
+            cache.committed_nodes == node_with_intro
+        ), f"Unexpected cache: {cache.committed_nodes} != {node_with_intro}"
+        next_node_fits = cache.next_node_alone_fits
+    else:
+        next_node_fits = config.nodes_fit_in_chunk(node_with_intro.as_list, node_with_intro.node)
+
     node = node_with_intro.node
+    data_type = node_with_intro.node.data_type
     # See if the node's contents fit, including descendants
-    if config.nodes_fit_in_chunk(node_with_intro.as_list, node_with_intro.node):
+    if next_node_fits:
         config.add_chunk(config.create_protochunk(node_with_intro.as_list))
-    elif node.data_type in ["Document", "HeadingSection", "ListItem"]:
+    elif data_type in ["Document", "HeadingSection", "ListItem"]:
         # ListItem can have similar children as HeadingSection
-        logger.debug("%s is too large for one chunk", node.data_id)
+        logger.debug("%s is too large for one chunk", node_with_intro)
         # TODO: Do something with the intro_node if it exists
-        split_heading_section_into_chunks(node, config)
-    elif node.data_type in ["List", "Table"]:
+        _add_chunks_for_heading_section(node, config)
+    elif data_type in ["List", "Table"]:
         # List and Table nodes are container nodes and never have their own content.
         # Renderable content are in their children, which are either ListItem or TableRow nodes.
         # Split these specially since they can have an intro sentence (and table header)
         # to include for each chunk
         # The intro_node will be rendered fully in the first of the split chunks
         # Remaining chunks will use the short node.data["intro"] text instead
-        split_list_or_table_node_into_chunks(node_with_intro, config)
-    elif node.data_type in ["TableRow"]:
+        _add_chunks_for_list_or_table(node_with_intro, config)
+    elif data_type in ["TableRow"]:
         # TODO: split TableRow into multiple chunks
         raise NotImplementedError(f"TableRow node {node.data_id} should be handled")
     else:
         raise AssertionError(f"Unexpected data_type: {node.id_string}")
 
-    # Then set a shorter summary text in a custom attribute
-    # assert node.data["summary"] is None, "Summary should not be set yet"
-    # node.data["summary"]
+    # Then add shorter summary node to replace the chunked nodes
     return _summarize_node(node_with_intro, config)
 
 

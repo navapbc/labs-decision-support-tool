@@ -114,7 +114,8 @@ from pprint import pprint
 
 
 def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
-    config = ChunkingConfig(170)
+    config = ChunkingConfig(175)
+    print(markdown_text)
     logger.info(prepped_tree.format())
     chunks = chunk_tree(prepped_tree, config)
     pprint(list(chunks.values()), sort_dicts=False, width=140)
@@ -186,7 +187,7 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
 import re
 
 from src.ingest_edd_web import EddChunkingConfig
-from src.ingestion.markdown_chunking import split_list_or_table_node_into_chunks
+from src.ingestion.markdown_chunking import _add_chunks_for_list_or_table
 
 
 def test_big_sublist_chunking():
@@ -210,7 +211,7 @@ List intro:
 
         node = tree["L_6"]
         intro_node = tree["H1_3"]
-        split_list_or_table_node_into_chunks(node, config, intro_node)
+        _add_chunks_for_list_or_table(node, config, intro_node)
         list_md = render_nodes_as_md([node])
 
         # paragraph_node = tree["P_4"]

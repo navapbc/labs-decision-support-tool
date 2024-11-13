@@ -5,8 +5,8 @@ import re
 import sys
 from typing import Optional, Sequence
 
-from smart_open import open as smart_open
 from nutree import Tree
+from smart_open import open as smart_open
 
 from src.adapters import db
 from src.app_config import app_config
@@ -47,7 +47,7 @@ def _ingest_edd_web(
             logger.warning("No chunks for %r", document.source)
             continue
         logger.info("Adding embeddings for %r", document.source)
-        exit(0)
+        exit(0)  # FIXME: Remove this line
         # Next, add embeddings to each chunk (slow)
         add_embeddings(chunks, [s.text_to_encode for s in splits])
         logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
@@ -103,16 +103,15 @@ def _create_chunks(
             logger.warning("Skipping duplicate URL: %s", item["url"])
             continue
 
-        name = item["title"]
-        logger.info("Processing: %s (%s)", name, item["url"])
+        logger.info("Processing: %s", item["url"])
         urls_processed.add(item["url"])
 
         content = item.get("main_content", item.get("main_primary"))
-        assert content, f"Item {name} has no main_content or main_primary"
+        assert content, f"Item {item['url']} has no main_content or main_primary"
 
-        document = Document(name=name, content=content, source=item["url"], **doc_attribs)
+        document = Document(name=item["title"], content=content, source=item["url"], **doc_attribs)
         chunks, splits = _chunk_page(document, content)
-        logger.info("Split into %d chunks for %r", len(chunks), document.source)
+        logger.info("Split into %d chunks: %s", len(chunks), item["title"])
         result.append((document, chunks, splits))
     return result
 
@@ -133,6 +132,7 @@ def _chunk_page(
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     splits: list[SplitWithContextText] = []
     if USE_MARKDOWN_TREE:
+        # FIXME: Remove
         # if document.source != "https://edd.ca.gov/en/jobs_and_training/northern_region/":
         #     return [], []
         chunking_config = EddChunkingConfig()
@@ -167,6 +167,7 @@ def _chunk_page(
                 _save_splits_to_files(document.source, content, splits, tree)
         except (Exception, KeyboardInterrupt) as e:
             logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
+            logger.error(tree.format())
             raise e
     else:
         for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
@@ -187,10 +188,9 @@ def _chunk_page(
     ]
     return chunks, splits
 
+
 def _save_splits_to_files(uri: str, content: str, splits: list[SplitWithContextText], tree: Tree):
-    url_path = "chunks-log/" + uri.removeprefix(
-                    "https://edd.ca.gov/en/"
-                ).rstrip("/")
+    url_path = "chunks-log/" + uri.removeprefix("https://edd.ca.gov/en/").rstrip("/")
     os.makedirs(os.path.dirname(url_path), exist_ok=True)
     with open(f"{url_path}.json", "w", encoding="utf-8") as file:
         file.write(f"{uri} => {len(splits)} chunks\n")
