@@ -119,3 +119,11 @@ This endpoint accepts a query from a navigator and responds with a generated ans
   ]
 }
 ```
+
+# For discussion
+
+## Questions (Nava)
+ - Do we need the security key? What are the risks to leaving the API open?
+ - What kind of user information would be helpful to track with each request?
+    Some possibilities we identified include user_id, org_id, customer_id, and session_id
+ - Does this endpoint schema make sense? Are there any changes we should make before implementing this as a v1? (Keeping in mind we can adapt over time as needed.)
