@@ -58,3 +58,18 @@ poetry run scrape-edd-web
 ```
 
 To load into the vector database, see sections above but use `make ingest-edd-web DATASET_ID=edd-web BENEFIT_PROGRAM=employment BENEFIT_REGION=California FILEPATH=src/ingestion/edd_scrapings.json`.
+
+## Batch processing
+
+To have answers generated for multiple questions at once, create a .csv file with a `question` column, for example:
+
+```
+question
+"What is the base period for SDI?"
+"Where can I find the Spanish version of the claims information?"
+"What types of support does the program offer for individuals recovering from an illness or injury?"
+```
+
+Then, in the chat interface, send the message `Batch processing` and upload the .csv file when requested.
+
+The input file can have additional columns beyond `question`. These will be preserved in the output file.
