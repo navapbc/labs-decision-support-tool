@@ -184,7 +184,7 @@ class ChunkingConfig:
             headings.insert(0, doc_name)
         return headings
 
-    def create_chunks_for_node(self, node_with_intro: NodeWithIntro) -> None:
+    def add_chunks_for_node(self, node_with_intro: NodeWithIntro) -> None:
         node = node_with_intro.node
         assert node.data_type not in [
             "HeadingSection",
@@ -298,7 +298,7 @@ def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk
         logger.debug("No more nodes to chunk")
 
     next_node = NodeWithIntro(doc_node)
-    _chunk_and_summarize_node(config, next_node)
+    _add_chunks_and_summarize_node(config, next_node)
 
     # Ensure all nodes are in some chunk
     input_nodes = {n.data_id for n in input_tree.iterator()} - {doc_node.data_id}
@@ -475,7 +475,7 @@ def _handle_does_not_fit(
         # For a Table node that doesn't fit when appended to the buffer, just chunk it by itself and summarize it.
         # We can revisit this to determine if a Table should be included with other nodes in the buffer.
         # Update COMMITTED tree
-        _chunk_and_summarize_node(config, cache.committed_nodes)
+        _add_chunks_and_summarize_node(config, cache.committed_nodes)
     elif (
         data_type == "HeadingSection"
         and cache.next_node_alone_fits
@@ -501,7 +501,7 @@ def _handle_does_not_fit(
             config.add_chunk(cache.next_node_alone_protochunk)
         else:
             logger.debug("Splitting %s into multiple chunks", next_node)
-            config.create_chunks_for_node(cache.committed_nodes)
+            config.add_chunks_for_node(cache.committed_nodes)
         # Update COMMITTED tree, adding summaries to replace the chunked nodes
         _summarize_node(cache.committed_nodes, config)
     elif config.full_enough_to_commit(
@@ -533,7 +533,7 @@ def _handle_does_not_fit(
         ], f"Unexpected data_type {data_type}"
         # Chunk and summarize next_node, splitting as needed
         # Update COMMITTED tree
-        _chunk_and_summarize_node(config, cache.committed_nodes)
+        _add_chunks_and_summarize_node(config, cache.committed_nodes)
     return True
 
 
@@ -614,7 +614,7 @@ def split_list_or_table_node_into_chunks(
             # Subsequent subtrees don't need an intro_node
             candidate_node = _new_tree_for_partials("PARTIAL", node, children_ids)
 
-    _create_chunks_from(config, node, chunks_to_create)
+    _add_chunks_from_partitions(config, node, chunks_to_create)
 
 
 def _new_tree_for_partials(
@@ -659,7 +659,7 @@ def _summarize_big_listitems(
         li_candidate = NodeWithIntro(li)
         if config.full_enough_to_commit([li], breadcrumb_node=candidate_node.node):
             logger.debug("Summarizing big list item %s", li.data_id)
-            li_candidate = _chunk_and_summarize_node(config, li_candidate)
+            li_candidate = _add_chunks_and_summarize_node(config, li_candidate)
             return li_candidate
     return None
 
@@ -708,7 +708,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
             if is_summarizable_type and config.full_enough_to_commit(
                 node_with_intro.as_list, breadcrumb_node=node
             ):
-                node_with_intro = _chunk_and_summarize_node(config, node_with_intro)
+                node_with_intro = _add_chunks_and_summarize_node(config, node_with_intro)
                 # Try again now that node_with_intro has been chunked and summarized.
                 # nodes_fit_in_chunk() calls render_nodes_as_md(), which will use the shorter
                 # summary text instead of the full text
@@ -734,7 +734,7 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
                 # Reset node_buffer to be node_with_intro
                 node_buffer = node_with_intro.as_list.copy()
             else:  # node_with_intro needs to be split into multiple chunks
-                config.create_chunks_for_node(node_with_intro)
+                config.add_chunks_for_node(node_with_intro)
 
     assert not intro_node, f"Was intro_node {intro_node.data_id} added to a node_buffer?"
     if node_buffer:  # Create a chunk with the remaining nodes
@@ -743,10 +743,10 @@ def split_heading_section_into_chunks(node: Node, config: ChunkingConfig) -> Non
         else:
             raise AssertionError(f"node_buffer should always fit: {node_buffer}")
 
-    _create_chunks_from(config, node, chunks_to_create)
+    _add_chunks_from_partitions(config, node, chunks_to_create)
 
 
-def _chunk_and_summarize_node(
+def _add_chunks_and_summarize_node(
     config: ChunkingConfig, node_with_intro: NodeWithIntro
 ) -> NodeWithIntro:
     "Creates chunk(s) and may split node_with_intro into multiple chunks"
@@ -841,30 +841,28 @@ def _create_summary_paragraph_node_data(line_number, summary):
     return p_nodedata
 
 
-def _create_chunks_from(
-    config: ChunkingConfig, node: Node, chunks_to_create: list[list[Node]]
+def _add_chunks_from_partitions(
+    config: ChunkingConfig, node: Node, partitions: list[list[Node]]
 ) -> None:
-    """
-    Create chunks based on chunks_to_create, which are some partitioning of node's children.
-    If there are multiple chunks for the node, use a different chunk_id_suffix to make it obvious.
-    """
-    logger.warning(
+    "Create chunks based on partitions, which are splits of the node's children."
+    logger.debug(
         "Creating chunks for %s: %s",
         node.data_id,
         [
             [n.data_id for node in nodes for n in node.iterator(add_self=True)]
-            for nodes in chunks_to_create
+            for nodes in partitions
         ],
     )
-    if len(chunks_to_create) == 1:
-        chunk_nodes = chunks_to_create[0]
+    if len(partitions) == 1:
+        chunk_nodes = partitions[0]
         if len(chunk_nodes) == 1 and chunk_nodes[0].data_type in ["Heading"]:
             # Don't chunk lone heading nodes
             return
         chunk = config.create_protochunk(chunk_nodes, chunk_id_suffix=f"{node.data_id}")
         config.add_chunk(chunk)
     else:
-        for i, chunk_nodes in enumerate(chunks_to_create):
+        # If there are multiple splits for the node, use a different chunk_id_suffix to make it obvious.
+        for i, chunk_nodes in enumerate(partitions):
             # Make sure first_node is different from node. They can be the same when splitting Lists and Tables.
             first_node_id = (
                 chunk_nodes[0].first_child().data_id
