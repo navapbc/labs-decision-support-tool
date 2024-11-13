@@ -14,6 +14,7 @@ from src.format import (
     format_guru_cards,
     format_web_subsections,
     reify_citations,
+    replace_citation_ids,
     return_citation_link,
 )
 from src.retrieve import retrieve_with_scores
@@ -292,3 +293,17 @@ def test__format_web_subsections(chunks_with_scores):
         0, 0, chunks_with_scores, subsections, "Some real citations: (citation-1) (citation-2)"
     )
     assert len(_unique_accordion_ids(html)) == 2
+
+
+def test_replace_citation_ids():
+    assert replace_citation_ids("No citations", {}) == "No citations"
+    assert replace_citation_ids("Hallucinated.(citation-1)", {}) == "Hallucinated."
+
+    remapped_citations = {
+        "citation-4": Subsection("1", ChunkFactory.build(), ""),
+        "citation-3": Subsection("2", ChunkFactory.build(), ""),
+    }
+    assert (
+        replace_citation_ids("Remapped. (citation-4)(citation-3)", remapped_citations)
+        == "Remapped. (citation-1)(citation-2)"
+    )
