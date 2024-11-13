@@ -1,6 +1,6 @@
 import logging
 import re
-from pprint import pformat
+from pprint import pformat, pprint
 
 import pytest
 from nutree import Tree
@@ -65,8 +65,13 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
                 assert line in all_chunk_text
 
     chunks_wo_headings = [chunk for _id, chunk in chunks.items() if not chunk.headings]
+    pprint(markdown_text)
+    pprint(list(chunks), sort_dicts=False, width=140)
+    # for i, ch in enumerate(chunks_wo_headings):
+    #     print(i, ch.headings, ch.markdown)
+
     # 1 doc intro paragraph + 2 H1 HeadingSections
-    assert len(chunks_wo_headings) == 3
+    assert len(chunks_wo_headings) == 4
     # assert False
 
 

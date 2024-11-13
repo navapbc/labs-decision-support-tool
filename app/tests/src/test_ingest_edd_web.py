@@ -258,8 +258,6 @@ def test__ingest_edd_using_md_tree(
     # Document[0] has 3 sections, each section becomes its own chunk
     doc0 = documents[0]
     assert len(doc0.chunks) == 3
-    for i, ch in enumerate(doc0.chunks):
-        print(i, ch.headings, ch.content)
     assert doc0.chunks[0].content.startswith(
         "## Can I participate in either State Disability Insurance (SDI)"
     )
