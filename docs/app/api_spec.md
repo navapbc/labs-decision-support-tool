@@ -66,5 +66,56 @@ This endpoint accepts a query from a navigator and responds with a generated ans
 
 - **500 Internal Server Error**: Generic server error.
   
+### Example
 
+#### Example request
 
+```json
+{
+  "user_id": "nav12345",
+  "org_id": "org789",
+  "customer_id": "cust001",
+  "session_id": "sess2024A",
+  "query": [
+    {
+      "role": "user",
+      "content": "What benefits are available for single mothers in California?"
+    },
+    {
+      "role": "assistant",
+      "content": "There are several programs, including CalWORKs, Medi-Cal, and more. What specific support are you interested in?"
+    },
+    {
+      "role": "user",
+      "content": "I’m looking for financial aid specifically."
+    }
+  ]
+}
+```
+
+#### Example response
+
+```json
+{
+  "response_id": "resp6789",
+  "response_text": "Here are some financial aid options for single mothers in California:\n\n- **CalWORKs**: This program provides cash aid to families with children.(citation-1)\n- **CalFresh**: A food assistance program for low-income individuals.(citation-2)\n\nFor more details, visit [CalWORKs Program](https://www.cdss.ca.gov/calworks)."
+  "citations": [
+    {
+      "citation_id": "citation-1",
+      "source_id": "doc543",
+      "source_name": "California Department of Social Services - CalWORKs",
+      "uri": "https://www.cdss.ca.gov/calworks",
+      "headings": ["Calworks", "CalWORKs Overview"],
+      "citation_text": "CalWORKs provides cash aid to families with children in California."
+    },
+    {
+      "citation_id": "citation-2",
+      "source_id": "doc1313",
+      "source_name": "CalFresh",
+      "uri": "https://www.getcalfresh.org/",
+      "headings": ["CalFresh"],
+      "citation_text": "If you already get CalFresh benefits, you can request replacement benefits for food you lost. If you don't already get CalFresh, learn more about Disaster CalFresh here."
+    }
+  ]
+}
+```
