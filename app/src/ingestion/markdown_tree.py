@@ -944,6 +944,7 @@ def _add_intro_attrib(node: Node) -> bool:
             intro_md = prev_node.data["raw_text"] or prev_node.render()
             # Limit size of intro by using only the last sentence
             node.data["intro"] = intro_md.split(". ")[-1]
+            node.data["intro_data_id"] = prev_node.data_id
             logger.debug("Added intro to %s: %r", node.data_id, node.data["intro"])
             # Mark the node being used as the intro as a hint when chunking to keep intro with the List/Table
             prev_node.data["is_intro"] = True
