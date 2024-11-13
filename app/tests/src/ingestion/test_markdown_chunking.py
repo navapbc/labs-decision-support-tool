@@ -1,18 +1,19 @@
 import logging
+import re
+from pprint import pformat
 
 import pytest
 from nutree import Tree
 
+from src.ingest_edd_web import EddChunkingConfig
 from src.ingestion.markdown_chunking import (
     ChunkingConfig,
+    NodeWithIntro,
+    _add_chunks_for_list_or_table,
     chunk_tree,
     shorten,
 )
-from src.ingestion.markdown_tree import (
-    create_markdown_tree,
-    find_closest_ancestor,
-    render_nodes_as_md,
-)
+from src.ingestion.markdown_tree import create_markdown_tree, render_nodes_as_md
 from tests.src.ingestion.test_markdown_tree import create_paragraph, markdown_text  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -24,39 +25,18 @@ def test_shorten():
     assert shorten("This is a test.", 15) == "This is a test."
 
 
-@pytest.fixture
-def str_tree():
-    tree = Tree("test tree")
-    doc = tree.add("doc")
-    child = doc.add("1child")
-    grandchild = child.add("2grandchild")
-    grandchild.add("3great_grandchild")
-    return tree
-
-
-def test_find_closest_ancestor(str_tree):
-    ggchild = str_tree["3great_grandchild"]
-    assert find_closest_ancestor(ggchild, lambda n: "child" in n.data) == str_tree["2grandchild"]
-    assert find_closest_ancestor(ggchild, lambda n: "child" in n.data, include_self=True) == ggchild
-    assert find_closest_ancestor(ggchild, lambda n: "1" in n.data) == str_tree["1child"]
-    assert find_closest_ancestor(ggchild, lambda n: "nowhere" in n.data) is None
-
-
 # Uses the imported markdown_text fixture
 @pytest.fixture
 def prepped_tree(markdown_text) -> Tree:  # noqa: F811
     return create_markdown_tree(markdown_text)
 
 
-from pprint import pprint
-
-
 def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
     config = ChunkingConfig(175)
-    print(markdown_text)
-    logger.info(prepped_tree.format())
     chunks = chunk_tree(prepped_tree, config)
-    pprint(list(chunks.values()), sort_dicts=False, width=140)
+    logger.info(markdown_text)
+    logger.info(prepped_tree.format())
+    logger.info(pformat(list(chunks.values()), sort_dicts=False, width=140))
     assert len(chunks) == 8
 
     for _id, chunk in chunks.items():
@@ -86,7 +66,7 @@ def test_chunk_tree(markdown_text, prepped_tree):  # noqa: F811
 
     chunks_wo_headings = [chunk for _id, chunk in chunks.items() if not chunk.headings]
     # 1 doc intro paragraph + 2 H1 HeadingSections
-    # assert len(chunks_wo_headings) == 3
+    assert len(chunks_wo_headings) == 3
     # assert False
 
 
@@ -104,7 +84,7 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
     assert not config.nodes_fit_in_chunk([paragraph_node], paragraph_node)
     chunks = chunk_tree(tree, config)
 
-    pprint(list(chunks.values()), sort_dicts=False, width=140)
+    logger.info(pformat(list(chunks.values()), sort_dicts=False, width=140))
     paragraph_chunks = [chunk for chunk in chunks.values() if "P_4" in chunk.id]
     assert len(paragraph_chunks) == 4
 
@@ -120,12 +100,6 @@ Sentence 1. {create_paragraph('H0.p1', 30)}
 
     for chunk in paragraph_chunks:
         assert chunk.headings == ["Long paragraph doc", "Heading 1"]
-
-
-import re
-
-from src.ingest_edd_web import EddChunkingConfig
-from src.ingestion.markdown_chunking import _add_chunks_for_list_or_table
 
 
 def test_big_sublist_chunking():
@@ -149,12 +123,13 @@ List intro:
 
         node = tree["L_6"]
         intro_node = tree["H1_3"]
-        _add_chunks_for_list_or_table(node, config, intro_node)
+        nwi = NodeWithIntro(node, intro_node)
+        _add_chunks_for_list_or_table(nwi, config)
         list_md = render_nodes_as_md([node])
 
         # paragraph_node = tree["P_4"]
         chunks = config.chunks.values()
-        pprint(list(chunks), sort_dicts=False, width=140)
+        logger.info(pformat(list(chunks), sort_dicts=False, width=140))
 
         joined_chunk_md = "\n".join([chunk.markdown for chunk in chunks])
         sentences = [sentence.strip() for sentence in re.split(r"(\. |\n)", list_md)]
@@ -169,6 +144,6 @@ List intro:
         tree.print()
         chunks = chunk_tree(tree, config)
         chunks = config.chunks.values()
-        pprint(list(chunks), sort_dicts=False, width=140)
+        logger.info(pformat(list(chunks), sort_dicts=False, width=140))
 
     # assert False

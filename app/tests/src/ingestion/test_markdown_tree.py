@@ -3,17 +3,19 @@ import logging
 import re
 
 import pytest
-from nutree import Tree
 from mistletoe import block_token
+from nutree import Tree
 
 from src.ingestion.markdown_tree import (
-    assert_no_mismatches,
+    TokenNodeData,
     add_list_and_table_intros,
+    assert_no_mismatches,
+    copy_subtree,
     create_heading_sections,
     create_markdown_tree,
-    copy_subtree,
     data_ids_for,
     describe_tree,
+    find_closest_ancestor,
     find_node,
     get_parent_headings_md,
     get_parent_headings_raw,
@@ -26,7 +28,6 @@ from src.ingestion.markdown_tree import (
     remove_children_from,
     render_subtree_as_md,
     tokens_vs_tree_mismatches,
-    TokenNodeData,
 )
 
 logger = logging.getLogger(__name__)
@@ -536,3 +537,21 @@ def test_remove_children(caplog, tiny_tree):
         remove_children_from(list_node, {"LI_8", "LI_nonexistant"})
         assert [c.data_id for c in list_node.children] == ["LI_7"]
         assert any("found only ['LI_8']" in msg for msg in caplog.messages)
+
+
+@pytest.fixture
+def str_tree():
+    tree = Tree("test tree")
+    doc = tree.add("doc")
+    child = doc.add("1child")
+    grandchild = child.add("2grandchild")
+    grandchild.add("3great_grandchild")
+    return tree
+
+
+def test_find_closest_ancestor(str_tree):
+    ggchild = str_tree["3great_grandchild"]
+    assert find_closest_ancestor(ggchild, lambda n: "child" in n.data) == str_tree["2grandchild"]
+    assert find_closest_ancestor(ggchild, lambda n: "child" in n.data, include_self=True) == ggchild
+    assert find_closest_ancestor(ggchild, lambda n: "1" in n.data) == str_tree["1child"]
+    assert find_closest_ancestor(ggchild, lambda n: "nowhere" in n.data) is None

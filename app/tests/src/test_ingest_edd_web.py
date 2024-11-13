@@ -285,5 +285,3 @@ def test__ingest_edd_using_md_tree(
         == "### SUTA Dumping Hurts Everyone\n\nEmployers, employees, and taxpayers make up the difference in higher taxes, lost jobs, lost profits, lower wages, and higher costs for goods and services."
     )
     assert documents[2].chunks[2].headings == ["State Unemployment Tax Act Dumping"]
-
-    assert False

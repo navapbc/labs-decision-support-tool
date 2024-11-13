@@ -72,6 +72,8 @@ class SplitWithContextText:
         else:
             self.text_to_encode = f"{context_str.strip()}\n\n" + remove_links(text)
         self.token_count = len(tokenize(self.text_to_encode))
+        self.chunk_id = ""
+        self.data_ids = ""
 
     def add_if_within_limit(self, paragraph: str, delimiter: str = "\n\n") -> bool:
         new_text_to_encode = f"{self.text_to_encode}{delimiter}{remove_links(paragraph)}"
@@ -119,7 +121,7 @@ USE_MARKDOWN_TREE = True
 
 
 class EddChunkingConfig(ChunkingConfig):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(app_config.sentence_transformer.max_seq_length)
 
     def text_length(self, text: str) -> int:
@@ -184,7 +186,9 @@ def _chunk_page(
     return chunks, splits
 
 
-def _save_splits_to_files(uri: str, content: str, splits: list[SplitWithContextText], tree: Tree):
+def _save_splits_to_files(
+    uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
+) -> None:
     url_path = "chunks-log/" + uri.removeprefix("https://edd.ca.gov/en/").rstrip("/")
     os.makedirs(os.path.dirname(url_path), exist_ok=True)
     with open(f"{url_path}.json", "w", encoding="utf-8") as file:

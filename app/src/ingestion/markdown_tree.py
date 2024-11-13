@@ -44,7 +44,7 @@ class TokenAwareNode(Node):
         - we don't modify token.children; these tokens are frozen as indicated by node.data["freeze_token_children"]
     """
 
-    def __init__(self, data, **kwargs):
+    def __init__(self, data: Any, **kwargs: dict[str, Any]) -> None:
         super().__init__(data, **kwargs)
         if self._copy_data_flag():
             logger.debug("Copying data for new node %s in %s", self.data_id, self.tree.name)
@@ -58,7 +58,7 @@ class TokenAwareNode(Node):
                 if not self._is_token_frozen():
                     self.data.token.children = []
 
-    def _copy_token(self):
+    def _copy_token(self) -> None:
         logger.debug("Copying token for new node %s in %s", self.data_id, self.tree.name)
         if self.data_type == "Paragraph":
             # Calling copy() on Paragraph tokens doesn't work, so copy it manually
@@ -74,8 +74,8 @@ class TokenAwareNode(Node):
         *,
         before: Node | None = None,
         deep: bool | None = None,
-        data_id=None,
-        node_id=None,
+        data_id: Any | None = None,
+        node_id: Any | None = None,
     ) -> Node:
         logger.debug("%s add_child: %s", self.data_id, child.data_id)
         child_node = super().add_child(
@@ -94,7 +94,7 @@ class TokenAwareNode(Node):
                     self.data.token.children += [child_node.data.token]
         return child_node
 
-    def _add_child_token(self, child_node: Node, before: Node):
+    def _add_child_token(self, child_node: Node, before: Node) -> None:
         while not before.has_token() and before.next_sibling():
             before = before.next_sibling()
         if before.has_token():
@@ -132,7 +132,7 @@ class TokenAwareNode(Node):
             )
         )
 
-    def remove(self, *, keep_children=False, with_clones=False) -> None:
+    def remove(self, *, keep_children: bool = False, with_clones: bool = False) -> None:
         logger.debug("Removing %s from %s", self.data_id, self.tree.name)
         if self._sync_token_applicable() and self.parent and self.parent.has_token():
             parent_token = self.parent.data.token
@@ -147,8 +147,8 @@ class TokenAwareNode(Node):
                 self.parent.assert_unfrozen_token()
                 logger.debug("Moving grandchildren to be children for %s", self.data_id)
                 # Only move children tokens that have corresponding nodes in the tree
-                children_node_tokens = {child_node.data.token for child_node in self.children}
-                grandchildren_tokens = [c for c in self.data.token.children if c in children_node_tokens]
+                node_tokens = {child_node.data.token for child_node in self.children}
+                grandchildren_tokens = [c for c in self.data.token.children if c in node_tokens]
                 parent_token.children += grandchildren_tokens
 
         super().remove(keep_children=keep_children, with_clones=with_clones)
@@ -275,7 +275,7 @@ def assert_no_mismatches(tree: Tree, tree_prepped: bool = True) -> Iterator[Tree
 
     if tree_prepped:
         paragraph_nodes = find_data_type_nodes(tree, "Paragraph")
-        assert all(paragraph_node.data["freeze_token_children"] for paragraph_node in paragraph_nodes)
+        assert all(node.data["freeze_token_children"] for node in paragraph_nodes)
 
 
 @contextmanager
@@ -328,7 +328,7 @@ def _new_md_renderer() -> MarkdownRenderer:
     return renderer
 
 
-def _populate_nutree(parent: Node, child_token: Token):
+def _populate_nutree(parent: Node, child_token: Token) -> None:
     child_node = parent.add(TokenNodeData(child_token))
     if isinstance(child_node.token.children, tuple):
         # Some token.children are tuples; convert them into lists for consistency
@@ -460,7 +460,7 @@ def copy_subtree(name: str, node: Node, include_descendants: bool = True) -> Tre
     return new_node
 
 
-def copy_with_ancestors(node: Node, tree: Tree, include_descendants: bool = True):
+def copy_with_ancestors(node: Node, tree: Tree, include_descendants: bool = True) -> Node:
     logger.debug("copy_with_ancestors %s to %s", node.data_id, tree.name)
     # Ancestors are needed to get_parent_headings()
     new_parent = copy_ancestors(node, tree)
@@ -747,7 +747,7 @@ def _prepare_tree(tree: Tree) -> None:
     _update_token_children(tree.first_child())
 
 
-def _update_token_children(n: Node):
+def _update_token_children(n: Node) -> None:
     n.assert_unfrozen_token()
     n.data.token.children = [c.token for c in n.children if c.has_token()]
 
@@ -764,7 +764,7 @@ def remove_blank_lines(tree: Tree) -> int:
 
 
 @contextmanager
-def _ignore_token_updates(tree: Tree):
+def _ignore_token_updates(tree: Tree) -> Iterator[Tree]:
     "Only used for tree preparation. Normally tokens are synced"
     tree.system_root.set_meta("sync_token", False)
     yield tree
@@ -1038,7 +1038,7 @@ def data_ids_for(nodes: Iterable[Node]) -> list[str]:
     return [n.data_id for n in nodes]
 
 
-def next_renderable_node(node) -> Node | None:
+def next_renderable_node(node: Node) -> Node | None:
     "Return the next node that would be rendered as markdown text"
     while not (next_s := node.next_sibling()):
         if not (node := node.parent):

@@ -322,7 +322,7 @@ def _format_tree_and_markdown(tree: Tree, config: ChunkingConfig) -> tuple[str, 
     return (tree.format(), pc.id, pc.length, pc.markdown)
 
 
-def _gradually_chunk_tree_nodes(committed_tree: Tree, config: ChunkingConfig):
+def _gradually_chunk_tree_nodes(committed_tree: Tree, config: ChunkingConfig) -> None:
     """
     The _general_ algorithm is:
     - Consider the next node in the TXN tree
@@ -843,7 +843,7 @@ def _summarize_node(node_with_intro: NodeWithIntro, config: ChunkingConfig) -> N
 summary_counter = itertools.count()
 
 
-def _create_summary_paragraph_node_data(line_number, summary):
+def _create_summary_paragraph_node_data(line_number: int, summary: str) -> TokenNodeData:
     p = block_token.Paragraph(lines=[f"{summary}\n"])
     p.line_number = line_number
     p_nodedata = TokenNodeData(p, id_suffix=f"_summ{next(summary_counter)}")
