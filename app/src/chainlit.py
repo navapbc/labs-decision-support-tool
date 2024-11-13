@@ -256,7 +256,7 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
         result_file_path = await batch_process(file.path, engine)
 
         # E.g., "abcd.csv" to "abcd_results.csv"
-        result_file_name = file.name.rsplit(".csv", 1)[0] + "_results.csv"
+        result_file_name = file.name.removesuffix(".csv") + "_results.csv"
 
         await cl.Message(
             content="File processed, results attached.",
