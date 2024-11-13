@@ -52,7 +52,8 @@ This endpoint accepts a query from a navigator and responds with a generated ans
       "uri": "string",                       // URL link to the source, if available
       "headings": ["string"],                // Headings within the document, if available
       "citation_text": "string"              // Extracted citation text
-    }
+    },
+    ...
   ]
 }
 ```
