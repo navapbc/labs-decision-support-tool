@@ -255,33 +255,54 @@ def test__ingest_edd_using_md_tree(
     assert documents[3].name == "The Northern Job Fairs and Workshops"
     assert documents[3].source == "https://edd.ca.gov/en/jobs_and_training/northern_region/"
 
-    assert len(documents[0].chunks) == 4
-
-    # for i, ch in enumerate(documents[0].chunks):
-    #     print(i, ch.content)
-    assert (
-        documents[0].chunks[1].content
-        == "## Nonindustrial Disability Insurance\n\nGet answers to FAQs about Nonindustrial Disability Insurance (NDI) and Nonindustrial Disability Insurance-Family Care Leave (NDI-FCL)."
+    # Document[0] has 3 sections, each section becomes its own chunk
+    doc0 = documents[0]
+    assert len(doc0.chunks) == 3
+    for i, ch in enumerate(doc0.chunks):
+        print(i, ch.headings, ch.content)
+    assert doc0.chunks[0].content.startswith(
+        "## Can I participate in either State Disability Insurance (SDI)"
     )
-    assert documents[0].chunks[1].headings == ["Nonindustrial Disability Insurance FAQs"]
-
-    # print("1: ", documents[1].name)
-    # for i, ch in enumerate(documents[1].chunks):
-    #     print(i, ch.content)
-    assert len(documents[1].chunks) == 1
-    assert (
-        documents[1].chunks[0].content
-        == "Disability Insurance (DI) provides short-term, partial wage replacement ...\n\nIf you think you are eligible to [file a claim](/en/disability/apply/), review ..."
+    assert doc0.chunks[1].content.startswith(
+        "## Will the State continue to contribute to my health, dental,"
     )
-    assert documents[1].chunks[0].headings == ["Options to File for Disability Insurance Benefits"]
+    assert doc0.chunks[2].content.startswith("## Nonindustrial Disability Insurance\n\n")
+    # All chunks have the same heading
+    for chunk in doc0.chunks:
+        assert chunk.headings == ["Nonindustrial Disability Insurance FAQs"]
+
+    # Document[1] is short
+    doc1 = documents[1]
+    assert len(doc1.chunks) == 1
+    assert doc1.chunks[0].content.startswith(
+        "Disability Insurance (DI) provides short-term, partial wage replacement ...\n\nIf you think you"
+    )
+    assert doc1.chunks[0].headings == ["Options to File for Disability Insurance Benefits"]
 
     # Document[2] has a list
-    print("2: ", documents[2].name)
-    for i, ch in enumerate(documents[2].chunks):
-        print(i, ch.content)
-    assert len(documents[2].chunks) == 4
-    assert (
-        documents[2].chunks[2].content
-        == "### SUTA Dumping Hurts Everyone\n\nEmployers, employees, and taxpayers make up the difference in higher taxes, lost jobs, lost profits, lower wages, and higher costs for goods and services."
+    doc2 = documents[2]
+    assert len(doc2.chunks) == 4
+
+    # First section
+    assert doc2.chunks[0].headings == ["State Unemployment Tax Act Dumping"]
+    assert doc2.chunks[0].content.startswith(
+        "### SUTA Dumping Hurts Everyone\n\nEmployers, employees, and taxpayers"
     )
-    assert documents[2].chunks[2].headings == ["State Unemployment Tax Act Dumping"]
+
+    # List is split into two chunks
+    assert (
+        doc2.chunks[1].headings
+        == doc2.chunks[2].headings
+        == [
+            "State Unemployment Tax Act Dumping",
+            "SUTA Dumping Hurts Everyone",
+        ]
+    )
+    assert doc2.chunks[1].content.startswith("SUTA dumping:\n\n* Costs the UI")
+    assert doc2.chunks[2].content.startswith(
+        "(SUTA dumping:)\n\n* Compromises the integrity of the UI system."
+    )
+
+    # Last section
+    assert doc2.chunks[3].headings == ["State Unemployment Tax Act Dumping"]
+    assert doc2.chunks[3].content.startswith("### [SUTA Dumping Schemes]")

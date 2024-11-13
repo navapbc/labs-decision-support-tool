@@ -128,6 +128,9 @@ class EddChunkingConfig(ChunkingConfig):
         return len(tokenize(text))
 
 
+from pprint import pprint
+
+
 def _chunk_page(
     document: Document, content: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
@@ -149,6 +152,8 @@ def _chunk_page(
         try:
             tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
             tree_chunks = chunk_tree(tree, chunking_config)
+            chunks = tree_chunks.values()
+            pprint(list(chunks), sort_dicts=False, width=140)
 
             for _id, chunk in tree_chunks.items():
                 split = SplitWithContextText(

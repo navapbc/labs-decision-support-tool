@@ -147,7 +147,7 @@ class ChunkingConfig:
     ) -> ProtoChunk:
         assert all(n for n in nodes), f"Unexpected None in {nodes}"
         chunk_id = chunk_id_suffix or nodes[0].data_id
-        logger.debug("Creating protochunk %s using %s", chunk_id, data_ids_for(nodes))
+        # logger.debug("Creating protochunk %s using %s", chunk_id, data_ids_for(nodes))
 
         markdown = markdown or render_nodes_as_md(nodes)
         markdown = self._replace_table_separators(markdown).strip()
@@ -232,7 +232,7 @@ class ChunkingConfig:
         if node.data_type == "Table":
             return f"(SUMMARIZED TABLE {node.data_id})\n\n"
 
-        summary = shorten(remove_links(md.splitlines()[0]), 200, placeholder="...")
+        summary = shorten(remove_links(md.splitlines()[0]), 120, placeholder="...")
         assert summary, f"Unexpected empty summary for {node.data_id}"
         return f"({summary})\n\n"
 
@@ -253,9 +253,9 @@ class ChunkingConfig:
         if next.node.data_type in "HeadingSection":
             return True
         if next.node.data_type == "List":
+            # Only go deeper if there are sublists
             sublists = find_data_type_nodes(next.node, "List")
-            if sublists:
-                return True
+            return bool(sublists)
         if next.node.has_children():
             next_nodes_portion = (
                 self.text_length(render_nodes_as_md(next.as_list)) / self.max_length
@@ -285,9 +285,9 @@ def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk
                 )
                 _gradually_chunk_tree_nodes(tree, config)
 
-                # Remove the summary paragraph from the tree as it provides no value at this time
+                # Remove these chunked nodes from the tree as it provides no value at this time
                 chunked = tree.find_all(
-                    match=lambda n: n.data["chunked"] and n.data_type == "Paragraph"
+                    match=lambda n: n.data["chunked"] and n.data_type in ["Paragraph", "ListItem"]
                 )
                 for chunked_node in chunked:
                     # It's possible a parent node already removed the chunked_node, so check if it's still in the tree
@@ -297,6 +297,7 @@ def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk
     except EOFError:
         logger.debug("No more nodes to chunk")
 
+    # Create the last chunk from the remaining content
     next_node = NodeWithIntro(doc_node)
     _add_chunks_and_summarize_node(next_node, config)
 
@@ -360,9 +361,8 @@ def _gradually_chunk_tree_nodes(committed_tree: Tree, config: ChunkingConfig) ->
             chunked_node = node
             # Determine the next node BEFORE removing chunked_node
             node = next_renderable_node(node)
-            if chunked_node.data_type == "Paragraph":
-                # Remove the summary paragraph from the tree as it provides no value at this time
-                #     committed_tree[chunked_node.data_id].remove()
+            if chunked_node.data_type in ["Paragraph", "ListItem"]:
+                # Remove these chunked nodes from the tree as it provides no value at this time
                 chunked_node.remove()
             continue
 
@@ -451,6 +451,7 @@ class NextNodeCache:
     @cached_property
     def next_node_alone_fits(self) -> bool:
         "Returns True if next_node fits in a chunk by itself, i.e., ignoring what's in the buffer?"
+        # TODO: pass next_node_alone_protochunk to nodes_fit_in_chunk() to avoid recomputing it
         return self.config.nodes_fit_in_chunk(
             self.committed_nodes.as_list, breadcrumb_node=self._committed_breadcrumb_node
         )
@@ -458,6 +459,7 @@ class NextNodeCache:
     @cached_property
     def next_node_alone_large_enough_to_commit(self) -> bool:
         "Returns True if next_node is large enough to commit by itself, i.e., ignoring what's in the buffer?"
+        # TODO: pass next_node_alone_protochunk to full_enough_to_commit() to avoid recomputing it
         return self.config.full_enough_to_commit(
             self.committed_nodes.as_list, breadcrumb_node=self._committed_breadcrumb_node
         )
@@ -483,12 +485,12 @@ def _handle_does_not_fit(
         # Update COMMITTED tree
         _add_chunks_and_summarize_node(cache.committed_nodes, config, cache)
     elif (
-        data_type == "HeadingSection"
+        data_type in ["HeadingSection", "List"]
         and cache.next_node_alone_fits
         and cache.next_node_alone_large_enough_to_commit
     ):
         # If an entire HeadingSection is sufficiently large by itself and fits in a chunk by itself, then create a chunk for it
-        logger.debug("Putting HeadingSection %s into separate chunk", next_node)
+        logger.debug("Putting %s into separate chunk", next_node)
         # Commit next_node as a chunk by itself, ignoring the buffer
         config.add_chunk(cache.next_node_alone_protochunk)
         # Update COMMITTED tree, adding summaries to replace the chunked nodes

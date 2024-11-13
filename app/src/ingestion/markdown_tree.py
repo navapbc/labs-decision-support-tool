@@ -534,6 +534,7 @@ def render_subtree_as_md(node: Node) -> str:
     return md_str
 
 
+# TODO: This may no longer be needed since we now use NodeWithIntro
 def _intro_if_needed(node: Node) -> str | None:
     "Return intro text if 'intro' has text and 'show_intro' is True."
     if (intro := node.data["intro"]) and node.data["show_intro"]:
