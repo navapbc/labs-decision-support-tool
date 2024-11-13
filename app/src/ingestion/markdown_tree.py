@@ -146,9 +146,12 @@ class TokenAwareNode(Node):
                 # Parent token must be modifiable
                 self.parent.assert_unfrozen_token()
                 logger.debug("Moving grandchildren to be children for %s", self.data_id)
-                parent_token.children += self.data.token.children
+                # Only move children tokens that have corresponding nodes in the tree
+                children_node_tokens = {child_node.data.token for child_node in self.children}
+                grandchildren_tokens = [c for c in self.data.token.children if c in children_node_tokens]
+                parent_token.children += grandchildren_tokens
 
-        return super().remove(keep_children=keep_children, with_clones=with_clones)
+        super().remove(keep_children=keep_children, with_clones=with_clones)
 
     def remove_children(self) -> None:
         if self._sync_token_applicable() and not self._is_token_frozen():
@@ -202,6 +205,7 @@ def markdown_tokens_as_json(markdown: str) -> str:
 def create_markdown_tree(
     markdown: str,
     name: str = "Markdown tree",
+    *,
     normalize_md: bool = True,
     doc_name: Optional[str] = None,
     doc_source: Optional[str] = None,
@@ -261,12 +265,17 @@ def create_markdown_tree(
 
 
 @contextmanager
-def assert_no_mismatches(tree: Tree) -> Iterator[Tree]:
+def assert_no_mismatches(tree: Tree, tree_prepped: bool = True) -> Iterator[Tree]:
     "Use this to ensure that the tree's nodes and tokens are in sync after tree structure modifications"
     yield tree
+
     if mismatches := tokens_vs_tree_mismatches(tree):
         logger.error("Mismatches %s", pprint.pformat(mismatches, sort_dicts=False, width=170))
     assert not mismatches, "Mismatches found in tree"
+
+    if tree_prepped:
+        paragraph_nodes = find_data_type_nodes(tree, "Paragraph")
+        assert all(paragraph_node.data["freeze_token_children"] for paragraph_node in paragraph_nodes)
 
 
 @contextmanager
@@ -280,7 +289,7 @@ def new_tree(name: str, copying_tree: bool = False) -> Iterator[Tree]:
         tree.system_root.set_meta("data_and_token_copying", True)
         tree.system_root.set_meta("sync_token", True)
 
-    with assert_no_mismatches(tree):
+    with assert_no_mismatches(tree, tree_prepped=False):
         yield tree
         validate_tree(tree)
 

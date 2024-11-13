@@ -47,7 +47,6 @@ def _ingest_edd_web(
             logger.warning("No chunks for %r", document.source)
             continue
         logger.info("Adding embeddings for %r", document.source)
-        exit(0)  # FIXME: Remove this line
         # Next, add embeddings to each chunk (slow)
         add_embeddings(chunks, [s.text_to_encode for s in splits])
         logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
@@ -132,16 +131,12 @@ def _chunk_page(
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     splits: list[SplitWithContextText] = []
     if USE_MARKDOWN_TREE:
-        # FIXME: Remove
-        # if document.source != "https://edd.ca.gov/en/jobs_and_training/northern_region/":
-        #     return [], []
         chunking_config = EddChunkingConfig()
 
         # Fix markdown formatting that causes markdown parsing errors
         # '. . .' is parsed as sublists on the same line
         # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
         content = content.replace(". . .", "...")
-
         # '. * ' is parsed as sublists; incorrect markdown from scraping
         # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
         content = content.replace(". *\n", ". \n")

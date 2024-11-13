@@ -1,25 +1,32 @@
 import json
 import logging
 import re
-from io import StringIO
 
 import pytest
 from nutree import Tree
+from mistletoe import block_token
 
 from src.ingestion.markdown_tree import (
-    _prepare_tree,
+    assert_no_mismatches,
     add_list_and_table_intros,
     create_heading_sections,
     create_markdown_tree,
+    copy_subtree,
+    data_ids_for,
     describe_tree,
+    find_node,
     get_parent_headings_md,
     get_parent_headings_raw,
     hide_span_tokens,
     markdown_tokens_as_json,
     nest_heading_sections,
+    new_tree,
+    next_renderable_node,
     remove_blank_lines,
+    remove_children_from,
     render_subtree_as_md,
     tokens_vs_tree_mismatches,
+    TokenNodeData,
 )
 
 logger = logging.getLogger(__name__)
@@ -293,7 +300,7 @@ def test_tree_preparation(tree):
 
 
 def test_subtree_rendering(tree):
-    md = render_subtree_as_md(tree.system_root.first_child())
+    md = render_subtree_as_md(tree.first_child())
     # Check that various markdown elements are present in the rendered text
     assert "This is the first paragraph with no heading." in md
     assert "# Second H1 without a paragraph" in md
@@ -328,8 +335,8 @@ def assert_extra_newlines_removed(markdown: str):
     "Assert that there are no extra blank lines"
     assert "\n\n\n" not in markdown
     # Each block markdown element should be separated by exactly two newlines
-    # Check for extraneous newlines within blocks
     for block_str in markdown.split("\n\n"):
+        # Check for no extraneous newlines within blocks
         if re.search(r"^\* ", block_str) or re.search(r"^\| ", block_str):
             # Handle list items and table rows individually
             list_items = block_str.split("\n")
@@ -361,19 +368,90 @@ def test_get_parent_headings(tree):
     assert headings == ["Second H1 without a paragraph", "Skip to H3"]
 
 
-def test_render_raw():
-    test_markdown = f"""
+def test_raw_text_on_headings():
+    test_markdown = """
 # Heading with [a link](google.com)
 
 Sentence 1.
 """
-    tree = create_markdown_tree(test_markdown, doc_name="Test doc", prepare=True)
-    tree.print()
-    node = tree["H1_2"]
-    assert node.data["raw_text"] == "Heading with a link"
+    tree = create_markdown_tree(test_markdown, prepare=True)
+    assert tree["H1_2"].data["raw_text"] == "Heading with a link"
 
+
+def create_paragraph_node_data(line_number: int, lines: list[str]) -> TokenNodeData:
+    token = block_token.Paragraph(lines=lines)
+    token.line_number = line_number
+
+    ndata = TokenNodeData(token, id_suffix="_para")
+    ndata["freeze_token_children"] = True
+    return ndata
+
+
+def test_new_tree():
+    test_markdown = """Intro
+
+Sentence 1.
+"""
+    tree = create_markdown_tree(test_markdown, doc_name="test tree", doc_source="nowhere.com")
+    doc_node = tree.first_child()
+    assert doc_node.data["name"] == "test tree"
+    assert doc_node.data["source"] == "nowhere.com"
+    assert tree["D_1"].data.data_type == tree["D_1"].data_type == "Document"
+    assert tree["P_3"].data.data_type == tree["P_3"].data_type == "Paragraph"
     with pytest.raises(ValueError):
         tree["nonexistent_id"]
+
+    d1 = tree["D_1"]
+    p3 = tree["P_3"]
+    with new_tree("test tree copying", copying_tree=True) as subtree:
+        d1.copy_to(subtree, deep=True)
+
+    assert subtree.count == 3
+    assert subtree["D_1"].data.data_type == "Document"
+
+    # Check that copies were made
+    assert subtree["D_1"] is not d1
+    assert subtree["D_1"].data is not d1.data
+    assert subtree["D_1"].data.id_string == d1.data.id_string
+    assert subtree["D_1"].data.token is not d1.data.token
+
+    # Check that copies of child were made
+    assert subtree["P_3"] is not p3
+    assert subtree["P_3"].data is not p3.data
+    assert subtree["P_3"].data.id_string == p3.data.id_string
+    assert subtree["P_3"].data.token is not p3.data.token
+    assert subtree["P_3"].data.token.line_number == p3.data.token.line_number
+
+    # More quick checks for increased code coverage
+    assert subtree["P_3"].data.token.line_number == subtree["P_3"].data.line_number
+    assert data_ids_for(subtree["D_1"]) == ["P_1", "P_3"]
+    assert find_node(subtree, "D_1") is subtree["D_1"]
+    assert find_node(subtree, "Non-existant") is None
+
+    # Check retrieval by token
+    assert subtree[subtree["P_3"].data.token] == subtree["P_3"]
+
+    # Check that the tree structure is the same, except for the first line which has the tree name
+    assert tree.format().splitlines()[1:] == subtree.format().splitlines()[1:]
+    # Check that they render markdown the same:
+    d1_md = TokenNodeData.render_token(d1.token)
+    subtree_d1_md = TokenNodeData.render_token(subtree["D_1"].data.token)
+    assert d1_md == subtree_d1_md
+
+    # Modifying subtree should not affect original tree
+    with assert_no_mismatches(subtree):
+        orig_child_count = len(tree["P_3"].parent.children)
+        ndata = create_paragraph_node_data(2, ["New paragraph text"])
+        p2 = subtree["P_3"].parent.add(ndata, before=subtree["P_3"])
+    assert subtree.count == 4
+    assert len(tree["P_3"].parent.children) == orig_child_count
+    assert len(subtree["P_3"].parent.children) == orig_child_count + 1
+
+    with assert_no_mismatches(subtree):
+        p2.remove(keep_children=True)
+    assert subtree.count == 3
+    assert len(tree["P_3"].parent.children) == orig_child_count
+    assert len(subtree["P_3"].parent.children) == orig_child_count
 
 
 def test_MdNodeData_repr(tree):
@@ -381,7 +459,6 @@ def test_MdNodeData_repr(tree):
     create_heading_sections(tree)
     nest_heading_sections(tree)
     out_str = tree.format()
-    print(out_str)
 
     # Spot check a few lines
     assert "Tree<'Markdown tree'>" in out_str
@@ -391,3 +468,71 @@ def test_MdNodeData_repr(tree):
     assert "    │   ╰── HeadingSection _S2_10" in out_str
     assert "    │       ├── List L_18 line_number=18 loose=False start=None" in out_str
     assert "    │       │   ├── ListItem LI_18: \"'* Item H2.3.L1.1" in out_str
+
+
+def test_next_renderable_node(markdown_text):
+    tree = create_markdown_tree(markdown_text)
+    assert next_renderable_node(tree["P_2"]) == tree["_S1_4"]
+    assert next_renderable_node(tree["LI_18"]) == tree["LI_19"]
+    assert next_renderable_node(tree["LI_44"]) == tree["LI_45"]
+    assert next_renderable_node(tree["LI_46"]) == tree["P_48"]
+    assert next_renderable_node(tree["P_54"]) is None
+
+
+@pytest.fixture
+def tiny_tree():
+    test_markdown = """
+# My Heading 1
+
+First paragraph.
+
+List intro:
+* Item 1
+* Item 2
+"""
+    tree = create_markdown_tree(test_markdown, prepare=False)
+    hide_span_tokens(tree)
+    return tree
+
+
+def test_copy_subtree(tiny_tree):
+    list_tree = copy_subtree("TINY", tiny_tree["L_7"]).tree
+    assert list_tree["L_7"] == list_tree["L_7"]
+    assert repr(list_tree["L_7"].data) == repr(tiny_tree["L_7"].data)
+    assert list_tree["L_7"].data is not tiny_tree["L_7"].data
+
+    assert len(list_tree["L_7"].children) == 2
+    for node_copy, node in zip(list_tree["L_7"].children, tiny_tree["L_7"].children, strict=True):
+        assert repr(node_copy.data) == repr(node.data)
+        assert node_copy.data is not node.data
+
+
+def test_copy_one_node_subtree(tiny_tree):
+    p_node = copy_subtree("TINY", tiny_tree["P_4"])
+    assert len(p_node.children) == 0
+    assert repr(p_node.data) == repr(tiny_tree["P_4"].data)
+
+
+def test_remove_children(caplog, tiny_tree):
+    list_node = copy_subtree("TINY", tiny_tree["L_7"])
+    assert [c.data_id for c in list_node.children] == ["LI_7", "LI_8"]
+    # Remove the first child
+    remove_children_from(list_node, {"LI_7"})
+    assert [c.data_id for c in list_node.children] == ["LI_8"]
+
+    # Remove remaining child
+    remove_children_from(list_node, {"LI_8"})
+    assert len(list_node.children) == 0
+
+    # Restart with a fresh copy
+    list_node = copy_subtree("TINY", tiny_tree["L_7"])
+    with caplog.at_level(logging.WARNING):
+        remove_children_from(list_node, {"LI_nonexistant"})
+        assert [c.data_id for c in list_node.children] == ["LI_7", "LI_8"]
+        assert "Expected to remove {'LI_nonexistant'}, but found only []" in caplog.messages
+
+    # Remove the last child
+    with caplog.at_level(logging.WARNING):
+        remove_children_from(list_node, {"LI_8", "LI_nonexistant"})
+        assert [c.data_id for c in list_node.children] == ["LI_7"]
+        assert any("found only ['LI_8']" in msg for msg in caplog.messages)

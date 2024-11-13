@@ -301,10 +301,19 @@ def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk
     _add_chunks_and_summarize_node(next_node, config)
 
     # Ensure all nodes are in some chunk
-    input_nodes = {n.data_id for n in input_tree.iterator()} - {doc_node.data_id}
-    chunked_nodes = {id for pc in config.chunks.values() for id in pc.data_ids} - {doc_node.data_id}
-    unchunked_nodes = input_nodes - chunked_nodes
-    assert not unchunked_nodes, f"Expected {unchunked_nodes} to be chunked"
+    input_data_ids = {n.data_id for n in input_tree.iterator()} - {doc_node.data_id}
+    chunked_data_ids = {id for pc in config.chunks.values() for id in pc.data_ids} - {
+        doc_node.data_id
+    }
+    unchunked_ids = input_data_ids - chunked_data_ids
+    assert not unchunked_ids, f"Expected {unchunked_ids} to be chunked"
+
+    # Identify which chunk each node is in
+    data_id_to_chunk_id = {id: pc.id for pc in config.chunks.values() for id in pc.data_ids}
+    logger.debug(
+        "Node-to-chunk mapping: %s",
+        {id: data_id_to_chunk_id[id] for id in [n.data_id for n in input_tree.iterator()]},
+    )
     return config.chunks
 
 
