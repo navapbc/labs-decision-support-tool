@@ -72,4 +72,4 @@ question
 
 Then, in the chat interface, submit the message `Batch processing` to the chatbot and upload the .csv file when prompted.
 
-The input file can have additional columns beyond `question`. These will be preserved in the output file.
+The input file can have additional columns beyond `question`. They will be preserved in the output file, in addition to the response columns.
