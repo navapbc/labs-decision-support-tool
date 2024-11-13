@@ -1,5 +1,5 @@
 # API Specification: Assistive Chatbot Integration
-This API enables the integration of an Assistive Chatbot into the ImagineLA product.
+This API enables the integration of an Assistive Chatbot with other products.
 
 ## Endpoint: `POST /chatbot`
 
