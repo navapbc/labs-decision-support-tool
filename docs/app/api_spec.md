@@ -16,21 +16,15 @@ This endpoint accepts a query from a navigator and responds with a generated ans
 
 **Parameters**
 
-- **user_id** _(string, required)_: Unique identifier for the navigator within SBN.  
-- **org_id** _(string, optional)_: Identifier for the organization the navigator belongs to. 
-- **customer_id / beneficiary_id** _(string, optional)_: Anonymized ID for the customer or beneficiary associated with the query, if applicable and distinct from `user_id`.
-- **session_id** _(string, optional)_: Unique identifier for the current session, which may represent the user’s duration of activity rather than a specific conversation.
+Note: we will defer making any of these required for now
+- **user_id** _(string, optional)_: Unique identifier for the navigator within ImagineLA
+- **agency** _(string, optional)_: Identifier for the organization the navigator belongs to
+- **beneficiary_id** _(string, optional)_: Anonymized ID for the customer or beneficiary associated with the query, if applicable and distinct from `user_id`.
 
-- **query** _(JSON, required)_: User’s question for the chatbot and any prior messages
-```json
-[
-  {
-    "role": "string",       // Author of message, one of "user", "assistant", or "system"
-    "content": "string"     // Message contents
-  },
-  ...
-]
-```
+- **session_id** _(string, required)_: Unique identifier for the current session, to track prior messages in the conversation.
+- **new_session** _(bool, required)_: Whether the session_id is expected to be new to the server (or not)
+- **message** _(string, required)_: User’s question for the chatbot and any prior messages
+
 ---
 
 ### Responses
@@ -48,7 +42,7 @@ This endpoint accepts a query from a navigator and responds with a generated ans
       "citation_id": "string",               // Unique ID for each citation
       "source_id": "string",                 // Identifier for the source document
       "source_name": "string",               // Name of the source document
-      "page_number": "integer",              // Page number where the citation is found, if available
+      "page_number": "integer" | None,       // Page number where the citation is found, if available
       "uri": "string",                       // URL link to the source, if available
       "headings": ["string"],                // Headings within the document, if available
       "citation_text": "string"              // Extracted citation text
@@ -76,20 +70,8 @@ This endpoint accepts a query from a navigator and responds with a generated ans
   "org_id": "org789",
   "customer_id": "cust001",
   "session_id": "sess2024A",
-  "query": [
-    {
-      "role": "user",
-      "content": "What benefits are available for single mothers in California?"
-    },
-    {
-      "role": "assistant",
-      "content": "There are several programs, including CalWORKs, Medi-Cal, and more. What specific support are you interested in?"
-    },
-    {
-      "role": "user",
-      "content": "I’m looking for financial aid specifically."
-    }
-  ]
+  "query": 
+      "content": "What benefits are available for single mothers in California?",
 }
 ```
 
