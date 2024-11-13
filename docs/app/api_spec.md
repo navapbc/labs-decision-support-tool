@@ -25,8 +25,8 @@ This endpoint accepts a query from a navigator and responds with a generated ans
 ```json
 [
   {
-    "role": "user" | "assistant" | "system", // Author of message
-    "content": "string"                      // Message contents
+    "role": "string",       // Author of message, one of "user", "assistant", or "system"
+    "content": "string"     // Message contents
   },
   ...
 ]
