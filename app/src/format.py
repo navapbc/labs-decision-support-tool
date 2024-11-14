@@ -21,6 +21,7 @@ _accordion_id = random.randint(0, 1000000)
 
 class FormattingConfig:
     "Default formatting configuration"
+
     def __init__(self) -> None:
         self.add_citation_link_per_subsection = False
 
@@ -38,6 +39,7 @@ class FormattingConfig:
 
 class BemFormattingConfig(FormattingConfig):
     "BEM-specific formatting configuration"
+
     def __init__(self) -> None:
         self.add_citation_link_per_subsection = True
 

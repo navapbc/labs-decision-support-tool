@@ -5,6 +5,8 @@ from sqlalchemy import delete
 from src.citations import CitationFactory, split_into_subsections
 from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
 from src.format import (
+    BemFormattingConfig,
+    FormattingConfig,
     _add_ellipses,
     _format_to_accordion_html,
     _get_breadcrumb_html,
@@ -15,7 +17,6 @@ from src.format import (
     format_web_subsections,
     reify_citations,
     replace_citation_ids,
-    return_citation_link,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
@@ -184,14 +185,15 @@ def test_reify_citations():
     chunks = ChunkFactory.build_batch(2)
     chunks[0].content = "This is the first chunk.\n\nWith two subsections"
     subsections = split_into_subsections(chunks, factory=CitationFactory())
+    config = FormattingConfig()
 
-    assert reify_citations("This is a citation (citation-0)", [], "") == "This is a citation "
+    assert reify_citations("This is a citation (citation-0)", [], config) == "This is a citation "
 
     assert (
         reify_citations(
             f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
             subsections,
-            "",
+            config,
         )
         == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
     )
@@ -264,12 +266,12 @@ def test__return_citation_link():
     chunk_list[1].document = doc[1]
     chunk_list[1].page_number = 3
 
-    bem_link = return_citation_link(chunk_list[0], "BEM")
+    bem_link = BemFormattingConfig().return_citation_link(chunk_list[0])
 
     assert "Open document to page 3" in bem_link
     assert "Source" not in bem_link
 
-    web_link = return_citation_link(chunk_list[1], "EDD")
+    web_link = FormattingConfig().return_citation_link(chunk_list[1])
     assert "page 3" not in web_link
     assert "Source" in web_link
 
