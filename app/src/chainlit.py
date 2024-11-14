@@ -207,7 +207,6 @@ async def on_message(message: cl.Message) -> None:
                 chunks_with_scores=result.chunks_with_scores,
                 subsections=result.subsections,
                 raw_response=result.response,
-                config=engine.formatting_config,
             )
         else:
             msg_content = build_accordions(
