@@ -253,10 +253,13 @@ def generate_question_answer_pair(document: Document, num_of_chunks: int):
         context_text=f"Full document content: {document.content}, document name: {document.name}, document source: {document.source}",
     )
     logger.info("Generated %i question answer pairs", num_of_chunks)
+    if q_a_json.startswith("{"):
+        q_a_json = f"[{q_a_json}]"
+        logger.info("Generated JSON with object instead of list")
     return json.loads(q_a_json)
 
 
-def write_to_csv(file_path: str, fields: list[str], q_a_json: list[dict[str, str]]):
+def write_to_csv(file_path: str, fields: list[str], q_a_json: list[dict[str, str]]) -> None:
     needs_header = (
         True
         if os.path.exists(file_path)
