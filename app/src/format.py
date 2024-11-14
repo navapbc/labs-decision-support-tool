@@ -26,7 +26,7 @@ def format_guru_cards(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations(raw_response, subsections)
+    response_with_citations = reify_citations(raw_response, subsections, data_source="Guru")
 
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
@@ -170,7 +170,9 @@ def build_accordions(
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
-    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations))
+    response_with_citations = to_html(
+        _add_citation_links(raw_response, remapped_citations, data_source)
+    )
     if citations_html:
         return (
             "<div>"
@@ -239,7 +241,7 @@ def format_bem_documents(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations(raw_response, subsections)
+    response_with_citations = reify_citations(raw_response, subsections, data_source="BEM")
 
     documents = _get_bem_documents_to_show(
         chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
@@ -351,16 +353,18 @@ def _add_ellipses(chunk: Chunk) -> str:
     return chunk_content
 
 
-def reify_citations(response: str, subsections: Sequence[Subsection]) -> str:
+def reify_citations(response: str, subsections: Sequence[Subsection], data_source: str) -> str:
     remapped_citations = remap_citation_ids(subsections, response)
-    return _add_citation_links(response, remapped_citations)
+    return _add_citation_links(response, remapped_citations, data_source)
 
 
 _footnote_id = random.randint(0, 1000000)
 _footnote_index = 0
 
 
-def _add_citation_links(response: str, remapped_citations: dict[str, Subsection]) -> str:
+def _add_citation_links(
+    response: str, remapped_citations: dict[str, Subsection], data_source: str
+) -> str:
     global _footnote_id
     _footnote_id += 1
     footnote_list = []
@@ -376,14 +380,18 @@ def _add_citation_links(response: str, remapped_citations: dict[str, Subsection]
             return ""
 
         chunk = remapped_citations[citation_id].chunk
-        bem_link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
-        bem_link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
-        citation = f"<sup><a href={bem_link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
+        if data_source == "BEM":
+            link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
+            link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
+        else:
+            link = chunk.document.source if chunk.document.source else "#"
+
+        citation = f"<sup><a href={link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
 
         global _footnote_index
         _footnote_index += 1
         footnote_list.append(
-            f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
+            f"<a style='text-decoration:none' href={link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
         )
         return citation
 
