@@ -160,7 +160,7 @@ def build_accordions(
                     class="usa-accordion__button"
                     aria-expanded="false"
                     aria-controls="a-{_accordion_id}">
-                    {",".join(citation_numbers)}. {document.name}
+                    {",".join(citation_numbers)}. {document.dataset}: {document.name}
                 </button>
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
