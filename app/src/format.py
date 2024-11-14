@@ -383,7 +383,6 @@ def _add_citation_links(
 
         chunk = remapped_citations[citation_id].chunk
         link = config.get_superscript_link(chunk)
-
         citation = f"<sup><a href={link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
 
         global _footnote_index
