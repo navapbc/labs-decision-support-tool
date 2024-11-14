@@ -150,7 +150,7 @@ def _chunk_page(
             tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
             tree_chunks = chunk_tree(tree, chunking_config)
 
-            for _id, chunk in tree_chunks.items():
+            for chunk in tree_chunks:
                 split = SplitWithContextText(
                     chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
                 )

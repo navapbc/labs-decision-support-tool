@@ -116,7 +116,7 @@ class ChunkingConfig:
         self.reset()
 
     def reset(self) -> None:
-        self.chunks: dict[str, ProtoChunk] = {}
+        self.chunks: list[ProtoChunk] = []
 
     def text_length(self, markdown: str) -> int:
         return self.text_splitter._length_function(markdown)
@@ -135,7 +135,7 @@ class ChunkingConfig:
             raise AssertionError(f"{chunk.id} is too large! {chunk.length} > {self.max_length}")
         chunk.id = f"{len(self.chunks)}:{chunk.id}"
         logger.debug("Adding chunk %s created from: %s", chunk.id, data_ids_for(chunk.nodes))
-        self.chunks[chunk.id] = chunk
+        self.chunks.append(chunk)
 
     def create_protochunk(
         self,
@@ -157,9 +157,9 @@ class ChunkingConfig:
             nodes,
             [n.data_id for node in nodes for n in node.iterator(add_self=True)],
             headings := self._headings_with_doc_name(breadcrumb_node or nodes[0]),
-            context_str := "\n".join(headings),
+            context_str := "\n".join(headings).strip(),
             markdown,
-            embedding_str := f"{context_str.strip()}\n\n{remove_links(markdown)}",
+            embedding_str := f"{f'{context_str}\n\n' if context_str else ''}{remove_links(markdown)}",
             self.text_length(embedding_str),
         )
         return chunk
@@ -268,7 +268,7 @@ class ChunkingConfig:
 # region ###### Chunking functions that operate on multiple trees -- see TreeTransaction
 
 
-def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk]:
+def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> list[ProtoChunk]:
     config.reset()
 
     # Initialize the COMMITTED tree as a full copy of input_tree
@@ -298,19 +298,20 @@ def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> dict[str, ProtoChunk
         logger.debug("No more nodes to chunk")
 
     # Create the last chunk from the remaining content
+    logger.debug(
+        "COMMITTED tree:\n%s\n%r (length %i)\n%s", *_format_tree_and_markdown(tree, config)
+    )
     next_node = NodeWithIntro(doc_node)
     _add_chunks_and_summarize_node(next_node, config)
 
-    # Ensure all nodes are in some chunk
+    # Ensure all nodes are in some chunk, ignoring the Document root node
     input_data_ids = {n.data_id for n in input_tree.iterator()} - {doc_node.data_id}
-    chunked_data_ids = {id for pc in config.chunks.values() for id in pc.data_ids} - {
-        doc_node.data_id
-    }
+    chunked_data_ids = {id for pc in config.chunks for id in pc.data_ids} - {doc_node.data_id}
     unchunked_ids = input_data_ids - chunked_data_ids
     assert not unchunked_ids, f"Expected {unchunked_ids} to be chunked"
 
     # Identify which chunk each node is in
-    data_id_to_chunk_id = {id: pc.id for pc in config.chunks.values() for id in pc.data_ids}
+    data_id_to_chunk_id = {id: pc.id for pc in config.chunks for id in pc.data_ids}
     logger.debug(
         "Node-to-chunk mapping: %s",
         {id: data_id_to_chunk_id[id] for id in [n.data_id for n in input_tree.iterator()]},
@@ -445,7 +446,7 @@ class NextNodeCache:
     def next_node_alone_protochunk(self) -> ProtoChunk:
         "Returns a ProtoChunk for the next_node by itself"
         return self.config.create_protochunk(
-            self.committed_nodes.as_list, breadcrumb_node=self._committed_breadcrumb_node
+            self.committed_nodes.as_list, breadcrumb_node=self.committed_nodes.node
         )
 
     @cached_property
@@ -453,7 +454,7 @@ class NextNodeCache:
         "Returns True if next_node fits in a chunk by itself, i.e., ignoring what's in the buffer?"
         # TODO: pass next_node_alone_protochunk to nodes_fit_in_chunk() to avoid recomputing it
         return self.config.nodes_fit_in_chunk(
-            self.committed_nodes.as_list, breadcrumb_node=self._committed_breadcrumb_node
+            self.committed_nodes.as_list, breadcrumb_node=self.committed_nodes.node
         )
 
     @cached_property
@@ -461,7 +462,7 @@ class NextNodeCache:
         "Returns True if next_node is large enough to commit by itself, i.e., ignoring what's in the buffer?"
         # TODO: pass next_node_alone_protochunk to full_enough_to_commit() to avoid recomputing it
         return self.config.full_enough_to_commit(
-            self.committed_nodes.as_list, breadcrumb_node=self._committed_breadcrumb_node
+            self.committed_nodes.as_list, breadcrumb_node=self.committed_nodes.node
         )
 
 
@@ -667,7 +668,7 @@ def _add_chunks_and_summarize_big_listitems(
     for li in list(candidate_node.node.children):
         assert li.data_type in ["ListItem", "TableRow"], f"Unexpected child {li.id_string}"
         li_candidate = NodeWithIntro(li)
-        if config.full_enough_to_commit([li], breadcrumb_node=candidate_node.node):
+        if config.full_enough_to_commit([li], breadcrumb_node=li):
             logger.debug("Summarizing big list item %s", li.data_id)
             li_candidate = _add_chunks_and_summarize_node(li_candidate, config)
             return li_candidate
@@ -716,7 +717,7 @@ def _add_chunks_for_heading_section(node: Node, config: ChunkingConfig) -> None:
                 "Table",
             ]
             if is_summarizable_type and config.full_enough_to_commit(
-                node_with_intro.as_list, breadcrumb_node=node
+                node_with_intro.as_list, breadcrumb_node=node_with_intro.node
             ):
                 node_with_intro = _add_chunks_and_summarize_node(node_with_intro, config)
                 # Try again now that node_with_intro has been chunked and summarized.
