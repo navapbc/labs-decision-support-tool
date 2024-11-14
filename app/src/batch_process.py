@@ -26,7 +26,11 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
             row.update(data)
 
         # Update fieldnames to include new columns
-        all_fieldnames = list(reader.fieldnames) + list(processed_data[0].keys())
+        all_fieldnames_dict = {
+            f: None
+            for f in list(reader.fieldnames) + [key for p in processed_data for key in p.keys()]
+        }
+        all_fieldnames = list(all_fieldnames_dict.keys())
 
     result_file = tempfile.NamedTemporaryFile(delete=False, mode="w", newline="", encoding="utf-8")
     writer = csv.DictWriter(result_file, fieldnames=all_fieldnames)
