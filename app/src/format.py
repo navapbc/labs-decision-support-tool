@@ -138,7 +138,7 @@ def build_accordions(
                 citation_numbers.append(chunk_subsection.id)
                 citation_body += (
                     f"<div>Citation #{chunk_subsection.id}: </div>"
-                    f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{chunk_subsection.text}</div>'
+                    f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(chunk_subsection.text)}</div>'
                 )
                 # generated citation links for BEM redirect to specific pages
                 if data_source == "BEM":
