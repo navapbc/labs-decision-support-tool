@@ -97,7 +97,10 @@ def _create_chunks(
         assert content, f"Item {name} has no main_content or main_primary"
 
         document = Document(name=name, content=content, source=item["url"], **doc_attribs)
+        fields = ["question", "answer", "document_name", "document_source"]
         chunks, splits = _chunk_page(document, content)
+        q_a_json = generate_question_answer_pair(document=document, num_of_chunks=len(chunks))
+        write_to_csv("question_answer_pairs.csv", fields, q_a_json)
         result.append((document, chunks, splits))
     return result
 
@@ -121,24 +124,6 @@ def _chunk_page(
             split_index=index,
             tokens=split.token_count,
         )
-
-        q_a_json = generate_question_answer_pair(chunk=chunk)
-
-        fields = ["question", "answer", "document_name", "document_source", "content"]
-        needs_header = (
-            True
-            if os.path.exists("question_answer_pairs.csv")
-            and os.stat("question_answer_pairs.csv").st_size == 0
-            or not os.path.exists("question_answer_pairs.csv")
-            else False
-        )
-
-        with open("question_answer_pairs.csv", "a", newline="", encoding="utf-8") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fields)
-            if needs_header:
-                writer.writeheader()
-            for question in q_a_json:
-                writer.writerow(question)
 
         chunks.append(chunk)
     return chunks, splits
@@ -260,15 +245,32 @@ def _split_large_text_block(
             )
 
 
-def generate_question_answer_pair(chunk: Chunk):
+def generate_question_answer_pair(document: Document, num_of_chunks: int):
     q_a_json = generate(
         llm="gpt-4o",
         system_prompt=GENERATE_QUESTION_ANSWER_PROMPT,
-        query="Please use the information to generate a question and answer.",
-        context_text=f"Content: {chunk.content}, full document content: {chunk.document.content}, document name: {chunk.document.name}, document source: {chunk.document.source}",
+        query=f"Please use the information to create {num_of_chunks} question(s) answer pairs.",
+        context_text=f"Full document content: {document.content}, document name: {document.name}, document source: {document.source}",
+    )
+    logger.info("Generated %i question answer pairs", num_of_chunks)
+    return json.loads(q_a_json)
+
+
+def write_to_csv(file_path: str, fields: list[str], q_a_json: list[dict[str, str]]):
+    needs_header = (
+        True
+        if os.path.exists(file_path)
+        and os.stat(file_path).st_size == 0
+        or not os.path.exists(file_path)
+        else False
     )
 
-    return json.loads(q_a_json)
+    with open(file_path, "a", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fields)
+        if needs_header:
+            writer.writeheader()
+        for question in q_a_json:
+            writer.writerow(question)
 
 
 def main() -> None:

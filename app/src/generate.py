@@ -46,14 +46,22 @@ Otherwise, set needs_context to false.
 """
 
 GENERATE_QUESTION_ANSWER_PROMPT = """
-Using the provided chunk, generate 2-3 unique questions and answers, avoid rephrasing the question and saying 'according to the document'. 
+Using the provided chunk, generate at least 5 unique questions and answers, avoid rephrasing or changing the punctuation of the question to ensure distinct questions and answers.
 Respond with a list of JSON dictionaries in the following format  (do not wrap in JSON markers):
 
 question: The generated question based on the content.
 answer: The answer to the question, derived from the content.
 document_name: The name of the document.
 document_source: The source or URL of the document.
-content: The provided content for context.
+
+Example
+question: What's a base period for SDI?
+answer: "- A base period covers 12 months and is divided into four quarters.
+- The base period includes wages subject to SDI tax that were paid about 5 to 18 months before the client's disability claim began
+- For a DI claim to be valid, they must have at least $300 in wages in the base period.
+- Benefit amounts are based on the quarter with their highest wages earned within their base period."
+document_name: Disability Insurance Benefit Payment Amounts
+document_source: https://edd.ca.gov/en/disability/Calculating_DI_Benefit_Payment_Amounts/
 """
 
 
