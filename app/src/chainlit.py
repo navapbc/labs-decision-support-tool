@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import pprint
 from typing import Any
@@ -5,8 +6,10 @@ from urllib.parse import parse_qs, urlparse
 
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Select, Slider, TextInput
+from chainlit.types import AskFileResponse
 from src import chat_engine
 from src.app_config import app_config
+from src.batch_process import batch_process
 from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.generate import get_models
 from src.login import require_login
@@ -175,6 +178,21 @@ async def on_message(message: cl.Message) -> None:
     chat_history = get_raw_chat_history(chat_context)
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+
+    if message.content == "Batch processing":
+        # The AskFileMessage cannot be called inside code run by asyncio.create_task,
+        # or the Chainlit UI will freeze indefinitely
+        files = await cl.AskFileMessage(
+            content="Please upload a CSV file with a `question` column.",
+            accept=["text/csv"],
+            max_size_mb=20,
+            timeout=180,
+        ).send()
+
+        if files:
+            asyncio.create_task(_batch_proccessing(files[0]))
+        return
+
     try:
         result = await cl.make_async(
             lambda: engine.on_message(question=message.content, chat_history=chat_history)
@@ -225,3 +243,29 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
         ],
         "raw_response": result.response,
     }
+
+
+async def _batch_proccessing(file: AskFileResponse) -> None:
+    await cl.Message(
+        author="backend",
+        content="Received file, processing...",
+    ).send()
+
+    try:
+        engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
+        result_file_path = await batch_process(file.path, engine)
+
+        # E.g., "abcd.csv" to "abcd_results.csv"
+        result_file_name = file.name.removesuffix(".csv") + "_results.csv"
+
+        await cl.Message(
+            content="File processed, results attached.",
+            elements=[cl.File(name=result_file_name, path=result_file_path)],
+        ).send()
+
+    except ValueError as err:
+        await cl.Message(
+            author="backend",
+            metadata={"error_class": err.__class__.__name__, "error": str(err)},
+            content=f"{err.__class__.__name__}: {err}",
+        ).send()
