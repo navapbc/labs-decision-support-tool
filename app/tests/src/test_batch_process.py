@@ -55,7 +55,7 @@ async def test_batch_process(monkeypatch, sample_csv, engine):
 
 def test_process_question(monkeypatch, engine):
     mock_result = OnMessageResult(
-        response=f"Answer to question.(citation-1)",
+        response="Answer to question.(citation-1)",
         subsections=[Subsection("citation-1", ChunkFactory.build(), "subsection text")],
         chunks_with_scores=[],
         system_prompt="",
