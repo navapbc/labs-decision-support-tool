@@ -27,8 +27,10 @@ class ChatEngineInterface(ABC):
 
     # Configuration for formatting responses
     formatting_config: FormattingConfig
+
     # Function for formatting responses instead of the default
-    formatter: Callable
+    # Only used by the old Guru chat engine
+    formatter: Callable | None = None
 
     # Thresholds that determine which retrieved documents are shown in the UI
     chunks_shown_max_num: int = 5

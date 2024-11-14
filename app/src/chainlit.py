@@ -199,7 +199,8 @@ async def on_message(message: cl.Message) -> None:
             lambda: engine.on_message(question=message.content, chat_history=chat_history)
         )()
         logger.info("Response: %s", result.response)
-        if hasattr(engine, "formatter"):
+        if engine.formatter:
+            # This block is to accommodate the old Guru chat engine
             msg_content = engine.formatter(
                 chunks_shown_max_num=engine.chunks_shown_max_num,
                 chunks_shown_min_score=engine.chunks_shown_min_score,

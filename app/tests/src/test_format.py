@@ -161,7 +161,7 @@ def test__add_ellipses():
     )
 
 
-def test_format_bem_subsections(chunks_with_scores):
+def test_build_accordions_for_bem(chunks_with_scores):
     subsections = to_subsections(chunks_with_scores)
 
     config = BemFormattingConfig()
@@ -277,7 +277,7 @@ def test__return_citation_link():
     assert "Source" in web_link
 
 
-def test__format_web_subsections(chunks_with_scores):
+def test_build_accordions(chunks_with_scores):
     subsections = to_subsections(chunks_with_scores)
 
     config = FormattingConfig()
