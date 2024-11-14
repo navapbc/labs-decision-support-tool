@@ -173,5 +173,5 @@ class CaEddWebEngine(BaseEngine):
 
     engine_id: str = "ca-edd-web"
     name: str = "CA EDD Web Chat Engine"
-    datasets = ["ca-edd-web"]
+    datasets = ["CA EDD"]
     formatter = staticmethod(format_web_subsections)
