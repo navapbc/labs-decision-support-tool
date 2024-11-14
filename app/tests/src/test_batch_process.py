@@ -1,10 +1,10 @@
 import pytest
 
-from src.db.models.document import Subsection
-from tests.src.db.models.factories import ChunkFactory
-from src.chat_engine import OnMessageResult
 from src import chat_engine
 from src.batch_process import _process_question, batch_process
+from src.chat_engine import OnMessageResult
+from src.db.models.document import Subsection
+from tests.src.db.models.factories import ChunkFactory
 
 
 @pytest.fixture
@@ -52,18 +52,16 @@ async def test_batch_process(monkeypatch, sample_csv, engine):
             "Second question,other metadata,Answer to Second question,value_2\n"
         )
 
-def test_process_question(monkeypatch, engine):
-    mock_result= OnMessageResult(
-                            response=f"Answer to question.(citation-1)",
-                            subsections=[Subsection("citation-1", ChunkFactory.build(), "subsection text")],
-                            chunks_with_scores=[],
-                            system_prompt="",
-                        )
 
-    monkeypatch.setattr(engine, "on_message",
-                        lambda question, chat_history:
-                        mock_result
-                        )
+def test_process_question(monkeypatch, engine):
+    mock_result = OnMessageResult(
+        response=f"Answer to question.(citation-1)",
+        subsections=[Subsection("citation-1", ChunkFactory.build(), "subsection text")],
+        chunks_with_scores=[],
+        system_prompt="",
+    )
+
+    monkeypatch.setattr(engine, "on_message", lambda question, chat_history: mock_result)
     assert _process_question("What is AI?", engine) == {
         "answer": "Answer to question.(citation-1)",
         "citation_1": "subsection text",
