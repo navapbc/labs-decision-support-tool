@@ -114,9 +114,8 @@ def _chunk_page(
         section_splits = _split_heading_section(headings, text)
         splits.extend(section_splits)
 
-    chunks = []
-    for index, split in enumerate(splits):
-        chunk = Chunk(
+    chunks = [
+        Chunk(
             document=document,
             content=split.text,
             headings=split.headings,
@@ -124,8 +123,8 @@ def _chunk_page(
             split_index=index,
             tokens=split.token_count,
         )
-
-        chunks.append(chunk)
+        for index, split in enumerate(splits)
+    ]
     return chunks, splits
 
 
