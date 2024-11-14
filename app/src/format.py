@@ -170,7 +170,9 @@ def build_accordions(
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
-    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations, data_source))
+    response_with_citations = to_html(
+        _add_citation_links(raw_response, remapped_citations, data_source)
+    )
     if citations_html:
         return (
             "<div>"
@@ -360,7 +362,9 @@ _footnote_id = random.randint(0, 1000000)
 _footnote_index = 0
 
 
-def _add_citation_links(response: str, remapped_citations: dict[str, Subsection], data_source: str) -> str:
+def _add_citation_links(
+    response: str, remapped_citations: dict[str, Subsection], data_source: str
+) -> str:
     global _footnote_id
     _footnote_id += 1
     footnote_list = []
