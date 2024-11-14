@@ -5,7 +5,7 @@ from typing import Callable, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, Subsection
-from src.format import format_bem_subsections, format_guru_cards, format_web_subsections
+from src.format import BemFormattingConfig, FormattingConfig, format_guru_cards
 from src.generate import PROMPT, MessageAttributes, analyze_message, generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
@@ -25,7 +25,9 @@ class ChatEngineInterface(ABC):
     engine_id: str
     name: str
 
-    # Function for formatting responses
+    # Configuration for formatting responses
+    formatting_config: FormattingConfig
+    # Function for formatting responses instead of the default
     formatter: Callable
 
     # Thresholds that determine which retrieved documents are shown in the UI
@@ -83,6 +85,8 @@ class BaseEngine(ChatEngineInterface):
         "chunks_shown_min_score",
         "system_prompt",
     ]
+
+    formatting_config = FormattingConfig()
 
     def on_message(self, question: str, chat_history: list[dict[str, str]]) -> OnMessageResult:
         attributes = analyze_message(self.llm, question)
@@ -160,11 +164,12 @@ class BridgesEligibilityManualEngine(BaseEngine):
     engine_id: str = "bridges-eligibility-manual"
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
     datasets = ["bridges-eligibility-manual"]
-    formatter = staticmethod(format_bem_subsections)
+
+    formatting_config = BemFormattingConfig()
 
 
 class CaEddWebEngine(BaseEngine):
-    retrieval_k: int = 50
+    retrieval_k: int = 5
     retrieval_k_min_score: float = -1
 
     # Note: currently not used
@@ -174,4 +179,3 @@ class CaEddWebEngine(BaseEngine):
     engine_id: str = "ca-edd-web"
     name: str = "CA EDD Web Chat Engine"
     datasets = ["CA EDD"]
-    formatter = staticmethod(format_web_subsections)

@@ -11,6 +11,7 @@ from src import chat_engine
 from src.app_config import app_config
 from src.batch_process import batch_process
 from src.chat_engine import ChatEngineInterface, OnMessageResult
+from src.format import build_accordions
 from src.generate import get_models
 from src.login import require_login
 
@@ -198,13 +199,21 @@ async def on_message(message: cl.Message) -> None:
             lambda: engine.on_message(question=message.content, chat_history=chat_history)
         )()
         logger.info("Response: %s", result.response)
-        msg_content = engine.formatter(
-            chunks_shown_max_num=engine.chunks_shown_max_num,
-            chunks_shown_min_score=engine.chunks_shown_min_score,
-            chunks_with_scores=result.chunks_with_scores,
-            subsections=result.subsections,
-            raw_response=result.response,
-        )
+        if hasattr(engine, "formatter"):
+            msg_content = engine.formatter(
+                chunks_shown_max_num=engine.chunks_shown_max_num,
+                chunks_shown_min_score=engine.chunks_shown_min_score,
+                chunks_with_scores=result.chunks_with_scores,
+                subsections=result.subsections,
+                raw_response=result.response,
+                config=engine.formatting_config,
+            )
+        else:
+            msg_content = build_accordions(
+                subsections=result.subsections,
+                raw_response=result.response,
+                config=engine.formatting_config,
+            )
 
         await cl.Message(
             content=msg_content,

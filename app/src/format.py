@@ -81,7 +81,9 @@ def format_guru_cards(
                 document.name,
             )
             continue
-        cards_html += _format_to_accordion_html(document=document, score=chunk_with_score.score)
+        cards_html += _format_guru_to_accordion_html(
+            document=document, score=chunk_with_score.score
+        )
 
     return response_with_citations + "<h3>Related Guru cards</h3>" + cards_html
 
@@ -118,18 +120,6 @@ def to_html(text: str) -> str:
     # markdown expects '\n' before the start of a list
     corrected_text = re.sub(r"^- ", "\n- ", text, flags=re.MULTILINE, count=1)
     return markdown.markdown(corrected_text)
-
-
-def format_bem_subsections(
-    chunks_shown_max_num: int,
-    chunks_shown_min_score: float,
-    chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[Subsection],
-    raw_response: str,
-) -> str:
-    return build_accordions(
-        subsections=subsections, raw_response=raw_response, config=BemFormattingConfig()
-    )
 
 
 def build_accordions(
@@ -200,18 +190,6 @@ def build_accordions(
     return "<div>" + response_with_citations + "</div>"
 
 
-def format_web_subsections(
-    chunks_shown_max_num: int,
-    chunks_shown_min_score: float,
-    chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[Subsection],
-    raw_response: str,
-) -> str:
-    return build_accordions(
-        subsections=subsections, raw_response=raw_response, config=FormattingConfig()
-    )
-
-
 def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> str:
     if not headings:
         return "<div>&nbsp;</div>"
@@ -252,6 +230,7 @@ def _group_by_document_and_chunks(
     return citations_by_document
 
 
+# TODO: This is not called. Remove it?
 def format_bem_documents(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
@@ -265,10 +244,10 @@ def format_bem_documents(
         chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
     )
 
-    return response_with_citations + _format_to_accordion_group_html(documents)
+    return response_with_citations + _format_bem_to_accordion_group_html(documents)
 
 
-def _format_to_accordion_html(document: Document, score: float) -> str:
+def _format_guru_to_accordion_html(document: Document, score: float) -> str:
     global _accordion_id
     _accordion_id += 1
     similarity_score = f"<p>Similarity Score: {str(score)}</p>"
@@ -293,7 +272,9 @@ def _format_to_accordion_html(document: Document, score: float) -> str:
     </div>"""
 
 
-def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkWithScore]]) -> str:
+def _format_bem_to_accordion_group_html(
+    documents: OrderedDict[Document, list[ChunkWithScore]]
+) -> str:
     global _accordion_id
     html = ""
     citation_number = 1
@@ -306,7 +287,7 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
         for chunk_with_score in documents[document]:
             chunk = chunk_with_score.chunk
 
-            formatted_chunk = _add_ellipses(chunk)
+            formatted_chunk = _add_ellipses_for_bem(chunk)
             formatted_chunk = replace_bem_with_link(formatted_chunk)
 
             # Adjust markdown for lists so Chainlit renders correctly
@@ -359,7 +340,7 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
     return "\n<h3>Source(s)</h3>" + html if html else ""
 
 
-def _add_ellipses(chunk: Chunk) -> str:
+def _add_ellipses_for_bem(chunk: Chunk) -> str:
     chunk_content = chunk.content
     if chunk.num_splits != 0:
         if chunk.split_index == 0:
@@ -382,6 +363,7 @@ _footnote_id = random.randint(0, 1000000)
 _footnote_index = 0
 
 
+# FIXME: Refactor to reduce code replication with replace_citation_ids()
 def _add_citation_links(
     response: str, remapped_citations: dict[str, Subsection], config: FormattingConfig
 ) -> str:
