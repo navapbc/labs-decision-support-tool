@@ -107,19 +107,23 @@ class ChunkingConfig:
         self.max_length = max_length
 
         self.full_enough_threshold = 0.65
-        self.text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-            model_name="gpt-4",
-            # Offer some buffer to ensure we stay below the max_length
-            chunk_size=self.max_length - 30,
-            chunk_overlap=15,
-        )
         self.reset()
 
     def reset(self) -> None:
         self.chunks: list[ProtoChunk] = []
 
     def text_length(self, markdown: str) -> int:
-        return self.text_splitter._length_function(markdown)
+        return self.text_splitter()._length_function(markdown)
+
+    def text_splitter(
+        self, chunk_size: Optional[int] = None, chunk_overlap: Optional[int] = 15
+    ) -> RecursiveCharacterTextSplitter:
+        return RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+            model_name="gpt-4",
+            # Offer some buffer to ensure we stay below the max_length
+            chunk_size=chunk_size if chunk_size else self.max_length - 30,
+            chunk_overlap=chunk_overlap,
+        )
 
     def nodes_fit_in_chunk(self, nodes: list[Node], breadcrumb_node: Node) -> bool:
         chunk = self.create_protochunk(nodes, breadcrumb_node=breadcrumb_node)
@@ -195,7 +199,8 @@ class ChunkingConfig:
 
         temp_chunk = self.create_protochunk(node_with_intro.as_list, breadcrumb_node=node)
         logger.warning("If this is called often, use a better text splitter for %s", node.id_string)
-        splits = self.text_splitter.split_text(temp_chunk.embedding_str)
+        chunk_size = self.max_length - 30 - self.text_length(temp_chunk.context_str)
+        splits = self.text_splitter(chunk_size=chunk_size).split_text(temp_chunk.markdown)
         for i, split in enumerate(splits):
             self.add_chunk(
                 self.create_protochunk(
@@ -225,14 +230,14 @@ class ChunkingConfig:
 
         if node.data_type == "List":
             # return f"* (SUMMARIZED LIST {node.data_id})\n\n"
-            summary = shorten(remove_links(md.splitlines()[0]), 120, placeholder="...")
+            summary = shorten(remove_links(md.splitlines()[0]), 50, placeholder="...")
             assert summary, f"Unexpected empty summary for {node.data_id}"
             return f"{summary}\n\n"
 
         if node.data_type == "Table":
             return f"(SUMMARIZED TABLE {node.data_id})\n\n"
 
-        summary = shorten(remove_links(md.splitlines()[0]), 120, placeholder="...")
+        summary = shorten(remove_links(md.splitlines()[0]), 50, placeholder="...")
         assert summary, f"Unexpected empty summary for {node.data_id}"
         return f"({summary})\n\n"
 
