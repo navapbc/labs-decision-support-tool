@@ -128,45 +128,54 @@ class EddChunkingConfig(ChunkingConfig):
         return len(tokenize(text))
 
 
+def _create_splits_using_markdown_tree(content: str, document: Document) -> list[SplitWithContextText]:
+    splits: list[SplitWithContextText] = []
+    chunking_config = EddChunkingConfig()
+    content = _fix_input_markdown(content)
+    try:
+        tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
+        tree_chunks = chunk_tree(tree, chunking_config)
+
+        for chunk in tree_chunks:
+            split = SplitWithContextText(
+                chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
+            )
+            assert split.token_count == chunk.length
+            splits.append(split)
+            if os.path.exists("SAVE_CHUNKS"):
+                split.chunk_id = chunk.id
+                split.data_ids = ", ".join(chunk.data_ids)
+        if os.path.exists("SAVE_CHUNKS"):
+            assert document.source
+            _save_splits_to_files(document.source, content, splits, tree)
+    except (Exception, KeyboardInterrupt) as e:
+        logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
+        logger.error(tree.format())
+        raise e
+    return splits
+
+
+def _fix_input_markdown(markdown: str) -> str:
+    # Fix markdown formatting that causes markdown parsing errors
+    # '. . .' is parsed as sublists on the same line
+    # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
+    markdown = markdown.replace(". . .", "...")
+    # '. * ' is parsed as sublists; incorrect markdown from scraping
+    # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
+    markdown = markdown.replace(". *\n", ". \n")
+    # nested sublist '+' created without parent list; incorrect markdown from scraping?
+    # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
+    markdown = markdown.replace("* + ", "    + ")
+    return markdown
+
+
 def _chunk_page(
     document: Document, content: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
-    splits: list[SplitWithContextText] = []
     if USE_MARKDOWN_TREE:
-        chunking_config = EddChunkingConfig()
-
-        # Fix markdown formatting that causes markdown parsing errors
-        # '. . .' is parsed as sublists on the same line
-        # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
-        content = content.replace(". . .", "...")
-        # '. * ' is parsed as sublists; incorrect markdown from scraping
-        # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
-        content = content.replace(". *\n", ". \n")
-        # nested sublist '+' created without parent list; incorrect markdown from scraping?
-        # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
-        content = content.replace("* + ", "    + ")
-
-        try:
-            tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
-            tree_chunks = chunk_tree(tree, chunking_config)
-
-            for chunk in tree_chunks:
-                split = SplitWithContextText(
-                    chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
-                )
-                assert split.token_count == chunk.length
-                splits.append(split)
-                if os.path.exists("SAVE_CHUNKS"):
-                    split.chunk_id = chunk.id
-                    split.data_ids = ", ".join(chunk.data_ids)
-            if os.path.exists("SAVE_CHUNKS"):
-                assert document.source
-                _save_splits_to_files(document.source, content, splits, tree)
-        except (Exception, KeyboardInterrupt) as e:
-            logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
-            logger.error(tree.format())
-            raise e
+        splits = _create_splits_using_markdown_tree(content, document)
     else:
+        splits = []
         for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
             # Start a new split for each heading
             section_splits = _split_heading_section(headings, text)
