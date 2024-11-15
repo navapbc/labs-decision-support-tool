@@ -93,6 +93,7 @@ def add_embeddings(
     else:
         to_encode = [chunk.content for chunk in chunks]
 
+    assert len(to_encode) > 0
     # Generate all the embeddings in parallel for speed
     embeddings = embedding_model.encode([text for text in to_encode], show_progress_bar=False)
 
