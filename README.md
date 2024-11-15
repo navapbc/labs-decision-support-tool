@@ -23,6 +23,8 @@ To load a JSON file containing Guru cards in your local environment, from within
 make ingest-guru-cards DATASET_ID=dataset_identifier BENEFIT_PROGRAM=SNAP BENEFIT_REGION=Michigan FILEPATH=path/to/some_cards.json
 ```
 
+Note that the DATASET_ID `dataset_identifier` will be used in the chatbot web UI to prefix each citation, so use a user-friendly identifier like "CA EDD".
+
 To load the BEM pdfs in your local environment, from within `/app`:
 
 ```bash
@@ -57,4 +59,19 @@ Scrape web pages and save to a JSON file, for example:
 poetry run scrape-edd-web
 ```
 
-To load into the vector database, see sections above but use `make ingest-edd-web DATASET_ID=edd-web BENEFIT_PROGRAM=employment BENEFIT_REGION=California FILEPATH=src/ingestion/edd_scrapings.json`.
+To load into the vector database, see sections above but use `make ingest-edd-web DATASET_ID="CA EDD" BENEFIT_PROGRAM=employment BENEFIT_REGION=California FILEPATH=src/ingestion/edd_scrapings.json`.
+
+## Batch processing
+
+To have answers generated for multiple questions at once, create a .csv file with a `question` column, for example:
+
+```
+question
+"What is the base period for SDI?"
+"Where can I find the Spanish version of the claims information?"
+"What types of support does the program offer for individuals recovering from an illness or injury?"
+```
+
+Then, in the chat interface, submit the message `Batch processing` to the chatbot and upload the .csv file when prompted.
+
+The input file can have additional columns beyond `question`. They will be preserved in the output file, in addition to the response columns.
