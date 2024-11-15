@@ -120,55 +120,6 @@ def _create_chunks(
 USE_MARKDOWN_TREE = True
 
 
-class EddChunkingConfig(ChunkingConfig):
-    def __init__(self) -> None:
-        super().__init__(app_config.sentence_transformer.max_seq_length)
-
-    def text_length(self, text: str) -> int:
-        return len(tokenize(text))
-
-
-def _create_splits_using_markdown_tree(content: str, document: Document) -> list[SplitWithContextText]:
-    splits: list[SplitWithContextText] = []
-    chunking_config = EddChunkingConfig()
-    content = _fix_input_markdown(content)
-    try:
-        tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
-        tree_chunks = chunk_tree(tree, chunking_config)
-
-        for chunk in tree_chunks:
-            split = SplitWithContextText(
-                chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
-            )
-            assert split.token_count == chunk.length
-            splits.append(split)
-            if os.path.exists("SAVE_CHUNKS"):
-                split.chunk_id = chunk.id
-                split.data_ids = ", ".join(chunk.data_ids)
-        if os.path.exists("SAVE_CHUNKS"):
-            assert document.source
-            _save_splits_to_files(document.source, content, splits, tree)
-    except (Exception, KeyboardInterrupt) as e:
-        logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
-        logger.error(tree.format())
-        raise e
-    return splits
-
-
-def _fix_input_markdown(markdown: str) -> str:
-    # Fix markdown formatting that causes markdown parsing errors
-    # '. . .' is parsed as sublists on the same line
-    # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
-    markdown = markdown.replace(". . .", "...")
-    # '. * ' is parsed as sublists; incorrect markdown from scraping
-    # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
-    markdown = markdown.replace(". *\n", ". \n")
-    # nested sublist '+' created without parent list; incorrect markdown from scraping?
-    # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
-    markdown = markdown.replace("* + ", "    + ")
-    return markdown
-
-
 def _chunk_page(
     document: Document, content: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
@@ -193,6 +144,58 @@ def _chunk_page(
         for index, split in enumerate(splits)
     ]
     return chunks, splits
+
+
+class EddChunkingConfig(ChunkingConfig):
+    def __init__(self) -> None:
+        super().__init__(app_config.sentence_transformer.max_seq_length)
+
+    def text_length(self, text: str) -> int:
+        return len(tokenize(text))
+
+
+def _create_splits_using_markdown_tree(
+    content: str, document: Document
+) -> list[SplitWithContextText]:
+    splits: list[SplitWithContextText] = []
+    chunking_config = EddChunkingConfig()
+    content = _fix_input_markdown(content)
+    try:
+        tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
+        tree_chunks = chunk_tree(tree, chunking_config)
+
+        for chunk in tree_chunks:
+            split = SplitWithContextText(
+                chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
+            )
+            assert split.token_count == chunk.length
+            splits.append(split)
+            if os.path.exists("SAVE_CHUNKS"):
+                # Add some extra info for debugging
+                split.chunk_id = chunk.id
+                split.data_ids = ", ".join(chunk.data_ids)
+        if os.path.exists("SAVE_CHUNKS"):
+            assert document.source
+            _save_splits_to_files(document.source, content, splits, tree)
+    except (Exception, KeyboardInterrupt) as e:
+        logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
+        logger.error(tree.format())
+        raise e
+    return splits
+
+
+def _fix_input_markdown(markdown: str) -> str:
+    # Fix markdown formatting that causes markdown parsing errors
+    # '. . .' is parsed as sublists on the same line
+    # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
+    markdown = markdown.replace(". . .", "...")
+    # '. * ' is parsed as sublists; incorrect markdown from scraping
+    # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
+    markdown = markdown.replace(". *\n", ". \n")
+    # nested sublist '+' created without parent list; incorrect markdown from scraping?
+    # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
+    markdown = markdown.replace("* + ", "    + ")
+    return markdown
 
 
 def _save_splits_to_files(
