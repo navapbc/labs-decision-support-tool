@@ -9,7 +9,7 @@ from asyncer import asyncify
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Select, Slider, TextInput
 from chainlit.types import AskFileResponse
-from src import backend, chat_engine
+from src import chat_engine
 from src.app_config import app_config
 from src.batch_process import batch_process
 from src.chat_engine import ChatEngineInterface, OnMessageResult
@@ -196,7 +196,9 @@ async def on_message(message: cl.Message) -> None:
         return
 
     try:
-        result = await backend.run_engine_async(engine, message.content, chat_history)
+        logger.info("Received: %s", message.content)
+        result = await asyncify(lambda: engine.on_message(message.content, chat_history))()
+        logger.info("Raw response: %s", result.response)
         if engine.formatter:
             # This block is to accommodate the old Guru chat engine
             msg_content = engine.formatter(

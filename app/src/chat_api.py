@@ -10,16 +10,16 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+from asyncer import asyncify
 from fastapi import FastAPI, HTTPException, Request
 from literalai import AsyncLiteralClient
 from pydantic import BaseModel
 
-from src import backend, chat_engine
+from src import chat_engine
 from src.chat_engine import ChatEngineInterface
+from src.citations import finalize_result
 from src.db.models.document import Subsection
 from src.healthcheck import HealthCheck, health
-from src.citations import remap_citation_ids
-from src.format import replace_citation_ids
 
 if __name__ == "__main__":
     # If running this file directly, define the FastAPI app
@@ -183,7 +183,7 @@ async def query(request: QueryRequest) -> QueryResponse:
             metadata={
                 "request": request.__dict__,
                 "user": session.user.__dict__,
-            }
+            },
         )
 
         # May want to cache engine instances rather than creating them for each request
@@ -277,12 +277,13 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
             citations=citations,
         )
     else:
-        result = await backend.run_engine_async(engine, question)
-        remapped_citations = remap_citation_ids(result.subsections, result.response)
-        remapped_response = replace_citation_ids(result.response, remapped_citations)
-        citations = [
-            Citation.from_subsection(subsection) for subsection in remapped_citations.values()
-        ]
+        logger.info("Received: %s", question)
+        chat_history = None
+        result = await asyncify(lambda: engine.on_message(question, chat_history))()
+        logger.info("Response: %s", result.response)
+
+        (remapped_response, subsections) = finalize_result(result.response, result.subsections)
+        citations = [Citation.from_subsection(subsection) for subsection in subsections]
         logger.info(pformat(citations))
         return QueryResponse(response_text=remapped_response, citations=citations)
 

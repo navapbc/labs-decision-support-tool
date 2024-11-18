@@ -1,5 +1,6 @@
 import pytest
 
+from src.db.models.document import Subsection
 from src.citations import (
     CitationFactory,
     create_prompt_context,
