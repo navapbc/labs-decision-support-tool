@@ -19,6 +19,49 @@ logger = logging.getLogger(__name__)
 _accordion_id = random.randint(0, 1000000)
 
 
+class FormattingConfig:
+    "Default formatting configuration"
+
+    def __init__(self) -> None:
+        self.add_citation_link_per_subsection = False
+
+    def return_citation_link(self, chunk: Chunk) -> str:
+        if chunk.document.source:
+            return f"<p>Source: <a href={chunk.document.source!r}>{chunk.document.source}</a></p>"
+        return ""
+
+    def get_superscript_link(self, chunk: Chunk) -> str:
+        return chunk.document.source if chunk.document.source else "#"
+
+    def build_accordion_body(self, citation_body: str) -> str:
+        return to_html(citation_body)
+
+
+class BemFormattingConfig(FormattingConfig):
+    "BEM-specific formatting configuration"
+
+    def __init__(self) -> None:
+        self.add_citation_link_per_subsection = True
+
+    def return_citation_link(self, chunk: Chunk) -> str:
+        bem_url_for_page = get_bem_url(chunk.document.name)
+        if chunk.page_number:
+            bem_url_for_page += "#page=" + str(chunk.page_number)
+        return (
+            f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
+            if chunk.page_number
+            else ""
+        )
+
+    def get_superscript_link(self, chunk: Chunk) -> str:
+        link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
+        link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
+        return link
+
+    def build_accordion_body(self, citation_body: str) -> str:
+        return to_html(replace_bem_with_link(citation_body))
+
+
 def format_guru_cards(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
@@ -26,7 +69,7 @@ def format_guru_cards(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations(raw_response, subsections)
+    response_with_citations = reify_citations(raw_response, subsections, FormattingConfig())
 
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
@@ -38,7 +81,9 @@ def format_guru_cards(
                 document.name,
             )
             continue
-        cards_html += _format_to_accordion_html(document=document, score=chunk_with_score.score)
+        cards_html += _format_guru_to_accordion_html(
+            document=document, score=chunk_with_score.score
+        )
 
     return response_with_citations + "<h3>Related Guru cards</h3>" + cards_html
 
@@ -77,43 +122,8 @@ def to_html(text: str) -> str:
     return markdown.markdown(corrected_text)
 
 
-def format_bem_subsections(
-    chunks_shown_max_num: int,
-    chunks_shown_min_score: float,
-    chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[Subsection],
-    raw_response: str,
-) -> str:
-    return build_accordions(subsections=subsections, raw_response=raw_response, data_source="BEM")
-
-
-def build_accordion_body(citation_body: str, source: str) -> str:
-    if source == "BEM":
-        return to_html(replace_bem_with_link(citation_body))
-    else:
-        return to_html(citation_body)
-
-
-def return_citation_link(chunk: Chunk, data_source: str) -> str:
-    if data_source == "BEM":
-        bem_url_for_page = get_bem_url(chunk.document.name)
-        if chunk.page_number:
-            bem_url_for_page += "#page=" + str(chunk.page_number)
-        return (
-            f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
-            if chunk.page_number
-            else ""
-        )
-    else:
-        if chunk.document.source:
-            return f"<p>Source: <a href={chunk.document.source!r}>{chunk.document.source}</a></p>"
-    return ""
-
-
 def build_accordions(
-    subsections: Sequence[Subsection],
-    raw_response: str,
-    data_source: str,
+    subsections: Sequence[Subsection], raw_response: str, config: FormattingConfig
 ) -> str:
     global _accordion_id
 
@@ -133,25 +143,23 @@ def build_accordions(
                 citation_body += f"<b>{citation_headings}</b>"
                 rendered_heading = citation_headings
 
-            citation_link = return_citation_link(chunk, data_source=data_source)
+            citation_link = config.return_citation_link(chunk)
             for chunk_subsection in subsection_list:
                 citation_numbers.append(chunk_subsection.id)
                 citation_body += (
                     f"<div>Citation #{chunk_subsection.id}: </div>"
-                    f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{chunk_subsection.text}</div>'
+                    f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(chunk_subsection.text)}</div>'
                 )
-                # generated citation links for BEM redirect to specific pages
-                if data_source == "BEM":
+                if config.add_citation_link_per_subsection:
+                    # generated citation links for BEM redirect to specific pages
                     citation_body += f"<div>{citation_link}</div>"
-        # if webpage, return source link once
-        if data_source != "BEM":
+
+        if not config.add_citation_link_per_subsection:
+            # return source link once
             citation_body += f"<div>{citation_link}</div>"
 
         _accordion_id += 1
-        formatted_citation_body = build_accordion_body(
-            citation_body=citation_body,
-            source=data_source,
-        )
+        formatted_citation_body = config.build_accordion_body(citation_body)
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -160,7 +168,7 @@ def build_accordions(
                     class="usa-accordion__button"
                     aria-expanded="false"
                     aria-controls="a-{_accordion_id}">
-                    {",".join(citation_numbers)}. {document.name}
+                    {",".join(citation_numbers)}. {document.dataset}: {document.name}
                 </button>
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
@@ -170,7 +178,7 @@ def build_accordions(
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a a list in response_with_citations
-    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations))
+    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations, config))
     if citations_html:
         return (
             "<div>"
@@ -180,16 +188,6 @@ def build_accordions(
             + "</div>"
         )
     return "<div>" + response_with_citations + "</div>"
-
-
-def format_web_subsections(
-    chunks_shown_max_num: int,
-    chunks_shown_min_score: float,
-    chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[Subsection],
-    raw_response: str,
-) -> str:
-    return build_accordions(subsections=subsections, raw_response=raw_response, data_source="EDD")
 
 
 def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> str:
@@ -232,6 +230,7 @@ def _group_by_document_and_chunks(
     return citations_by_document
 
 
+# TODO: This is not called. Remove it?
 def format_bem_documents(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,
@@ -239,16 +238,16 @@ def format_bem_documents(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations(raw_response, subsections)
+    response_with_citations = reify_citations(raw_response, subsections, BemFormattingConfig())
 
     documents = _get_bem_documents_to_show(
         chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
     )
 
-    return response_with_citations + _format_to_accordion_group_html(documents)
+    return response_with_citations + _format_bem_to_accordion_group_html(documents)
 
 
-def _format_to_accordion_html(document: Document, score: float) -> str:
+def _format_guru_to_accordion_html(document: Document, score: float) -> str:
     global _accordion_id
     _accordion_id += 1
     similarity_score = f"<p>Similarity Score: {str(score)}</p>"
@@ -273,7 +272,9 @@ def _format_to_accordion_html(document: Document, score: float) -> str:
     </div>"""
 
 
-def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkWithScore]]) -> str:
+def _format_bem_to_accordion_group_html(
+    documents: OrderedDict[Document, list[ChunkWithScore]]
+) -> str:
     global _accordion_id
     html = ""
     citation_number = 1
@@ -286,7 +287,7 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
         for chunk_with_score in documents[document]:
             chunk = chunk_with_score.chunk
 
-            formatted_chunk = _add_ellipses(chunk)
+            formatted_chunk = _add_ellipses_for_bem(chunk)
             formatted_chunk = replace_bem_with_link(formatted_chunk)
 
             # Adjust markdown for lists so Chainlit renders correctly
@@ -339,7 +340,7 @@ def _format_to_accordion_group_html(documents: OrderedDict[Document, list[ChunkW
     return "\n<h3>Source(s)</h3>" + html if html else ""
 
 
-def _add_ellipses(chunk: Chunk) -> str:
+def _add_ellipses_for_bem(chunk: Chunk) -> str:
     chunk_content = chunk.content
     if chunk.num_splits != 0:
         if chunk.split_index == 0:
@@ -351,16 +352,21 @@ def _add_ellipses(chunk: Chunk) -> str:
     return chunk_content
 
 
-def reify_citations(response: str, subsections: Sequence[Subsection]) -> str:
+def reify_citations(
+    response: str, subsections: Sequence[Subsection], config: FormattingConfig
+) -> str:
     remapped_citations = remap_citation_ids(subsections, response)
-    return _add_citation_links(response, remapped_citations)
+    return _add_citation_links(response, remapped_citations, config)
 
 
 _footnote_id = random.randint(0, 1000000)
 _footnote_index = 0
 
 
-def _add_citation_links(response: str, remapped_citations: dict[str, Subsection]) -> str:
+# FIXME: Refactor to reduce code replication with replace_citation_ids()
+def _add_citation_links(
+    response: str, remapped_citations: dict[str, Subsection], config: FormattingConfig
+) -> str:
     global _footnote_id
     _footnote_id += 1
     footnote_list = []
@@ -376,14 +382,13 @@ def _add_citation_links(response: str, remapped_citations: dict[str, Subsection]
             return ""
 
         chunk = remapped_citations[citation_id].chunk
-        bem_link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
-        bem_link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
-        citation = f"<sup><a href={bem_link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
+        link = config.get_superscript_link(chunk)
+        citation = f"<sup><a href={link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
 
         global _footnote_index
         _footnote_index += 1
         footnote_list.append(
-            f"<a style='text-decoration:none' href={bem_link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
+            f"<a style='text-decoration:none' href={link!r}><sup id={_footnote_id!r}>{_footnote_index}. {chunk.document.name}</sup></a>"
         )
         return citation
 
@@ -392,3 +397,19 @@ def _add_citation_links(response: str, remapped_citations: dict[str, Subsection]
 
     # For now, don't show footnote list
     return added_citations  # + "</br>" + "</br>".join(footnote_list)
+
+
+def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection]) -> str:
+    """Replace (citation-XX) in response with (citation-YY), where XX is the original citation ID
+    and YY is the remapped citation ID"""
+
+    def replace_citation(match: Match) -> str:
+        citation_id = match.group(1)
+        if citation_id not in remapped_citations:
+            logger.error(
+                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
+            )
+            return ""
+        return "(citation-" + remapped_citations[citation_id].id + ")"
+
+    return re.sub(CITATION_PATTERN, replace_citation, response)
