@@ -5,7 +5,7 @@ from typing import Callable, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, Subsection
-from src.format import format_bem_subsections, format_guru_cards, format_web_subsections
+from src.format import BemFormattingConfig, FormattingConfig, format_guru_cards
 from src.generate import PROMPT, MessageAttributes, analyze_message, generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
@@ -25,8 +25,12 @@ class ChatEngineInterface(ABC):
     engine_id: str
     name: str
 
-    # Function for formatting responses
-    formatter: Callable
+    # Configuration for formatting responses
+    formatting_config: FormattingConfig
+
+    # Function for formatting responses instead of the default
+    # Only used by the old Guru chat engine
+    formatter: Callable | None = None
 
     # Thresholds that determine which retrieved documents are shown in the UI
     chunks_shown_max_num: int = 5
@@ -83,6 +87,8 @@ class BaseEngine(ChatEngineInterface):
         "chunks_shown_min_score",
         "system_prompt",
     ]
+
+    formatting_config = FormattingConfig()
 
     def on_message(self, question: str, chat_history: list[dict[str, str]]) -> OnMessageResult:
         attributes = analyze_message(self.llm, question)
@@ -160,7 +166,8 @@ class BridgesEligibilityManualEngine(BaseEngine):
     engine_id: str = "bridges-eligibility-manual"
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
     datasets = ["bridges-eligibility-manual"]
-    formatter = staticmethod(format_bem_subsections)
+
+    formatting_config = BemFormattingConfig()
 
 
 class CaEddWebEngine(BaseEngine):
@@ -174,7 +181,6 @@ class CaEddWebEngine(BaseEngine):
     engine_id: str = "ca-edd-web"
     name: str = "CA EDD Web Chat Engine"
     datasets = ["CA EDD"]
-    formatter = staticmethod(format_web_subsections)
 
     system_prompt = f"""You are an assistant to navigators who support clients-such as claimants, beneficiaries, families, and individuals-during the screening, application, and receipt of public benefits from California's Employment Development Department (EDD).
 If you can't find information about the user's prompt in your context, don't answer it. If the user asks a question about a program not delivered by California's Employment Development Department (EDD), don't answer beyond pointing the user to the relevant trusted website for more information. Don't answer questions about tax credits (such as EITC, CTC) or benefit programs not delivered by EDD.
