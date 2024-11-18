@@ -1,7 +1,5 @@
-import csv
 import json
 import logging
-import os
 import re
 import sys
 from typing import Sequence
@@ -11,10 +9,6 @@ from smart_open import open as smart_open
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.generate import (
-    QuestionAnswerAttributes,
-    generate_q_a_pairs,
-)
 from src.util.ingest_utils import (
     add_embeddings,
     deconstruct_list,
@@ -100,10 +94,7 @@ def _create_chunks(
         assert content, f"Item {name} has no main_content or main_primary"
 
         document = Document(name=name, content=content, source=item["url"], **doc_attribs)
-        fields = ["question", "answer", "document_name", "document_source"]
         chunks, splits = _chunk_page(document, content)
-        q_a_json = generate_question_answer_pair(document=document, num_of_chunks=len(chunks))
-        write_question_answer_json_to_csv("question_answer_pairs.csv", fields, q_a_json)
         result.append((document, chunks, splits))
     return result
 
@@ -245,35 +236,6 @@ def _split_large_text_block(
             raise ValueError(
                 f"Cannot split long ({split.token_count} tokens) text_block: {split.text}"
             )
-
-
-def generate_question_answer_pair(
-    document: Document, num_of_chunks: int
-) -> list[QuestionAnswerAttributes]:
-    generated_question_anwers = generate_q_a_pairs(
-        llm="gpt-4o",
-        message=f"Please use the following content to create {num_of_chunks} question(s) answer pairs. Content: {document.content}",
-    )
-    return generated_question_anwers.pairs
-
-
-def write_question_answer_json_to_csv(
-    file_path: str, fields: list[str], q_a_json: list[QuestionAnswerAttributes]
-) -> None:
-    needs_header = (
-        True
-        if os.path.exists(file_path)
-        and os.stat(file_path).st_size == 0
-        or not os.path.exists(file_path)
-        else False
-    )
-
-    with open(file_path, "a", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fields)
-        if needs_header:
-            writer.writeheader()
-        for question in q_a_json:
-            writer.writerow(dict(question))
 
 
 def main() -> None:
