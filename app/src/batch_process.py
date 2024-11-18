@@ -51,10 +51,14 @@ def _process_question(question: str, engine: ChatEngineInterface) -> dict[str, s
 
     for subsection in remapped_citations.values():
         citation_key = "citation_" + subsection.id
+        formatted_headings = (
+            " > ".join(subsection.chunk.headings) if subsection.chunk.headings else ""
+        )
         result_table |= {
-            citation_key: subsection.text,
             citation_key + "_name": subsection.chunk.document.name,
+            citation_key + "_headings": formatted_headings,
             citation_key + "_source": subsection.chunk.document.source,
+            citation_key + "_text": subsection.text,
         }
 
     return result_table
