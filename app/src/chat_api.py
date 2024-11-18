@@ -282,10 +282,12 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
         result = await asyncify(lambda: engine.on_message(question, chat_history))()
         logger.info("Response: %s", result.response)
 
-        (remapped_response, subsections) = finalize_result(result.response, result.subsections)
-        citations = [Citation.from_subsection(subsection) for subsection in subsections]
+        final_result = finalize_result(result)
+        citations = [
+            Citation.from_subsection(subsection) for subsection in final_result.subsections
+        ]
         logger.info(pformat(citations))
-        return QueryResponse(response_text=remapped_response, citations=citations)
+        return QueryResponse(response_text=final_result.response, citations=citations)
 
 
 # endregion
