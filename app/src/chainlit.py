@@ -180,7 +180,7 @@ async def on_message(message: cl.Message) -> None:
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
 
-    if message.content == "Batch processing":
+    if message.content.lower() == "batch processing":
         # The AskFileMessage cannot be called inside code run by asyncio.create_task,
         # or the Chainlit UI will freeze indefinitely
         files = await cl.AskFileMessage(

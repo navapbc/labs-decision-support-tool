@@ -66,7 +66,8 @@ def test_process_question(monkeypatch, engine):
     monkeypatch.setattr(engine, "on_message", lambda question, chat_history: mock_result)
     assert _process_question("What is AI?", engine) == {
         "answer": "Answer to question.(citation-1)",
-        "citation_1": "subsection text",
         "citation_1_name": mock_result.subsections[0].chunk.document.name,
+        "citation_1_headings": " > ".join(mock_result.subsections[0].chunk.headings),
         "citation_1_source": mock_result.subsections[0].chunk.document.source,
+        "citation_1_text": "subsection text",
     }
