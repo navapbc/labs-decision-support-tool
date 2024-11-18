@@ -134,6 +134,45 @@ def completion_args(llm: str) -> dict[str, Any]:
     return {}
 
 
+class QuestionAnswerAttributes(BaseModel):
+    question: str
+    answer: str
+    document_name: str
+    document_source: str
+
+
+class QuestionAnswerList(BaseModel):
+    pairs: list[QuestionAnswerAttributes]
+
+
+def generate_q_a_pairs(llm: str, message: str) -> QuestionAnswerList:
+    response = (
+        completion(
+            model=llm,
+            messages=[
+                {
+                    "content": GENERATE_QUESTION_ANSWER_PROMPT,
+                    "role": "system",
+                },
+                {
+                    "content": message,
+                    "role": "user",
+                },
+            ],
+            response_format=QuestionAnswerList,
+            temperature=app_config.temperature,
+            **completion_args(llm),
+        )
+        .choices[0]
+        .message.content
+    )
+
+    logger.info("Generated Question Answer: %s", response)
+
+    response_as_json = json.loads(response)
+    return QuestionAnswerList.model_validate(response_as_json)
+
+
 class MessageAttributes(BaseModel):
     original_language: str
     is_in_english: bool

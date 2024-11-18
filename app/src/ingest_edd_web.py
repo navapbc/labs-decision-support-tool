@@ -11,7 +11,10 @@ from smart_open import open as smart_open
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.generate import GENERATE_QUESTION_ANSWER_PROMPT, generate
+from src.generate import (
+    QuestionAnswerAttributes,
+    generate_q_a_pairs,
+)
 from src.util.ingest_utils import (
     add_embeddings,
     deconstruct_list,
@@ -100,7 +103,7 @@ def _create_chunks(
         fields = ["question", "answer", "document_name", "document_source"]
         chunks, splits = _chunk_page(document, content)
         q_a_json = generate_question_answer_pair(document=document, num_of_chunks=len(chunks))
-        write_to_csv("question_answer_pairs.csv", fields, q_a_json)
+        write_question_answer_json_to_csv("question_answer_pairs.csv", fields, q_a_json)
         result.append((document, chunks, splits))
     return result
 
@@ -244,21 +247,19 @@ def _split_large_text_block(
             )
 
 
-def generate_question_answer_pair(document: Document, num_of_chunks: int):
-    q_a_json = generate(
+def generate_question_answer_pair(
+    document: Document, num_of_chunks: int
+) -> list[QuestionAnswerAttributes]:
+    generated_question_anwers = generate_q_a_pairs(
         llm="gpt-4o",
-        system_prompt=GENERATE_QUESTION_ANSWER_PROMPT,
-        query=f"Please use the information to create {num_of_chunks} question(s) answer pairs.",
-        context_text=f"Full document content: {document.content}, document name: {document.name}, document source: {document.source}",
+        message=f"Please use the following content to create {num_of_chunks} question(s) answer pairs. Content: {document.content}",
     )
-    logger.info("Generated %i question answer pairs", num_of_chunks)
-    if q_a_json.startswith("{"):
-        q_a_json = f"[{q_a_json}]"
-        logger.info("Generated JSON with object instead of list")
-    return json.loads(q_a_json)
+    return generated_question_anwers.pairs
 
 
-def write_to_csv(file_path: str, fields: list[str], q_a_json: list[dict[str, str]]) -> None:
+def write_question_answer_json_to_csv(
+    file_path: str, fields: list[str], q_a_json: list[QuestionAnswerAttributes]
+) -> None:
     needs_header = (
         True
         if os.path.exists(file_path)
@@ -272,7 +273,7 @@ def write_to_csv(file_path: str, fields: list[str], q_a_json: list[dict[str, str
         if needs_header:
             writer.writeheader()
         for question in q_a_json:
-            writer.writerow(question)
+            writer.writerow(dict(question))
 
 
 def main() -> None:
