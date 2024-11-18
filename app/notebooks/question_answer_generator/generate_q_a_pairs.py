@@ -98,8 +98,3 @@ def write_question_answer_json_to_csv(
             writer.writeheader()
         for question in q_a_json:
             writer.writerow(dict(question))
-
-
-# fields = ["question", "answer", "document_name", "document_source"]
-# q_a_json = generate_question_answer_pair(document=document, num_of_chunks=len(chunks))
-# write_question_answer_json_to_csv("question_answer_pairs.csv", fields, q_a_json)
