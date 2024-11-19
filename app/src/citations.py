@@ -144,7 +144,7 @@ class ResponseWithSubsections:
     subsections: Sequence[Subsection]
 
 
-def finalize_result(result: ResponseWithSubsections) -> ResponseWithSubsections:
+def simplify_citation_numbers(result: ResponseWithSubsections) -> ResponseWithSubsections:
     """
     Returns the response with remapped `(citation-X)` strings and
     a list of subsections representing the citations.

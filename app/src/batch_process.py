@@ -3,7 +3,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from src.chat_engine import ChatEngineInterface
-from src.citations import finalize_result
+from src.citations import simplify_citation_numbers
 
 
 async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
@@ -42,7 +42,7 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
 
 def _process_question(question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
     result = engine.on_message(question=question, chat_history=[])
-    final_result = finalize_result(result)
+    final_result = simplify_citation_numbers(result)
 
     result_table: dict[str, str | None] = {"answer": final_result.response}
 
