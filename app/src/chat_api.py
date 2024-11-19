@@ -86,12 +86,6 @@ async def _get_user_session(user_id: str) -> UserSession:
 # region: ===================  Example API Endpoint and logging to LiteralAI  ===================
 
 
-# This will show up as a separate step in LiteralAI, showing input and output
-@literalai().step(type="tool")
-def list_engines() -> list[str]:
-    return chat_engine.available_engines()
-
-
 # Make sure to use async functions for faster responses
 @router.get("/engines")
 async def engines(user_id: str) -> list[str]:
@@ -104,7 +98,13 @@ async def engines(user_id: str) -> list[str]:
             name=user_id,
             metadata=session.user.__dict__,
         )
-        response = [engine for engine in list_engines() if engine in session.user.allowed_engines]
+        # This will show up as a separate step in LiteralAI, showing input and output
+        with literalai().step(type="tool"):
+            response = [
+                engine
+                for engine in chat_engine.available_engines()
+                if engine in session.user.allowed_engines
+            ]
         # Example of using parent_id to have a hierarchy of messages in Literal AI
         literalai().message(content=str(response), type="system_message", parent_id=request_msg.id)
 
