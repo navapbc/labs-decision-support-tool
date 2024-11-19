@@ -1,9 +1,9 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Callable, Optional, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
-from typing import Callable, Optional, Sequence
 from src.db.models.document import ChunkWithScore, Subsection
 from src.format import BemFormattingConfig, FormattingConfig, format_guru_cards
 from src.generate import PROMPT, ChatHistory, MessageAttributes, analyze_message, generate

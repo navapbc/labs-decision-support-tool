@@ -1,14 +1,14 @@
 import asyncio
 import logging
 import pprint
-from asyncer import asyncify
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+
+from asyncer import asyncify
 
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Select, Slider, TextInput
 from chainlit.types import AskFileResponse
-
 from src import chat_engine
 from src.app_config import app_config
 from src.batch_process import batch_process
