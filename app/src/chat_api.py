@@ -6,6 +6,7 @@ This is enabled with the Chainlit chatbot or can be launched as a standalone app
 """
 
 import logging
+import functools
 from dataclasses import dataclass
 from typing import Optional
 
@@ -32,7 +33,9 @@ async def healthcheck(request: Request) -> HealthCheck:
     return healthcheck_response
 
 
-literalai = AsyncLiteralClient()
+@functools.cache
+def literalai():
+    return AsyncLiteralClient()
 
 # region: ===================  Session Management ===================
 
@@ -71,7 +74,7 @@ def __query_user_session(user_id: str) -> UserSession:
 async def _get_user_session(user_id: str) -> UserSession:
     session = __query_user_session(user_id)
     # Ensure user exists in Literal AI
-    literalai_user = await literalai.api.get_or_create_user(user_id, session.user.__dict__)
+    literalai_user = await literalai().api.get_or_create_user(user_id, session.user.__dict__)
     # Set the LiteralAI user ID for this session
     session.literalai_user_id = literalai_user.id
     return session
@@ -82,7 +85,7 @@ async def _get_user_session(user_id: str) -> UserSession:
 
 
 # This will show up as a separate step in LiteralAI, showing input and output
-@literalai.step(type="tool")
+@literalai().step(type="tool")
 def list_engines() -> list[str]:
     return chat_engine.available_engines()
 
@@ -92,8 +95,8 @@ def list_engines() -> list[str]:
 async def engines(user_id: str) -> list[str]:
     session = await _get_user_session(user_id)
     # Example of using Literal AI to log the request and response
-    with literalai.thread(name="API:/engines", participant_id=session.literalai_user_id):
-        request_msg = literalai.message(
+    with literalai().thread(name="API:/engines", participant_id=session.literalai_user_id):
+        request_msg = literalai().message(
             content="List chat engines",
             type="user_message",
             name=user_id,
@@ -101,7 +104,7 @@ async def engines(user_id: str) -> list[str]:
         )
         response = [engine for engine in list_engines() if engine in session.user.allowed_engines]
         # Example of using parent_id to have a hierarchy of messages in Literal AI
-        literalai.message(content=str(response), type="system_message", parent_id=request_msg.id)
+        literalai().message(content=str(response), type="system_message", parent_id=request_msg.id)
 
     return response
 
@@ -170,8 +173,8 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 async def query(request: QueryRequest) -> QueryResponse:
     # For now, use the required session_id as the user_id to get a UserSession
     session = await _get_user_session(request.session_id)
-    with literalai.thread(name="API:/query", participant_id=session.literalai_user_id):
-        request_msg = literalai.message(
+    with literalai().thread(name="API:/query", participant_id=session.literalai_user_id):
+        request_msg = literalai().message(
             content=request.message,
             type="user_message",
             name=request.session_id,
@@ -186,7 +189,7 @@ async def query(request: QueryRequest) -> QueryResponse:
         response: QueryResponse = await run_query(engine, request.message)
 
         # Example of using parent_id to have a hierarchy of messages in Literal AI
-        response_msg = literalai.message(
+        response_msg = literalai().message(
             content=response.response_text,
             type="assistant_message",
             parent_id=request_msg.id,
@@ -194,9 +197,6 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
         # id needed to later provide feedback on this message in LiteralAI
         response.response_id = response_msg.id
-
-    # FIXME: Wait for all steps to be sent. This is NOT needed in production code.
-    # await literalai.flush()
     return response
 
 

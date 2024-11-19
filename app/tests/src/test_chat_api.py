@@ -36,7 +36,7 @@ def mock_literalai():
 def client(monkeypatch):
     mock = mock_literalai()
     monkeypatch.setattr(mock, "api", AsyncMock())
-    monkeypatch.setattr(chat_api, "literalai", mock)
+    monkeypatch.setattr(chat_api, "literalai", lambda: mock)
     return TestClient(router)
 
 
