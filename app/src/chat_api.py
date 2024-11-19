@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 """
-This is an initial API that demonstrates how to create an API using FastAPI,
-which is compatible with Chainlit. This file is a starting point for creating
-an API that can be deployed with the Chainlit chatbot or as a standalone app.
+This creates API endpoints using FastAPI, which is compatible with Chainlit.
+This is enabled with the Chainlit chatbot or can be launched as a standalone app.
 """
 
 import logging
@@ -205,9 +204,6 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
-from pprint import pformat
-
-
 async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse:
     MOCK_RESPONSE = True
     if MOCK_RESPONSE:
@@ -271,7 +267,8 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
                 citation_text="If you filed for unemployment within the last 52 weeks and have not exhausted your benefits, you must [reopen your claim](https://edd.ca.gov/en/unemployment/reopen-a-claim/) to restart your benefits.",
             ),
         ]
-        logger.info(pformat(citations))
+        # from pprint import pformat
+        # logger.info(pformat(citations))
         return QueryResponse(
             response_text="Here are some important deadlines for unemployment insurance benefits:\n\n- **Apply Early**: File for unemployment in the first week you lose your job or your hours are reduced. Your claim starts the Sunday of the week you apply.(citation-1)\n- **Benefit Year**: A regular unemployment insurance benefit year ends 12 months after your claim starts. You cannot be paid for weeks of unemployment after your benefit year ends, even if you have a balance on your claim.(citation-2) (citation-3)\n- **Certify Every Two Weeks**: To continue receiving benefits, you must certify for benefits every two weeks. This involves answering questions to confirm you are still eligible.(citation-4) (citation-5)\n- **Reopen Claims**: If you filed for unemployment within the last 52 weeks and haven't exhausted your benefits, you must reopen your claim to restart your benefits.(citation-6)\n\nFor more detailed information, you can visit the EDD website or contact them directly.",
             citations=citations,
@@ -286,7 +283,6 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
         citations = [
             Citation.from_subsection(subsection) for subsection in final_result.subsections
         ]
-        logger.info(pformat(citations))
         return QueryResponse(response_text=final_result.response, citations=citations)
 
 

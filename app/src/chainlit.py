@@ -176,6 +176,7 @@ def get_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
+    logger.info("Received: %r", message.content)
     chat_context = cl.chat_context.get()
     chat_history = get_raw_chat_history(chat_context)
 
@@ -196,7 +197,6 @@ async def on_message(message: cl.Message) -> None:
         return
 
     try:
-        logger.info("Received: %s", message.content)
         result = await asyncify(lambda: engine.on_message(message.content, chat_history))()
         logger.info("Raw response: %s", result.response)
         if engine.formatter:
