@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from asyncer import asyncify
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from literalai import AsyncLiteralClient
 from pydantic import BaseModel
@@ -21,20 +21,11 @@ from src.citations import simplify_citation_numbers
 from src.db.models.document import Subsection
 from src.healthcheck import HealthCheck, health
 
-app = FastAPI()
-
-if __name__ == "__main__":
-    # If running this file directly, define the FastAPI app
-    app = FastAPI()
-else:
-    # Otherwise use Chainlit's app
-    # See https://docs.chainlit.io/deploy/api#how-it-works
-    from chainlit.server import app
-
 logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api")
 
 
-@app.get("/api_healthcheck", response_class=JSONResponse)
+@router.get("/healthcheck", response_class=JSONResponse)
 async def healthcheck(request: Request) -> HealthCheck:
     logger.info(request.headers)
     healthcheck_response = await health(request)
@@ -97,7 +88,7 @@ def list_engines() -> list[str]:
 
 
 # Make sure to use async functions for faster responses
-@app.get("/engines")
+@router.get("/engines")
 async def engines(username: str) -> list[str]:
     session = await _get_user_session(username)
     # Example of using Literal AI to log the request and response
@@ -174,7 +165,7 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 
 
 # curl -X POST 'http://0.0.0.0:8001/query' -H 'Content-Type: application/json' -d '{ "session_id": "12", "new_session": true, "message": "list unemployment insurance benefits?" }'
-@app.post("/query")
+@router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
     session = await _get_user_session(request.session_id)
     with literalai.thread(name="API:/query", participant_id=session.literalai_user_id):
@@ -296,4 +287,4 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     # Use port 8001 so that this standalone API app does not conflict with the Chainlit app
-    uvicorn.run("__main__:app", host="127.0.0.1", port=8001, log_level="info")
+    uvicorn.run(router, host="127.0.0.1", port=8001, log_level="info")

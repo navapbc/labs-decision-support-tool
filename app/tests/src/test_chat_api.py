@@ -1,19 +1,13 @@
-
-import json
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.chat_api import app
-# from src.healthcheck import healthcheck_router
+from src.chat_api import router
 
-# app = FastAPI()
-client = TestClient(app)
+client = TestClient(router)
 
 
 def test_api_healthcheck():
-    response = client.get("/api_healthcheck")
+    response = client.get("/api/healthcheck")
     assert response.status_code == 200
-    # response_data = json.loads(response.content)
+    print(type(response))
     print(response.content)
-    # assert response.json() == {"msg": "Hello World"}
-
+    assert response.json()["status"] == "OK"
