@@ -196,7 +196,7 @@ async def query(request: QueryRequest) -> QueryResponse:
         response.response_id = response_msg.id
 
     # FIXME: Wait for all steps to be sent. This is NOT needed in production code.
-    await literalai.flush()
+    # await literalai.flush()
     return response
 
 

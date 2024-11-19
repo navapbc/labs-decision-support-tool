@@ -1,10 +1,13 @@
 import logging
+from contextlib import contextmanager
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
+from src import chat_api
 from src.chat_api import (
     ChatEngineSettings,
     QueryResponse,
@@ -19,16 +22,27 @@ from src.citations import CitationFactory, split_into_subsections
 from tests.src.db.models.factories import ChunkFactory
 
 
+def mock_literalai():
+    @contextmanager
+    def dummy_context_manager():
+        yield
+
+    mock = MagicMock()
+    mock.thread.return_value = dummy_context_manager()
+    return mock
+
+
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    mock = mock_literalai()
+    monkeypatch.setattr(mock, "api", AsyncMock())
+    monkeypatch.setattr(chat_api, "literalai", mock)
     return TestClient(router)
 
 
 def test_api_healthcheck(client):
     response = client.get("/api/healthcheck")
     assert response.status_code == 200
-    print(type(response))
-    print(response.content)
     assert response.json()["status"] == "OK"
 
 
@@ -38,7 +52,7 @@ def test_api_engines(client):
     assert response.json() == ["ca-edd-web"]
 
 
-def test_api_query(client, monkeypatch):
+def test_api_query(monkeypatch, client):
     async def mock_run_query(engine, question):
         return QueryResponse(
             response_text="Response from LLM",
