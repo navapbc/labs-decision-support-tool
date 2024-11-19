@@ -1,12 +1,12 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
+from typing import Callable, Optional, Sequence
 from src.db.models.document import ChunkWithScore, Subsection
 from src.format import BemFormattingConfig, FormattingConfig, format_guru_cards
-from src.generate import PROMPT, MessageAttributes, analyze_message, generate
+from src.generate import PROMPT, ChatHistory, MessageAttributes, analyze_message, generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
 
@@ -46,7 +46,7 @@ class ChatEngineInterface(ABC):
         super().__init__()
 
     @abstractmethod
-    def on_message(self, question: str, chat_history: list[dict[str, str]]) -> OnMessageResult:
+    def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
         pass
 
 
@@ -90,7 +90,7 @@ class BaseEngine(ChatEngineInterface):
 
     formatting_config = FormattingConfig()
 
-    def on_message(self, question: str, chat_history: list[dict[str, str]]) -> OnMessageResult:
+    def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
         attributes = analyze_message(self.llm, question)
 
         if attributes.needs_context:
@@ -99,7 +99,10 @@ class BaseEngine(ChatEngineInterface):
         return self._build_response(question, attributes, chat_history)
 
     def _build_response(
-        self, question: str, attributes: MessageAttributes, chat_history: list[dict[str, str]]
+        self,
+        question: str,
+        attributes: MessageAttributes,
+        chat_history: Optional[ChatHistory] = None,
     ) -> OnMessageResult:
         response = generate(
             self.llm,
@@ -112,7 +115,10 @@ class BaseEngine(ChatEngineInterface):
         return OnMessageResult(response, self.system_prompt)
 
     def _build_response_with_context(
-        self, question: str, attributes: MessageAttributes, chat_history: list[dict[str, str]]
+        self,
+        question: str,
+        attributes: MessageAttributes,
+        chat_history: Optional[ChatHistory] = None,
     ) -> OnMessageResult:
         question_for_retrieval = (
             question if attributes.is_in_english else attributes.message_in_english

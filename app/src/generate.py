@@ -66,12 +66,15 @@ def get_models() -> dict[str, str]:
     return models
 
 
+ChatHistory = list[dict[str, str]]
+
+
 def generate(
     llm: str,
     system_prompt: str,
     query: str,
     context_text: str | None = None,
-    chat_history: list[dict[str, str]] | None = None,
+    chat_history: ChatHistory | None = None,
 ) -> str:
     """
     Returns a string response from an LLM model, based on a query input.

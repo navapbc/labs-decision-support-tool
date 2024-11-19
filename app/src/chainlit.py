@@ -12,7 +12,7 @@ from src.app_config import app_config
 from src.batch_process import batch_process
 from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.format import build_accordions
-from src.generate import get_models
+from src.generate import ChatHistory, get_models
 from src.login import require_login
 
 logger = logging.getLogger(__name__)
@@ -151,8 +151,8 @@ _WIDGET_FACTORIES = {
 }
 
 
-def get_raw_chat_history(messages: list[cl.Message]) -> list[dict[str, str]]:
-    raw_chat_history: list[dict[str, str]] = []
+def get_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
+    raw_chat_history: ChatHistory = []
     for message in messages:
         if message.type == "assistant_message":
             raw_chat_history.append(
