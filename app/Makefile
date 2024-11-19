@@ -106,6 +106,9 @@ stop:
 
 check: format-check lint test
 
+launch-api-only:
+	$(PY_RUN_CMD) launch-api-only -p 8001
+
 ##################################################
 # DB & migrations
 ##################################################
@@ -249,16 +252,13 @@ ifndef FILEPATH
 endif
 
 ingest-guru-cards: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-guru-cards $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+	$(PY_RUN_CMD) ingest-guru-cards "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
 
 ingest-policy-pdfs: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-policy-pdfs $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+	$(PY_RUN_CMD) ingest-policy-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
 
 ingest-bem-pdfs: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-bem-pdfs $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+	$(PY_RUN_CMD) ingest-bem-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
 
 ingest-edd-web: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-edd-web $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
-
-launch-api-only:
-	$(PY_RUN_CMD) launch-api-only -p 8001
+	$(PY_RUN_CMD) ingest-edd-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
