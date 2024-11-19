@@ -29,6 +29,7 @@ def mock_literalai():
 
     mock = MagicMock()
     mock.thread.return_value = dummy_context_manager()
+    mock.step.return_value = dummy_context_manager()
     return mock
 
 

@@ -5,8 +5,8 @@ This creates API endpoints using FastAPI, which is compatible with Chainlit.
 This is enabled with the Chainlit chatbot or can be launched as a standalone app.
 """
 
-import logging
 import functools
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
@@ -35,7 +35,9 @@ async def healthcheck(request: Request) -> HealthCheck:
 
 @functools.cache
 def literalai():
+    "This needs to be a function so we can mock it in tests"
     return AsyncLiteralClient()
+
 
 # region: ===================  Session Management ===================
 
@@ -75,7 +77,7 @@ async def _get_user_session(user_id: str) -> UserSession:
     session = __query_user_session(user_id)
     # Ensure user exists in Literal AI
     literalai_user = await literalai().api.get_or_create_user(user_id, session.user.__dict__)
-    # Set the LiteralAI user ID for this session
+    # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
     session.literalai_user_id = literalai_user.id
     return session
 
