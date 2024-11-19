@@ -39,7 +39,7 @@ literalai = AsyncLiteralClient()
 
 @dataclass
 class UserInfo:
-    username: str
+    user_id: str
     allowed_engines: list[str]
 
 
@@ -56,22 +56,22 @@ class UserSession:
     literalai_user_id: Optional[str] = None
 
 
-def __query_user_session(username: str) -> UserSession:
+def __query_user_session(user_id: str) -> UserSession:
     """
     Placeholder for creating/retrieving user's session from the DB, including settings and constraints
     """
     session = UserSession(
-        user=UserInfo(username, ["ca-edd-web"]),
+        user=UserInfo(user_id, ["ca-edd-web"]),
         chat_engine_settings=ChatEngineSettings("ca-edd-web"),
     )
-    logger.info("Found user session for: %s", username)
+    logger.info("Found user session for: %s", user_id)
     return session
 
 
-async def _get_user_session(username: str) -> UserSession:
-    session = __query_user_session(username)
+async def _get_user_session(user_id: str) -> UserSession:
+    session = __query_user_session(user_id)
     # Ensure user exists in Literal AI
-    literalai_user = await literalai.api.get_or_create_user(username, session.user.__dict__)
+    literalai_user = await literalai.api.get_or_create_user(user_id, session.user.__dict__)
     # Set the LiteralAI user ID for this session
     session.literalai_user_id = literalai_user.id
     return session
@@ -89,14 +89,14 @@ def list_engines() -> list[str]:
 
 # Make sure to use async functions for faster responses
 @router.get("/engines")
-async def engines(username: str) -> list[str]:
-    session = await _get_user_session(username)
+async def engines(user_id: str) -> list[str]:
+    session = await _get_user_session(user_id)
     # Example of using Literal AI to log the request and response
     with literalai.thread(name="API:/engines", participant_id=session.literalai_user_id):
         request_msg = literalai.message(
             content="List chat engines",
             type="user_message",
-            name=username,
+            name=user_id,
             metadata=session.user.__dict__,
         )
         response = [engine for engine in list_engines() if engine in session.user.allowed_engines]
@@ -152,12 +152,13 @@ class QueryResponse(BaseModel):
 
 
 def get_chat_engine(session: UserSession) -> ChatEngineInterface:
+    engine_id = session.chat_engine_settings.engine_id
     # May want to cache engine instances rather than creating them for each request
-    engine = chat_engine.create_engine(session.chat_engine_settings.engine_id)
+    engine = (
+        chat_engine.create_engine(engine_id) if engine_id in session.user.allowed_engines else None
+    )
     if not engine:
-        raise HTTPException(
-            status_code=406, detail=f"Unknown engine: {session.chat_engine_settings.engine_id}"
-        )
+        raise HTTPException(status_code=406, detail=f"Unknown engine: {engine_id}")
     for setting_name in engine.user_settings:
         if setting_value := getattr(session.chat_engine_settings, setting_name, None):
             setattr(engine, setting_name, setting_value)
@@ -167,6 +168,7 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 # curl -X POST 'http://0.0.0.0:8001/query' -H 'Content-Type: application/json' -d '{ "session_id": "12", "new_session": true, "message": "list unemployment insurance benefits?" }'
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
+    # For now, use the required session_id as the user_id to get a UserSession
     session = await _get_user_session(request.session_id)
     with literalai.thread(name="API:/query", participant_id=session.literalai_user_id):
         request_msg = literalai.message(
@@ -199,85 +201,14 @@ async def query(request: QueryRequest) -> QueryResponse:
 
 
 async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse:
-    MOCK_RESPONSE = True
-    if MOCK_RESPONSE:
-        citations = [
-            Citation(
-                citation_id="citation-1",
-                source_id="e4b3050a-23a4-47d6-8634-67012ea1a9d0",
-                source_name="Register and Apply for Unemployment Insurance",
-                page_number=None,
-                uri="https://edd.ca.gov/en/unemployment/apply/",
-                headings=["Register and Apply for Unemployment Insurance"],
-                citation_text="[File for unemployment](https://edd.ca.gov/en/unemployment/Filing_a_Claim/) in the first week that you lose your job or have your hours reduced. Your claim begins the Sunday of the week you applied for unemployment.",
-            ),
-            Citation(
-                citation_id="citation-2",
-                source_id="e4b3050a-23a4-47d6-8634-67012ea1a9d0",
-                source_name="Register and Apply for Unemployment Insurance",
-                page_number=None,
-                uri="https://edd.ca.gov/en/unemployment/apply/",
-                headings=["Register and Apply for Unemployment Insurance"],
-                citation_text="### Benefit Year End Date\nA regular unemployment insurance benefit year ends 12 months after the claim started.",
-            ),
-            Citation(
-                citation_id="citation-3",
-                source_id="e4b3050a-23a4-47d6-8634-67012ea1a9d0",
-                source_name="Register and Apply for Unemployment Insurance",
-                page_number=None,
-                uri="https://edd.ca.gov/en/unemployment/apply/",
-                headings=["Register and Apply for Unemployment Insurance"],
-                citation_text="You cannot be paid for weeks of unemployment after your benefit year ends, even if you have a balance on your claim. Continue to certify for benefits if you haveweeks available within your benefit year.",
-            ),
-            Citation(
-                citation_id="citation-4",
-                source_id="83d89e49-dc9d-4f9f-8bb3-82650e3a3133",
-                source_name="Filing an Unemployment Claim",
-                page_number=None,
-                uri="https://edd.ca.gov/en/unemployment/Filing_a_Claim/",
-                headings=["Filing an Unemployment Claim"],
-                citation_text="## Prepare to Apply\nFile for unemployment in the first week that you lose your job or have your hours reduced. Your claim begins the Sunday of the week you applied for unemployment. You must serve a one-week unpaid waiting period on your claim before you are paid unemployment insurance benefits. The waiting period can only be served if you certify for benefits and meet all eligibility requirements for that week. Your first certification will usually include the one-week unpaid waiting period and one week of payment if you meet eligibility requirements for both weeks. **Certify for benefits every two weeks to continue receiving benefit payments**.",
-            ),
-            Citation(
-                citation_id="citation-5",
-                source_id="6e0e0cfd-0b44-422b-8af1-119897b8a22d",
-                source_name="Unemployment Insurance – After You Apply",
-                page_number=None,
-                uri="https://edd.ca.gov/en/unemployment/After_You_Filed/",
-                headings=[
-                    "Unemployment Insurance – After You Apply",
-                    "Unemployment Insurance – After You Apply",
-                    "Important Next Steps",
-                ],
-                citation_text="### Certify for Benefits Every Two Weeks\nTo continue receiving benefits, you must provide [eligibility information](https://edd.ca.gov/en/unemployment/eligibility/) every two weeks. This process is known as [certifying for benefits](https://edd.ca.gov/en/unemployment/ways-to-certify-ui-benefits/). You can do this with [UI Online](https://edd.ca.gov/en/unemployment/ui_online/), [EDD Tele-Cert](https://edd.ca.gov/en/unemployment/EDD_Tele-Cert/), or by mail—whichever is easier for you.",
-            ),
-            Citation(
-                citation_id="citation-6",
-                source_id="e4b3050a-23a4-47d6-8634-67012ea1a9d0",
-                source_name="Register and Apply for Unemployment Insurance",
-                page_number=None,
-                uri="https://edd.ca.gov/en/unemployment/apply/",
-                headings=["Register and Apply for Unemployment Insurance"],
-                citation_text="If you filed for unemployment within the last 52 weeks and have not exhausted your benefits, you must [reopen your claim](https://edd.ca.gov/en/unemployment/reopen-a-claim/) to restart your benefits.",
-            ),
-        ]
-        # from pprint import pformat
-        # logger.info(pformat(citations))
-        return QueryResponse(
-            response_text="Here are some important deadlines for unemployment insurance benefits:\n\n- **Apply Early**: File for unemployment in the first week you lose your job or your hours are reduced. Your claim starts the Sunday of the week you apply.(citation-1)\n- **Benefit Year**: A regular unemployment insurance benefit year ends 12 months after your claim starts. You cannot be paid for weeks of unemployment after your benefit year ends, even if you have a balance on your claim.(citation-2) (citation-3)\n- **Certify Every Two Weeks**: To continue receiving benefits, you must certify for benefits every two weeks. This involves answering questions to confirm you are still eligible.(citation-4) (citation-5)\n- **Reopen Claims**: If you filed for unemployment within the last 52 weeks and haven't exhausted your benefits, you must reopen your claim to restart your benefits.(citation-6)\n\nFor more detailed information, you can visit the EDD website or contact them directly.",
-            citations=citations,
-        )
-    else:
-        logger.info("Received: %s", question)
-        chat_history = None
-        result = await asyncify(lambda: engine.on_message(question, chat_history))()
-        logger.info("Response: %s", result.response)
+    logger.info("Received: %s", question)
+    chat_history = None
+    result = await asyncify(lambda: engine.on_message(question, chat_history))()
+    logger.info("Response: %s", result.response)
 
-        final_result = simplify_citation_numbers(result)
-        citations = [
-            Citation.from_subsection(subsection) for subsection in final_result.subsections
-        ]
-        return QueryResponse(response_text=final_result.response, citations=citations)
+    final_result = simplify_citation_numbers(result)
+    citations = [Citation.from_subsection(subsection) for subsection in final_result.subsections]
+    return QueryResponse(response_text=final_result.response, citations=citations)
 
 
 # endregion
