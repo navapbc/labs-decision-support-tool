@@ -397,19 +397,3 @@ def _add_citation_links(
 
     # For now, don't show footnote list
     return added_citations  # + "</br>" + "</br>".join(footnote_list)
-
-
-def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection]) -> str:
-    """Replace (citation-XX) in response with (citation-YY), where XX is the original citation ID
-    and YY is the remapped citation ID"""
-
-    def replace_citation(match: Match) -> str:
-        citation_id = match.group(1)
-        if citation_id not in remapped_citations:
-            logger.error(
-                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
-            )
-            return ""
-        return "(citation-" + remapped_citations[citation_id].id + ")"
-
-    return re.sub(CITATION_PATTERN, replace_citation, response)
