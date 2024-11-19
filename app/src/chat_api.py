@@ -34,8 +34,11 @@ async def healthcheck(request: Request) -> HealthCheck:
 
 
 @functools.cache
-def literalai():
-    "This needs to be a function so we can mock it in tests"
+def literalai() -> AsyncLiteralClient:
+    """
+    This needs to be a function so that it's not immediated instantiated upon
+    import of this module and so that it can mocked in tests.
+    """
     return AsyncLiteralClient()
 
 
