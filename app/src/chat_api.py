@@ -11,14 +11,17 @@ from typing import Optional
 
 from asyncer import asyncify
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from literalai import AsyncLiteralClient
 from pydantic import BaseModel
 
 from src import chat_engine
 from src.chat_engine import ChatEngineInterface
-from src.citations import finalize_result
+from src.citations import simplify_citation_numbers
 from src.db.models.document import Subsection
 from src.healthcheck import HealthCheck, health
+
+app = FastAPI()
 
 if __name__ == "__main__":
     # If running this file directly, define the FastAPI app
@@ -31,7 +34,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
-@app.get("/api_healthcheck")
+@app.get("/api_healthcheck", response_class=JSONResponse)
 async def healthcheck(request: Request) -> HealthCheck:
     logger.info(request.headers)
     healthcheck_response = await health(request)
@@ -279,7 +282,7 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
         result = await asyncify(lambda: engine.on_message(question, chat_history))()
         logger.info("Response: %s", result.response)
 
-        final_result = finalize_result(result)
+        final_result = simplify_citation_numbers(result)
         citations = [
             Citation.from_subsection(subsection) for subsection in final_result.subsections
         ]
