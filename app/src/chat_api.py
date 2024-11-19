@@ -219,9 +219,10 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
 logger.info("Chat API loaded with routes: %s", router.routes)
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     import getopt
     import sys
+
     import uvicorn
     from fastapi import FastAPI
 
@@ -236,4 +237,4 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     app = FastAPI()
     app.include_router(router)
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")  # nosec
