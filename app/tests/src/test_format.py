@@ -15,7 +15,6 @@ from src.format import (
     format_bem_documents,
     format_guru_cards,
     reify_citations,
-    replace_citation_ids,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
@@ -294,17 +293,3 @@ def test_build_accordions(chunks_with_scores):
 
     html = build_accordions(subsections, "Some real citations: (citation-1) (citation-2)", config)
     assert len(_unique_accordion_ids(html)) == 2
-
-
-def test_replace_citation_ids():
-    assert replace_citation_ids("No citations", {}) == "No citations"
-    assert replace_citation_ids("Hallucinated.(citation-1)", {}) == "Hallucinated."
-
-    remapped_citations = {
-        "citation-4": Subsection("1", ChunkFactory.build(), ""),
-        "citation-3": Subsection("2", ChunkFactory.build(), ""),
-    }
-    assert (
-        replace_citation_ids("Remapped. (citation-4)(citation-3)", remapped_citations)
-        == "Remapped. (citation-1)(citation-2)"
-    )

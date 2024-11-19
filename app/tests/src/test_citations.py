@@ -5,8 +5,10 @@ from src.citations import (
     create_prompt_context,
     default_chunk_splitter,
     remap_citation_ids,
+    replace_citation_ids,
     split_into_subsections,
 )
+from src.db.models.document import Subsection
 from tests.src.db.models.factories import ChunkFactory
 
 
@@ -102,3 +104,17 @@ def test_default_chunk_splitter():
         "## Last Heading\nLast paragraph.",
         "## Last Heading without next paragraph\n",
     ]
+
+
+def test_replace_citation_ids():
+    assert replace_citation_ids("No citations", {}) == "No citations"
+    assert replace_citation_ids("Hallucinated.(citation-1)", {}) == "Hallucinated."
+
+    remapped_citations = {
+        "citation-4": Subsection("1", ChunkFactory.build(), ""),
+        "citation-3": Subsection("2", ChunkFactory.build(), ""),
+    }
+    assert (
+        replace_citation_ids("Remapped. (citation-4)(citation-3)", remapped_citations)
+        == "Remapped. (citation-1)(citation-2)"
+    )
