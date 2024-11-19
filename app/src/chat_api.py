@@ -12,7 +12,6 @@ from typing import Optional
 
 from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
 from literalai import AsyncLiteralClient
 from pydantic import BaseModel
 
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 
-@router.get("/healthcheck", response_class=JSONResponse)
+@router.get("/healthcheck")
 async def healthcheck(request: Request) -> HealthCheck:
     logger.info(request.headers)
     healthcheck_response = await health(request)
@@ -217,6 +216,9 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
 
 
 # endregion
+
+logger.info("Chat API loaded with routes: %s", router.routes)
+
 
 if __name__ == "__main__":
     import uvicorn
