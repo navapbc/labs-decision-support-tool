@@ -3,8 +3,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from src.chat_engine import ChatEngineInterface
-from src.citations import remap_citation_ids
-from src.format import replace_citation_ids
+from src.citations import finalize_result
 
 
 async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
@@ -43,13 +42,11 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
 
 def _process_question(question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
     result = engine.on_message(question=question, chat_history=[])
+    final_result = finalize_result(result)
 
-    remapped_citations = remap_citation_ids(result.subsections, result.response)
-    response_with_remapped_citations = replace_citation_ids(result.response, remapped_citations)
+    result_table: dict[str, str | None] = {"answer": final_result.response}
 
-    result_table: dict[str, str | None] = {"answer": response_with_remapped_citations}
-
-    for subsection in remapped_citations.values():
+    for subsection in final_result.subsections:
         citation_key = "citation_" + subsection.id
         formatted_headings = (
             " > ".join(subsection.chunk.headings) if subsection.chunk.headings else ""

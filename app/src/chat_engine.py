@@ -1,9 +1,13 @@
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import Callable, Optional, Sequence
 
-from src.citations import CitationFactory, create_prompt_context, split_into_subsections
+from src.citations import (
+    CitationFactory,
+    ResponseWithSubsections,
+    create_prompt_context,
+    split_into_subsections,
+)
 from src.db.models.document import ChunkWithScore, Subsection
 from src.format import BemFormattingConfig, FormattingConfig, format_guru_cards
 from src.generate import PROMPT, ChatHistory, MessageAttributes, analyze_message, generate
@@ -13,12 +17,17 @@ from src.util.class_utils import all_subclasses
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class OnMessageResult:
-    response: str
-    system_prompt: str
-    chunks_with_scores: Sequence[ChunkWithScore] = field(default_factory=list)
-    subsections: Sequence[Subsection] = field(default_factory=list)
+class OnMessageResult(ResponseWithSubsections):
+    def __init__(
+        self,
+        response: str,
+        system_prompt: str,
+        chunks_with_scores: Sequence[ChunkWithScore] | None = None,
+        subsections: Sequence[Subsection] | None = None,
+    ):
+        super().__init__(response, subsections if subsections is not None else [])
+        self.system_prompt = system_prompt
+        self.chunks_with_scores = chunks_with_scores if chunks_with_scores is not None else []
 
 
 class ChatEngineInterface(ABC):
