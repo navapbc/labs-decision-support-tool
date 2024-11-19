@@ -172,7 +172,6 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
     return engine
 
 
-# curl -X POST 'http://0.0.0.0:8001/query' -H 'Content-Type: application/json' -d '{ "session_id": "12", "new_session": true, "message": "list unemployment insurance benefits?" }'
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
     # For now, use the required session_id as the user_id to get a UserSession
@@ -220,9 +219,19 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
 logger.info("Chat API loaded with routes: %s", router.routes)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    import getopt
+    import sys
+
     import uvicorn
 
+    # Use default port 8001 so that this standalone API app does not conflict with the Chainlit app
+    port = 8001
+
+    options, _ = getopt.getopt(sys.argv[1:], "p:")
+    for opt, arg in options:
+        if opt in ("-p"):
+            port = int(arg)
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    # Use port 8001 so that this standalone API app does not conflict with the Chainlit app
-    uvicorn.run(router, host="127.0.0.1", port=8001, log_level="info")
+    uvicorn.run(router, host="127.0.0.1", port=port, log_level="info")

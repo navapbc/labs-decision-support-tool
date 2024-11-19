@@ -259,3 +259,6 @@ ingest-bem-pdfs: check-ingest-arguments
 
 ingest-edd-web: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-edd-web $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+
+launch-api-only:
+	$(PY_RUN_CMD) launch-api-only -p 8001
