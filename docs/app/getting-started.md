@@ -67,8 +67,9 @@ The Chat API is intended for other applications to make requests to the chatbot.
 Running the Chainlit app will also run the API, if `app_config.enable_chat_api=True`.
 
 ### Running only the API (without Chainlit) in local env
+1. Setup `local` native development environment following `app/README.md` instructions.
 1. Run `make launch-api-only`
-1. Check that the API is up, open a browser to http://localhost:8001/api_healthcheck.
+1. Check that the API is up, open a browser to http://localhost:8001/api/healthcheck.
 1. Browse to http://localhost:8001/docs to try out the API.
 
 ## Terminology

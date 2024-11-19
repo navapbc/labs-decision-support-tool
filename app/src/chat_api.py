@@ -22,7 +22,7 @@ from src.db.models.document import Subsection
 from src.healthcheck import HealthCheck, health
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", tags=["Chat API"])
 
 
 @router.get("/healthcheck")
@@ -222,8 +222,8 @@ logger.info("Chat API loaded with routes: %s", router.routes)
 def main() -> None:
     import getopt
     import sys
-
     import uvicorn
+    from fastapi import FastAPI
 
     # Use default port 8001 so that this standalone API app does not conflict with the Chainlit app
     port = 8001
@@ -234,4 +234,6 @@ def main() -> None:
             port = int(arg)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    uvicorn.run(router, host="127.0.0.1", port=port, log_level="info")
+    app = FastAPI()
+    app.include_router(router)
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
