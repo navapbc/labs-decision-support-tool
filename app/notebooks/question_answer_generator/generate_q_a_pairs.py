@@ -1,26 +1,23 @@
 import csv
 import json
 from litellm import completion
-import logging
 
 import os
 from pydantic import BaseModel
 
-
 from src.app_config import app_config
-from src.db.models.document import Document
+from src.db.models.document import Chunk, Document
 from src.generate import completion_args
 
 
-logger = logging.getLogger(__name__)
-
 GENERATE_QUESTION_ANSWER_PROMPT = """
-Using the provided chunk, generate at least 5 unique questions and answers, avoid rephrasing or changing the punctuation of the question to ensure distinct questions and answers.
+Using the provided text, generate at least 5 unique questions and answers, avoid rephrasing or changing the punctuation of the question to ensure distinct questions and answers.
 Respond with a list of JSON dictionaries in the following format  (do not wrap in JSON markers):
 question: The generated question based on the content.
 answer: The answer to the question, derived from the content.
 document_name: The name of the document.
 document_source: The source or URL of the document.
+document_id: the id of the chunk or document.
 Example
 question: What's a base period for SDI?
 answer: "- A base period covers 12 months and is divided into four quarters.
@@ -29,6 +26,7 @@ answer: "- A base period covers 12 months and is divided into four quarters.
 - Benefit amounts are based on the quarter with their highest wages earned within their base period."
 document_name: Disability Insurance Benefit Payment Amounts
 document_source: https://edd.ca.gov/en/disability/Calculating_DI_Benefit_Payment_Amounts/
+document_id: 538c8ed8-a967-4d67-9294-197143cfdbfa
 """
 
 
@@ -65,14 +63,12 @@ def generate_q_a_pairs(llm: str, message: str) -> QuestionAnswerList:
         .message.content
     )
 
-    logger.info("Generated Question Answer: %s", response)
-
     response_as_json = json.loads(response)
     return QuestionAnswerList.model_validate(response_as_json)
 
 
 def generate_question_answer_pair(
-    document: Document, num_of_chunks: int
+    document: Document | Chunk, num_of_chunks: int
 ) -> list[QuestionAnswerAttributes]:
     generated_question_anwers = generate_q_a_pairs(
         llm="gpt-4o",
