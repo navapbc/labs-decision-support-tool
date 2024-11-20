@@ -106,10 +106,6 @@ stop:
 
 check: format-check lint test
 
-launch-api-only:
-	# Only for local development
-	poetry run launch-api-only -p 8001
-
 ##################################################
 # DB & migrations
 ##################################################

@@ -217,24 +217,3 @@ async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse
 # endregion
 
 logger.info("Chat API loaded with routes: %s", router.routes)
-
-
-def main() -> None:  # pragma: no cover
-    import getopt
-    import sys
-
-    import uvicorn
-    from fastapi import FastAPI
-
-    # Use default port 8001 so that this standalone API app does not conflict with the Chainlit app
-    port = 8001
-
-    options, _ = getopt.getopt(sys.argv[1:], "p:")
-    for opt, arg in options:
-        if opt in ("-p"):
-            port = int(arg)
-
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    app = FastAPI()
-    app.include_router(router)
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")  # nosec
