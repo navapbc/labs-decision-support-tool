@@ -1,5 +1,4 @@
 import logging
-from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -22,14 +21,18 @@ from src.citations import CitationFactory, split_into_subsections
 from tests.src.db.models.factories import ChunkFactory
 
 
-def mock_literalai():
-    @contextmanager
-    def dummy_context_manager():
-        yield
+class MockContextManager:
+    def __enter__(self):
+        pass
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+def mock_literalai():
     mock = MagicMock()
-    mock.thread.return_value = dummy_context_manager()
-    mock.step.return_value = dummy_context_manager()
+    mock.thread.return_value = MockContextManager()
+    mock.step.return_value = MockContextManager()
     return mock
 
 
@@ -54,9 +57,9 @@ def test_api_engines(client):
 
 
 def test_api_query(monkeypatch, client):
-    async def mock_run_query(engine, question):
+    async def mock_run_query(engine, question, chat_history):
         return QueryResponse(
-            response_text="Response from LLM",
+            response_text=f"Response from LLM: {chat_history}",
             citations=[],
         )
 
@@ -66,7 +69,28 @@ def test_api_query(monkeypatch, client):
         "/api/query", json={"session_id": "Session0", "new_session": True, "message": "Hello"}
     )
     assert response.status_code == 200
-    assert response.json()["response_text"] == "Response from LLM"
+    assert response.json()["response_text"] == "Response from LLM: []"
+
+    # Posting again with the same session_id should fail
+    try:
+        response = client.post(
+            "/api/query",
+            json={"session_id": "Session0", "new_session": True, "message": "Hello again"},
+        )
+    except HTTPException as e:
+        assert e.status_code == 409
+        assert e.detail == "Cannot start a new session with existing session_id: Session0"
+
+    # Test chat history
+    response = client.post(
+        "/api/query",
+        json={"session_id": "Session0", "new_session": False, "message": "Hello again"},
+    )
+    assert response.status_code == 200
+    assert (
+        response.json()["response_text"]
+        == "Response from LLM: [{'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Response from LLM: []'}]"
+    )
 
 
 def test_api_query__bad_request(client):
