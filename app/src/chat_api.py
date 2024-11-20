@@ -165,7 +165,7 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
         chat_engine.create_engine(engine_id) if engine_id in session.user.allowed_engines else None
     )
     if not engine:
-        raise HTTPException(status_code=406, detail=f"Unknown engine: {engine_id}")
+        raise HTTPException(status_code=403, detail=f"Unknown engine: {engine_id}")
     for setting_name in engine.user_settings:
         if setting_value := getattr(session.chat_engine_settings, setting_name, None):
             setattr(engine, setting_name, setting_value)
