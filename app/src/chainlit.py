@@ -172,8 +172,7 @@ def extract_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
             # User's query
             raw_chat_history.append({"role": "user", "content": message.content})
         else:
-            # System message for high-level framing that governs the assistant response
-            raw_chat_history.append({"role": "system", "content": message.content})
+            logger.warning("Unexpected message type: %s: %r", message.type, message.content)
     return raw_chat_history
 
 

@@ -82,6 +82,7 @@ def generate(
     messages = [
         {
             "content": system_prompt,
+            # System message for high-level framing that governs the assistant response
             "role": "system",
         }
     ]
