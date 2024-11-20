@@ -195,6 +195,8 @@ def _fix_input_markdown(markdown: str) -> str:
     # nested sublist '+' created without parent list; incorrect markdown from scraping?
     # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
     markdown = markdown.replace("* + ", "    + ")
+    # Blank sublist in https://edd.ca.gov/en/unemployment/Employer_Information/
+    markdown = markdown.replace("* +\n", "")
     return markdown
 
 
