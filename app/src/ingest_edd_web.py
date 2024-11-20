@@ -185,18 +185,21 @@ def _create_splits_using_markdown_tree(
 
 
 def _fix_input_markdown(markdown: str) -> str:
-    # Fix markdown formatting that causes markdown parsing errors
+    # Fix ellipsis text that causes markdown parsing errors
     # '. . .' is parsed as sublists on the same line
     # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
     markdown = markdown.replace(". . .", "...")
-    # '. * ' is parsed as sublists; incorrect markdown from scraping
-    # in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
-    markdown = markdown.replace(". *\n", ". \n")
-    # nested sublist '+' created without parent list; incorrect markdown from scraping?
-    # in https://edd.ca.gov/en/disability/Employer_Physician-Practitioner_Automated_Phone_Information_System/
+
+    # Nested sublist '* + California's New Application' created without parent list
+    # in https://edd.ca.gov/en/about_edd/eddnext
     markdown = markdown.replace("* + ", "    + ")
-    # Blank sublist in https://edd.ca.gov/en/unemployment/Employer_Information/
-    markdown = markdown.replace("* +\n", "")
+
+    # Blank sublist '* +" in https://edd.ca.gov/en/unemployment/Employer_Information/
+    # Empty sublist '4. * ' in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
+    # Remove empty nested sublists
+    markdown = re.sub(
+        r"^\s*(\w+\.|\*|\+|\-) (\w+\.|\*|\+|\-)\s*$", "", markdown, flags=re.MULTILINE
+    )
     return markdown
 
 
