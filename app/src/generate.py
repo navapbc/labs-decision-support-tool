@@ -95,9 +95,7 @@ def generate(
             },
         )
 
-    # chat_history has the user query as the last item, but we want to insert the context first
     if chat_history:
-        chat_history.pop()
         messages.extend(chat_history)
 
     messages.append({"content": query, "role": "user"})
