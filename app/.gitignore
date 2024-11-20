@@ -44,3 +44,4 @@ documents/
 !.chainlit/translations/en-US.json
 
 /chunks-log/
+/src/ingestion/imagine-la/scrape/pages/*
