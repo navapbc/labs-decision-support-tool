@@ -131,5 +131,5 @@ markers = [
   "audit: mark a test as a security audit log test, to be run isolated from other tests"]
 
 [tool.coverage.run]
-omit = ["src/db/migrations/*.py", "src/db/migrations/versions/*.py", "src/chainlit.py"]
+omit = ["src/db/migrations/*.py", "src/db/migrations/versions/*.py", "src/chainlit.py", "src/app.py"]
 
