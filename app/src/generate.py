@@ -82,6 +82,7 @@ def generate(
     messages = [
         {
             "content": system_prompt,
+            # System message for high-level framing that governs the assistant response
             "role": "system",
         }
     ]
@@ -95,9 +96,7 @@ def generate(
             },
         )
 
-    # chat_history has the user query as the last item, but we want to insert the context first
     if chat_history:
-        chat_history.pop()
         messages.extend(chat_history)
 
     messages.append({"content": query, "role": "user"})
