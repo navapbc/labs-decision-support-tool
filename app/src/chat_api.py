@@ -13,10 +13,14 @@ from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request
 from literalai import AsyncLiteralClient
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from src import chat_engine
+from src.adapters import db
+from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
+from src.db.models.conversation import ChatMessage
 from src.db.models.document import Subsection
 from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
@@ -56,15 +60,6 @@ class ChatEngineSettings:
     retrieval_k: Optional[int] = None
 
 
-# TODO: Convert into DB object
-@dataclass
-class ChatMessage:
-    session_id: str
-    role: str
-    content: str
-    timestamp: str
-
-
 @dataclass
 class UserSession:
     user: UserInfo
@@ -94,21 +89,13 @@ async def _get_user_session(user_id: str) -> UserSession:
     return session
 
 
-# A temporary placeholder for a DB
-_DB: list[ChatMessage] = [
-    ChatMessage("session_id", "user", "Hello", "2022-01-01T00:00:00"),
-    ChatMessage("session_id", "assistant", "Hi", "2022-01-01T00:00:01"),
-]
-
-
-def _get_message_history(session_id: str) -> ChatHistory:
-    # TODO: When querying DB, order by timestamp
-    session_msgs = [msg for msg in _DB if msg.session_id == session_id]
+def _load_chat_history(db_session: db.Session, session_id: str) -> ChatHistory:
+    session_msgs = db_session.scalars(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at)
+    ).all()
     return [{"role": message.role, "content": message.content} for message in session_msgs]
-
-
-def _save_message(message: ChatMessage) -> None:
-    _DB.append(message)
 
 
 # endregion
@@ -213,41 +200,45 @@ async def query(request: QueryRequest) -> QueryResponse:
                 "user": session.user.__dict__,
             },
         )
-        # Load history BEFORE saving the new message
-        chat_history = _get_message_history(request.session_id)
-        if request.new_session and chat_history:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Cannot start a new session with existing session_id: {request.session_id}",
-            )
-        elif not request.new_session and not chat_history:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Chat history for existing session not found: {request.session_id}",
-            )
+        with app_config.db_session() as db_session:
+            with db_session.begin():  # session is auto-committed or rolled back upon exception
+                # Load history BEFORE saving the new message
+                chat_history = _load_chat_history(db_session, request.session_id)
+                if request.new_session and chat_history:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Cannot start a new session with existing session_id: {request.session_id}",
+                    )
+                elif not request.new_session and not chat_history:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Chat history for existing session not found: {request.session_id}",
+                    )
 
-        _save_message(
-            ChatMessage(request.session_id, "user", request.message, request_msg.timestamp)
-        )
+                db_session.add(
+                    ChatMessage(session_id=request.session_id, role="user", content=request.message)
+                )
 
-        engine = get_chat_engine(session)
-        response: QueryResponse = await run_query(engine, request.message, chat_history)
+                engine = get_chat_engine(session)
+                response: QueryResponse = await run_query(engine, request.message, chat_history)
 
-        # Example of using parent_id to have a hierarchy of messages in Literal AI
-        response_msg = literalai().message(
-            content=response.response_text,
-            type="assistant_message",
-            parent_id=request_msg.id,
-            metadata={"citations": [c.__dict__ for c in response.citations]},
-        )
-        # id needed to later provide feedback on this message in LiteralAI
-        response.response_id = response_msg.id
+                # Example of using parent_id to have a hierarchy of messages in Literal AI
+                response_msg = literalai().message(
+                    content=response.response_text,
+                    type="assistant_message",
+                    parent_id=request_msg.id,
+                    metadata={"citations": [c.__dict__ for c in response.citations]},
+                )
+                # id needed to later provide feedback on this message in LiteralAI
+                response.response_id = response_msg.id
 
-        _save_message(
-            ChatMessage(
-                request.session_id, "assistant", response.response_text, response_msg.timestamp
-            )
-        )
+                db_session.add(
+                    ChatMessage(
+                        session_id=request.session_id,
+                        role="assistant",
+                        content=response.response_text,
+                    )
+                )
     return response
 
 

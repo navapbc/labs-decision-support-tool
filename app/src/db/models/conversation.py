@@ -1,14 +1,13 @@
 import logging
 
-from datetime import datetime
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.db.models.base import Base, IdMixin
+from src.db.models.base import Base, IdMixin, TimestampMixin
 
 logger = logging.getLogger(__name__)
 
 
-class ChatMessage(Base, IdMixin):
+class ChatMessage(Base, IdMixin, TimestampMixin):
     __tablename__ = "chat_message"
 
     session_id: Mapped[str] = mapped_column(
@@ -16,6 +15,3 @@ class ChatMessage(Base, IdMixin):
     )
     role: Mapped[str] = mapped_column(comment="Role of the message speaker")
     content: Mapped[str] = mapped_column(comment="Content of the message")
-    timestamp: Mapped[datetime] = mapped_column(
-        nullable=False, comment="Used to order messages in a session"
-    )

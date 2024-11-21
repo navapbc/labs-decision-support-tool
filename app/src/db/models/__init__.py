@@ -1,6 +1,6 @@
 import logging
 
-from . import base, document, conversation
+from . import base, conversation, document
 
 logger = logging.getLogger(__name__)
 

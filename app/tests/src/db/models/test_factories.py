@@ -1,9 +1,10 @@
 from sqlalchemy import delete, select
 
 import src.adapters.db as db
+from src.db.models.conversation import ChatMessage
 from src.db.models.document import Chunk, Document
 from tests.mock.mock_sentence_transformer import MockSentenceTransformer
-from tests.src.db.models.factories import ChunkFactory, DocumentFactory
+from tests.src.db.models.factories import ChatMessageFactory, ChunkFactory, DocumentFactory
 
 
 def test_document_factory(enable_factory_create, db_session: db.Session):
@@ -37,3 +38,31 @@ def test_chunk_factory(enable_factory_create, db_session: db.Session):
         MockSentenceTransformer().tokenizer.tokenize(chunk.content)
     )
     assert chunk_db_record.mpnet_embedding == MockSentenceTransformer().encode(chunk.content)
+
+
+def test_chat_message_factory(db_session: db.Session, enable_factory_create):
+    db_session.execute(delete(ChatMessage))
+
+    # Create some messages
+    ChatMessageFactory.create_batch(4)
+
+    # Create messages with a specific session_id to test
+    session_id = "session_10"
+    msgs: list[ChatMessage] = ChatMessageFactory.create_batch(3, session_id=session_id)
+    # Prepend the message content with the index so the ordering is obvious
+    for i, msg in enumerate(msgs):
+        msg.content = f"Message {i}: {msg.content}"
+
+    # Create some more messages
+    ChatMessageFactory.create_batch(5)
+
+    assert db_session.query(ChatMessage).count() == 12
+
+    all_msgs = db_session.scalars(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at)
+    ).all()
+    assert len(all_msgs) == 3
+    for i, msg in enumerate(all_msgs):
+        assert msg.content.startswith(f"Message {i}: ")
