@@ -1,6 +1,11 @@
+import json
 import logging
+import os
+import tempfile
 from unittest.mock import ANY, Mock
 
+import pytest
+from smart_open import open
 from sqlalchemy import delete, select
 
 from src.db.models.document import Document
@@ -13,6 +18,7 @@ from src.util.ingest_utils import (
     process_and_ingest_sys_args,
     reconstruct_list,
     reconstruct_table,
+    save_json,
     tokenize,
 )
 from tests.mock.mock_sentence_transformer import MockSentenceTransformer
@@ -218,3 +224,33 @@ def test__ensure_blank_line_suffix():
     assert _ensure_blank_line_suffix("This is a sentence.") == "This is a sentence.\n\n"
     assert _ensure_blank_line_suffix("This is a sentence.\n") == "This is a sentence.\n\n"
     assert _ensure_blank_line_suffix("This is a sentence.\n\n") == "This is a sentence.\n\n"
+
+
+@pytest.mark.parametrize("file_location", ["local", "s3"])
+def test__save_json(file_location, mock_s3_bucket_resource):
+    chunks = ChunkFactory.build_batch(2)
+    file_path = (
+        "s3://test_bucket/test.pdf"
+        if file_location == "s3"
+        else os.path.join(tempfile.mkdtemp(), "test.pdf")
+    )
+    save_json(file_path, chunks)
+    saved_json = json.loads(open(file_path + ".json", "r").read())
+    assert saved_json == [
+        {
+            "id": str(chunks[0].id),
+            "content": chunks[0].content,
+            "document_id": str(chunks[0].document_id),
+            "headings": chunks[0].headings if chunks[0].headings else [],
+            "num_splits": chunks[0].num_splits,
+            "split_index": chunks[0].split_index,
+        },
+        {
+            "id": str(chunks[1].id),
+            "content": chunks[1].content,
+            "document_id": str(chunks[1].document_id),
+            "headings": chunks[1].headings if chunks[1].headings else [],
+            "num_splits": chunks[1].num_splits,
+            "split_index": chunks[1].split_index,
+        },
+    ]
