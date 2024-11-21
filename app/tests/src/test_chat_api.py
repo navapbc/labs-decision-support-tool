@@ -73,10 +73,11 @@ def test_api_query(monkeypatch, client):
 
     # Posting again with the same session_id should fail
     try:
-        response = client.post(
+        client.post(
             "/api/query",
             json={"session_id": "Session0", "new_session": True, "message": "Hello again"},
         )
+        raise AssertionError("Expected HTTPException")
     except HTTPException as e:
         assert e.status_code == 409
         assert e.detail == "Cannot start a new session with existing session_id: Session0"
@@ -93,9 +94,22 @@ def test_api_query(monkeypatch, client):
     )
 
 
+def test_api_query__nonexistent_session_id(monkeypatch, client):
+    try:
+        client.post(
+            "/api/query",
+            json={"session_id": "NewSession999", "new_session": False, "message": "Should fail"},
+        )
+        raise AssertionError("Expected HTTPException")
+    except HTTPException as e:
+        assert e.status_code == 409
+        assert e.detail == "Chat history for existing session not found: NewSession999"
+
+
 def test_api_query__bad_request(client):
     try:
         client.post("/api/query", json={"session_id": "Session0", "new_session": True})
+        raise AssertionError("Expected RequestValidationError")
     except RequestValidationError as e:
         error = e.errors()[0]
         assert error["type"] == "missing"

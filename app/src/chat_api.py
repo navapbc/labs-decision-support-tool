@@ -94,10 +94,10 @@ async def _get_user_session(user_id: str) -> UserSession:
     return session
 
 
-# TODO: Replace this temporary placeholder for the DB
+# A temporary placeholder for a DB
 _DB: list[ChatMessage] = [
-    ChatMessage("session_123", "user", "Hello", "2022-01-01T00:00:00"),
-    ChatMessage("session_123", "assistant", "Hi", "2022-01-01T00:00:01"),
+    ChatMessage("session_id", "user", "Hello", "2022-01-01T00:00:00"),
+    ChatMessage("session_id", "assistant", "Hi", "2022-01-01T00:00:01"),
 ]
 
 
@@ -219,6 +219,11 @@ async def query(request: QueryRequest) -> QueryResponse:
             raise HTTPException(
                 status_code=409,
                 detail=f"Cannot start a new session with existing session_id: {request.session_id}",
+            )
+        elif not request.new_session and not chat_history:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Chat history for existing session not found: {request.session_id}",
             )
 
         _save_message(
