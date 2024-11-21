@@ -25,7 +25,6 @@ answer: "- A base period covers 12 months and is divided into four quarters.
 - For a DI claim to be valid, they must have at least $300 in wages in the base period.
 - Benefit amounts are based on the quarter with their highest wages earned within their base period."
 document_name: Disability Insurance Benefit Payment Amounts
-document_source: https://edd.ca.gov/en/disability/Calculating_DI_Benefit_Payment_Amounts/
 document_id: 538c8ed8-a967-4d67-9294-197143cfdbfa
 """
 
@@ -35,6 +34,7 @@ class QuestionAnswerAttributes(BaseModel):
     answer: str
     document_name: str
     document_source: str
+    document_id: str
 
 
 class QuestionAnswerList(BaseModel):
@@ -62,7 +62,6 @@ def generate_q_a_pairs(llm: str, message: str) -> QuestionAnswerList:
         .choices[0]
         .message.content
     )
-
     response_as_json = json.loads(response)
     return QuestionAnswerList.model_validate(response_as_json)
 
