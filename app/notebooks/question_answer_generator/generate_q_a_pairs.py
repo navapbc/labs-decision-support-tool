@@ -12,12 +12,13 @@ from src.generate import completion_args
 
 GENERATE_QUESTION_ANSWER_PROMPT = """
 Using the provided text, generate at least 5 unique questions and answers, avoid rephrasing or changing the punctuation of the question to ensure distinct questions and answers.
-Respond with a list of JSON dictionaries in the following format  (do not wrap in JSON markers):
+Respond with a list of JSON dictionaries in the following format (do not wrap in JSON markers):
 question: The generated question based on the content.
 answer: The answer to the question, derived from the content.
 document_name: The name of the document.
 document_source: The source or URL of the document.
 document_id: the id of the chunk or document.
+
 Example
 question: What's a base period for SDI?
 answer: "- A base period covers 12 months and is divided into four quarters.
