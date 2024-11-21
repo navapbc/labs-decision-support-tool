@@ -15,7 +15,7 @@ to S3 to ingest them into a deployed environment's database.
 You can either install the above dependences with pip, e.g.,
 `pip install -r requirements.txt` before running with
 `python scrape_content_hub.py`, or run this with
-`uv run scrape_content_hub.py` to have an environment
+`uv run --no-project scrape_content_hub.py` to have an environment
 automatically created for you.
 """
 
