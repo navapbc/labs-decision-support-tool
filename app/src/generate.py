@@ -66,12 +66,15 @@ def get_models() -> dict[str, str]:
     return models
 
 
+ChatHistory = list[dict[str, str]]
+
+
 def generate(
     llm: str,
     system_prompt: str,
     query: str,
     context_text: str | None = None,
-    chat_history: list[dict[str, str]] | None = None,
+    chat_history: ChatHistory | None = None,
 ) -> str:
     """
     Returns a string response from an LLM model, based on a query input.
@@ -79,6 +82,7 @@ def generate(
     messages = [
         {
             "content": system_prompt,
+            # System message for high-level framing that governs the assistant response
             "role": "system",
         }
     ]
@@ -92,9 +96,7 @@ def generate(
             },
         )
 
-    # chat_history has the user query as the last item, but we want to insert the context first
     if chat_history:
-        chat_history.pop()
         messages.extend(chat_history)
 
     messages.append({"content": query, "role": "user"})

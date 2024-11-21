@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 from src import chainlit, chat_engine
-from src.chainlit import _get_retrieval_metadata, get_raw_chat_history
+from src.chainlit import _get_retrieval_metadata, extract_raw_chat_history
 from src.chat_engine import OnMessageResult
 from src.db.models.document import Subsection
 from src.generate import PROMPT
@@ -61,7 +61,7 @@ def test__get_retrieval_metadata(chunks_with_scores):
     ]
 
 
-def test__get_raw_chat_history():
+def test__extract_raw_chat_history():
     clMessage1 = MagicMock()
     clMessage2 = MagicMock()
     clMessage3 = MagicMock()
@@ -97,7 +97,7 @@ def test__get_raw_chat_history():
     )
     message = [clMessage1, clMessage2, clMessage3]
 
-    assert get_raw_chat_history(message) == [
+    assert extract_raw_chat_history(message) == [
         {"role": "assistant", "content": "CA EDD Web Chat Engine started "},
         {"role": "user", "content": "can you tell me about income eligibility?"},
         {

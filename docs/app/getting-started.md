@@ -62,6 +62,12 @@ We use Jupyter notebooks for saving and sharing exploratory code. You can open a
 
 Copy and paste the provided URL that starts with http://127.0.0.1:8888 to access Jupyter.
 
+## Running the Chat API
+The Chat API is intended for other applications to make requests to the chatbot.
+Running the Chainlit app will also run the API, if `app_config.enable_chat_api=True`.
+
+1. Check that the API is up, open a browser to http://localhost:8000/api/healthcheck.
+1. Browse to http://localhost:8000/docs to try out the API.
 
 ## Terminology
 

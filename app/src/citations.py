@@ -1,7 +1,8 @@
 import logging
 import re
+from dataclasses import dataclass
 from itertools import count
-from typing import Callable, Sequence
+from typing import Callable, Match, Sequence
 
 from src.db.models.document import Chunk, Subsection
 
@@ -85,6 +86,7 @@ def remap_citation_ids(subsections: Sequence[Subsection], response: str) -> dict
     Map '(citation-<id>)' in `response`, where '(citation-<id>)' is the `id` in one of the `subsections`,
     to a dict from '(citation-<id>)' to corresponding Subsection,
     where the order of the list reflects the order of the citations in `response`.
+    Only cited subsections are included in the returned dict.
     Remap the Subsection.id value to be the user-friendly citation number for that citation.
     E.g., if `subsections` is a list with five entries, and `response` is a string like
     "Example (citation-3)(citation-1), another example (citation-1).", then this function will return
@@ -118,3 +120,37 @@ def remap_citation_ids(subsections: Sequence[Subsection], response: str) -> dict
         "\n  ".join([f"{id} -> {c.id}, {c.chunk.document.name}" for id, c in citations.items()]),
     )
     return citations
+
+
+def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection]) -> str:
+    """Replace (citation-XX) in response with (citation-YY), where XX is the original citation ID
+    and YY is the remapped citation ID"""
+
+    def replace_citation(match: Match) -> str:
+        citation_id = match.group(1)
+        if citation_id not in remapped_citations:
+            logger.error(
+                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
+            )
+            return ""
+        return "(citation-" + remapped_citations[citation_id].id + ")"
+
+    return re.sub(CITATION_PATTERN, replace_citation, response)
+
+
+@dataclass
+class ResponseWithSubsections:
+    response: str
+    subsections: Sequence[Subsection]
+
+
+def simplify_citation_numbers(result: ResponseWithSubsections) -> ResponseWithSubsections:
+    """
+    Returns the response with remapped `(citation-X)` strings and
+    a list of subsections representing the citations.
+    The returned subsections only contain citations used in the response
+    and are ordered consecutively starting from 1.
+    """
+    remapped_citations = remap_citation_ids(result.subsections, result.response)
+    remapped_response = replace_citation_ids(result.response, remapped_citations)
+    return ResponseWithSubsections(remapped_response, tuple(remapped_citations.values()))

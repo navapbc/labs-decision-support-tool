@@ -249,16 +249,16 @@ ifndef FILEPATH
 endif
 
 ingest-guru-cards: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-guru-cards $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+	$(PY_RUN_CMD) ingest-guru-cards "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
 
 ingest-policy-pdfs: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-policy-pdfs $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+	$(PY_RUN_CMD) ingest-policy-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
 
 ingest-bem-pdfs: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-bem-pdfs $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+	$(PY_RUN_CMD) ingest-bem-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
 
 ingest-edd-web: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-edd-web $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+	$(PY_RUN_CMD) ingest-edd-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
 
 ingest-imagine-la: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-imagine-la $(DATASET_ID) $(BENEFIT_PROGRAM) $(BENEFIT_REGION) $(FILEPATH)
+	$(PY_RUN_CMD) ingest-imagine-la "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
