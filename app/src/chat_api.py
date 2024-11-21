@@ -190,7 +190,11 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 async def query(request: QueryRequest) -> QueryResponse:
     user_session_id = request.user_id if request.user_id else request.session_id
     session = await _get_user_session(user_session_id)
-    with literalai().thread(name="API:/query", participant_id=session.literalai_user_id):
+    with (
+        literalai().thread(name="API:/query", participant_id=session.literalai_user_id),
+        app_config.db_session() as db_session,
+        db_session.begin(),  # session is auto-committed or rolled back upon exception
+    ):
         request_msg = literalai().message(
             content=request.message,
             type="user_message",
@@ -200,45 +204,44 @@ async def query(request: QueryRequest) -> QueryResponse:
                 "user": session.user.__dict__,
             },
         )
-        with app_config.db_session() as db_session:
-            with db_session.begin():  # session is auto-committed or rolled back upon exception
-                # Load history BEFORE saving the new message
-                chat_history = _load_chat_history(db_session, request.session_id)
-                if request.new_session and chat_history:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"Cannot start a new session with existing session_id: {request.session_id}",
-                    )
-                elif not request.new_session and not chat_history:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"Chat history for existing session not found: {request.session_id}",
-                    )
 
-                db_session.add(
-                    ChatMessage(session_id=request.session_id, role="user", content=request.message)
-                )
+        # Load history BEFORE saving the new message
+        chat_history = _load_chat_history(db_session, request.session_id)
+        if request.new_session and chat_history:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot start a new session with existing session_id: {request.session_id}",
+            )
+        elif not request.new_session and not chat_history:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Chat history for existing session not found: {request.session_id}",
+            )
 
-                engine = get_chat_engine(session)
-                response: QueryResponse = await run_query(engine, request.message, chat_history)
+        db_session.add(
+            ChatMessage(session_id=request.session_id, role="user", content=request.message)
+        )
 
-                # Example of using parent_id to have a hierarchy of messages in Literal AI
-                response_msg = literalai().message(
-                    content=response.response_text,
-                    type="assistant_message",
-                    parent_id=request_msg.id,
-                    metadata={"citations": [c.__dict__ for c in response.citations]},
-                )
-                # id needed to later provide feedback on this message in LiteralAI
-                response.response_id = response_msg.id
+        engine = get_chat_engine(session)
+        response: QueryResponse = await run_query(engine, request.message, chat_history)
 
-                db_session.add(
-                    ChatMessage(
-                        session_id=request.session_id,
-                        role="assistant",
-                        content=response.response_text,
-                    )
-                )
+        # Example of using parent_id to have a hierarchy of messages in Literal AI
+        response_msg = literalai().message(
+            content=response.response_text,
+            type="assistant_message",
+            parent_id=request_msg.id,
+            metadata={"citations": [c.__dict__ for c in response.citations]},
+        )
+        # id needed to later provide feedback on this message in LiteralAI
+        response.response_id = response_msg.id
+
+        db_session.add(
+            ChatMessage(
+                session_id=request.session_id,
+                role="assistant",
+                content=response.response_text,
+            )
+        )
     return response
 
 
