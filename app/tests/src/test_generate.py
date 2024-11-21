@@ -117,7 +117,6 @@ def test_generate_with_history(monkeypatch):
     history = [
         {"content": "some query", "role": "user"},
         {"content": "<div> answer</div>", "role": "assistant"},
-        {"content": "some other query", "role": "user"},
     ]
     expected_response = (
         'Called gpt-4o with [{"content": "' + PROMPT + '", "role": "system"}, '

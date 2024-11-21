@@ -153,10 +153,11 @@ _WIDGET_FACTORIES = {
 }
 
 
-def get_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
+def extract_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
     raw_chat_history: ChatHistory = []
     for message in messages:
         if message.type == "assistant_message":
+            # Response to the user's query
             raw_chat_history.append(
                 {
                     "role": "assistant",
@@ -168,9 +169,10 @@ def get_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
                 }
             )
         elif message.type == "user_message":
+            # User's query
             raw_chat_history.append({"role": "user", "content": message.content})
         else:
-            raw_chat_history.append({"role": "system", "content": message.content})
+            logger.warning("Unexpected message type: %s: %r", message.type, message.content)
     return raw_chat_history
 
 
@@ -178,7 +180,8 @@ def get_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
 async def on_message(message: cl.Message) -> None:
     logger.info("Received: %r", message.content)
     chat_context = cl.chat_context.get()
-    chat_history = get_raw_chat_history(chat_context)
+    # chat_context has the user query as the last item; exclude it from the chat history
+    chat_history = extract_raw_chat_history(chat_context[:-1])
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
 
