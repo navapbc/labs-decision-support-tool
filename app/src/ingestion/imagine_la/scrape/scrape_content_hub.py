@@ -4,6 +4,7 @@
 #   "playwright",
 # ]
 # ///
+# (This comment enables `uv run` to automatically create a virtual environment)
 
 """
 This script renders the child pages of the ImagineLA content hub
