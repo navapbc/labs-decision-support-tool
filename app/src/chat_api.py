@@ -60,15 +60,6 @@ class ChatEngineSettings:
     retrieval_k: Optional[int] = None
 
 
-# TODO: Convert into DB object
-@dataclass
-class ChatMessage:
-    session_id: str
-    role: str
-    content: str
-    timestamp: str
-
-
 @dataclass
 class UserSession:
     user: UserInfo
@@ -213,23 +204,6 @@ async def query(request: QueryRequest) -> QueryResponse:
                 "user": session.user.__dict__,
             },
         )
-        # Load history BEFORE saving the new message
-        chat_history = _get_message_history(request.session_id)
-        if request.new_session and chat_history:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Cannot start a new session with existing session_id: {request.session_id}",
-            )
-        elif not request.new_session and not chat_history:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Chat history for existing session not found: {request.session_id}",
-            )
-
-        _save_message(
-            ChatMessage(request.session_id, "user", request.message, request_msg.timestamp)
-        )
-
         # Load history BEFORE saving the new message
         chat_history = _load_chat_history(db_session, request.session_id)
         if request.new_session and chat_history:
