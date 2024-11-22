@@ -13,10 +13,14 @@ from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request
 from literalai import AsyncLiteralClient
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from src import chat_engine
+from src.adapters import db
+from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
+from src.db.models.conversation import ChatMessage
 from src.db.models.document import Subsection
 from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
@@ -56,15 +60,6 @@ class ChatEngineSettings:
     retrieval_k: Optional[int] = None
 
 
-# TODO: Convert into DB object
-@dataclass
-class ChatMessage:
-    session_id: str
-    role: str
-    content: str
-    timestamp: str
-
-
 @dataclass
 class UserSession:
     user: UserInfo
@@ -94,21 +89,13 @@ async def _get_user_session(user_id: str) -> UserSession:
     return session
 
 
-# A temporary placeholder for a DB
-_DB: list[ChatMessage] = [
-    ChatMessage("session_id", "user", "Hello", "2022-01-01T00:00:00"),
-    ChatMessage("session_id", "assistant", "Hi", "2022-01-01T00:00:01"),
-]
-
-
-def _get_message_history(session_id: str) -> ChatHistory:
-    # TODO: When querying DB, order by timestamp
-    session_msgs = [msg for msg in _DB if msg.session_id == session_id]
+def _load_chat_history(db_session: db.Session, session_id: str) -> ChatHistory:
+    session_msgs = db_session.scalars(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at)
+    ).all()
     return [{"role": message.role, "content": message.content} for message in session_msgs]
-
-
-def _save_message(message: ChatMessage) -> None:
-    _DB.append(message)
 
 
 # endregion
@@ -203,7 +190,11 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 async def query(request: QueryRequest) -> QueryResponse:
     user_session_id = request.user_id if request.user_id else request.session_id
     session = await _get_user_session(user_session_id)
-    with literalai().thread(name="API:/query", participant_id=session.literalai_user_id):
+    with (
+        literalai().thread(name="API:/query", participant_id=session.literalai_user_id),
+        app_config.db_session() as db_session,
+        db_session.begin(),  # session is auto-committed or rolled back upon exception
+    ):
         request_msg = literalai().message(
             content=request.message,
             type="user_message",
@@ -214,7 +205,7 @@ async def query(request: QueryRequest) -> QueryResponse:
             },
         )
         # Load history BEFORE saving the new message
-        chat_history = _get_message_history(request.session_id)
+        chat_history = _load_chat_history(db_session, request.session_id)
         if request.new_session and chat_history:
             raise HTTPException(
                 status_code=409,
@@ -226,8 +217,8 @@ async def query(request: QueryRequest) -> QueryResponse:
                 detail=f"Chat history for existing session not found: {request.session_id}",
             )
 
-        _save_message(
-            ChatMessage(request.session_id, "user", request.message, request_msg.timestamp)
+        db_session.add(
+            ChatMessage(session_id=request.session_id, role="user", content=request.message)
         )
 
         engine = get_chat_engine(session)
@@ -243,9 +234,11 @@ async def query(request: QueryRequest) -> QueryResponse:
         # id needed to later provide feedback on this message in LiteralAI
         response.response_id = response_msg.id
 
-        _save_message(
+        db_session.add(
             ChatMessage(
-                request.session_id, "assistant", response.response_text, response_msg.timestamp
+                session_id=request.session_id,
+                role="assistant",
+                content=response.response_text,
             )
         )
     return response

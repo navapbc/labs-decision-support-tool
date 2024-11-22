@@ -18,6 +18,7 @@ from sqlalchemy.orm import scoped_session
 
 import src.adapters.db as db
 import src.util.datetime_util as datetime_util
+from src.db.models.conversation import ChatMessage
 from src.db.models.document import Chunk, Document
 from tests.mock.mock_sentence_transformer import MockSentenceTransformer
 
@@ -88,3 +89,12 @@ class ChunkFactory(BaseFactory):
     headings = factory.Faker("words")
     num_splits = 1
     split_index = 0
+
+
+class ChatMessageFactory(BaseFactory):
+    class Meta:
+        model = ChatMessage
+
+    session_id = factory.Faker("sha1")
+    role = factory.Faker("random_element", elements=["user", "assistant"])
+    content = factory.Faker("sentence")
