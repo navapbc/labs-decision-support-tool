@@ -2,13 +2,12 @@
 
 """
 This creates API endpoints using FastAPI, which is compatible with Chainlit.
-This is enabled with the Chainlit chatbot or can be launched as a standalone app.
 """
 
 import functools
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request
@@ -19,6 +18,7 @@ from src import chat_engine
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 from src.db.models.document import Subsection
+from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
 
 logger = logging.getLogger(__name__)
@@ -56,11 +56,21 @@ class ChatEngineSettings:
     retrieval_k: Optional[int] = None
 
 
+# TODO: Convert into DB object
+@dataclass
+class ChatMessage:
+    session_id: str
+    role: str
+    content: str
+    timestamp: str
+
+
 @dataclass
 class UserSession:
     user: UserInfo
     chat_engine_settings: ChatEngineSettings
     literalai_user_id: Optional[str] = None
+    message_history: Optional[Sequence[ChatMessage]] = None
 
 
 def __query_user_session(user_id: str) -> UserSession:
@@ -82,6 +92,23 @@ async def _get_user_session(user_id: str) -> UserSession:
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
     session.literalai_user_id = literalai_user.id
     return session
+
+
+# A temporary placeholder for a DB
+_DB: list[ChatMessage] = [
+    ChatMessage("session_id", "user", "Hello", "2022-01-01T00:00:00"),
+    ChatMessage("session_id", "assistant", "Hi", "2022-01-01T00:00:01"),
+]
+
+
+def _get_message_history(session_id: str) -> ChatHistory:
+    # TODO: When querying DB, order by timestamp
+    session_msgs = [msg for msg in _DB if msg.session_id == session_id]
+    return [{"role": message.role, "content": message.content} for message in session_msgs]
+
+
+def _save_message(message: ChatMessage) -> None:
+    _DB.append(message)
 
 
 # endregion
@@ -174,8 +201,8 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
-    # For now, use the required session_id as the user_id to get a UserSession
-    session = await _get_user_session(request.session_id)
+    user_session_id = request.user_id if request.user_id else request.session_id
+    session = await _get_user_session(user_session_id)
     with literalai().thread(name="API:/query", participant_id=session.literalai_user_id):
         request_msg = literalai().message(
             content=request.message,
@@ -186,10 +213,25 @@ async def query(request: QueryRequest) -> QueryResponse:
                 "user": session.user.__dict__,
             },
         )
+        # Load history BEFORE saving the new message
+        chat_history = _get_message_history(request.session_id)
+        if request.new_session and chat_history:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot start a new session with existing session_id: {request.session_id}",
+            )
+        elif not request.new_session and not chat_history:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Chat history for existing session not found: {request.session_id}",
+            )
 
-        # May want to cache engine instances rather than creating them for each request
+        _save_message(
+            ChatMessage(request.session_id, "user", request.message, request_msg.timestamp)
+        )
+
         engine = get_chat_engine(session)
-        response: QueryResponse = await run_query(engine, request.message)
+        response: QueryResponse = await run_query(engine, request.message, chat_history)
 
         # Example of using parent_id to have a hierarchy of messages in Literal AI
         response_msg = literalai().message(
@@ -200,12 +242,19 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
         # id needed to later provide feedback on this message in LiteralAI
         response.response_id = response_msg.id
+
+        _save_message(
+            ChatMessage(
+                request.session_id, "assistant", response.response_text, response_msg.timestamp
+            )
+        )
     return response
 
 
-async def run_query(engine: ChatEngineInterface, question: str) -> QueryResponse:
-    logger.info("Received: %s", question)
-    chat_history = None
+async def run_query(
+    engine: ChatEngineInterface, question: str, chat_history: Optional[ChatHistory] = None
+) -> QueryResponse:
+    logger.info("Received: %s with history: %s", question, chat_history)
     result = await asyncify(lambda: engine.on_message(question, chat_history))()
     logger.info("Response: %s", result.response)
 
