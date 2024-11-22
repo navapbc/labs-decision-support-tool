@@ -1,4 +1,3 @@
-import json
 import logging
 import math
 import re
@@ -18,7 +17,7 @@ from src.ingestion.pdf_postprocess import add_markdown, associate_stylings, grou
 from src.ingestion.pdf_stylings import extract_stylings
 from src.util import pdf_utils
 from src.util.file_util import get_files
-from src.util.ingest_utils import add_embeddings, process_and_ingest_sys_args, tokenize
+from src.util.ingest_utils import add_embeddings, process_and_ingest_sys_args, save_json, tokenize
 from src.util.pdf_utils import Heading
 from src.util.string_utils import split_list, split_paragraph
 
@@ -41,7 +40,7 @@ def _ingest_bem_pdfs(
     db_session: db.Session,
     pdf_file_dir: str,
     doc_attribs: dict[str, str],
-    save_json: bool = True,
+    should_save_json: bool = True,
 ) -> None:
     file_list = sorted(get_files(pdf_file_dir))
 
@@ -66,10 +65,10 @@ def _ingest_bem_pdfs(
             add_embeddings(chunks)
             db_session.add_all(chunks)
 
-            if save_json:
+            if should_save_json:
                 # Note that chunks are being added to the DB before saving the JSON.
                 # Originally, we thought about reviewing the JSON manually before adding chunks to the DB.
-                _save_json(file_path, chunks)
+                save_json(file_path, chunks)
 
 
 def _parse_pdf(file: BinaryIO, file_path: str) -> list[EnrichedText]:
@@ -239,13 +238,6 @@ def _split_into_chunks(document: Document, grouped_texts: list[EnrichedText]) ->
         ]
         chunks += text_chunks
     return chunks
-
-
-def _save_json(file_path: str, chunks: list[Chunk]) -> None:
-    chunks_as_json = [chunk.to_json() for chunk in chunks]
-
-    with smart_open(file_path + ".json", "w") as file:
-        file.write(json.dumps(chunks_as_json))
 
 
 def main() -> None:

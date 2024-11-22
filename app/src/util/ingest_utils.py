@@ -1,9 +1,11 @@
 import getopt
+import json
 import logging
 import re
 from logging import Logger
 from typing import Callable, Optional, Sequence
 
+from smart_open import open
 from sqlalchemy import delete, select
 
 from src.adapters import db
@@ -226,3 +228,10 @@ def _join_up_to_max_seq_length(
 
     assert all(len(tokenize(chunk)) <= max_seq_length for chunk in chunks)
     return chunks
+
+
+def save_json(file_path: str, chunks: list[Chunk]) -> None:
+    chunks_as_json = [chunk.to_json() for chunk in chunks]
+
+    with open(file_path + ".json", "w") as file:
+        file.write(json.dumps(chunks_as_json))

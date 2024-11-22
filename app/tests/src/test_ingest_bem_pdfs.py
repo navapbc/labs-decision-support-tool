@@ -1,7 +1,4 @@
-import json
 import logging
-import os
-import tempfile
 
 import pytest
 from smart_open import open as smart_open
@@ -15,11 +12,9 @@ from src.ingest_bem_pdfs import (
     _ingest_bem_pdfs,
     _match_heading,
     _next_heading,
-    _save_json,
 )
 from src.ingestion.pdf_elements import EnrichedText
 from src.util.pdf_utils import Heading
-from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_ingest_policy_pdfs import doc_attribs
 
 _707_PDF_PATH = "/app/tests/src/util/707.pdf"
@@ -74,9 +69,11 @@ def test__ingest_bem_pdfs(caplog, app_config, db_session, policy_s3_file, file_l
 
     with caplog.at_level(logging.INFO):
         if file_location == "local":
-            _ingest_bem_pdfs(db_session, "/app/tests/src/util/", doc_attribs, save_json=False)
+            _ingest_bem_pdfs(
+                db_session, "/app/tests/src/util/", doc_attribs, should_save_json=False
+            )
         else:
-            _ingest_bem_pdfs(db_session, policy_s3_file, doc_attribs, save_json=False)
+            _ingest_bem_pdfs(db_session, policy_s3_file, doc_attribs, should_save_json=False)
 
         assert any(text.startswith("Processing file: ") for text in caplog.messages)
 
@@ -195,34 +192,4 @@ def test__next_heading(mock_outline, mock_elements):
     assert dropped_level == [
         Heading(title="Overview", level=1, pageno=1),
         Heading(title="Test Level 2", level=2, pageno=2),
-    ]
-
-
-@pytest.mark.parametrize("file_location", ["local", "s3"])
-def test__save_json(file_location, mock_s3_bucket_resource):
-    chunks = ChunkFactory.build_batch(2)
-    file_path = (
-        "s3://test_bucket/test.pdf"
-        if file_location == "s3"
-        else os.path.join(tempfile.mkdtemp(), "test.pdf")
-    )
-    _save_json(file_path, chunks)
-    saved_json = json.loads(smart_open(file_path + ".json", "r").read())
-    assert saved_json == [
-        {
-            "id": str(chunks[0].id),
-            "content": chunks[0].content,
-            "document_id": str(chunks[0].document_id),
-            "headings": chunks[0].headings if chunks[0].headings else [],
-            "num_splits": chunks[0].num_splits,
-            "split_index": chunks[0].split_index,
-        },
-        {
-            "id": str(chunks[1].id),
-            "content": chunks[1].content,
-            "document_id": str(chunks[1].document_id),
-            "headings": chunks[1].headings if chunks[1].headings else [],
-            "num_splits": chunks[1].num_splits,
-            "split_index": chunks[1].split_index,
-        },
     ]
