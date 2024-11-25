@@ -4,6 +4,7 @@ from litellm import completion
 
 import os
 from pydantic import BaseModel
+from uuid import UUID
 
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
@@ -15,9 +16,6 @@ Using the provided text, generate unique questions and answers, avoid rephrasing
 Respond with a list of JSON dictionaries in the following format (do not wrap in JSON markers):
 question: The generated question based on the content.
 answer: The answer to the question, derived from the content.
-document_name: The name of the document.
-document_source: The source or URL of the document.
-document_id: the id of the chunk or document.
 
 Example
 question: What's a base period for SDI?
@@ -25,21 +23,22 @@ answer: "- A base period covers 12 months and is divided into four quarters.
 - The base period includes wages subject to SDI tax that were paid about 5 to 18 months before the client's disability claim began
 - For a DI claim to be valid, they must have at least $300 in wages in the base period.
 - Benefit amounts are based on the quarter with their highest wages earned within their base period."
-document_name: Disability Insurance Benefit Payment Amounts
-document_id: 538c8ed8-a967-4d67-9294-197143cfdbfa
 """
 
 
-class QuestionAnswerAttributes(BaseModel):
+class QuestionAnswerPair(BaseModel):
     question: str
     answer: str
+
+
+class QuestionAnswerAttributes(QuestionAnswerPair):
     document_name: str
     document_source: str
-    document_id: str
+    document_id: UUID
 
 
 class QuestionAnswerList(BaseModel):
-    pairs: list[QuestionAnswerAttributes]
+    pairs: list[QuestionAnswerPair]
 
 
 def generate_question_answer_pairs(llm: str, message: str) -> QuestionAnswerList:
@@ -68,13 +67,26 @@ def generate_question_answer_pairs(llm: str, message: str) -> QuestionAnswerList
 
 
 def process_document_or_chunk(
-    document: Document | Chunk, num_of_chunks: int, llm:str
+    document: Document | Chunk, num_of_chunks: int, llm: str
 ) -> list[QuestionAnswerAttributes]:
-    generated_question_anwers = generate_question_answer_pairs(
+    generated_question_answers = generate_question_answer_pairs(
         llm=llm,
         message=f"Please use the following content to create {num_of_chunks} question-answer pairs. Content: {document.content}",
     )
-    return generated_question_anwers.pairs
+    question_answer_list: list[QuestionAnswerAttributes] = []
+
+    for generated_question_answer in generated_question_answers.pairs:
+        document_item = document if isinstance(document, Document) else document.document
+        question_answer_item = QuestionAnswerAttributes(
+            document_id=document_item.id,
+            document_name=document_item.name,
+            document_source=document_item.source,
+            question=generated_question_answer.question,
+            answer=generated_question_answer.answer,
+        )
+        question_answer_list.append(question_answer_item)
+
+    return question_answer_list
 
 
 def write_question_answer_json_to_csv(
@@ -87,7 +99,6 @@ def write_question_answer_json_to_csv(
         or not os.path.exists(file_path)
         else False
     )
-
     with open(file_path, "a", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fields)
         if needs_header:
