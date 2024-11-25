@@ -42,7 +42,7 @@ class QuestionAnswerList(BaseModel):
     pairs: list[QuestionAnswerAttributes]
 
 
-def generate_q_a_pairs(llm: str, message: str) -> QuestionAnswerList:
+def generate_question_answer_pairs(llm: str, message: str) -> QuestionAnswerList:
     response = (
         completion(
             model=llm,
@@ -67,12 +67,12 @@ def generate_q_a_pairs(llm: str, message: str) -> QuestionAnswerList:
     return QuestionAnswerList.model_validate(response_as_json)
 
 
-def generate_question_answer_pair(
+def process_document_or_chunk(
     document: Document | Chunk, num_of_chunks: int
 ) -> list[QuestionAnswerAttributes]:
-    generated_question_anwers = generate_q_a_pairs(
+    generated_question_anwers = generate_question_answer_pairs(
         llm="gpt-4o",
-        message=f"Please use the following content to create {num_of_chunks} question(s) answer pairs. Content: {document.content}",
+        message=f"Please use the following content to create {num_of_chunks} question-answer pairs. Content: {document.content}",
     )
     return generated_question_anwers.pairs
 
