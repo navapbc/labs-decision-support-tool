@@ -11,7 +11,7 @@ from src.generate import completion_args
 
 
 GENERATE_QUESTION_ANSWER_PROMPT = """
-Using the provided text, generate at least 5 unique questions and answers, avoid rephrasing or changing the punctuation of the question to ensure distinct questions and answers.
+Using the provided text, generate unique questions and answers, avoid rephrasing or changing the punctuation of the question to ensure distinct questions and answers.
 Respond with a list of JSON dictionaries in the following format (do not wrap in JSON markers):
 question: The generated question based on the content.
 answer: The answer to the question, derived from the content.
@@ -68,10 +68,10 @@ def generate_question_answer_pairs(llm: str, message: str) -> QuestionAnswerList
 
 
 def process_document_or_chunk(
-    document: Document | Chunk, num_of_chunks: int
+    document: Document | Chunk, num_of_chunks: int, llm:str
 ) -> list[QuestionAnswerAttributes]:
     generated_question_anwers = generate_question_answer_pairs(
-        llm="gpt-4o",
+        llm=llm,
         message=f"Please use the following content to create {num_of_chunks} question-answer pairs. Content: {document.content}",
     )
     return generated_question_anwers.pairs
