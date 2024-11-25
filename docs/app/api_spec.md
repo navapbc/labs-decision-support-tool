@@ -18,7 +18,7 @@ This endpoint accepts a query from a navigator and responds with a generated ans
 
 Note: we will defer making any of these required for now
 - **user_id** _(string, optional)_: Unique identifier for the navigator within ImagineLA
-- **agency** _(string, optional)_: Identifier for the organization the navigator belongs to
+- **agency_id** _(string, optional)_: Identifier for the organization the navigator belongs to
 - **beneficiary_id** _(string, optional)_: Anonymized ID for the customer or beneficiary associated with the query, if applicable and distinct from `user_id`.
 
 - **session_id** _(string, required)_: Unique identifier for the current session, to track prior messages in the conversation.
