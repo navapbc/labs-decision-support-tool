@@ -1,7 +1,7 @@
 # API Specification: Assistive Chatbot Integration
 This API enables the integration of an Assistive Chatbot with other products.
 
-## Endpoint: `POST /chatbot`
+## Endpoint: `POST /query`
 
 ### Description
 This endpoint accepts a query from a navigator and responds with a generated answer from the chatbot, along with relevant citations. Each response includes auditing fields to monitor usage by user, organization, and customer.
