@@ -1,5 +1,6 @@
 import csv
 import json
+from typing import Optional
 from litellm import completion
 
 import os
@@ -35,6 +36,7 @@ class QuestionAnswerAttributes(QuestionAnswerPair):
     document_name: str
     document_source: str
     document_id: UUID
+    chunk_id: Optional[UUID]
 
 
 class QuestionAnswerList(BaseModel):
@@ -76,13 +78,16 @@ def process_document_or_chunk(
     question_answer_list: list[QuestionAnswerAttributes] = []
 
     for generated_question_answer in generated_question_answers.pairs:
-        document_item = document if isinstance(document, Document) else document.document
+        is_document = isinstance(document, Document)
+        # use chunk document if is_document is false
+        document_item = document if is_document else document.document
         question_answer_item = QuestionAnswerAttributes(
             document_id=document_item.id,
             document_name=document_item.name,
             document_source=document_item.source,
             question=generated_question_answer.question,
             answer=generated_question_answer.answer,
+            chunk_id=None if is_document else document.id,
         )
         question_answer_list.append(question_answer_item)
 
