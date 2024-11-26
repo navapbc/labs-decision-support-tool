@@ -53,7 +53,7 @@ def test_api_healthcheck(client):
 def test_api_engines(client):
     response = client.get("/api/engines?user_id=TestUser")
     assert response.status_code == 200
-    assert response.json() == ["ca-edd-web"]
+    assert response.json() == ["imagine-la"]
 
 
 def test_api_query(monkeypatch, client):
