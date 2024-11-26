@@ -37,6 +37,7 @@ class QuestionAnswerAttributes(QuestionAnswerPair):
     document_source: str
     document_id: UUID
     chunk_id: Optional[UUID]
+    dataset: str
 
 
 class QuestionAnswerList(BaseModel):
@@ -69,7 +70,10 @@ def generate_question_answer_pairs(llm: str, message: str) -> QuestionAnswerList
 
 
 def process_document_or_chunk(
-    document: Document | Chunk, num_of_chunks: int, llm: str
+    document: Document | Chunk,
+    num_of_chunks: int,
+    llm: str,
+    dataset: str,
 ) -> list[QuestionAnswerAttributes]:
     generated_question_answers = generate_question_answer_pairs(
         llm=llm,
@@ -88,6 +92,7 @@ def process_document_or_chunk(
             question=generated_question_answer.question,
             answer=generated_question_answer.answer,
             chunk_id=None if is_document else document.id,
+            dataset=dataset,
         )
         question_answer_list.append(question_answer_item)
 
