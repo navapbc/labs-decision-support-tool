@@ -73,8 +73,8 @@ def __query_user_session(user_id: str) -> UserSession:
     Placeholder for creating/retrieving user's session from the DB, including settings and constraints
     """
     session = UserSession(
-        user=UserInfo(user_id, ["ca-edd-web"]),
-        chat_engine_settings=ChatEngineSettings("ca-edd-web"),
+        user=UserInfo(user_id, ["imagine-la"]),
+        chat_engine_settings=ChatEngineSettings("imagine-la"),
     )
     logger.info("Found user session for: %s", user_id)
     return session
