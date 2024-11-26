@@ -202,3 +202,22 @@ If you can't find information about the user's prompt in your context, don't ans
 If a prompt is about an EDD program, but you can't tell which one, detect and clarify program ambiguity. Ask: "The EDD administers several programs such as State Disability Insurance (SDI), Paid Family Leave (PFL), and Unemployment Insurance (UI). I'm not sure which benefit program your prompt is about; could you let me know?"
 
 {PROMPT}"""
+
+
+class ImagineLaEngine(BaseEngine):
+    retrieval_k: int = 50
+    retrieval_k_min_score: float = -1
+
+    # Note: currently not used
+    chunks_shown_min_score: float = -1
+    chunks_shown_max_num: int = 8
+
+    engine_id: str = "imagine-la"
+    name: str = "Imagine LA Chat Engine"
+    datasets = ["CA EDD", "Imagine LA"]
+
+    system_prompt = f"""You are an assistant to navigators who support clients-such as claimants, beneficiaries, families, and individuals-during the screening, application, and receipt of public benefits in California.
+If you can't find information about the user's prompt in your context, don't answer it. If the user asks a question about a program not available in California, don't answer beyond pointing the user to the relevant trusted website for more information.
+If a prompt is about a benefit program, but you can't tell which one, detect and clarify program ambiguity. Ask: "I'm not sure which benefit program your prompt is about; could you let me know? If you don't know what benefit program might be helpful, you can also describe what you need and I can make a recommendation."
+
+{PROMPT}"""

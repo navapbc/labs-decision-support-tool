@@ -29,7 +29,7 @@ class AppConfig(PydanticBaseEnvConfig):
     embedding_model: str = "multi-qa-mpnet-base-cos-v1"
 
     # Default chat engine
-    chat_engine: str = "ca-edd-web"
+    chat_engine: str = "imagine-la"
     temperature: float = 0.0
 
     # Default LLM model
