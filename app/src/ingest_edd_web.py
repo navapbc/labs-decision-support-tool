@@ -7,6 +7,8 @@ from typing import Optional, Sequence
 
 from nutree import Tree
 from smart_open import open as smart_open
+from sqlalchemy import and_
+from sqlalchemy.sql import exists
 
 from src.adapters import db
 from src.app_config import app_config
@@ -27,13 +29,36 @@ from src.util.string_utils import remove_links, split_markdown_by_heading
 logger = logging.getLogger(__name__)
 
 
+def _item_exists(db_session: db.Session, item: dict[str, str], doc_attribs: dict[str, str]) -> bool:
+    # Existing documents are determined by the source URL; could use document.content instead
+    if db_session.query(
+        exists().where(
+            and_(
+                Document.source == item["url"],
+                Document.dataset == doc_attribs["dataset"],
+                Document.program == doc_attribs["program"],
+                Document.region == doc_attribs["region"],
+            )
+        )
+    ).scalar():
+        logger.info("Skipping -- item already exists: %r", item["url"])
+        return True
+    return False
+
+
 def _ingest_edd_web(
     db_session: db.Session,
     json_filepath: str,
     doc_attribs: dict[str, str],
+    resume: bool = False,
 ) -> None:
     with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
         json_items = json.load(json_file)
+
+    if resume:
+        json_items = [
+            item for item in json_items if not _item_exists(db_session, item, doc_attribs)
+        ]
 
     # First, split all json_items into chunks (fast) to debug any issues quickly
     all_chunks = _create_chunks(json_items, doc_attribs)
@@ -46,6 +71,7 @@ def _ingest_edd_web(
         if not chunks:
             logger.warning("No chunks for %r", document.source)
             continue
+
         logger.info("Adding embeddings for %r", document.source)
         # Next, add embeddings to each chunk (slow)
         add_embeddings(chunks, [s.text_to_encode for s in splits])
@@ -54,6 +80,8 @@ def _ingest_edd_web(
         # Then, add to the database
         db_session.add(document)
         db_session.add_all(chunks)
+        if resume:
+            db_session.commit()
 
 
 class SplitWithContextText:

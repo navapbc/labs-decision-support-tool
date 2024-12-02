@@ -43,17 +43,19 @@ def test_process_and_ingest_sys_args_requires_four_args(caplog):
     logger = logging.getLogger(__name__)
     ingest = Mock()
 
-    with caplog.at_level(logging.WARNING):
-        process_and_ingest_sys_args(["ingest-policy-pdfs"], logger, ingest)
-        assert "Expecting 4 arguments" in caplog.text
-        assert not ingest.called
+    with pytest.raises(SystemExit):
+        with caplog.at_level(logging.WARNING):
+            process_and_ingest_sys_args(["ingest-policy-pdfs"], logger, ingest)
+            assert "the following arguments are required:" in caplog.text
+            assert not ingest.called
 
-    with caplog.at_level(logging.WARNING):
-        process_and_ingest_sys_args(
-            ["ingest-policy-pdfs", "with", "too", "many", "args", "passed"], logger, ingest
-        )
-        assert "Expecting 4 arguments" in caplog.text
-        assert not ingest.called
+    with pytest.raises(SystemExit):
+        with caplog.at_level(logging.WARNING):
+            process_and_ingest_sys_args(
+                ["ingest-policy-pdfs", "with", "too", "many", "args", "passed"], logger, ingest
+            )
+            assert "the following arguments are required:" in caplog.text
+            assert not ingest.called
 
 
 def test_process_and_ingest_sys_args_calls_ingest(caplog):
@@ -72,7 +74,7 @@ def test_process_and_ingest_sys_args_calls_ingest(caplog):
             logger,
             ingest,
         )
-        assert "Finished processing" in caplog.text
+        assert "Finished ingesting" in caplog.text
         ingest.assert_called_with(
             ANY,
             "/some/folder",
