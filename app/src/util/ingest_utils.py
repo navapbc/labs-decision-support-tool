@@ -1,4 +1,3 @@
-import getopt
 import json
 import logging
 import re
@@ -36,10 +35,7 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
         )
         return
 
-    _, args = getopt.getopt(
-        argv[1:], shortopts="", longopts=["DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH)"]
-    )
-
+    args = argv[1:]
     dataset_id = args[0]
     benefit_program = args[1]
     benefit_region = args[2]
