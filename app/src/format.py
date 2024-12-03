@@ -132,9 +132,12 @@ def build_accordions(
     global _accordion_id
 
     remapped_citations = remap_citation_ids(subsections, raw_response)
+    # Group the citations by document to build an accordion for each document
+    citations_by_document = groupby(remapped_citations.values(), key=lambda t: t.chunk.document)
     citations_html = ""
-    for document, cited_subsections in _group_by_document(remapped_citations):
+    for document, subsection_itr in citations_by_document:
         _accordion_id += 1
+        cited_subsections = list(subsection_itr)
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
         citation_numbers = [citation.id for citation in cited_subsections]
@@ -155,7 +158,7 @@ def build_accordions(
         </div>"""
 
     # This heading is important to prevent Chainlit from embedding citations_html
-    # as the next part of a a list in response_with_citations
+    # as the next part of a list in response_with_citations
     response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations, config))
     if citations_html:
         return (
@@ -218,17 +221,6 @@ def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> 
         headings = headings[1:]
 
     return f"<div><b>{' → '.join(headings)}</b></div>"
-
-
-def _group_by_document(
-    remapped_citations: dict[str, Subsection]
-) -> dict[Document, list[Subsection]]:
-    """
-    Group the input citations by document
-    Argument `remapped_citations` maps original citation_id (used in the LLM generated response) to Subsection
-    """
-    by_doc = groupby(remapped_citations.values(), key=lambda t: t.chunk.document)
-    return {doc: list(subsections) for doc, subsections in by_doc}
 
 
 # TODO: This is not called. Remove it?

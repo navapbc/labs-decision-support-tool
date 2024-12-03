@@ -199,38 +199,6 @@ def test_reify_citations():
     )
 
 
-def test__group_by_document():
-    docs = DocumentFactory.build_batch(2)
-    for doc in docs:
-        doc.name += "BEM 123"
-    chunk_list = ChunkFactory.build_batch(4)
-
-    chunk_list[0].document = docs[0]
-    chunk_list[1].document = docs[0]
-    chunk_list[2].document = docs[1]
-    chunk_list[3].document = docs[1]
-
-    subsections = [
-        Subsection("1", chunk_list[0], "Subsection 1"),
-        Subsection("2", chunk_list[0], "Subsection 2"),
-        Subsection("3", chunk_list[1], "Subsection 3"),
-        Subsection("4", chunk_list[2], "Subsection 5"),
-        Subsection("5", chunk_list[3], "Subsection 6"),
-    ]
-    remapped_citations = {
-        "citation-22": subsections[0],
-        "citation-21": subsections[1],
-        "citation-20": subsections[2],
-        "citation-27": subsections[3],
-        "citation-25": subsections[4],
-    }
-
-    assert _group_by_document(remapped_citations) == {
-        docs[0]: [subsections[0], subsections[1], subsections[2]],
-        docs[1]: [subsections[3], subsections[4]],
-    }
-
-
 def test__get_breadcrumb_html():
     headings = []
     assert _get_breadcrumb_html(headings, "Doc name") == "<div>&nbsp;</div>"
