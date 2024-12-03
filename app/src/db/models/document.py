@@ -1,5 +1,5 @@
 import logging
-from typing import NamedTuple
+from typing import NamedTuple, Sequence
 from uuid import UUID
 
 import numpy as np
@@ -80,8 +80,13 @@ class DocumentWithMaxScore(NamedTuple):
     max_score: float
 
 
-class Subsection(NamedTuple):
-    id: str
-    chunk: Chunk
-    # specific substring within chunk.text
-    text: str
+class Subsection:
+
+    def __init__(self, id: str, chunk: Chunk, text: str) -> None:
+        self.id = id
+        self.chunk = chunk
+        # specific substring within chunk.text
+        self.text = text
+
+        # FIXME: parse subsection and append to chunk.headings
+        self.text_headings = chunk.headings if chunk.headings else []

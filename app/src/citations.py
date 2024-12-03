@@ -69,12 +69,12 @@ def split_into_subsections(
 
 def create_prompt_context(subsections: Sequence[Subsection]) -> str:
     context_list = []
-    for chunk_with_subsection in subsections:
-        context_text = f"Citation: {chunk_with_subsection.id}\n"
-        context_text += "Document name: " + chunk_with_subsection.chunk.document.name + "\n"
-        if chunk_with_subsection.chunk.headings:
-            context_text += "Headings: " + " > ".join(chunk_with_subsection.chunk.headings) + "\n"
-        context_text += "Content: " + chunk_with_subsection.text
+    for subsection in subsections:
+        context_text = f"Citation: {subsection.id}\n"
+        context_text += "Document name: " + subsection.chunk.document.name + "\n"
+        if subsection.text_headings:
+            context_text += "Headings: " + " > ".join(subsection.text_headings) + "\n"
+        context_text += "Content: " + subsection.text
 
         context_list.append(context_text)
 

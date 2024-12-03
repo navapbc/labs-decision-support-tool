@@ -1,3 +1,5 @@
+from copy import copy
+
 import pytest
 
 from src.citations import (
@@ -71,13 +73,13 @@ def test_get_context(chunks, subsections):
 def test_remap_citation_ids(subsections):
     assert remap_citation_ids(subsections, "") == {}
     assert remap_citation_ids([], "A non-existent citation is (citation-0)") == {}
-    assert remap_citation_ids(
+
+    remapped_citations = remap_citation_ids(
         subsections,
         f"Now a real citation is ({subsections[1].id}), which we can cite twice ({subsections[1].id}), followed by ({subsections[0].id})",
-    ) == {
-        subsections[1].id: subsections[1]._replace(id="1"),
-        subsections[0].id: subsections[0]._replace(id="2"),
-    }
+    )
+    assert remapped_citations[subsections[1].id].id == "1"
+    assert remapped_citations[subsections[0].id].id == "2"
 
 
 def test_default_chunk_splitter():

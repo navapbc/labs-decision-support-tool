@@ -254,7 +254,7 @@ def test__get_breadcrumb_html():
     assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 2</b></div>"
 
 
-def test__return_citation_link():
+def test__get_citation_link():
     doc = DocumentFactory.build_batch(2)
     chunk_list = ChunkFactory.build_batch(2)
     doc[0].name = "BEM 234"
@@ -266,12 +266,14 @@ def test__return_citation_link():
     chunk_list[1].document = doc[1]
     chunk_list[1].page_number = 3
 
-    bem_link = BemFormattingConfig().return_citation_link(chunk_list[0])
+    bem_link = BemFormattingConfig().get_citation_link(
+        Subsection("1", chunk_list[0], "Subsection 1")
+    )
 
     assert "Open document to page 3" in bem_link
     assert "Source" not in bem_link
 
-    web_link = FormattingConfig().return_citation_link(chunk_list[1])
+    web_link = FormattingConfig().get_citation_link(Subsection("2", chunk_list[1], "Subsection 1"))
     assert "page 3" not in web_link
     assert "Source" in web_link
 
