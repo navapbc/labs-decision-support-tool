@@ -133,14 +133,8 @@ def build_accordions(
 
     remapped_citations = remap_citation_ids(subsections, raw_response)
     citations_html = ""
-    citations_by_document = _group_by_document_and_chunks(remapped_citations)
-    for document, chunks_in_doc in citations_by_document.items():
+    for document, cited_subsections in _group_by_document(remapped_citations):
         _accordion_id += 1
-        cited_subsections = [
-            chunk_subsection
-            for _, subsection_list in chunks_in_doc
-            for chunk_subsection in subsection_list
-        ]
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
         citation_numbers = [citation.id for citation in cited_subsections]
@@ -226,24 +220,15 @@ def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> 
     return f"<div><b>{' → '.join(headings)}</b></div>"
 
 
-def _group_by_document_and_chunks(  # FIXME: group by subsection.text_headings and by document
+def _group_by_document(
     remapped_citations: dict[str, Subsection]
-) -> dict[Document, list[ChunkWithCitation]]:
+) -> dict[Document, list[Subsection]]:
     """
-    Group the chunks by document and nests the values of the citation number and subsection string.
+    Group the input citations by document
     Argument `remapped_citations` maps original citation_id (used in the LLM generated response) to Subsection
     """
-    # Group the input citations by chunk then by document
-    by_chunk = groupby(remapped_citations.values(), key=lambda t: t.chunk)
-    by_doc = groupby(by_chunk, key=lambda t: t[0].document)
-
-    # Create output dictionary with structure {Document: [(Chunk, [Subsection])]}
-    citations_by_document: dict[Document, list[ChunkWithCitation]] = defaultdict(list)
-    for doc, chunk_list in by_doc:
-        for chunk, subsection_list in chunk_list:
-            citations_by_document[doc].append((chunk, list(subsection_list)))
-
-    return citations_by_document
+    by_doc = groupby(remapped_citations.values(), key=lambda t: t.chunk.document)
+    return {doc: list(subsections) for doc, subsections in by_doc}
 
 
 # TODO: This is not called. Remove it?

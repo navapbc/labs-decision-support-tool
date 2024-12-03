@@ -10,7 +10,7 @@ from src.format import (
     _add_ellipses_for_bem,
     _format_guru_to_accordion_html,
     _get_breadcrumb_html,
-    _group_by_document_and_chunks,
+    _group_by_document,
     build_accordions,
     format_bem_documents,
     format_guru_cards,
@@ -199,7 +199,7 @@ def test_reify_citations():
     )
 
 
-def test__group_by_document_and_chunks():
+def test__group_by_document():
     docs = DocumentFactory.build_batch(2)
     for doc in docs:
         doc.name += "BEM 123"
@@ -224,16 +224,10 @@ def test__group_by_document_and_chunks():
         "citation-27": subsections[3],
         "citation-25": subsections[4],
     }
-    # Check for items with the same chunk and different subsections
-    assert _group_by_document_and_chunks(remapped_citations) == {
-        docs[0]: [
-            (chunk_list[0], [subsections[0], subsections[1]]),
-            (chunk_list[1], [subsections[2]]),
-        ],
-        docs[1]: [
-            (chunk_list[2], [subsections[3]]),  #
-            (chunk_list[3], [subsections[4]]),
-        ],
+
+    assert _group_by_document(remapped_citations) == {
+        docs[0]: [subsections[0], subsections[1], subsections[2]],
+        docs[1]: [subsections[3], subsections[4]],
     }
 
 
