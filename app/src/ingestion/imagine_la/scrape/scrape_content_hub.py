@@ -55,6 +55,7 @@ page.wait_for_selector("h2", timeout=10_000)
 learn_more_buttons = page.locator('button:has-text("Learn more")')
 content_hub_pages: dict[str, str] = {}
 
+root_url_prefix = root_url if root_url.endswith("/") else root_url + "/"
 for index in range(learn_more_buttons.count()):
 
     # Expand all the accordions on the page
@@ -66,7 +67,9 @@ for index in range(learn_more_buttons.count()):
     with page.expect_navigation() as navigation:
         learn_more_buttons.nth(index).click()
 
-    page_path = page.url[1 + len(root_url) :]
+    page_path = page.url.removeprefix(root_url_prefix)
+    print(f"Scraped page: {page_path}")
+
     content_hub_pages[page_path] = page.content()
 
     page.go_back()
