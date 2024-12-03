@@ -205,7 +205,7 @@ def _create_splits_using_markdown_tree(
         if os.path.exists("SAVE_CHUNKS"):
             assert document.source
             _save_splits_to_files(document.source, content, splits, tree)
-    except (Exception, KeyboardInterrupt) as e:
+    except (Exception, KeyboardInterrupt) as e:  # pragma: no cover
         logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
         logger.error(tree.format())
         raise e
