@@ -134,6 +134,48 @@ def test_process_and_ingest_sys_args_drops_existing_dataset(
         assert db_session.execute(select(Document).where(Document.dataset == "other dataset")).one()
 
 
+def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_create):
+    db_session.execute(delete(Document))
+    logger = logging.getLogger(__name__)
+    ingest = Mock()
+    with pytest.raises(NotImplementedError):
+        process_and_ingest_sys_args(
+            [
+                "ingest-policy-pdfs",
+                "bridges-eligibility-manual",
+                "SNAP",
+                "Michigan",
+                "/some/folder",
+                "--resume",
+            ],
+            logger,
+            ingest,
+        )
+
+    # Use an unmocked function so that the resume parameter is detectable by process_and_ingest_sys_args()
+    def ingest_with_resume(db_session, json_filepath, doc_attribs, resume=False) -> None:
+        logger.info("Ingesting with resume: %r", resume)
+
+    DocumentFactory.create(dataset="CA EDD")
+    with caplog.at_level(logging.INFO):
+        process_and_ingest_sys_args(
+            [
+                "ingest-edd-web",
+                "CA EDD",
+                "employment",
+                "California",
+                "/some/folder",
+                "--resume",
+            ],
+            logger,
+            ingest_with_resume,
+        )
+        assert "Enabled resuming from previous run" in caplog.text
+        assert "Ingesting with resume: True" in caplog.text
+        assert "Dropped existing dataset" not in caplog.text
+        assert db_session.execute(select(Document).where(Document.dataset == "CA EDD")).one()
+
+
 def test__add_embeddings(app_config):
     embedding_model = MockSentenceTransformer()
     chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)

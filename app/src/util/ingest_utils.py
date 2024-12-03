@@ -41,11 +41,9 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
         params = inspect.signature(ingestion_call).parameters
         if "resume" not in params:
             raise NotImplementedError(
-                f"Ingestion function {ingestion_call.__name__} does not support `resume`"
+                f"Ingestion function does not support `resume`: {ingestion_call}"
             )
-        logger.info(
-            "Resuming from previous run. Note the previous run must have been run with `--resume`."
-        )
+        logger.info("Enabled resuming from previous run.")
 
     doc_attribs = {
         "dataset": args.dataset_id,
