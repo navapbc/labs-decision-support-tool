@@ -220,9 +220,7 @@ def test__ingest_edd(
         ]
 
 
-def test__ingest_edd_using_md_tree(
-    caplog, app_config, db_session, edd_web_local_file
-):
+def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local_file):
     ingest_edd_web.USE_MARKDOWN_TREE = True
     # Force a short max_seq_length to test chunking
     app_config_for_test.sentence_transformer.max_seq_length = 47
@@ -305,6 +303,8 @@ def test__ingest_edd_using_md_tree(
     with caplog.at_level(logging.INFO):
         _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, resume=True)
 
-    skipped_logs = {msg for msg in caplog.messages if msg.startswith("Skipping -- item already exists:")}
+    skipped_logs = {
+        msg for msg in caplog.messages if msg.startswith("Skipping -- item already exists:")
+    }
     assert len(skipped_logs) == 4
     assert db_session.query(Document.id).count() == 4
