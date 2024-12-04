@@ -19,18 +19,26 @@ class CitationFactory:
         else:
             self.next_id = lambda: f"{prefix}{self.counter.__next__()}"
 
-    def create_citation(self, chunk: Chunk, subsection: str) -> Subsection:
-        return Subsection(self.next_id(), chunk, subsection)
+    def create_citation(self, chunk: Chunk, text: str, text_headings: Sequence[str]) -> Subsection:
+        # Check that text is in chunk.content, ignoring whitespace
+        assert re.sub(r"\s+", " ", text) in re.sub(
+            r"\s+", " ", chunk.content
+        ), f"Text {text!r} not found in chunk {chunk.content!r}"
+        return Subsection(self.next_id(), chunk, text, text_headings)
 
 
 citation_factory = CitationFactory()
 
 
-def default_chunk_splitter(chunk: Chunk) -> list[str]:
+def default_chunk_splitter(
+    chunk: Chunk, factory: CitationFactory = citation_factory
+) -> list[Subsection]:
     splits = [split for split in chunk.content.split("\n\n") if split]
     # Rejoin headings with the subsequent first paragraph
     better_splits = []
     skip_next = False
+    curr_headings = chunk.headings or []
+    # FIXME: update curr_headings as we go through the splits
     for i, split in enumerate(splits):
         if skip_next:
             skip_next = False
@@ -38,11 +46,12 @@ def default_chunk_splitter(chunk: Chunk) -> list[str]:
 
         next_split = splits[i + 1] if i + 1 < len(splits) else None
         if next_split and split.startswith("#") and not next_split.startswith("#"):
-            better_splits.append(f"{split}\n{next_split}")
+            subsection = factory.create_citation(chunk, f"{split}\n{next_split}", curr_headings)
+            better_splits.append(subsection)
             skip_next = True
             continue
 
-        better_splits.append(split)
+        better_splits.append(factory.create_citation(chunk, split, curr_headings))
 
     return better_splits
 
@@ -53,11 +62,7 @@ def split_into_subsections(
     factory: CitationFactory = citation_factory,
 ) -> Sequence[Subsection]:
     # Given a list of chunks, split them into a flat list of subsections to be used as citations
-    subsections = [
-        factory.create_citation(chunk, subsection)
-        for chunk in chunks
-        for subsection in chunk_splitter(chunk)
-    ]
+    subsections = [subsection for chunk in chunks for subsection in chunk_splitter(chunk, factory)]
     logger.info(
         "Split %d chunks into %d subsections:\n%s",
         len(chunks),
@@ -114,7 +119,9 @@ def remap_citation_ids(subsections: Sequence[Subsection], response: str) -> dict
         if citation_id in citation_map:
             # Add a copy of the subsection with the id replaced by a new consecutive citation number
             citation = citation_map[citation_id]
-            citations[citation_id] = factory.create_citation(citation.chunk, citation.text)
+            citations[citation_id] = factory.create_citation(
+                citation.chunk, citation.text, citation.text_headings
+            )
     logger.info(
         "Remapped citations:\n  %s",
         "\n  ".join([f"{id} -> {c.id}, {c.chunk.document.name}" for id, c in citations.items()]),

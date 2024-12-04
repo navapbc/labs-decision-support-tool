@@ -132,12 +132,10 @@ def build_accordions(
     global _accordion_id
 
     remapped_citations = remap_citation_ids(subsections, raw_response)
-    # Group the citations by document to build an accordion for each document
-    citations_by_document = groupby(remapped_citations.values(), key=lambda t: t.chunk.document)
+
     citations_html = ""
-    for document, subsection_itr in citations_by_document:
+    for document, cited_subsections in _group_by_document(remapped_citations).items():
         _accordion_id += 1
-        cited_subsections = list(subsection_itr)
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
         citation_numbers = [citation.id for citation in cited_subsections]
@@ -169,6 +167,19 @@ def build_accordions(
             + "</div>"
         )
     return "<div>" + response_with_citations + "</div>"
+
+
+def _group_by_document(
+    remapped_citations: dict[str, Subsection]
+) -> dict[Document, list[Subsection]]:
+    # Group the citations by document to build an accordion for each document
+    citations_by_document: dict[Document, list[Subsection]] = defaultdict(list)
+    # Combine all citations for each document
+    for document, subsection_itr in groupby(
+        remapped_citations.values(), key=lambda t: t.chunk.document
+    ):
+        citations_by_document[document] += list(subsection_itr)
+    return citations_by_document
 
 
 ChunkWithCitation = tuple[Chunk, Sequence[Subsection]]

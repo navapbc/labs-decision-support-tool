@@ -1,5 +1,3 @@
-from copy import copy
-
 import pytest
 
 from src.citations import (
@@ -97,7 +95,8 @@ def test_default_chunk_splitter():
             "## Last Heading without next paragraph\n"
         )
     )
-    assert default_chunk_splitter(chunk) == [
+    subsections = default_chunk_splitter(chunk)
+    assert [subsection.text for subsection in subsections] == [
         "## My Heading\nFirst paragraph.",
         "Paragraph two.",
         "And paragraph 3",

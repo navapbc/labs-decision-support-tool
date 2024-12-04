@@ -10,7 +10,6 @@ from src.format import (
     _add_ellipses_for_bem,
     _format_guru_to_accordion_html,
     _get_breadcrumb_html,
-    _group_by_document,
     build_accordions,
     format_bem_documents,
     format_guru_cards,
