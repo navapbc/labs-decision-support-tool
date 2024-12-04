@@ -8,6 +8,7 @@ from src.citations import (
     remap_citation_ids,
     replace_citation_ids,
     split_into_subsections,
+    tree_based_chunk_splitter,
 )
 from src.db.models.document import Subsection
 from tests.src.db.models.factories import ChunkFactory
@@ -97,27 +98,29 @@ CHUNK_CONTENT = (
     "Last paragraph.\n\n"
     "## Last Heading without next paragraph\n"
 )
+EXPECTED_SUBSECTIONS = [
+    (["Heading 1", "My Heading"], "First paragraph."),
+    (["Heading 1", "My Heading"], "Paragraph two."),
+    (["Heading 1", "My Heading"], "And paragraph 3"),
+    (["Heading 1", "My Heading", "Heading 3"], "Paragraph under H3."),
+    (["Heading 1", "Last Heading"], "Last paragraph."),
+]
 
 
 def test_basic_chunk_splitter():
     chunk = ChunkFactory.build(content=CHUNK_CONTENT, headings=["Heading 1"])
     subsections = basic_chunk_splitter(chunk)
-    assert [(subsection.text_headings, subsection.text) for subsection in subsections] == [
-        (["Heading 1", "My Heading"], "First paragraph."),
-        (["Heading 1", "My Heading"], "Paragraph two."),
-        (["Heading 1", "My Heading"], "And paragraph 3"),
-        (["Heading 1", "My Heading", "Heading 3"], "Paragraph under H3."),
-        (["Heading 1", "Last Heading"], "Last paragraph."),
-    ]
-    assert [subsection.text for subsection in subsections] == [
-        "## My Heading\nFirst paragraph.",
-        "Paragraph two.",
-        "And paragraph 3",
-        "### Heading with empty next paragraph",
-        "### Heading without next paragraph",
-        "## Last Heading\nLast paragraph.",
-        "## Last Heading without next paragraph\n",
-    ]
+    assert [
+        (subsection.text_headings, subsection.text) for subsection in subsections
+    ] == EXPECTED_SUBSECTIONS
+
+
+def test_tree_based_chunk_splitter():
+    chunk = ChunkFactory.build(content=CHUNK_CONTENT, headings=["Heading 1"])
+    subsections = tree_based_chunk_splitter(chunk)
+    assert [
+        (subsection.text_headings, subsection.text) for subsection in subsections
+    ] == EXPECTED_SUBSECTIONS
 
 
 def test_replace_citation_ids():
