@@ -5,6 +5,7 @@ from itertools import count
 from typing import Callable, Match, Sequence
 
 from src.db.models.document import Chunk, Subsection
+from src.util.string_utils import parse_heading_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -36,22 +37,20 @@ def default_chunk_splitter(
     splits = [split for split in chunk.content.split("\n\n") if split]
     # Rejoin headings with the subsequent first paragraph
     better_splits = []
-    skip_next = False
-    curr_headings = chunk.headings or []
-    # FIXME: update curr_headings as we go through the splits
-    for i, split in enumerate(splits):
-        if skip_next:
-            skip_next = False
+    base_headings = chunk.headings or []
+    curr_headings = ["" for _ in range(6)]
+    for split in splits:
+        if split.startswith("#"):
+            heading_level, heading_text = parse_heading_markdown(split)
+            # Clear all headings after the heading_level
+            for i in range(heading_level + 1, len(curr_headings)):
+                curr_headings[i] = ""
+            curr_headings[heading_level] = heading_text
             continue
 
-        next_split = splits[i + 1] if i + 1 < len(splits) else None
-        if next_split and split.startswith("#") and not next_split.startswith("#"):
-            subsection = factory.create_citation(chunk, f"{split}\n{next_split}", curr_headings)
-            better_splits.append(subsection)
-            skip_next = True
-            continue
-
-        better_splits.append(factory.create_citation(chunk, split, curr_headings))
+        headings = [text for text in base_headings + curr_headings if text]
+        subsection = factory.create_citation(chunk, split, headings)
+        better_splits.append(subsection)
 
     return better_splits
 

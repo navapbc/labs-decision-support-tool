@@ -81,29 +81,26 @@ def test_remap_citation_ids(subsections):
 
 
 def test_default_chunk_splitter():
-    chunk = ChunkFactory.build(
-        content=(
-            "## My Heading\n\n"
-            "First paragraph.\n\n"
-            "Paragraph two.\n\n"
-            "And paragraph 3\n\n"
-            "### Heading with empty next paragraph\n\n"
-            "\n\n"
-            "### Heading without next paragraph\n\n"
-            "## Last Heading\n\n"
-            "Last paragraph.\n\n"
-            "## Last Heading without next paragraph\n"
-        )
+    chunk_content = (
+        "## My Heading\n\n"
+        "First paragraph.\n\n"
+        "Paragraph two.\n\n"
+        "And paragraph 3\n\n"
+        "### Heading with empty next paragraph\n\n"
+        "### Heading 3\n\n"
+        "Paragraph under H3.\n\n"
+        "## Last Heading\n\n"
+        "Last paragraph.\n\n"
+        "## Last Heading without next paragraph\n"
     )
+    chunk = ChunkFactory.build(content=chunk_content, headings=["Heading 1"])
     subsections = default_chunk_splitter(chunk)
-    assert [subsection.text for subsection in subsections] == [
-        "## My Heading\nFirst paragraph.",
-        "Paragraph two.",
-        "And paragraph 3",
-        "### Heading with empty next paragraph",
-        "### Heading without next paragraph",
-        "## Last Heading\nLast paragraph.",
-        "## Last Heading without next paragraph\n",
+    assert [(subsection.text_headings, subsection.text) for subsection in subsections] == [
+        (["Heading 1", "My Heading"], "First paragraph."),
+        (["Heading 1", "My Heading"], "Paragraph two."),
+        (["Heading 1", "My Heading"], "And paragraph 3"),
+        (["Heading 1", "My Heading", "Heading 3"], "Paragraph under H3."),
+        (["Heading 1", "Last Heading"], "Last paragraph."),
     ]
 
 
