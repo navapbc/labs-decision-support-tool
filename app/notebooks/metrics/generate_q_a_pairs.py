@@ -83,17 +83,21 @@ def process_document_or_chunk(
     )
     question_answer_list: list[QuestionAnswerAttributes] = []
 
+    if isinstance(document_or_chunk, Document):
+        document = document_or_chunk
+        chunk_id = None
+    else:
+        document = document_or_chunk.document
+        chunk_id = document_or_chunk.id
+
     for generated_question_answer in generated_question_answers.pairs:
-        is_document = isinstance(document_or_chunk, Document)
-        # use chunk document if is_document is false
-        document = document_or_chunk if is_document else document_or_chunk.document
         question_answer_item = QuestionAnswerAttributes(
             document_id=document.id,
             document_name=document.name,
             document_source=document.source,
             question=generated_question_answer.question,
             answer=generated_question_answer.answer,
-            chunk_id=None if is_document else document_or_chunk.id,
+            chunk_id=chunk_id,
             content_hash=md5(document_or_chunk.content.encode('utf-8'), usedforsecurity=False).hexdigest(),
             dataset=dataset,
         )
