@@ -4,7 +4,6 @@ from src.citations import (
     CitationFactory,
     basic_chunk_splitter,
     create_prompt_context,
-    default_chunk_splitter,
     remap_citation_ids,
     replace_citation_ids,
     split_into_subsections,

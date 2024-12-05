@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from itertools import count
 from typing import Callable, Match, Sequence
 
-from nutree import IterMethod, Node
+from nutree import Node
 
 from src.db.models.document import Chunk, Subsection
 from src.ingestion.markdown_tree import create_markdown_tree, get_parent_headings_raw
@@ -79,7 +79,7 @@ def _split_section(
     hs_node: Node,
     chunk: Chunk,
     factory: CitationFactory = citation_factory,
-):
+) -> list[Subsection]:
     base_headings = chunk.headings or []
     headings = None
     subsections: list[Subsection] = []
@@ -93,7 +93,7 @@ def _split_section(
             markdown = node.render().strip()
             subsections.append(factory.create_citation(chunk, markdown, headings))
         else:
-            assert False, f"Unhandled: {node}"
+            raise NotImplementedError(f"Unexpected: {node.id_string()}")
     return subsections
 
 
