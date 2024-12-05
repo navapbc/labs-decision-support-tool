@@ -35,23 +35,21 @@ def default_chunk_splitter(
     chunk: Chunk, factory: CitationFactory = citation_factory
 ) -> list[Subsection]:
     splits = [split for split in chunk.content.split("\n\n") if split]
-    # Rejoin headings with the subsequent first paragraph
     better_splits = []
     base_headings = chunk.headings or []
     curr_headings = ["" for _ in range(6)]
     for split in splits:
         if split.startswith("#"):
             heading_level, heading_text = parse_heading_markdown(split)
+            curr_headings[heading_level] = heading_text
             # Clear all headings after the heading_level
             for i in range(heading_level + 1, len(curr_headings)):
                 curr_headings[i] = ""
-            curr_headings[heading_level] = heading_text
             continue
 
         headings = [text for text in base_headings + curr_headings if text]
         subsection = factory.create_citation(chunk, split, headings)
         better_splits.append(subsection)
-
     return better_splits
 
 
