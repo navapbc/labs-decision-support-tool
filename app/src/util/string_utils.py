@@ -158,13 +158,12 @@ def headings_as_markdown(headings: Sequence[str]) -> str:
     return "\n".join(f"{"#" * i} {h}" for i, h in enumerate(headings, start=1) if h)
 
 
-def parse_heading_markdown(md: str) -> Optional[tuple[int, str]]:
+def parse_heading_markdown(md: str) -> tuple[int, str]:
     match = re.match("^#+ ", md)
     if match:
         prefix = match.group()
         return prefix.count("#"), md.removeprefix(prefix)
-    else:
-        return None
+    raise ValueError(f"Unable to parse markdown heading: {md!r}")
 
 
 def remove_links(markdown: str) -> str:
