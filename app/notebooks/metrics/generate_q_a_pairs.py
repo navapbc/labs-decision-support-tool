@@ -2,6 +2,7 @@ import csv
 import json
 from typing import Optional
 from litellm import completion
+from hashlib import md5
 
 import os
 from pydantic import BaseModel
@@ -37,6 +38,7 @@ class QuestionAnswerAttributes(QuestionAnswerPair):
     document_source: str
     document_id: UUID
     chunk_id: Optional[UUID]
+    content_hash: str
     dataset: str
 
 
@@ -70,28 +72,29 @@ def generate_question_answer_pairs(llm: str, message: str) -> QuestionAnswerList
 
 
 def process_document_or_chunk(
-    document: Document | Chunk,
+    document_or_chunk: Document | Chunk,
     num_of_chunks: int,
     llm: str,
     dataset: str,
 ) -> list[QuestionAnswerAttributes]:
     generated_question_answers = generate_question_answer_pairs(
         llm=llm,
-        message=f"Please use the following content to create {num_of_chunks} question-answer pairs. Content: {document.content}",
+        message=f"Please use the following content to create {num_of_chunks} question-answer pairs. Content: {document_or_chunk.content}",
     )
     question_answer_list: list[QuestionAnswerAttributes] = []
 
     for generated_question_answer in generated_question_answers.pairs:
-        is_document = isinstance(document, Document)
+        is_document = isinstance(document_or_chunk, Document)
         # use chunk document if is_document is false
-        document_item = document if is_document else document.document
+        document = document_or_chunk if is_document else document_or_chunk.document
         question_answer_item = QuestionAnswerAttributes(
-            document_id=document_item.id,
-            document_name=document_item.name,
-            document_source=document_item.source,
+            document_id=document.id,
+            document_name=document.name,
+            document_source=document.source,
             question=generated_question_answer.question,
             answer=generated_question_answer.answer,
-            chunk_id=None if is_document else document.id,
+            chunk_id=None if is_document else document_or_chunk.id,
+            content_hash=md5(document_or_chunk.content.encode('utf-8')).hexdigest(),
             dataset=dataset,
         )
         question_answer_list.append(question_answer_item)
