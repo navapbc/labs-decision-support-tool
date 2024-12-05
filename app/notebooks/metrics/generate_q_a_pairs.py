@@ -94,7 +94,7 @@ def process_document_or_chunk(
             question=generated_question_answer.question,
             answer=generated_question_answer.answer,
             chunk_id=None if is_document else document_or_chunk.id,
-            content_hash=md5(document_or_chunk.content.encode('utf-8')).hexdigest(),
+            content_hash=md5(document_or_chunk.content.encode('utf-8'), usedforsecurity=False).hexdigest(),
             dataset=dataset,
         )
         question_answer_list.append(question_answer_item)
