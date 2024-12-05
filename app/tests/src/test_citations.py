@@ -116,11 +116,17 @@ def test_basic_chunk_splitter():
 
 
 def test_tree_based_chunk_splitter():
-    chunk = ChunkFactory.build(content=CHUNK_CONTENT, headings=["Heading 1"])
+    chunk_content = CHUNK_CONTENT + (
+        "## Some Heading\n"  #
+        "Text with no empty line between heading and paragraph."
+    )
+    chunk = ChunkFactory.build(content=chunk_content, headings=["Heading 1"])
     subsections = tree_based_chunk_splitter(chunk)
     assert [
         (subsection.text_headings, subsection.text) for subsection in subsections
-    ] == EXPECTED_SUBSECTIONS
+    ] == EXPECTED_SUBSECTIONS + [
+        (["Heading 1", "Some Heading"], "Text with no empty line between heading and paragraph."),
+    ]
 
 
 def test_replace_citation_ids():
