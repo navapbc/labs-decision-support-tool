@@ -9,12 +9,14 @@ from fastapi.testclient import TestClient
 from src import chat_api
 from src.chat_api import (
     ChatEngineSettings,
+    FeedbackRequest,
     QueryResponse,
     UserInfo,
     UserSession,
     get_chat_engine,
     router,
     run_query,
+    # FeedbackResponse,
 )
 from src.chat_engine import OnMessageResult
 from src.citations import CitationFactory, split_into_subsections
@@ -204,7 +206,17 @@ def test_get_chat_engine_not_allowed(user_info):
         get_chat_engine(session)
 
 
-def test_post_feedback(client):
+def test_post_feedback(monkeypatch, client):
+    # async def mock_feedback():
+    #     return FeedbackResponse(
+    #         user_id="Session0",
+    #         is_positive="true",
+    #         response_id="response_id0",
+    #         comment="great answer",
+    #     )
+
+    # monkeypatch.setattr("src.chat_api.feedback", mock_feedback)
+
     response = client.post(
         "/api/feedback",
         json={
