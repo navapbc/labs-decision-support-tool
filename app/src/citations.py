@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from itertools import count
 from typing import Callable, Match, Sequence
 
+from nutree import Node
+
 from src.db.models.document import Chunk, Subsection
+from src.ingestion.markdown_tree import create_markdown_tree, get_parent_headings_raw
 from src.util.string_utils import parse_heading_markdown
 
 logger = logging.getLogger(__name__)
@@ -34,6 +37,19 @@ citation_factory = CitationFactory()
 def default_chunk_splitter(
     chunk: Chunk, factory: CitationFactory = citation_factory
 ) -> list[Subsection]:
+    try:
+        return tree_based_chunk_splitter(chunk, factory)
+    except RuntimeError as e:
+        logger.warning(
+            "Falling back to basic_chunk_splitter for chunk: %s", chunk.id, exc_info=True
+        )
+        logger.warning(e)
+        return basic_chunk_splitter(chunk, factory)
+
+
+def basic_chunk_splitter(
+    chunk: Chunk, factory: CitationFactory = citation_factory
+) -> list[Subsection]:
     splits = [split for split in chunk.content.split("\n\n") if split]
     better_splits = []
     base_headings = chunk.headings or []
@@ -48,9 +64,37 @@ def default_chunk_splitter(
             continue
 
         headings = [text for text in base_headings + curr_headings if text]
-        subsection = factory.create_citation(chunk, split, headings)
-        better_splits.append(subsection)
+        better_splits.append(factory.create_citation(chunk, split, headings))
     return better_splits
+
+
+def tree_based_chunk_splitter(
+    chunk: Chunk, factory: CitationFactory = citation_factory
+) -> list[Subsection]:
+    tree = create_markdown_tree(chunk.content)
+    return _split_section(tree.first_child(), chunk, factory)
+
+
+def _split_section(
+    hs_node: Node,
+    chunk: Chunk,
+    factory: CitationFactory = citation_factory,
+) -> list[Subsection]:
+    base_headings = chunk.headings or []
+    headings = None
+    subsections: list[Subsection] = []
+    for node in hs_node.children:
+        if node.data_type == "HeadingSection":
+            subsections += _split_section(node, chunk, factory)
+        elif node.data_type == "Heading":
+            pass
+        elif node.has_token() and node.is_block_token():
+            headings = headings or (base_headings + get_parent_headings_raw(node))
+            markdown = node.render().strip()
+            subsections.append(factory.create_citation(chunk, markdown, headings))
+        else:
+            raise NotImplementedError(f"Unexpected: {node.id_string()}")
+    return subsections
 
 
 def split_into_subsections(
