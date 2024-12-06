@@ -202,3 +202,18 @@ def test_get_chat_engine_not_allowed(user_info):
     )
     with pytest.raises(HTTPException, match="Unknown engine: bridges-eligibility-manual"):
         get_chat_engine(session)
+
+
+def test_post_feedback(client):
+    response = client.post(
+        "/api/feedback",
+        json={
+            "session_id": "Session0",
+            "is_positive": "true",
+            "response_id": "response_id0",
+            "comment": "great answer",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()

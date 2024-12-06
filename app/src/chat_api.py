@@ -127,6 +127,53 @@ async def engines(user_id: str) -> list[str]:
     return response
 
 
+class FeedbackRequest(BaseModel):
+    session_id: str
+    is_positive: bool
+    response_id: str
+    comment: Optional[str] = None
+    user_id: Optional[str] = None
+
+
+class FeedbackResponse(BaseModel):
+    user_id: str
+    value: float
+    step_id: str
+    comment: Optional[str]
+
+
+@router.post("/feedback")
+async def feedback(
+    request: FeedbackRequest,
+) -> FeedbackResponse:
+    """Endpoint for creating feedback for a chatbot response message
+
+    Args:
+        request (FeedbackRequest): _description_
+
+    Returns:
+        FeedbackResponse: _description_
+    """
+    user_session_id = request.user_id if request.user_id else request.session_id
+
+    session = await _get_user_session(user_session_id)
+    # API endpoint to send feedback https://docs.literalai.com/guides/logs#add-a-score
+    response = await literalai().api.create_score(
+        step_id=request.response_id,
+        name=session.user.user_id,
+        type="HUMAN",
+        value=1 if request.is_positive else 0,
+        comment=request.comment,
+    )
+
+    return FeedbackResponse(
+        user_id=response.name,
+        value=response.value,
+        step_id=response.step_id,
+        comment=response.comment,
+    )
+
+
 # endregion
 # region: ===================  API Endpoints  ===================
 
