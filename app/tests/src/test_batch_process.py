@@ -56,9 +56,11 @@ async def test_batch_process(monkeypatch, sample_csv, engine):
 
 
 def test_process_question(monkeypatch, engine):
+    chunk = ChunkFactory.build()
+    subsection_text = chunk.content[: int(len(chunk.content) / 2)]
     mock_result = OnMessageResult(
         response="Answer to question.(citation-1)",
-        subsections=[Subsection("citation-1", ChunkFactory.build(), "subsection text")],
+        subsections=[Subsection("citation-1", chunk, subsection_text)],
         chunks_with_scores=[],
         system_prompt="",
     )
@@ -67,7 +69,7 @@ def test_process_question(monkeypatch, engine):
     assert _process_question("What is AI?", engine) == {
         "answer": "Answer to question.(citation-1)",
         "citation_1_name": mock_result.subsections[0].chunk.document.name,
-        "citation_1_headings": " > ".join(mock_result.subsections[0].chunk.headings),
+        "citation_1_headings": " > ".join(mock_result.subsections[0].text_headings),
         "citation_1_source": mock_result.subsections[0].chunk.document.source,
-        "citation_1_text": "subsection text",
+        "citation_1_text": subsection_text,
     }

@@ -10,7 +10,6 @@ from src.format import (
     _add_ellipses_for_bem,
     _format_guru_to_accordion_html,
     _get_breadcrumb_html,
-    _group_by_document_and_chunks,
     build_accordions,
     format_bem_documents,
     format_guru_cards,
@@ -199,44 +198,6 @@ def test_reify_citations():
     )
 
 
-def test__group_by_document_and_chunks():
-    docs = DocumentFactory.build_batch(2)
-    for doc in docs:
-        doc.name += "BEM 123"
-    chunk_list = ChunkFactory.build_batch(4)
-
-    chunk_list[0].document = docs[0]
-    chunk_list[1].document = docs[0]
-    chunk_list[2].document = docs[1]
-    chunk_list[3].document = docs[1]
-
-    subsections = [
-        Subsection("1", chunk_list[0], "Subsection 1"),
-        Subsection("2", chunk_list[0], "Subsection 2"),
-        Subsection("3", chunk_list[1], "Subsection 3"),
-        Subsection("4", chunk_list[2], "Subsection 5"),
-        Subsection("5", chunk_list[3], "Subsection 6"),
-    ]
-    remapped_citations = {
-        "citation-22": subsections[0],
-        "citation-21": subsections[1],
-        "citation-20": subsections[2],
-        "citation-27": subsections[3],
-        "citation-25": subsections[4],
-    }
-    # Check for items with the same chunk and different subsections
-    assert _group_by_document_and_chunks(remapped_citations) == {
-        docs[0]: [
-            (chunk_list[0], [subsections[0], subsections[1]]),
-            (chunk_list[1], [subsections[2]]),
-        ],
-        docs[1]: [
-            (chunk_list[2], [subsections[3]]),  #
-            (chunk_list[3], [subsections[4]]),
-        ],
-    }
-
-
 def test__get_breadcrumb_html():
     headings = []
     assert _get_breadcrumb_html(headings, "Doc name") == "<div>&nbsp;</div>"
@@ -254,7 +215,7 @@ def test__get_breadcrumb_html():
     assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 2</b></div>"
 
 
-def test__return_citation_link():
+def test__get_citation_link():
     doc = DocumentFactory.build_batch(2)
     chunk_list = ChunkFactory.build_batch(2)
     doc[0].name = "BEM 234"
@@ -266,12 +227,14 @@ def test__return_citation_link():
     chunk_list[1].document = doc[1]
     chunk_list[1].page_number = 3
 
-    bem_link = BemFormattingConfig().return_citation_link(chunk_list[0])
+    bem_link = BemFormattingConfig().get_citation_link(
+        Subsection("1", chunk_list[0], "Subsection 1")
+    )
 
     assert "Open document to page 3" in bem_link
     assert "Source" not in bem_link
 
-    web_link = FormattingConfig().return_citation_link(chunk_list[1])
+    web_link = FormattingConfig().get_citation_link(Subsection("2", chunk_list[1], "Subsection 1"))
     assert "page 3" not in web_link
     assert "Source" in web_link
 
