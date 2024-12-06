@@ -51,6 +51,12 @@ aws s3 cp path/to/some_cards.json s3://decision-support-tool-app-dev/
 Replace `<ENVIRONMENT>` with your environment, e.g., `dev`.
 Note the arguments `"dataset_identifier", "SNAP", "Michigan", "s3://decision-support-tool-app-dev/some_cards.json"` are in the same order as described above for `ingest-guru-cards`, i.e., `DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH`.
 
+#### Resuming ingestion for large datasets
+
+To continue ingestion from where it last stopped (typically due to resource limitation failures), start ingestion with the `INGEST_ARGS="--resume"` argument like `make ingest-edd-web DATASET_ID="CA EDD" BENEFIT_PROGRAM=employment BENEFIT_REGION=California FILEPATH=src/ingestion/edd_scrapings.json INGEST_ARGS="--resume"`.
+
+This will commit the DB transaction for each Document, rather than committing after all Document records are added.
+Upon re-running ingestion using the same command. Expect to see `Skipping -- item already exists:` log messages for Documents that already exist in the DB.
 
 ### Web scraping
 

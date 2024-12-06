@@ -81,10 +81,6 @@ def test_remap_citation_ids(subsections):
     assert remapped_citations[subsections[0].id].id == "2"
 
 
-def test_default_chunk_splitter():
-    pass
-
-
 CHUNK_CONTENT = (
     "## My Heading\n\n"
     "First paragraph.\n\n"
