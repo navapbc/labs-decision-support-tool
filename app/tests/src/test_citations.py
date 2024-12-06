@@ -2,11 +2,12 @@ import pytest
 
 from src.citations import (
     CitationFactory,
+    basic_chunk_splitter,
     create_prompt_context,
-    default_chunk_splitter,
     remap_citation_ids,
     replace_citation_ids,
     split_into_subsections,
+    tree_based_chunk_splitter,
 )
 from src.db.models.document import Subsection
 from tests.src.db.models.factories import ChunkFactory
@@ -80,27 +81,46 @@ def test_remap_citation_ids(subsections):
     assert remapped_citations[subsections[0].id].id == "2"
 
 
-def test_default_chunk_splitter():
-    chunk_content = (
-        "## My Heading\n\n"
-        "First paragraph.\n\n"
-        "Paragraph two.\n\n"
-        "And paragraph 3\n\n"
-        "### Heading with empty next paragraph\n\n"
-        "### Heading 3\n\n"
-        "Paragraph under H3.\n\n"
-        "## Last Heading\n\n"
-        "Last paragraph.\n\n"
-        "## Last Heading without next paragraph\n"
+CHUNK_CONTENT = (
+    "## My Heading\n\n"
+    "First paragraph.\n\n"
+    "Paragraph two.\n\n"
+    "And paragraph 3\n\n"
+    "### Heading with empty next paragraph\n\n"
+    "### Heading 3\n\n"
+    "Paragraph under H3.\n\n"
+    "## Last Heading\n\n"
+    "Last paragraph.\n\n"
+    "## Last Heading without next paragraph\n"
+)
+EXPECTED_SUBSECTIONS = [
+    (["Heading 1", "My Heading"], "First paragraph."),
+    (["Heading 1", "My Heading"], "Paragraph two."),
+    (["Heading 1", "My Heading"], "And paragraph 3"),
+    (["Heading 1", "My Heading", "Heading 3"], "Paragraph under H3."),
+    (["Heading 1", "Last Heading"], "Last paragraph."),
+]
+
+
+def test_basic_chunk_splitter():
+    chunk = ChunkFactory.build(content=CHUNK_CONTENT, headings=["Heading 1"])
+    subsections = basic_chunk_splitter(chunk)
+    assert [
+        (subsection.text_headings, subsection.text) for subsection in subsections
+    ] == EXPECTED_SUBSECTIONS
+
+
+def test_tree_based_chunk_splitter():
+    chunk_content = CHUNK_CONTENT + (
+        "## Some Heading\n"  #
+        "Text with no empty line between heading and paragraph."
     )
     chunk = ChunkFactory.build(content=chunk_content, headings=["Heading 1"])
-    subsections = default_chunk_splitter(chunk)
-    assert [(subsection.text_headings, subsection.text) for subsection in subsections] == [
-        (["Heading 1", "My Heading"], "First paragraph."),
-        (["Heading 1", "My Heading"], "Paragraph two."),
-        (["Heading 1", "My Heading"], "And paragraph 3"),
-        (["Heading 1", "My Heading", "Heading 3"], "Paragraph under H3."),
-        (["Heading 1", "Last Heading"], "Last paragraph."),
+    subsections = tree_based_chunk_splitter(chunk)
+    assert [
+        (subsection.text_headings, subsection.text) for subsection in subsections
+    ] == EXPECTED_SUBSECTIONS + [
+        (["Heading 1", "Some Heading"], "Text with no empty line between heading and paragraph."),
     ]
 
 
