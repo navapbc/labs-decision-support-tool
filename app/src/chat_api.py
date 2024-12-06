@@ -149,10 +149,19 @@ async def feedback(
     """Endpoint for creating feedback for a chatbot response message
 
     Args:
-        request (FeedbackRequest): _description_
+        request (FeedbackRequest):
+        session_id: the session id, used if user_id is None
+        is_positive: if chatbot response answer is helpful or not
+        response_id: the response_id of the chatbot response
+        comment: user comment for the feedback
+        user_id: the user's id
 
     Returns:
-        FeedbackResponse: _description_
+        FeedbackResponse
+        user_id: the user's id
+        value: 1 if is_positive was "true" and 0 if is_positive was "false"
+        step_id: ID of the step associated with the score
+        comment: the initial user comment for the feedback
     """
     user_session_id = request.user_id if request.user_id else request.session_id
 
