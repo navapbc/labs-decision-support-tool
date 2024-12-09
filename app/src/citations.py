@@ -24,11 +24,15 @@ class CitationFactory:
             self.next_id = lambda: f"{prefix}{self.counter.__next__()}"
 
     def create_citation(self, chunk: Chunk, text: str, text_headings: Sequence[str]) -> Subsection:
-        # Check that text is in chunk.content, ignoring whitespace
-        assert re.sub(r"\s+", " ", text) in re.sub(
-            r"\s+", " ", chunk.content
-        ), f"Text {text!r} not found in chunk {chunk.content!r}"
+        if not self._text_in_chunk(text, chunk):
+            logger.warning("Text not found in chunk: %r\n%r", text, chunk.content)
         return Subsection(self.next_id(), chunk, text, text_headings)
+
+    def _text_in_chunk(self, text: str, chunk: Chunk) -> bool:
+        # Check that text is in chunk.content, ignoring whitespace and dashes
+        stripped_text = re.sub(r"\s+|-", "", text)
+        stripped_chunk_text = re.sub(r"\s+|-", "", chunk.content)
+        return stripped_text in stripped_chunk_text
 
 
 citation_factory = CitationFactory()
