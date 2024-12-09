@@ -43,17 +43,19 @@ def test_process_and_ingest_sys_args_requires_four_args(caplog):
     logger = logging.getLogger(__name__)
     ingest = Mock()
 
-    with caplog.at_level(logging.WARNING):
-        process_and_ingest_sys_args(["ingest-policy-pdfs"], logger, ingest)
-        assert "Expecting 4 arguments" in caplog.text
-        assert not ingest.called
+    with pytest.raises(SystemExit):
+        with caplog.at_level(logging.WARNING):
+            process_and_ingest_sys_args(["ingest-policy-pdfs"], logger, ingest)
+            assert "the following arguments are required:" in caplog.text
+            assert not ingest.called
 
-    with caplog.at_level(logging.WARNING):
-        process_and_ingest_sys_args(
-            ["ingest-policy-pdfs", "with", "too", "many", "args", "passed"], logger, ingest
-        )
-        assert "Expecting 4 arguments" in caplog.text
-        assert not ingest.called
+    with pytest.raises(SystemExit):
+        with caplog.at_level(logging.WARNING):
+            process_and_ingest_sys_args(
+                ["ingest-policy-pdfs", "with", "too", "many", "args", "passed"], logger, ingest
+            )
+            assert "the following arguments are required:" in caplog.text
+            assert not ingest.called
 
 
 def test_process_and_ingest_sys_args_calls_ingest(caplog):
@@ -72,7 +74,7 @@ def test_process_and_ingest_sys_args_calls_ingest(caplog):
             logger,
             ingest,
         )
-        assert "Finished processing" in caplog.text
+        assert "Finished ingesting" in caplog.text
         ingest.assert_called_with(
             ANY,
             "/some/folder",
@@ -130,6 +132,48 @@ def test_process_and_ingest_sys_args_drops_existing_dataset(
             is None
         )
         assert db_session.execute(select(Document).where(Document.dataset == "other dataset")).one()
+
+
+def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_create):
+    db_session.execute(delete(Document))
+    logger = logging.getLogger(__name__)
+    ingest = Mock()
+    with pytest.raises(NotImplementedError):
+        process_and_ingest_sys_args(
+            [
+                "ingest-policy-pdfs",
+                "bridges-eligibility-manual",
+                "SNAP",
+                "Michigan",
+                "/some/folder",
+                "--resume",
+            ],
+            logger,
+            ingest,
+        )
+
+    # Use an unmocked function so that the resume parameter is detectable by process_and_ingest_sys_args()
+    def ingest_with_resume(db_session, json_filepath, doc_attribs, resume=False) -> None:
+        logger.info("Ingesting with resume: %r", resume)
+
+    DocumentFactory.create(dataset="CA EDD")
+    with caplog.at_level(logging.INFO):
+        process_and_ingest_sys_args(
+            [
+                "ingest-edd-web",
+                "CA EDD",
+                "employment",
+                "California",
+                "/some/folder",
+                "--resume",
+            ],
+            logger,
+            ingest_with_resume,
+        )
+        assert "Enabled resuming from previous run" in caplog.text
+        assert "Ingesting with resume: True" in caplog.text
+        assert "Dropped existing dataset" not in caplog.text
+        assert db_session.execute(select(Document).where(Document.dataset == "CA EDD")).one()
 
 
 def test__add_embeddings(app_config):

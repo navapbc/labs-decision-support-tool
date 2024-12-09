@@ -1,3 +1,5 @@
+import argparse
+import inspect
 import json
 import logging
 import re
@@ -24,41 +26,43 @@ def _drop_existing_dataset(db_session: db.Session, dataset: str) -> bool:
 def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call: Callable) -> None:
     """Method that reads sys args and passes them into ingestion call"""
 
-    # Print INFO messages since this is often run from the terminal
-    # during local development
+    # Print INFO messages since this is often run from the terminal during local development
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    if len(argv[1:]) != 4:
-        logger.warning(
-            "Expecting 4 arguments: DATASET_ID BENEFIT_PROGRAM BENEFIT_REGION FILEPATH\n   but got: %s",
-            argv[1:],
-        )
-        return
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dataset_id")
+    parser.add_argument("benefit_program")
+    parser.add_argument("benefit_region")
+    parser.add_argument("file_path")
+    parser.add_argument("--resume", action="store_true")
+    args = parser.parse_args(argv[1:])
 
-    args = argv[1:]
-    dataset_id = args[0]
-    benefit_program = args[1]
-    benefit_region = args[2]
-    pdf_file_dir = args[3]
-
-    logger.info(
-        f"Processing files {dataset_id} at {pdf_file_dir} for {benefit_program} in {benefit_region}"
-    )
+    if args.resume:
+        params = inspect.signature(ingestion_call).parameters
+        if "resume" not in params:
+            raise NotImplementedError(
+                f"Ingestion function does not support `resume`: {ingestion_call}"
+            )
+        logger.info("Enabled resuming from previous run.")
 
     doc_attribs = {
-        "dataset": dataset_id,
-        "program": benefit_program,
-        "region": benefit_region,
+        "dataset": args.dataset_id,
+        "program": args.benefit_program,
+        "region": args.benefit_region,
     }
+    logger.info("Ingesting from %s: %r", args.file_path, doc_attribs)
 
     with app_config.db_session() as db_session:
-        dropped = _drop_existing_dataset(db_session, dataset_id)
-        if dropped:
-            logger.warning("Dropped existing dataset %s", dataset_id)
-        ingestion_call(db_session, pdf_file_dir, doc_attribs)
+        if args.resume:
+            ingestion_call(db_session, args.file_path, doc_attribs, resume=args.resume)
+        else:
+            dropped = _drop_existing_dataset(db_session, args.dataset_id)
+            if dropped:
+                logger.warning("Dropped existing dataset %s", args.dataset_id)
+            ingestion_call(db_session, args.file_path, doc_attribs)
         db_session.commit()
 
-    logger.info("Finished processing")
+    logger.info("Finished ingesting")
 
 
 def tokenize(text: str) -> list[str]:
