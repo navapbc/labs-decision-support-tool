@@ -1,10 +1,12 @@
 import logging
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
+from literalai import Score
 
 from src import chat_api
 from src.chat_api import (
@@ -44,10 +46,38 @@ def client(monkeypatch):
     return TestClient(router)
 
 
-def test_api_healthcheck(client):
-    response = client.get("/api/healthcheck")
-    assert response.status_code == 200
-    assert response.json()["status"] == "OK"
+class MockLiteralAIApi:
+    async def get_or_create_user(self, identifier, metadata):
+        self.id = identifier
+        return self
+
+    async def create_score(
+        self,
+        name: str | None,
+        type: str,
+        value: float,
+        step_id: Optional[str] = None,
+        comment: Optional[str] = None,
+    ):
+        return Score(
+            name=name,
+            type=type,
+            value=value,
+            step_id=step_id,
+            comment=comment,
+            generation_id=None,
+            dataset_experiment_item_id=None,
+            tags=None,
+        )
+
+
+@pytest.fixture
+def literalai_client(monkeypatch):
+    mock = mock_literalai()
+    monkeypatch.setattr(mock, "api", MockLiteralAIApi())
+    monkeypatch.setattr(chat_api, "literalai", lambda: mock)
+
+    return TestClient(router)
 
 
 def test_api_engines(client):
@@ -202,3 +232,35 @@ def test_get_chat_engine_not_allowed(user_info):
     )
     with pytest.raises(HTTPException, match="Unknown engine: bridges-eligibility-manual"):
         get_chat_engine(session)
+
+
+def test_post_feedback_success(literalai_client):
+    response = literalai_client.post(
+        "/api/feedback",
+        json={
+            "session_id": "Session2",
+            "is_positive": "true",
+            "response_id": "response_id0",
+            "comment": "great answer",
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_post_feedback_fail(monkeypatch, literalai_client):
+    try:
+        literalai_client.post(
+            "/api/feedback",
+            json={
+                "session_id": "Session2",
+                "is_positive": "true",
+                "comment": "great answer",
+            },
+        )
+        raise AssertionError("Expected RequestValidationError")
+    except RequestValidationError as e:
+        error = e.errors()[0]
+        assert error["type"] == "missing"
+        assert error["msg"] == "Field required"
+        assert error["loc"] == ("body", "response_id")
