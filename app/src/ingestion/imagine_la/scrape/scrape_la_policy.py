@@ -21,21 +21,20 @@ automatically created for you.
 """
 
 import os
+import pdb
 import sys
 
 from install_playwright import install
-from playwright.sync_api import sync_playwright, Locator
-
-import pdb
+from playwright.sync_api import Locator, sync_playwright
 
 if len(sys.argv) != 2:
     print("You need to pass the root URL and password as command line arguments.")
     print("E.g.: uv run scrape_content_hub.py <root_url> <password>")
     quit()
 
-base_url = 'https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster'
-root_url = f'{base_url}/index.htm'
-#sys.argv[1]
+base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
+root_url = f"{base_url}/index.htm"
+# sys.argv[1]
 
 
 p = sync_playwright().start()
@@ -55,28 +54,33 @@ page.goto(root_url)
 
 # Wait for the page to load by ensuring an element (e.g., an <h2> tag) is present
 # page.wait_for_selector("text='When all attempts to verify'", timeout=10_000)
-page.wait_for_load_state('domcontentloaded')
+page.wait_for_load_state("domcontentloaded")
 # page.set_default_timeout(10_000)
-page.wait_for_selector('a.toc')
+page.wait_for_selector("a.toc")
 
 
 def html(locator: Locator):
     return locator.evaluate("el => el.outerHTML")
-def write_html(filename = "pdb.html"):
+
+
+def write_html(filename="pdb.html"):
     filepath = os.path.join("pagesT1", filename)
-    with open(filepath, "w", encoding="utf-8") as file: file.write(page.content())
+    with open(filepath, "w", encoding="utf-8") as file:
+        file.write(page.content())
+
 
 # page.locator('a.toc').first.click()
-page.click('a.toc')
+page.click("a.toc")
 page.wait_for_selector('li.book:has-text("Programs")')
 
 # lis = page.locator('li.book a:has-text("Programs")')
 # lis = page.locator('li.book.expanded.active a:has-text("Programs")')
 # print(programs.evaluate("el => el.outerHTML"))
 
+
 def expand_nav_item(li: Locator):
-    data_itemkey = li.get_attribute('data-itemkey')
-    print("Clicking", li.text_content(), li.get_attribute('data-itemid'), data_itemkey)
+    data_itemkey = li.get_attribute("data-itemkey")
+    print("Clicking", li.text_content(), li.get_attribute("data-itemid"), data_itemkey)
     li.click()
     page.locator(f'ul.child[data-child="{data_itemkey}"]:not(hidden)').wait_for()
     children = page.locator(f'ul.child[data-child="{data_itemkey}"] > li.book')  #:not(.expanded)
@@ -84,7 +88,7 @@ def expand_nav_item(li: Locator):
     for index in range(children.count()):
         child = children.nth(index)
         print(index, child.text_content())
-        href = child.locator('a').first.get_attribute('href')
+        href = child.locator("a").first.get_attribute("href")
         if href == "#":
             expand_nav_item(child)
             # if True or child.text_content() == ' 63-300 Application Process ':
@@ -107,7 +111,7 @@ try:
     expand_nav_item(programs)
 except Exception as e:
     write_html("exception.html")
-    raise e    
+    raise e
 
 # page.wait_for_selector('li.book:has-text("CalFresh")')
 # child = page.locator('li.book:has-text("CalFresh")')
