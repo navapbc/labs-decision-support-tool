@@ -25,6 +25,9 @@ class EddSpider(CrawlSpider):
     allowed_domains = ["edd.ca.gov"]
     start_urls = ["https://edd.ca.gov/en/claims"]
 
+    # This is used to substitute the base URL in the cache storage
+    common_url_prefix = "https://edd.ca.gov/en/"
+
     rules = (
         Rule(
             LinkExtractor(

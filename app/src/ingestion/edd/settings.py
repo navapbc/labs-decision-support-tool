@@ -10,6 +10,7 @@
 BOT_NAME = "EDD.CA.Gov Bot"
 
 SPIDER_MODULES = ["edd.spiders"]
+# where to create new spiders using the genspider command
 NEWSPIDER_MODULE = "edd.spiders"
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
