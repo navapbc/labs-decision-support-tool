@@ -124,7 +124,8 @@ def resolve_urls(base_url: str, markdown: str) -> str:
     # Insert the base URL of the web page before the link
     if not base_url.endswith("/"):
         base_url += "/"
-    markdown = re.sub(r"\]\((?!\/|https?:\/\/)", rf"]({base_url}", markdown)
+    # Hint: Use https://regex101.com/ to create and test regex
+    markdown = re.sub(r"\]\((?!\/|\#|https?:\/\/)", rf"]({base_url}", markdown)
     return markdown
 
 

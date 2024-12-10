@@ -68,6 +68,12 @@ def test_resolve_urls_scenario2():
     )
 
 
+def test_resolve_urls_scenario_anchor():
+    base_url = "https://example.com"
+    markdown = "Go to [this heading](#some_heading)"
+    assert resolve_urls(base_url, markdown) == markdown
+
+
 def test_split_markdown_by_heading():
     markdown = (
         "Intro text\n"
