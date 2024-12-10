@@ -14,8 +14,6 @@ This endpoint accepts a query from a navigator and responds with a generated ans
 
 **Headers**
 
-- **Authorization**: Bearer token for authenticating API access.
-
 **Parameters**
 
 Note: we will defer making any of these required for now
@@ -115,16 +113,14 @@ This endpoint accepts feedback from a navigator and responds with the user_id, v
 
 **Headers**
 
-- **Authorization**: Bearer token for authenticating API access.
-
 **Parameters**
-
-- **user_id** _(string, optional)_: Unique identifier for the navigator within ImagineLA.
-- **comment** _(string, optional)_: The user's feedback comment for the LLM response.
 
 - **session_id** _(string, required)_: Unique identifier for the current session, to track prior messages in the conversation.
 - **response_id** _(string, required)_: Unique identifier for the chatbot response.
 - **is_positive** _(bool, required)_: If the chatbot response is helpful to the navigator or not.
+
+- **user_id** _(string, optional)_: Unique identifier for the navigator within ImagineLA.
+- **comment** _(string, optional)_: The user's feedback comment for the LLM response.
 
 ---
 

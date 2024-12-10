@@ -234,7 +234,6 @@ def test_get_chat_engine_not_allowed(user_info):
         get_chat_engine(session)
 
 
-@pytest.mark.asyncio
 def test_post_feedback_success(literalai_client):
     response = literalai_client.post(
         "/api/feedback",
