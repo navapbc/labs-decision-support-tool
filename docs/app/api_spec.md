@@ -132,17 +132,6 @@ This endpoint accepts feedback from a navigator and responds with the user_id, v
 
 #### Success Response (200 OK)
 
-**Body**
-
-```json
-{
-  "user_id": "string",       // Unique identifier for the navigator within ImagineLA
-  "value": "float",          // 1 if is_positive was "true" and 0 if is_positive was "false"
-  "step_id": "string",       // ID of the step associated with the score
-  "comment": "string"        // Navigator's comment on the response
-}
-```
-
 #### Client Error Responses (4xx)
 
 - **400 Bad Request**: Missing or invalid parameters.
@@ -160,17 +149,6 @@ This endpoint accepts feedback from a navigator and responds with the user_id, v
   "user_id": "nav12345",
   "is_positive": true,
   "response_id": "resp6789",
-  "comment": "this response is great."
-}
-```
-
-#### Example response
-
-```json
-{
-  "user_id": "nav12345",
-  "value": 1,
-  "step_id": "step1234",
   "comment": "this response is great."
 }
 ```

@@ -247,12 +247,6 @@ def test_post_feedback_success(literalai_client):
     )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "comment": "great answer",
-        "step_id": "response_id0",
-        "user_id": "Session2",
-        "value": 1.0,
-    }
 
 
 def test_post_feedback_fail(monkeypatch, literalai_client):
