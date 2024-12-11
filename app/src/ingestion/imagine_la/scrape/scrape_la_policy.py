@@ -21,20 +21,19 @@ automatically created for you.
 """
 
 import os
-import pdb
-import sys
+
+# import sys
 
 from install_playwright import install
 from playwright.sync_api import Locator, sync_playwright
 
-if len(sys.argv) != 2:
-    print("You need to pass the root URL and password as command line arguments.")
-    print("E.g.: uv run scrape_content_hub.py <root_url> <password>")
-    quit()
+# if len(sys.argv) != 2:
+#     print("You need to pass the root URL and password as command line arguments.")
+#     print("E.g.: uv run scrape_content_hub.py <root_url> <password>")
+#     quit()
 
 base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 root_url = f"{base_url}/index.htm"
-# sys.argv[1]
 
 
 p = sync_playwright().start()
@@ -83,7 +82,7 @@ def expand_nav_item(li: Locator):
     print("Clicking", li.text_content(), li.get_attribute("data-itemid"), data_itemkey)
     li.click()
     page.locator(f'ul.child[data-child="{data_itemkey}"]:not(hidden)').wait_for()
-    children = page.locator(f'ul.child[data-child="{data_itemkey}"] > li.book')  #:not(.expanded)
+    children = page.locator(f'ul.child[data-child="{data_itemkey}"] > li.book')
     print("Count", children.count(), children.all_text_contents())
     for index in range(children.count()):
         child = children.nth(index)

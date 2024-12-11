@@ -1,4 +1,3 @@
-import logging
 import os
 import re
 import sys
@@ -14,7 +13,6 @@ print("Adding app folder to sys.path:", app_folder)
 sys.path.append(app_folder)
 from src.util import string_utils  # noqa: E402
 
-logger = logging.getLogger(__name__)
 
 AccordionSections = dict[str, list[str]]
 
@@ -81,7 +79,7 @@ class EddSpider(CrawlSpider):
             extractions |= self.parse_entire_two_thirds(base_url, two_thirds)
 
             if not extractions.get("main_content"):
-                logger.warning(
+                self.logger.warning(
                     "Insufficient div.two-thirds content, fallback to parsing entire main-content for %s",
                     response.url,
                 )
@@ -91,7 +89,7 @@ class EddSpider(CrawlSpider):
 
             if accordions := two_thirds.css("div.panel-group.accordion"):
                 if len(accordions) > 1:
-                    logger.info("Multiple accordions found at %s", response.url)
+                    self.logger.info("Multiple accordions found at %s", response.url)
 
                 # If these parse methods become more complicated, move them to items.py
                 # and use ItemLoaders https://docs.scrapy.org/en/latest/topics/loaders.html

@@ -1,28 +1,23 @@
-import pdb
-import logging
 import os
+import pdb
 import re
 import sys
-
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
 from pathlib import Path
-from markdownify import markdownify
-
-from bs4 import BeautifulSoup
-from bs4.element import NavigableString, Tag, PageElement
+from typing import Any, Optional, Sequence
 
 import scrapy
+from bs4 import BeautifulSoup
+from bs4.element import NavigableString, Tag
+from markdownify import markdownify
 from scrapy.http import HtmlResponse
-from scrapy.selector import Selector, SelectorList
+from scrapy.selector import Selector
 
 app_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 print("Adding app folder to sys.path:", app_folder)
 sys.path.append(app_folder)
 from src.util import string_utils  # noqa: E402
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,69 +44,103 @@ class LA_PolicyManualSpider(scrapy.Spider):
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 
     def parse(self, response: HtmlResponse):
-        page = response.url.split("/")[-1]
-        filename = f"page-{page}.html"
-        Path(filename).write_bytes(response.body)
-        self.log(f"Saved file {filename}")
+        if False:
+            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-407_Work_Registration/63-407_Work_Registration.htm"
+            page_url = "/Users/yoom/dev/labs-decision-support-tool/app/src/ingestion/44-350_Overpayments.htm"
+            # page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households.htm"
 
-        lis = response.css("li.book")
-        for li in lis[2:]:  # Start with "Programs" li. TODO: Remove slice
-            href = li.css("a::attr(href)").get()
-            if href != "#":
-                page_url = f"{self.common_url_prefix}/{href}"
-                logger.info("Found page URL %s", page_url)
-                yield response.follow(page_url, callback=self.parse_page)
-                # break
+            # "Cannot insert None into a tag."
+            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions.htm"
+            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CAPI/CAPI/49-015_CAPI_Application_Process/49-015_CAPI_Application_Process.htm"
+            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_552_Moving_Assistance_Program/44-211_552_Moving_Assistance_Program.htm"
+            # NotImplementedError: Unexpected number of columns in row: 3
+            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members/40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm"
+
+            # Expected one paragraph in heading row: <tr>
+            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/SSI_SSP_COLA/SSI_SSP_COLA.htm"
+
+            yield response.follow(page_url, callback=self.parse_page)
+        else:
+            lis = response.css("li.book")
+            for li in lis[2:]:  # Start with "Programs"-related pages. TODO: Remove slice
+                href = li.css("a::attr(href)").get()
+                if href != "#":
+                    page_url = f"{self.common_url_prefix}/{href}"
+                    # self.logger.info("Found page URL %s", page_url)
+                    yield response.follow(page_url, callback=self.parse_page)
 
     def parse_page(self, response: HtmlResponse):
-        logger.info("parse_page %s", response.url)
-
-        # FIXME: Record critical sentences and ensure they exist in the output markdown
-        Path(f"{response.url.split("/")[-1]}").write_bytes(response.body)
-        Path(f"{response.url.split("/")[-1]}_0.md").write_text(
-            to_markdown(self.common_url_prefix, response.text)
-        )
+        self.logger.info("parse_page %s", response.url)
+        # Save html file for debugging
+        filepath = "./scraped/" + response.url.removeprefix(self.common_url_prefix + "/mergedProjects/")
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        Path(filepath).write_bytes(response.body)
 
         tables = response.xpath("body/table")
-        assert len(tables) == 1, "Expected one top-level table"
-        rows = response.xpath("body/table/tr")
+        rows = tables[0].xpath("./tr")
 
-        base_url = self.common_url_prefix
-        header_md = to_markdown(rows[0].get(), base_url)
+        # assert len(tables) == 1, "Expected one top-level table"
+        # FIXME: https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-407_Work_Registration/63-407_Work_Registration.htm
+        # has a table that is outside the top-level table
+        # pdb.set_trace()
+
+        header_md = to_markdown(rows[0].get())
         assert (
-            "Release Date" in header_md
-        ), "Expected 'Release Date' in first row (which acts as page header)"
+            "Purpose" in header_md and "Policy" in header_md
+        ), "Expected 'Purpose' and 'Policy' in first row (which acts as page header)"
+        # Ignore the first row, which is the page header boilerplate
+        rows = rows[1:]
 
-        markdown: list[str] = []
-        # Convert table into headings and associated sections
-        for row in rows[1:]:
-            tds = row.xpath("./td")
-            if len(tds) == 1:  # 1-column row
-                p = tds[0].xpath("./p")
-                p.get()
-                p_class = p.attrib["class"]
+        # Convert table rows into headings and associated sections
+        markdown: list[str] = [
+            self._convert_to_headings_and_sections(row, self.common_url_prefix) for row in rows
+        ]
+
+        Path(f"{filepath}.md").write_text(
+            f"[Source page]({response.url})\n\n" + "\n\n".join(markdown), encoding="utf-8"
+        )
+
+    def _convert_to_headings_and_sections(self, row: Selector, base_url: str) -> str:
+        # FIXME: Record critical sentences and ensure they exist in the output markdown
+        tds = row.xpath("./td")
+        # A 1-column row represents top-level headings
+        if len(tds) == 1:
+            paras = tds[0].xpath("./p")
+            if len(paras) > 1:
+                self.logger.warning("Expected only one <p> in 1-col heading rows: %s", row.get())
+            heading_md = []
+            for para in paras:
+                p_class = para.attrib["class"]
                 if p_class == "WD_ProgramName":
-                    heading_md = "# " + to_markdown(self._parse_heading(p), base_url)
+                    heading_md.append("# " + to_markdown(self._parse_heading(para), base_url))
                 elif p_class == "WD_SubjectLine":
-                    heading_md = "## " + to_markdown(self._parse_heading(p), base_url)
-                else:
-                    # Some `p` tags do not have the `WD_SubjectLine` class
-                    heading_md = "## " + to_markdown(self._parse_heading(p), base_url)
-                    logger.warning("Assuming H2 heading: %r", heading_md)
+                    heading_md.append("## " + to_markdown(self._parse_heading(para), base_url))
+                elif (text := para.xpath(".//text()").get()) and text.strip():
+                    # Some `p` tags don't have the `WD_SubjectLine` class when it should
+                    assumed_heading = "## " + to_markdown(self._parse_heading(para), base_url)
+                    self.logger.warning("Assuming H2 heading: %r", assumed_heading)
+                    heading_md.append(assumed_heading)
                     # FIXME: https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-181_Processing_Redeterminations/40-181_Processing_Redeterminations.htm
                     # does not use the typical WD_ProgramName and WD_SubjectLine classes to identify H1 and H2 headings
                     # pdb.set_trace()
-                markdown.append(heading_md)
-            elif len(tds) == 2:  # 2-column row
-                heading_md = "### " + to_markdown(self._parse_heading(tds[0]), base_url)
-                section_md = self._parse_section(base_url, tds[1].get(), heading_level=3)
-                markdown.append("\n\n".join([heading_md, section_md]))
+            return "\n".join(heading_md)
+
+        if len(tds) == 3:
+            # In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm, there's an erroneous empty 3rd column
+            # Remove the empty 3rd column and let the next block handle the 2-column rows
+            if not tds[2].xpath(".//text()").get().strip():
+                tds[2].remove()
+                tds = row.xpath("./td")
             else:
-                raise NotImplementedError(
-                    f"Unexpected number of columns in row: {len(tds)}: {row.get()}"
-                )
-                pdb.set_trace()
-        Path(f"{response.url.split("/")[-1]}.md").write_text("\n\n".join(markdown))
+                raise AssertionError(f"Unexpected 3-column row has text: {tds[2].get()}")
+
+        if len(tds) == 2:  # 2-column row
+            # FIXME: look for "WD_SectionHeading" class in the first column
+            subheading_md = "### " + to_markdown(self._parse_heading(tds[0]), base_url)
+            section_md = self._parse_section(base_url, tds[1].get(), heading_level=3)
+            return "\n\n".join([subheading_md, section_md])
+
+        raise NotImplementedError(f"Unexpected number of columns in row: {len(tds)}: {row.get()}")
 
     def _parse_heading(self, cell: Selector) -> str:
         raw_texts = cell.xpath(".//text()").getall()
@@ -140,7 +169,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
         state = ScrapingState(soup)
         # Iterate over a copy of the contents since we may modify the contents
         for child in list(body.contents):
-            if (child.name == "div" and len(child.contents) == 1):
+            if (
+                child.name == "div"
+                and len(child.contents) == 1
+                and child.contents[0].name == "table"
+            ):
                 # For divs with only one child, ignore the div and process the child
                 # Occurs for a table that is wrapped in a div for centering
                 child = child.contents[0]
@@ -149,19 +182,16 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # Handle lists presented as paragraphs
                 self.__convert_any_paragraph_lists(state, child)
             elif child.name == "div":
-                logger.warning("Unexpected div in body: %s", child)
+                self.logger.warning("Unexpected div in body: %s", child)
                 state2 = ScrapingState(soup)
                 for c in list(child.contents):
                     if c.name == "p":
                         self.__convert_any_paragraph_lists(state2, c)
             elif child.name == "table":
-                # If any table cell is large, then convert into a list
+                # If any table cell is large, then convert table to heading sections
                 if self._should_convert_table(child):
-                    # TODO: Add _convert_table_to_list for columns > 2
-                    self._convert_table_to_section(state, child, heading_level)
-            elif isinstance(child, NavigableString):
-                pass
-            elif child.name in ["ul", "ol"]:
+                    self._convert_table_to_sections(state, child, heading_level)
+            elif isinstance(child, NavigableString) or child.name in ["ul", "ol"]:
                 pass
             else:
                 print(child.name, child)
@@ -169,12 +199,19 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     # FIXME: replace state with container for current_list
     def __convert_any_paragraph_lists(self, state: ScrapingState, para: Tag):
+        if "class" not in para.attrs:
+            return
+
+        if "WD_ListParagraph" in para["class"]:  # Often used for ordered lists
+            if state.current_list is None:
+                # Use `ul` tag rather than `ol` since we're going to leave the explicit numbering alone
+                state.current_list = state.soup.new_tag("ul")
+            # CalFresh/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions.htm
+            # incorrectly uses a mix of both in the same list
+
         if "WD_ListParagraphCxSpFirst" in para["class"]:
-            if para.contents[0].get_text().strip() in "·":
-                tag = "ul"
-            else:
-                tag = "ol"
-            state.current_list = state.soup.new_tag(tag)
+            # Use `ul` tag even if it's an ordered list since we're going to leave the explicit numbering alone
+            state.current_list = state.soup.new_tag("ul")
         if any(
             c
             in [
@@ -190,10 +227,16 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 return
 
             para.name = "li"
-            assert state.current_list is not None, "Expected current_list to be set"
-            para.wrap(state.current_list)
+            # In 44-350_Overpayments, a table is erroneously interleaved with the list;
+            # the table start with a WD_ListParagraphCxSpMiddle and ends with WD_ListParagraphCxSpLast
+            if state.current_list is None:
+                # In CalFresh/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions.htm
+                # incorrectly uses a mix of both in the same list
+                self.logger.warning("Improperly annotated list item! Creating a new list.")
+                state.current_list = state.soup.new_tag("ul")
 
-            logger.debug("paragraph/list contents: %s", para.contents)
+            self.logger.debug("paragraph/list contents: %s", para.contents)
+            para.wrap(state.current_list)
             # Remove extraneous space and bullet character at the beginning of para.contents
             for c in para.contents[:4]:
                 stripped_text = c.get_text().strip()
@@ -202,31 +245,27 @@ class LA_PolicyManualSpider(scrapy.Spider):
                         # Removes `ltr` (left-to-right?) span -- not sure what this is for
                         # Removes the explicit bullet character and extra spaces
                         c.decompose()
-                elif stripped_text == "" or re.match(r"^\d+\.", stripped_text):
+                elif stripped_text == "":
                     # for NavigableString (raw text) which doesn't have decompose()
                     # Removes extraneous space (after bullet character)
                     # Removes number and period (e.g., "1.") that prefix ordered list items
                     c.extract()
 
-            # Iterate over a copy of the contents since we may modify the contents
-            # for c in list(para.contents):
-            #     if c.name in [None, "br", "b", "u", "i", "sup", "span", "a", "strong", "em", "s"]:
-            #         # "b" occurs for `<b><u>Note</u></b>`
-            #         # "s" occurs for strike-through text but is blank
-            #         pass
-            #     else:
-            #         logger.error("Unexpected in list item: %s", c.name, extra={"contents": para.contents})
-            #         pdb.set_trace()
-
         if "WD_ListParagraphCxSpLast" in para["class"]:
             state.current_list = None
 
     def _should_convert_table(self, table: Tag) -> bool:
-        # TODO: also check for nested tables or lists
+        # FIXME: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members/40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
+        # many occurrences of a list inappropriately wrapped in a table and is rendered as a curious table in markdown
         col_sizes = self._size_of_columns(table)
         if len(col_sizes) == 2:
+            # First column is usually short
+            # If the second column is long, then convert the table
+            # TODO: Check for nested tables or lists in the second column
             if col_sizes[1] > 2:
                 return True
+        if len(col_sizes) > 2:
+            self.logger.warning("Leaving %s-column tables alone: %s", len(col_sizes), col_sizes)
         return False
 
     def _size_of_columns(self, table: Tag) -> Sequence[int]:
@@ -240,60 +279,47 @@ class LA_PolicyManualSpider(scrapy.Spider):
         return tuple(col_lengths.values())
 
     # FIXME: replace state arg with new_tag Callable
-    def _convert_table_to_section(self, state: ScrapingState, table: Tag, heading_level: int):
+    def _convert_table_to_sections(self, state: ScrapingState, table: Tag, heading_level: int):
         table_headings = []
         rows = table.find_all("tr", recursive=False)
 
         # Use first row as table headings if all cells are bold
         cols = rows[0].find_all(["td", "th"], recursive=False)
-        assert len(cols) == 2, f"Expected 2 columns, got {len(cols)}: {cols}"
-        if all(cell.find_all("b") for cell in cols):
+        if len(cols) == 2 and all(cell.find_all("b") for cell in cols):
+            # Since all cells are bold, treat them as table headings
             table_headings = [cell.get_text().strip() for cell in cols]
             rows[0].decompose()
             rows = rows[1:]
         else:
-            # Since all cells are not bold, assume there are not table headings
+            # Since all cells are not bold, assume they are not table headings
             table_headings = ["" for _ in range(2)]
 
         for row in rows:
-            row.name = "div"
             cols = row.find_all(["td", "th"], recursive=False)
             if len(cols) == 1:
+                # Treat single column rows as a heading
+                row.name = "div"
                 cols[0].name = f"h{heading_level + 1}"
             elif len(cols) == 2:
+                # Treat 2-column rows as a subheading and its associated body
+                row.name = "div"
                 cols[0].name = f"h{heading_level + 2}"
                 if table_headings[0]:
                     heading_span = state.soup.new_tag("span")
                     heading_span.string = f"{table_headings[0]}: "
                     cols[0].contents[0].insert_before(heading_span)
-                # pdb.set_trace()
-                # replace_with(state.soup.new_tag(f"h{heading_level + 2}", f"{table_headings[0]}: {cols[0].get_text()}"))
                 cols[1].name = "div"
                 self.__fix_body(heading_level, state.soup, cols[1])
                 if table_headings[1]:
                     heading_span = state.soup.new_tag("span")
                     heading_span.string = f"{table_headings[1]}: "
                     cols[1].contents[0].insert_before(heading_span)
+            else:
+                self.logger.warning(
+                    "Unexpected number of columns in table row: %s: %r", len(cols), cols.strings
+                )
 
         table.name = "div"
-        # pdb.set_trace()
-
-
-test_html = """
-<td width=123>
-    intro
-    <p>paragraph 1</p>
-    <p>paragraph 2</p>
-</td>
-"""
-
-
-def _test_selector():
-    return Selector(text=test_html)
-
-
-def _test_bs():
-    return BeautifulSoup(test_html, "html.parser")
 
 
 def to_markdown(html: str, base_url: Optional[str] = None) -> str:
