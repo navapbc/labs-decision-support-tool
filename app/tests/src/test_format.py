@@ -186,15 +186,19 @@ def test_reify_citations():
     subsections = split_into_subsections(chunks, factory=CitationFactory())
     config = FormattingConfig()
 
-    assert reify_citations("This is a citation (citation-0)", [], config) == "This is a citation "
+    assert (
+        reify_citations("This is a citation (citation-0)", [], config, None)
+        == "This is a citation "
+    )
 
     assert (
         reify_citations(
             f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
             subsections,
             config,
+            None,
         )
-        == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
+        == "This is a citation <sup><a class='accordion_item' data-id=a-None>1</a>&nbsp;</sup> and another <sup><a class='accordion_item' data-id=a-None>2</a>&nbsp;</sup>."
     )
 
 
