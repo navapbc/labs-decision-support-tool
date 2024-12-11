@@ -1,9 +1,7 @@
 import re
 
-from sqlalchemy import delete
-
 from src.citations import CitationFactory, split_into_subsections
-from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
+from src.db.models.document import Chunk, ChunkWithScore, Subsection
 from src.format import (
     BemFormattingConfig,
     FormattingConfig,
