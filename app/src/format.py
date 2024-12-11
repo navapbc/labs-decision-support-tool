@@ -37,31 +37,6 @@ class FormattingConfig:
         return to_html(citation_body)
 
 
-class BemFormattingConfig(FormattingConfig):
-    "BEM-specific formatting configuration"
-
-    def __init__(self) -> None:
-        self.add_citation_link_per_subsection = True
-
-    def return_citation_link(self, chunk: Chunk) -> str:
-        bem_url_for_page = get_bem_url(chunk.document.name)
-        if chunk.page_number:
-            bem_url_for_page += "#page=" + str(chunk.page_number)
-        return (
-            f"<p><a href={bem_url_for_page!r}>Open document to page {chunk.page_number}</a></p>"
-            if chunk.page_number
-            else ""
-        )
-
-    def get_superscript_link(self, chunk: Chunk) -> str:
-        link = get_bem_url(chunk.document.name) if "BEM" in chunk.document.name else "#"
-        link += "#page=" + str(chunk.page_number) if chunk.page_number else ""
-        return link
-
-    def build_accordion_body(self, citation_body: str) -> str:
-        return to_html(replace_bem_with_link(citation_body))
-
-
 def format_guru_cards(
     chunks_shown_max_num: int,
     chunks_shown_min_score: float,

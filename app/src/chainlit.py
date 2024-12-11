@@ -202,21 +202,12 @@ async def on_message(message: cl.Message) -> None:
     try:
         result = await asyncify(lambda: engine.on_message(message.content, chat_history))()
         logger.info("Raw response: %s", result.response)
-        if engine.formatter:
-            # This block is to accommodate the old Guru chat engine
-            msg_content = engine.formatter(
-                chunks_shown_max_num=engine.chunks_shown_max_num,
-                chunks_shown_min_score=engine.chunks_shown_min_score,
-                chunks_with_scores=result.chunks_with_scores,
-                subsections=result.subsections,
-                raw_response=result.response,
-            )
-        else:
-            msg_content = build_accordions(
-                subsections=result.subsections,
-                raw_response=result.response,
-                config=engine.formatting_config,
-            )
+        
+        msg_content = build_accordions(
+            subsections=result.subsections,
+            raw_response=result.response,
+            config=engine.formatting_config,
+        )
 
         await cl.Message(
             content=msg_content,
