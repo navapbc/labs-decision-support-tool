@@ -9,7 +9,7 @@ from src.citations import (
     split_into_subsections,
 )
 from src.db.models.document import ChunkWithScore, Subsection
-from src.format import BemFormattingConfig, FormattingConfig, format_guru_cards
+from src.format import BemFormattingConfig, FormattingConfig
 from src.generate import PROMPT, ChatHistory, MessageAttributes, analyze_message, generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
