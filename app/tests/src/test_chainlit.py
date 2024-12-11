@@ -10,10 +10,10 @@ from src.generate import PROMPT
 def test_url_query_values(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
 
-    url = "https://example.com/chat/?engine=guru-snap&llm=gpt-4o&retrieval_k=3&someunknownparam=42"
+    url = "https://example.com/chat/?engine=ca-edd-web&llm=gpt-4o&retrieval_k=3&someunknownparam=42"
     query_values = chainlit.url_query_values(url)
     engine_id = query_values.pop("engine")
-    assert engine_id == "guru-snap"
+    assert engine_id == "ca-edd-web"
 
     engine = chat_engine.create_engine(engine_id)
     input_widgets = chainlit._init_chat_settings(engine, query_values)
