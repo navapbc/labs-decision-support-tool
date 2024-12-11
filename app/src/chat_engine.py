@@ -156,20 +156,6 @@ class BaseEngine(ChatEngineInterface):
         return OnMessageResult(response, self.system_prompt, chunks_with_scores, subsections)
 
 
-class GuruMultiprogramEngine(BaseEngine):
-    engine_id: str = "guru-multiprogram"
-    name: str = "Guru Multi-program Chat Engine"
-    datasets = ["guru-multiprogram"]
-    formatter = staticmethod(format_guru_cards)
-
-
-class GuruSnapEngine(BaseEngine):
-    engine_id: str = "guru-snap"
-    name: str = "Guru SNAP Chat Engine"
-    datasets = ["guru-snap"]
-    formatter = staticmethod(format_guru_cards)
-
-
 class BridgesEligibilityManualEngine(BaseEngine):
     retrieval_k: int = 10
     retrieval_k_min_score: float = -1
