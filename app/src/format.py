@@ -73,7 +73,7 @@ def format_guru_cards(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations(raw_response, subsections, FormattingConfig())
+    response_with_citations = reify_citations(raw_response, subsections, FormattingConfig(), None)
 
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
@@ -134,11 +134,15 @@ def build_accordions(
     remapped_citations = remap_citation_ids(subsections, raw_response)
 
     citations_html = ""
+    list_of_accordion_ids = []
     for document, cited_subsections in _group_by_document(remapped_citations).items():
         _accordion_id += 1
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
         citation_numbers = [citation.id for citation in cited_subsections]
+        list_of_accordion_ids.append(
+            {"citation_numbers": citation_numbers, "accordion_id": _accordion_id}
+        )
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -157,7 +161,9 @@ def build_accordions(
 
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a list in response_with_citations
-    response_with_citations = to_html(_add_citation_links(raw_response, remapped_citations, config))
+    response_with_citations = to_html(
+        _add_citation_links(raw_response, remapped_citations, config, list_of_accordion_ids)
+    )
     if citations_html:
         return (
             "<div>"
@@ -242,7 +248,9 @@ def format_bem_documents(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations(raw_response, subsections, BemFormattingConfig())
+    response_with_citations = reify_citations(
+        raw_response, subsections, BemFormattingConfig(), None
+    )
 
     documents = _get_bem_documents_to_show(
         chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
@@ -357,10 +365,13 @@ def _add_ellipses_for_bem(chunk: Chunk) -> str:
 
 
 def reify_citations(
-    response: str, subsections: Sequence[Subsection], config: FormattingConfig
+    response: str,
+    subsections: Sequence[Subsection],
+    config: FormattingConfig,
+    list_of_accordion_ids: list[dict] | None,
 ) -> str:
     remapped_citations = remap_citation_ids(subsections, response)
-    return _add_citation_links(response, remapped_citations, config)
+    return _add_citation_links(response, remapped_citations, config, list_of_accordion_ids)
 
 
 _footnote_id = random.randint(0, 1000000)
@@ -369,13 +380,24 @@ _footnote_index = 0
 
 # FIXME: Refactor to reduce code replication with replace_citation_ids()
 def _add_citation_links(
-    response: str, remapped_citations: dict[str, Subsection], config: FormattingConfig
+    response: str,
+    remapped_citations: dict[str, Subsection],
+    config: FormattingConfig,
+    list_of_accordion_ids: list[dict] | None,
 ) -> str:
     global _footnote_id
     _footnote_id += 1
     footnote_list = []
 
     # Replace (citation-<index>) with the appropriate citation
+
+    def find_accordion_id(citation_num: str) -> str | None:
+        if list_of_accordion_ids:
+            for accordion_item in list_of_accordion_ids:
+                if citation_num in accordion_item["citation_numbers"]:
+                    return accordion_item["accordion_id"]
+        return None
+
     def replace_citation(match: Match) -> str:
         citation_id = match.group(1)
         # Remove citation for chunks that don't exist alone
@@ -387,7 +409,8 @@ def _add_citation_links(
 
         chunk = remapped_citations[citation_id].chunk
         link = config.get_superscript_link(chunk)
-        citation = f"<sup><a href={link!r}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
+        matched_accordion_num = find_accordion_id(remapped_citations[citation_id].id)
+        citation = f"<sup><a class='accordion_item' data-id=a-{matched_accordion_num}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
 
         global _footnote_index
         _footnote_index += 1
