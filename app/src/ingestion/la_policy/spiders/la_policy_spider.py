@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
-from scrapy.selector import Selector
+from scrapy.selector import SelectorList, Selector
 
 app_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 print("Adding app folder to sys.path:", app_folder)
@@ -24,6 +24,13 @@ from src.util import string_utils  # noqa: E402
 class ScrapingState:
     soup: BeautifulSoup
     current_list: Optional[Any] = None
+
+
+@dataclass
+class PageState:
+    title: str
+    h1: Optional[str] = None
+    h2: Optional[str] = None
 
 
 class LA_PolicyManualSpider(scrapy.Spider):
@@ -46,8 +53,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
     def parse(self, response: HtmlResponse):
         if False:
             "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-407_Work_Registration/63-407_Work_Registration.htm"
-            page_url = "/Users/yoom/dev/labs-decision-support-tool/app/src/ingestion/44-350_Overpayments.htm"
-            # page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households.htm"
+            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households.htm"
 
             # "Cannot insert None into a tag."
             "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions.htm"
@@ -59,6 +65,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
             # Expected one paragraph in heading row: <tr>
             "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/SSI_SSP_COLA/SSI_SSP_COLA.htm"
 
+            # page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-181_Processing_Redeterminations/40-181_Processing_Redeterminations.htm"
+            # page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-402_6_Authorized_Representative/63-402_6_Authorized_Representative.htm"
+            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/69-202_1_Identification_of_Refugees/69-202_1_Identification_of_Refugees.htm"
+
             yield response.follow(page_url, callback=self.parse_page)
         else:
             lis = response.css("li.book")
@@ -69,10 +79,18 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     # self.logger.info("Found page URL %s", page_url)
                     yield response.follow(page_url, callback=self.parse_page)
 
-    def parse_page(self, response: HtmlResponse):
+    # Return value is saved to filename set by scrape_la_policy.OUTPUT_JSON
+    def parse_page(self, response: HtmlResponse) -> dict[str, str]:
         self.logger.info("parse_page %s", response.url)
+        extractions = {
+            "url": response.url,
+            "title": response.xpath("head/title/text()").get().strip(),
+        }
+
         # Save html file for debugging
-        filepath = "./scraped/" + response.url.removeprefix(self.common_url_prefix + "/mergedProjects/")
+        filepath = "./scraped/" + response.url.removeprefix(
+            self.common_url_prefix + "/mergedProjects/"
+        )
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         Path(filepath).write_bytes(response.body)
 
@@ -89,41 +107,83 @@ class LA_PolicyManualSpider(scrapy.Spider):
             "Purpose" in header_md and "Policy" in header_md
         ), "Expected 'Purpose' and 'Policy' in first row (which acts as page header)"
         # Ignore the first row, which is the page header boilerplate
+        # FIXME: Extract "Release Date" value
         rows = rows[1:]
 
         # Convert table rows into headings and associated sections
-        markdown: list[str] = [
-            self._convert_to_headings_and_sections(row, self.common_url_prefix) for row in rows
+        page_state = PageState(extractions["title"])
+        md_list: list[str] = [
+            self._convert_to_headings_and_sections(row, self.common_url_prefix, page_state)
+            for row in rows
         ]
 
+        markdown = "\n\n".join(md_list)
         Path(f"{filepath}.md").write_text(
-            f"[Source page]({response.url})\n\n" + "\n\n".join(markdown), encoding="utf-8"
+            f"[Source page]({response.url})\n\n" + markdown, encoding="utf-8"
         )
 
-    def _convert_to_headings_and_sections(self, row: Selector, base_url: str) -> str:
+        extractions["markdown"] = markdown
+        return extractions
+
+    def _convert_to_headings_and_sections(
+        self, row: Selector, base_url: str, page_state: PageState
+    ) -> str:
         # FIXME: Record critical sentences and ensure they exist in the output markdown
         tds = row.xpath("./td")
-        # A 1-column row represents top-level headings
+        heading_md = []
+        if not page_state.h1:
+            h1s = tds.xpath(".//p[@class='WD_ProgramName']")
+            if len(h1s):
+                for para in h1s:
+                    page_state.h1 = to_markdown(self._parse_heading(para), base_url)
+                    heading_md.append("# " + page_state.h1)
+                return "\n".join(heading_md)
+        if not page_state.h2:
+            # 69-202_1_Identification_of_Refugees incorrectly uses WD_SubjectLine class for non-heading text
+            # so ignore it if page_state.h2 is already set
+            h2s = tds.xpath(".//p[@class='WD_SubjectLine']")
+            if len(h2s):
+                for para in h2s:
+                    # FIXME: change h2 to list or boolean
+                    page_state.h2 = to_markdown(self._parse_heading(para), base_url)
+                    heading_md.append("## " + page_state.h2)
+                return "\n".join(heading_md)
+
+        if not page_state.h1 or not page_state.h2:
+            if (texts := tds.xpath(".//text()").getall()) and "".join(
+                [text.strip() for text in texts]
+            ):
+                # 40-181_Processing_Redeterminations.htm
+                # does not use the typical WD_ProgramName and WD_SubjectLine classes to identify H1 and H2 headings
+                paras = tds.xpath("./p")
+                if len(paras) > 1:
+                    # One page used multiple consecutive <p> tags to split up a single heading title
+                    self.logger.warning("Expected only one <p> in table_data: %s", paras)
+                if page_state.h1 is None:
+                    for para in paras:
+                        page_state.h1 = "True"
+                        h1 = to_markdown(self._parse_heading(para), base_url)
+                        heading_md.append("# " + h1)
+                elif page_state.h2 is None:
+                    for para in paras:
+                        page_state.h2 = "True"
+                        # Some `p` tags don't have the `WD_SubjectLine` class when it should
+                        h2 = to_markdown(self._parse_heading(para), base_url)
+                        heading_md.append("## " + h2)
+                else:
+                    for para in paras:
+                        assumed_heading = "## " + to_markdown(self._parse_heading(para), base_url)
+                        self.logger.warning("Assuming H2 heading: %r", assumed_heading)
+                        heading_md.append(assumed_heading)
+                return "\n".join(heading_md)
+            else:
+                raise AssertionError(f"Expecting H1 and H2 headings to be set by now {page_state}")
+
         if len(tds) == 1:
-            paras = tds[0].xpath("./p")
-            if len(paras) > 1:
-                self.logger.warning("Expected only one <p> in 1-col heading rows: %s", row.get())
-            heading_md = []
-            for para in paras:
-                p_class = para.attrib["class"]
-                if p_class == "WD_ProgramName":
-                    heading_md.append("# " + to_markdown(self._parse_heading(para), base_url))
-                elif p_class == "WD_SubjectLine":
-                    heading_md.append("## " + to_markdown(self._parse_heading(para), base_url))
-                elif (text := para.xpath(".//text()").get()) and text.strip():
-                    # Some `p` tags don't have the `WD_SubjectLine` class when it should
-                    assumed_heading = "## " + to_markdown(self._parse_heading(para), base_url)
-                    self.logger.warning("Assuming H2 heading: %r", assumed_heading)
-                    heading_md.append(assumed_heading)
-                    # FIXME: https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-181_Processing_Redeterminations/40-181_Processing_Redeterminations.htm
-                    # does not use the typical WD_ProgramName and WD_SubjectLine classes to identify H1 and H2 headings
-                    # pdb.set_trace()
-            return "\n".join(heading_md)
+            # Near the bottom of 69-202_1_Identification_of_Refugees.htm, the row becomes 1-column
+            # because there's a div-wrapped table. The row should have been part of the previous row.
+            # Treat the single-column row as if it was the second column of a 2-column row
+            return self._parse_section(base_url, tds[0].get(), heading_level=3)
 
         if len(tds) == 3:
             # In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm, there's an erroneous empty 3rd column
@@ -135,15 +195,53 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 raise AssertionError(f"Unexpected 3-column row has text: {tds[2].get()}")
 
         if len(tds) == 2:  # 2-column row
-            # FIXME: look for "WD_SectionHeading" class in the first column
             subheading_md = "### " + to_markdown(self._parse_heading(tds[0]), base_url)
+
+            paras = tds[0].xpath("./p")
+            if not next(para.attrib["class"] == "WD_SectionHeading" for para in paras):
+                self.logger.warning(
+                    "Expected a WD_SectionHeading in the first column: %s", subheading_md
+                )
+
             section_md = self._parse_section(base_url, tds[1].get(), heading_level=3)
             return "\n\n".join([subheading_md, section_md])
 
         raise NotImplementedError(f"Unexpected number of columns in row: {len(tds)}: {row.get()}")
 
-    def _parse_heading(self, cell: Selector) -> str:
-        raw_texts = cell.xpath(".//text()").getall()
+    def _parse_single_column_row(
+        self, table_data: Selector, base_url: str, page_state: PageState
+    ) -> str:
+        paras = table_data.xpath("./p")
+        if len(paras) > 1:
+            # One page used multiple consecutive <p> tags to split up a single heading title
+            self.logger.warning("Expected only one <p> in table_data: %s", table_data)
+        heading_md = []
+        for para in paras:
+            p_class = para.attrib["class"]
+            if p_class == "WD_ProgramName":
+                page_state.h1 = to_markdown(self._parse_heading(para), base_url)
+                heading_md.append("# " + page_state.h1)
+            elif p_class == "WD_SubjectLine":
+                page_state.h2 = to_markdown(self._parse_heading(para), base_url)
+                heading_md.append("## " + page_state.h2)
+            elif (text := para.xpath(".//text()").get()) and text.strip():
+                # 40-181_Processing_Redeterminations.htm
+                # does not use the typical WD_ProgramName and WD_SubjectLine classes to identify H1 and H2 headings
+                if not page_state.h1:
+                    page_state.h1 = to_markdown(self._parse_heading(para), base_url)
+                    heading_md.append("# " + page_state.h1)
+                elif not page_state.h2:
+                    # Some `p` tags don't have the `WD_SubjectLine` class when it should
+                    page_state.h2 = to_markdown(self._parse_heading(para), base_url)
+                    heading_md.append("## " + page_state.h2)
+                else:
+                    assumed_heading = "## " + to_markdown(self._parse_heading(para), base_url)
+                    self.logger.warning("Assuming H2 heading: %r", assumed_heading)
+                    heading_md.append(assumed_heading)
+        return "\n".join(heading_md)
+
+    def _parse_heading(self, cells: Selector) -> str:
+        raw_texts = cells.xpath(".//text()").getall()
         return "".join(raw_texts)
 
     def _parse_section(self, base_url, html: str, heading_level: int) -> str:
@@ -188,7 +286,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     if c.name == "p":
                         self.__convert_any_paragraph_lists(state2, c)
             elif child.name == "table":
-                # If any table cell is large, then convert table to heading sections
+                # FIXME: Check table for 1-col rows and convert them to headings -- see _convert_table_to_sections
                 if self._should_convert_table(child):
                     self._convert_table_to_sections(state, child, heading_level)
             elif isinstance(child, NavigableString) or child.name in ["ul", "ol"]:
@@ -255,17 +353,39 @@ class LA_PolicyManualSpider(scrapy.Spider):
             state.current_list = None
 
     def _should_convert_table(self, table: Tag) -> bool:
-        # FIXME: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members/40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
+        # row_text = [td.text for td in table.find("tr").find_all(["td", "th"], recursive=False)]
+        # self.logger.debug("_should_convert_table: %r", row_text)
+
+        if self._table_uses_rowspan(table):
+            # 69-202_1_Identification_of_Refugees.htm
+            self.logger.warning("Ignoring table with rowspan: %s", table)
+            return False
+
+        # FIXME: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
         # many occurrences of a list inappropriately wrapped in a table and is rendered as a curious table in markdown
         col_sizes = self._size_of_columns(table)
         if len(col_sizes) == 2:
-            # First column is usually short
+            # First column is usually short and often acts as a heading
             # If the second column is long, then convert the table
             # TODO: Check for nested tables or lists in the second column
             if col_sizes[1] > 2:
                 return True
+
         if len(col_sizes) > 2:
-            self.logger.warning("Leaving %s-column tables alone: %s", len(col_sizes), col_sizes)
+            row_text = [td.text for td in table.find("tr").find_all(["td", "th"], recursive=False)]
+            self.logger.warning(
+                "Leaving %s-column tables alone: %s: %r", len(col_sizes), col_sizes, row_text
+            )
+            return False
+
+        return False
+
+    def _table_uses_rowspan(self, table: Tag) -> bool:
+        for row in table.find_all("tr", recursive=False):
+            for cell in row.find_all(["td", "th"], recursive=False):
+                if "rowspan" in cell.attrs and int(cell.attrs["rowspan"]) > 1:
+                    # TODO: handle non-default rowspans in 69-202_1_Identification_of_Refugees.htm
+                    return True
         return False
 
     def _size_of_columns(self, table: Tag) -> Sequence[int]:
@@ -278,6 +398,20 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 col_lengths[i] = max(col_lengths[i], size)
         return tuple(col_lengths.values())
 
+    def __table_row_is_heading(self, first_row_cols: Sequence[Tag]) -> bool:
+        # If all columns are bold, then treat the row as a heading
+        if all(cell.find_all("b") for cell in first_row_cols):
+            return True
+
+        # If all columns have a p tag using WD_TableHeading class, then treat the row as a heading
+        if [
+            cell
+            for cell in first_row_cols
+            if cell.find_all("p", attrs={"class": "WD_TableHeading"})
+        ] == first_row_cols:
+            return True
+        return False
+
     # FIXME: replace state arg with new_tag Callable
     def _convert_table_to_sections(self, state: ScrapingState, table: Tag, heading_level: int):
         table_headings = []
@@ -285,7 +419,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         # Use first row as table headings if all cells are bold
         cols = rows[0].find_all(["td", "th"], recursive=False)
-        if len(cols) == 2 and all(cell.find_all("b") for cell in cols):
+        if len(cols) == 2 and self.__table_row_is_heading(cols):
             # Since all cells are bold, treat them as table headings
             table_headings = [cell.get_text().strip() for cell in cols]
             rows[0].decompose()
