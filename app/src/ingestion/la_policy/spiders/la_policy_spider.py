@@ -5,15 +5,15 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Sequence, Iterable
+from typing import Any, Optional, Sequence
 from itertools import chain
 
 import scrapy
-from bs4 import BeautifulSoup, ResultSet
+from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
-from scrapy.selector import SelectorList, Selector
+from scrapy.selector import Selector
 
 app_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 print("Adding app folder to sys.path:", app_folder)
@@ -43,6 +43,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     # TODO: Port playwrite code to scrapy via https://github.com/scrapy-plugins/scrapy-playwright?tab=readme-ov-file#executing-actions-on-pages
     start_urls = [
+        # To create this html file:
+        #   cd app/src/ingestion/la_policy/scrape
+        #   pip install -r requirements.txt
+        #   python scrape_la_policy_nav_bar.py
         Path(os.path.abspath("./la_policy/scrape/la_policy_nav_bar.html")).as_uri(),
     ]
 

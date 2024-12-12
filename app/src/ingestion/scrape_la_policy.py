@@ -47,28 +47,6 @@ def postprocess_json() -> None:
             formatted_json.write(json.dumps(data, indent=4))
             logger.info("Formatted JSON saved to pretty-%s", OUTPUT_JSON)
 
-        # with open(f"{OUTPUT_JSON}.md", "w", encoding="utf-8") as md_file:
-        #     for item in data:
-        #         item_md = ["\n\n=============================="]
-        #         item_md.append(f"{item['title']}, {item['url']}")
-        #         if "main_content" in item:
-        #             item_md.append("\n------- @MAIN_CONTENT:\n")
-        #             item_md.append(item["main_content"])
-        #         if "main_primary" in item:
-        #             item_md.append("\n------- @MAIN_PRIMARY:\n")
-        #             item_md.append(item["main_primary"])
-        #         # if "nonaccordion" in item:
-        #         #     item_md.append("\n------- @NONACCORDION:")
-        #         #     item_md.append(item["nonaccordion"])
-        #         # if "accordions" in item:
-        #         #     item_md.append("\n------- @ACCORDIONS:")
-        #         #     for heading, paras in item["accordions"].items():
-        #         #         item_md.append(f"\n---- ## {heading}:\n")
-        #         #         for para in paras:
-        #         #             item_md.append(para)
-        #         md_file.write("\n".join(item_md))
-        #     logger.info("User-friendly markdown of JSON saved to %s.md", OUTPUT_JSON)
-
 
 def main() -> None:
     # Scrapy expects the scrapy.cfg file to be in the current working directory

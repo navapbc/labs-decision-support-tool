@@ -73,6 +73,7 @@ ingest-bem-pdfs = "src.ingest_bem_pdfs:main"
 ingest-edd-web = "src.ingest_edd_web:main"
 scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 ingest-imagine-la = "src.ingestion.imagine_la.ingest:main"
+scrape-la-policy = "src.ingestion.scrape_la_policy:main"
 
 [tool.black]
 line-length = 100
