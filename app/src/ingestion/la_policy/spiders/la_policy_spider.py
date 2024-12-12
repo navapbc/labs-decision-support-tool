@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, Optional, Sequence
 
 import scrapy
-import html5lib
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 from markdownify import markdownify
@@ -35,6 +34,7 @@ class PageState:
     h1: Optional[str] = None
     h2: Optional[str] = None
 
+DEBUGGING = True
 
 class LA_PolicyManualSpider(scrapy.Spider):
     name = "la_policy_spider"
@@ -44,52 +44,25 @@ class LA_PolicyManualSpider(scrapy.Spider):
         "file:////Users/yoom/dev/labs-decision-support-tool/app/src/ingestion/imagine_la/scrape/pagesT1/expanded_all_programs.html"
     ]
 
-    # def start_requests(self):
-    #     urls = [
-    #         "file:////Users/yoom/dev/labs-decision-support-tool/app/src/ingestion/imagine_la/scrape/pagesT1/expanded_all_programs.html"
-    #     ]
-    #     for url in urls:
-    #         yield scrapy.Request(url=url, callback=self.parse)
+# FOR DEBUGGING
+    def AAstart_requests(self):
+        urls = [
+            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/40-101_19_Extended_Foster_Care_Benefits/40-101_19_Extended_Foster_Care_Benefits.htm",
+            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Child%20Care/Child_Care/1210_Overview/1210_Overview.htm"
+        ]
+        for url in urls:
+            yield scrapy.Request(url=url, callback=self.parse_page)
 
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 
     def parse(self, response: HtmlResponse):
-        if not True:
-            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-407_Work_Registration/63-407_Work_Registration.htm"
-            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households.htm"
-
-            # "Cannot insert None into a tag."
-            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions.htm"
-            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CAPI/CAPI/49-015_CAPI_Application_Process/49-015_CAPI_Application_Process.htm"
-            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_552_Moving_Assistance_Program/44-211_552_Moving_Assistance_Program.htm"
-            # NotImplementedError: Unexpected number of columns in row: 3
-            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members/40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm"
-
-            # Expected one paragraph in heading row: <tr>
-            "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/SSI_SSP_COLA/SSI_SSP_COLA.htm"
-
-            # page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-181_Processing_Redeterminations/40-181_Processing_Redeterminations.htm"
-            # page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-402_6_Authorized_Representative/63-402_6_Authorized_Representative.htm"
-            # page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/69-202_1_Identification_of_Refugees/69-202_1_Identification_of_Refugees.htm"
-            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Organ_Transplant_AntiRejection_Medications/Organ_Transplant_AntiRejection_Medications.htm"
-            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/70-100_Trafficking_And_Crime_Victims_Assistance_Program/70-100_Trafficking_And_Crime_Victims_Assistance_Program.htm"
-            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Pickle_Program/Pickle_Program.htm"
-            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GROW/GROW/4_1_2_GROW_Youth_Employment_Program/4_1_2_GROW_Youth_Employment_Program.htm"
-
-            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-405_Citizenship_or_Eligible_Non-Citizen_Status/63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm"
-            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/40-101_19_Extended_Foster_Care_Benefits/40-101_19_Extended_Foster_Care_Benefits.htm"
-
-            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/SSI_SSP_COLA/SSI_SSP_COLA.htm"
-
-            yield response.follow(page_url, callback=self.parse_page)
-        else:
-            lis = response.css("li.book")
-            for li in lis[2:]:  # Start with "Programs"-related pages. TODO: Remove slice
-                href = li.css("a::attr(href)").get()
-                if href != "#":
-                    page_url = f"{self.common_url_prefix}/{href}"
-                    # self.logger.info("Found page URL %s", page_url)
-                    yield response.follow(page_url, callback=self.parse_page)
+        lis = response.css("li.book")
+        for li in lis[2:]:  # Start with "Programs"-related pages. TODO: Remove slice
+            href = li.css("a::attr(href)").get()
+            if href != "#":
+                page_url = f"{self.common_url_prefix}/{href}"
+                # self.logger.info("Found page URL %s", page_url)
+                yield response.follow(page_url, callback=self.parse_page)
 
     # Return value is saved to filename set by scrape_la_policy.OUTPUT_JSON
     def parse_page(self, response: HtmlResponse) -> dict[str, str]:
@@ -101,22 +74,22 @@ class LA_PolicyManualSpider(scrapy.Spider):
             self.common_url_prefix + "/mergedProjects/"
         )
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        # soup = BeautifulSoup(response.body.decode("utf-8").replace("\r\n", ""), "html5lib")
-        # html = soup.prettify()
-        Path(filepath).write_bytes(response.body)
-        # Path(filepath).write_text(html, encoding="utf-8")
-        # mresponse = Selector(text=html)
 
-        tables = response.xpath("body/table")
+        # 40-101_19_Extended_Foster_Care_Benefits.htm and 1210_Overview.htm have extra '\r\n' and missing spaces
+        # `replace("\r\n", "")` fixes this :shrug:
+        soup = BeautifulSoup(response.body.decode("utf-8").replace("\r\n", ""), "html.parser")
+        smoothed_html = soup.prettify()
+        smoothed_response = Selector(text=smoothed_html)
+        if DEBUGGING:
+            Path(filepath).write_text(smoothed_html, encoding="utf-8")
+
+        tables = smoothed_response.xpath("body/table")
         rows = tables[0].xpath("./tr")
 
-        # assert len(tables) == 1, "Expected one top-level table"
-        # FIXME: 63-407_Work_Registration.htm has a table that is outside the top-level table
         # FIXME: In Organ_Transplant_AntiRejection_Medications.htm and Pickle_Program.htm, the H1 and H2 are in the ignored first row
         #     and not classed as WD_ProgramName and WD_SubjectLine
         if (
-            response.url.endswith("63-407_Work_Registration.htm")
-            or response.url.endswith("Organ_Transplant_AntiRejection_Medications.htm")
+            response.url.endswith("Organ_Transplant_AntiRejection_Medications.htm")
             or response.url.endswith("Pickle_Program.htm")
         ):
             extractions["title"] = "SKIPPED"
@@ -136,6 +109,15 @@ class LA_PolicyManualSpider(scrapy.Spider):
             self._convert_to_headings_and_sections(row, self.common_url_prefix, page_state)
             for row in rows
         ]
+
+        # 63-407_Work_Registration.htm has a table that is outside the main top-level table
+        for table in tables[1:]:
+            self.logger.info("Scraping extra table after main table: %s")
+            rows = table.xpath("./tr")
+            for row in rows:
+                md_list.append(
+                    self._convert_to_headings_and_sections(row, self.common_url_prefix, page_state)
+                )
 
         markdown = "\n\n".join(md_list)
         Path(f"{filepath}.md").write_text(
@@ -279,8 +261,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                             assumed_heading = "## " + to_markdown(
                                 self._parse_heading(para), base_url
                             )
-                            # FIXME: Usually incorrect assumption
-                            self.logger.error("Assuming H2 heading: %r", assumed_heading)
+                            self.logger.error("Extra assumed H2 heading: %r", assumed_heading)
                             heading_md.append(assumed_heading)
                     return "\n".join(heading_md)
 
@@ -309,6 +290,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
             # because there's a div-wrapped table. The row should have been part of the previous row.
             # Treat the single-column row as if it was the second column of a 2-column row
             return self._parse_section(base_url, tds[0].get(), heading_level=3)
+        if len(tds) == 8:
+            # At the bottom of 63-900_Emergency_CalFresh_Assistance.htm is an extra table with 8 columns;
+            # just render it as a table
+            return to_markdown(row.get(), base_url)
 
         if len(tds) == 3:
             # In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm, there's an erroneous empty 3rd column
@@ -391,10 +376,12 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     self._convert_table_to_sections(state, child, heading_level)
             elif isinstance(child, NavigableString) or child.name in ["ul", "ol"]:
                 pass
+            elif child.get_text().strip() == "":
+                pass
             else:
                 raise NotImplementedError(f"Unexpected {child.name}: {child}")
 
-    # FIXME: replace state with container for current_list
+    # FIXME: replace state with container for current_list and new_tag Callable
     def __convert_any_paragraph_lists(self, state: ScrapingState, para: Tag):
         if "class" not in para.attrs:
             return
@@ -461,7 +448,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             self.logger.info("Leaving table using rowspan as is: %s", row_text)
             return False
 
-        # FIXME: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
+        # TODO: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
         # many occurrences of a list inappropriately wrapped in a table and is rendered as a curious table in markdown
         col_sizes = self._size_of_columns(table)
         if len(col_sizes) == 2:
@@ -567,8 +554,6 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     )
     # Clean up markdown text: consolidate newlines; replace non-breaking spaces
     markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
-    markdown = re.sub(r"\s\s+", " ", markdown)
-    # r"[\n\r]\n+"
 
     if base_url:
         # Replace non-absolute URLs with absolute URLs

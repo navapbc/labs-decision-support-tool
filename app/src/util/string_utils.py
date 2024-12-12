@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import difflib
 from typing import Iterator, Optional, Sequence
 from urllib.parse import urlparse
 
@@ -27,6 +28,11 @@ def join_list(joining_list: Optional[list], join_txt: str = "\n") -> str:
 def basic_ascii(text: str) -> str:
     # See https://www.ascii-code.com/
     return "".join([c if 32 <= ord(c) <= 126 else " " for c in text])
+
+
+def count_diffs(str1, str2):
+    diffs = difflib.ndiff(str1, str2)
+    return sum(1 for line in diffs if line.startswith('+ ') or line.startswith('- '))
 
 
 # Set the nltk.data.path to a relative directory so that it's available in the Docker environment
