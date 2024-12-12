@@ -7,7 +7,7 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = "EDD.CA.Gov Bot"
+BOT_NAME = "DST Bot"
 
 SPIDER_MODULES = ["edd.spiders"]
 # where to create new spiders using the genspider command
@@ -18,6 +18,9 @@ USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 
 LOG_LEVEL = "INFO"
 DEPTH_STATS_VERBOSE = True
+
+# the maximum number of errors to receive before closing the spider
+# CLOSESPIDER_ERRORCOUNT = 1
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True

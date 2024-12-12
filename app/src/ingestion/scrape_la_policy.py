@@ -11,11 +11,13 @@ logger = logging.getLogger(__name__)
 
 # Typically, env variable SCRAPY_PROJECT should be set when calling this script.
 # The SCRAPY_PROJECT env variable refers to the projects defined in scrapy.cfg
+# and the folder that Scrapy uses to find Python files.
 if "SCRAPY_PROJECT" not in os.environ:
     # This script is useful for postprocessing the json output.
-    os.environ["SCRAPY_PROJECT"] = "la_policy"
+    os.environ["SCRAPY_PROJECT"] = "edd"
 
-OUTPUT_JSON = f"{os.environ["SCRAPY_PROJECT"]}_scrapings.json"
+SPIDER_NAME = "la_policy_spider"
+OUTPUT_JSON = "la_policy_scrapings.json"
 
 
 def run_spider(spider_name: str) -> None:
@@ -47,16 +49,15 @@ def postprocess_json() -> None:
             formatted_json.write(json.dumps(data, indent=4))
             logger.info("Formatted JSON saved to pretty-%s", OUTPUT_JSON)
 
-
 def main() -> None:
     # Scrapy expects the scrapy.cfg file to be in the current working directory
     os.chdir("src/ingestion")
-    run_spider(f"{os.environ["SCRAPY_PROJECT"]}_spider")
+    run_spider(SPIDER_NAME)
 
     if "DEBUG_SCRAPINGS" in os.environ:
         postprocess_json()
 
 
 if __name__ == "__main__":
-    run_spider(f"{os.environ["SCRAPY_PROJECT"]}_spider")
+    run_spider(SPIDER_NAME)
     postprocess_json()
