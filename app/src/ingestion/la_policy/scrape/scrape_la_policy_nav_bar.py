@@ -7,26 +7,20 @@
 # (This comment enables `uv run` to automatically create a virtual environment)
 
 """
-This script renders the child pages of the ImagineLA content hub
-and saves them to .html files in the `pages` subdirectory.
+This script expands the navigation bar's TOC in order to get a list of pages to scrape
+and saves the html file, required for Scrapy to process.
 
-It is intended to be run locally: the HTML files can later be added
-to S3 to ingest them into a deployed environment's database.
+This is intended to be run locally.
 
 You can either install the above dependences with pip, e.g.,
 `pip install -r requirements.txt` before running with
-`python scrape_content_hub.py`, or run this with
-`uv run --no-project scrape_content_hub.py` to have an environment
+`python scrape_la_policy_nav_bar.py`, or run this with
+`uv run --no-project scrape_la_policy_nav_bar.py` to have an environment
 automatically created for you.
 """
 
-import os
-
 from install_playwright import install
 from playwright.sync_api import Locator, sync_playwright
-
-base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
-root_url = f"{base_url}/index.htm"
 
 
 p = sync_playwright().start()
@@ -34,7 +28,8 @@ install(p.chromium)
 browser = p.chromium.launch()
 
 page = browser.new_page()
-page.goto(root_url)
+base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
+page.goto(f"{base_url}/index.htm")
 
 # Wait for the page to load by ensuring an element (e.g., an <h2> tag) is present
 page.wait_for_load_state("domcontentloaded")
@@ -44,13 +39,16 @@ page.wait_for_selector('li.book:has-text("Programs")')
 
 # Helper functions for debugging
 
+
 def html(locator: Locator):
     return locator.evaluate("el => el.outerHTML")
+
 
 def write_html(filename="la_policy.html"):
     with open(filename, "w", encoding="utf-8") as file:
         file.write(page.content())
     print("Saved to", filename)
+
 
 def expand_nav_item(li: Locator):
     data_itemkey = li.get_attribute("data-itemkey")
@@ -67,6 +65,7 @@ def expand_nav_item(li: Locator):
             expand_nav_item(child)
         else:
             print(index, "Found URL to scrape:", href)
+
 
 try:
     programs = page.locator('li.book:has-text("Programs")')
