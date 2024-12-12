@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Optional, Sequence
 
 import scrapy
+import html5lib
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 from markdownify import markdownify
@@ -30,7 +31,7 @@ class ScrapingState:
 @dataclass
 class PageState:
     title: str
-    heading_error_logged: bool = False
+    title_diff_logged: bool = False
     h1: Optional[str] = None
     h2: Optional[str] = None
 
@@ -72,6 +73,13 @@ class LA_PolicyManualSpider(scrapy.Spider):
             # page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/69-202_1_Identification_of_Refugees/69-202_1_Identification_of_Refugees.htm"
             page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Organ_Transplant_AntiRejection_Medications/Organ_Transplant_AntiRejection_Medications.htm"
             page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/70-100_Trafficking_And_Crime_Victims_Assistance_Program/70-100_Trafficking_And_Crime_Victims_Assistance_Program.htm"
+            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Pickle_Program/Pickle_Program.htm"
+            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GROW/GROW/4_1_2_GROW_Youth_Employment_Program/4_1_2_GROW_Youth_Employment_Program.htm"
+
+            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-405_Citizenship_or_Eligible_Non-Citizen_Status/63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm"
+            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/40-101_19_Extended_Foster_Care_Benefits/40-101_19_Extended_Foster_Care_Benefits.htm"
+
+    # FIXME: 40-101_19_Extended_Foster_Care_Benefits.htm.md, 1210_Overview.htm are missing spaces: "*Whatchanged*?" "Thebrochure"
 
             yield response.follow(page_url, callback=self.parse_page)
         else:
@@ -93,27 +101,33 @@ class LA_PolicyManualSpider(scrapy.Spider):
             self.common_url_prefix + "/mergedProjects/"
         )
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        # soup = BeautifulSoup(response.body.decode("utf-8").replace("\r\n", ""), "html5lib")
+        # html = soup.prettify()
         Path(filepath).write_bytes(response.body)
+        # Path(filepath).write_text(html, encoding="utf-8")
+        # mresponse = Selector(text=html)
 
         tables = response.xpath("body/table")
         rows = tables[0].xpath("./tr")
 
         # assert len(tables) == 1, "Expected one top-level table"
         # FIXME: 63-407_Work_Registration.htm has a table that is outside the top-level table
-        # FIXME: In Organ_Transplant_AntiRejection_Medications.htm, the H1 and H2 are in the ignored first row
+        # FIXME: In Organ_Transplant_AntiRejection_Medications.htm and Pickle_Program.htm, the H1 and H2 are in the ignored first row
         #     and not classed as WD_ProgramName and WD_SubjectLine
-        # FIXME: Similar for Pickle_Program.htm
+        if response.url.endswith("63-407_Work_Registration.htm") or response.url.endswith("Organ_Transplant_AntiRejection_Medications.htm") or response.url.endswith("Pickle_Program.htm"):
+            extractions["title"] = "SKIPPED"
+            return extractions
 
         header_md = to_markdown(rows[0].get())
         assert (
             "Purpose" in header_md and "Policy" in header_md
         ), "Expected 'Purpose' and 'Policy' in first row (which acts as page header)"
         # Ignore the first row, which is the page header boilerplate
-        # FIXME: Extract "Release Date" value
+        # TODO: Extract "Release Date" value
         rows = rows[1:]
 
         # Convert table rows into headings and associated sections
-        page_state = PageState(response.xpath("head/title/text()").get().strip())
+        page_state = PageState(title=response.xpath("head/title/text()").get().strip())
         md_list: list[str] = [
             self._convert_to_headings_and_sections(row, self.common_url_prefix, page_state)
             for row in rows
@@ -124,36 +138,77 @@ class LA_PolicyManualSpider(scrapy.Spider):
             f"[Source page]({response.url})\n\n" + markdown, encoding="utf-8"
         )
 
-        extractions["title"] = page_state.title
+        assert page_state.h1, f"Missing H1: {page_state}"
+        assert page_state.h2, f"Missing H2: {page_state}"
+        # check that h1 is one of the 10 programs
+        if page_state.h1.casefold() not in self.KNOWN_PROGRAMS:
+            self.logger.error("Unknown program: %s", page_state.h1)
+
+        # More often than not, the h2 is better suited as the title
+        # Also 44-211_2_Recurring_Special_Needs.htm has the wrong title
         extractions["h2"] = page_state.h2
+        extractions["title"] = page_state.title
         extractions["markdown"] = markdown
         return extractions
+
+    KNOWN_PROGRAMS = {
+        program.casefold()
+        for program in [
+            "CAPI",
+            "CalFresh",
+            "CalWORKs",
+            "Child Care",
+            "GAIN", "GAIN/GROW",
+            "GR", "GENERAL RELIEF",
+            "GROW",
+            "IHSS", "IN-HOME SUPPORTIVE SERVICES", "IN-HOME SUPPORTIVE SERVICES PROGRAM",
+            "Medi-Cal", "MEDI-CAL PROGRAM",
+            "REP", "REFUGEE EMPLOYMENT PROGRAM",
+        ]
+    }
 
     def _convert_to_headings_and_sections(
         self, row: Selector, base_url: str, page_state: PageState
     ) -> str:
-        # FIXME: Record critical sentences and ensure they exist in the output markdown
+        # FIXME: Record sentences and ensure they exist in the output markdown
         tds = row.xpath("./td")
         heading_md = []
-        if not page_state.h1:
-            h1s = tds.xpath(".//p[@class='WD_ProgramName']")
-            if len(h1s):
+        h1s = tds.xpath(".//p[@class='WD_ProgramName']")
+        h2s = tds.xpath(".//p[@class='WD_SubjectLine']")
+        # pdb.set_trace()
+        if not page_state.h1 and len(h1s):
+            if len(h2s):
                 for para in h1s:
                     page_state.h1 = to_markdown(self._parse_heading(para), base_url)
                     heading_md.append("# " + page_state.h1)
                 return "\n".join(heading_md)
+            else:
+                # For 4_1_1__GROW_Transition_Age_Youth_Employment_Program.htm, 4_1_2_GROW_Youth_Employment_Program.htm,
+                # they incorrectly have multiple WD_ProgramName and no WD_SubjectLine
+                # so use WD_ProgramName in subsequent rows as H2.
+                for para in h1s:
+                    parsed_heading_md = to_markdown(self._parse_heading(para), base_url)
+                    if not page_state.h1:
+                        page_state.h1 = parsed_heading_md
+                        heading_md.append("# " + parsed_heading_md)
+                        continue
+                    if not page_state.h2:
+                        page_state.h2 = parsed_heading_md
+                        heading_md.append("## " + parsed_heading_md)
+                        continue
+                    self.logger.error("Extra heading: %r %s", parsed_heading_md, page_state)
+                return "\n".join(heading_md)
+
         # 44-211_552_Moving_Assistance_Program.htm misclassifies WD_ProgramName as a WD_SubjectLine,
         # so check for H1 before H2
-        if page_state.h1 and not page_state.h2:
-            # 69-202_1_Identification_of_Refugees incorrectly uses WD_SubjectLine class for non-heading text
-            # so ignore it if page_state.h2 is already set
-            h2s = tds.xpath(".//p[@class='WD_SubjectLine']")
-            if len(h2s):
-                for para in h2s:
-                    # FIXME: change h1 and h2 to list or boolean
-                    page_state.h2 = to_markdown(self._parse_heading(para), base_url)
-                    heading_md.append("## " + page_state.h2)
-                return "\n".join(heading_md)
+        # 69-202_1_Identification_of_Refugees incorrectly uses WD_SubjectLine class for non-heading text
+        # so ignore it if page_state.h2 is already set
+        if page_state.h1 and not page_state.h2 and len(h2s):
+            for para in h2s:
+                # FIXME: change h1 and h2 to list or boolean
+                page_state.h2 = to_markdown(self._parse_heading(para), base_url)
+                heading_md.append("## " + page_state.h2)
+            return "\n".join(heading_md)
 
         if not page_state.h1 or not page_state.h2:
             if (texts := tds.xpath(".//text()").getall()) and "".join(
@@ -164,30 +219,40 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 paras = [p for p in tds.xpath("./p") if p.xpath(".//text()").get().strip()]
                 if len(paras) > 1:
                     # One page used multiple consecutive <p> tags to split up a single heading title
-                    self.logger.warning("Expected only one <p> in table_data: %s", paras)
-                    # pdb.set_trace()
-                if page_state.h1 is None:
-                    for para in paras:
-                        h1 = to_markdown(self._parse_heading(para), base_url)
-                        page_state.h1 = h1
-                        heading_md.append("# " + h1)
-                elif page_state.h2 is None:
-                    for para in paras:
-                        # Some `p` tags don't have the `WD_SubjectLine` class when it should
-                        h2 = to_markdown(self._parse_heading(para), base_url)
-                        page_state.h2 = h2
-                        heading_md.append("## " + h2)
+                    # For several other pages, this is a sign of a missing H1 or H2 heading
+                    self.logger.info("Expected only one <p> for H1/H2 heading: %s", texts)
+                if set(texts) & self.TYPICAL_SUBHEADINGS:
+                    if page_state.title == "2_3_Comprehensive Intake and Employability Assessment":
+                        page_state.h2 = page_state.title
+                        self.logger.info("Missing H2; using title as H2: %s", page_state)
+                    else:
+                        self.logger.error("Did not find expected H1 or H2 headings: %s", page_state)
                 else:
-                    for para in paras:
-                        assumed_heading = "## " + to_markdown(self._parse_heading(para), base_url)
-                        self.logger.warning("Assuming H2 heading: %r", assumed_heading)
-                        heading_md.append(assumed_heading)
-                return "\n".join(heading_md)
-            else:
-                raise AssertionError(f"Expecting H1 and H2 headings to be set by now {page_state}")
+                    if page_state.h1 is None:
+                        for para in paras:
+                            h1 = to_markdown(self._parse_heading(para), base_url)
+                            page_state.h1 = h1
+                            heading_md.append("# " + h1)
+                    elif page_state.h2 is None:
+                        for para in paras:
+                            # Some `p` tags don't have the `WD_SubjectLine` class when it should
+                            h2 = to_markdown(self._parse_heading(para), base_url)
+                            page_state.h2 = h2
+                            heading_md.append("## " + h2)
+                    else:
+                        for para in paras:
+                            assumed_heading = "## " + to_markdown(
+                                self._parse_heading(para), base_url
+                            )
+                            # FIXME: Usually incorrect assumption
+                            self.logger.error("Assuming H2 heading: %r", assumed_heading)
+                            heading_md.append(assumed_heading)
+                    return "\n".join(heading_md)
+
+        assert page_state.h1 and page_state.h2, f"Expecting H1 and H2 to be set: {page_state}"
 
         if (
-            not page_state.heading_error_logged
+            not page_state.title_diff_logged
             and (page_state.h2.casefold() not in page_state.title.casefold())
             and (page_state.title.casefold() not in page_state.h2.casefold())
             and (
@@ -196,20 +261,13 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 > 0.7
             )
         ):
-            pair = (page_state.h2, page_state.title)
-            if pair == (
-                "44-211.2 Recurring Special Needs",
-                "44-211.52 Temporary Homeless Assistance",
-            ):
-                # 44-211_2_Recurring_Special_Needs.htm has the wrong page_state.title
-                page_state.title = h2
-                self.logger.info("Fixed incorrect page title to be: %s", h2)
-            elif pair in self.ALLOWED_DIFFS:
-                # Acceptable differences
-                pass
-            else:
-                page_state.heading_error_logged = True
-                self.logger.error("Expected H2 to be the same as the page title: %s", page_state)
+            page_state.title_diff_logged = True
+            self.logger.info(
+                "Expected H2 is significantly different from the page title: %s", page_state
+            )
+
+            if not page_state.h2[0].isdigit() and len(page_state.h2) > 100:
+                self.logger.warning("H2 heading may not be a heading: %s", page_state.h2)
 
         if len(tds) == 1:
             # Near the bottom of 69-202_1_Identification_of_Refugees.htm, the row becomes 1-column
@@ -239,60 +297,23 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         raise NotImplementedError(f"Unexpected number of columns in row: {len(tds)}: {row.get()}")
 
-    ALLOWED_DIFFS = {
-        ("44-115 Income-In-Kind", "44-115 Inkind Income"),
-        (
-            "Modified Adjusted Gross Income Tax Household",
-            "MAGI Tax Household",
-        ),
-        ("Public Assistance Reporting Information System", "PARIS"),
-        (
-            "DHS Patient Financial Services Staff Application Processing",
-            "DHS MC Application Processing",
-        ),
-        ("Documentation of Case Records", "Documenting Case, Person, and Assessment Activity 2"),
-        ("Waiver Personal Care Services Program", 'WPCS Provider Payment Processing')
+    TYPICAL_SUBHEADINGS = {
+        "Purpose",
+        "Policy",
+        "Background",
+        "Definition",
+        "Requirements",
+        "Verification Docs",
     }
-
-    def _parse_single_column_row(
-        self, table_data: Selector, base_url: str, page_state: PageState
-    ) -> str:
-        paras = table_data.xpath("./p")
-        if len(paras) > 1:
-            # One page used multiple consecutive <p> tags to split up a single heading title
-            self.logger.warning("Expected only one <p> in table_data: %s", table_data)
-        heading_md = []
-        for para in paras:
-            p_class = para.attrib["class"]
-            if p_class == "WD_ProgramName":
-                page_state.h1 = to_markdown(self._parse_heading(para), base_url)
-                heading_md.append("# " + page_state.h1)
-            elif p_class == "WD_SubjectLine":
-                page_state.h2 = to_markdown(self._parse_heading(para), base_url)
-                heading_md.append("## " + page_state.h2)
-            elif (text := para.xpath(".//text()").get()) and text.strip():
-                # 40-181_Processing_Redeterminations.htm
-                # does not use the typical WD_ProgramName and WD_SubjectLine classes to identify H1 and H2 headings
-                if not page_state.h1:
-                    page_state.h1 = to_markdown(self._parse_heading(para), base_url)
-                    heading_md.append("# " + page_state.h1)
-                elif not page_state.h2:
-                    # Some `p` tags don't have the `WD_SubjectLine` class when it should
-                    page_state.h2 = to_markdown(self._parse_heading(para), base_url)
-                    heading_md.append("## " + page_state.h2)
-                else:
-                    assumed_heading = "## " + to_markdown(self._parse_heading(para), base_url)
-                    self.logger.warning("Assuming H2 heading: %r", assumed_heading)
-                    heading_md.append(assumed_heading)
-        return "\n".join(heading_md)
 
     def _parse_heading(self, cells: Selector) -> str:
         raw_texts = cells.xpath(".//text()").getall()
-        return "".join(raw_texts)
+        return " ".join(raw_texts)
+        # return " ".join([text.strip() for text in raw_texts if text.strip()])
 
     def _parse_section(self, base_url, html: str, heading_level: int) -> str:
         # Remove extraneous whitespace to simplify parsing
-        min_html = "".join(line.strip() for line in html.split("\n"))
+        min_html = "".join(line.strip() for line in html.split("\n")) #.replace("\r\n", "\n")
         soup = BeautifulSoup(min_html, "html.parser")
 
         body = soup.find("td")
@@ -308,15 +329,15 @@ class LA_PolicyManualSpider(scrapy.Spider):
         section_md = re.sub(r"\n\n \n\n", "\n\n", section_md)
         return section_md
 
-    def __fix_body(self, heading_level, soup, body):
+    def __fix_body(self, heading_level: int, soup, body: Tag | NavigableString):
         "Convert any tags so they can be appropriately converted to markdown"
         state = ScrapingState(soup)
-        # Iterate over a copy of the contents since we may modify the contents
+        # Iterate over a copy of body.contents since we may modify the contents
         for child in list(body.contents):
             if (
                 child.name == "div"
                 and len(child.contents) == 1
-                and child.contents[0].name == "table"
+                and child.contents[0].name in ["table", "p"]
             ):
                 # For divs with only one child, ignore the div and process the child
                 # Occurs for a table that is wrapped in a div for centering
@@ -326,20 +347,17 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # Handle lists presented as paragraphs
                 self.__convert_any_paragraph_lists(state, child)
             elif child.name == "div":
-                self.logger.warning("Unexpected div in body: %s", child)
-                state2 = ScrapingState(soup)
-                for c in list(child.contents):
-                    if c.name == "p":
-                        self.__convert_any_paragraph_lists(state2, c)
+                # 63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm has a div wrapping several <p> tags
+                self.logger.info("Atypical div wrapping several tags: %s", child)
+                self.__fix_body(heading_level, soup, child)
             elif child.name == "table":
-                # FIXME: Check table for 1-col rows and convert them to headings -- see _convert_table_to_sections
+                # TODO: Check table for 1-col rows and convert them to headings -- see _convert_table_to_sections
                 if self._should_convert_table(child):
                     self._convert_table_to_sections(state, child, heading_level)
             elif isinstance(child, NavigableString) or child.name in ["ul", "ol"]:
                 pass
             else:
-                print(child.name, child)
-                pdb.set_trace()
+                raise NotImplementedError(f"Unexpected {child.name}: {child}")
 
     # FIXME: replace state with container for current_list
     def __convert_any_paragraph_lists(self, state: ScrapingState, para: Tag):
@@ -403,8 +421,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # self.logger.debug("_should_convert_table: %r", row_text)
 
         if self._table_uses_rowspan(table):
+            row_text = [td.text for td in table.find("tr").find_all(["td", "th"], recursive=False)]
             # 69-202_1_Identification_of_Refugees.htm
-            self.logger.warning("Ignoring table with rowspan: %s", table)
+            self.logger.info("Leaving table using rowspan as is: %s", row_text)
             return False
 
         # FIXME: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
@@ -419,7 +438,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         if len(col_sizes) > 2:
             row_text = [td.text for td in table.find("tr").find_all(["td", "th"], recursive=False)]
-            self.logger.warning(
+            self.logger.info(
                 "Leaving %s-column table as is: %s: %r", len(col_sizes), col_sizes, row_text
             )
             return False
@@ -460,7 +479,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     # FIXME: replace state arg with new_tag Callable
     def _convert_table_to_sections(self, state: ScrapingState, table: Tag, heading_level: int):
-        table_headings = []
         rows = table.find_all("tr", recursive=False)
 
         # Use first row as table headings if all cells are bold
@@ -514,6 +532,8 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     )
     # Clean up markdown text: consolidate newlines; replace non-breaking spaces
     markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
+    markdown = re.sub(r'\s\s+', ' ', markdown)
+    # r"[\n\r]\n+"
 
     if base_url:
         # Replace non-absolute URLs with absolute URLs
