@@ -34,7 +34,7 @@ poetry-installer-error-*.log
 /models/
 /nltk_data
 
-# Ddocuments to load into the database
+# Documents to load into the database
 documents/
 
 .ipynb_checkpoints
