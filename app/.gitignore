@@ -34,7 +34,7 @@ poetry-installer-error-*.log
 /models/
 /nltk_data
 
-# Guru cards and other documents to load into the database
+# Ddocuments to load into the database
 documents/
 
 .ipynb_checkpoints
