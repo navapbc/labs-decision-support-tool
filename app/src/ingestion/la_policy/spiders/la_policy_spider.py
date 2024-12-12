@@ -326,120 +326,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
         for para in self._nonempty_paragraphs(top_rows[1:]):
             self.logger.error("Extra heading: %r", para.get_text())
 
-        if self.DEBUGGING and (not pstate.h1 or not pstate.h2):
-            ...
-        #     # Requery in case paragraphs were removed
-        #     print([para.get_text() for para in self.__nonempty_paragraphs(top_rows)])
-        #     print([para.get_text() for para in paras])
-        #     pdb.set_trace()
-
-    def __old_get_headings(self, row: Selector, base_url: str, page_state: PageState):
-        tds = row.xpath("./td")
-        heading_md = []
-        h1s = tds.xpath(".//p[@class='WD_ProgramName']")
-        h2s = tds.xpath(".//p[@class='WD_SubjectLine']")
-        # if not page_state.h1 and len(h1s):
-        #     if len(h2s):
-        #         for para in h1s:
-        #             h1 = to_markdown(self._parse_heading(para), base_url)
-        #             if not page_state.h1:
-        #                 page_state.h1 = h1
-        #                 heading_md.append("# " + page_state.h1)
-        #                 continue
-        #             self.logger.error("Extra H1 heading: %r %s", h1, page_state)
-        #         return "\n".join(heading_md)
-        #     else:
-        #         # For 4_1_1__GROW_Transition_Age_Youth_Employment_Program.htm, 4_1_2_GROW_Youth_Employment_Program.htm,
-        #         # they incorrectly have multiple WD_ProgramName and no WD_SubjectLine
-        #         # so use WD_ProgramName in subsequent rows as H2.
-        #         for para in h1s:
-        #             parsed_heading_md = to_markdown(self._parse_heading(para), base_url)
-        #             if not page_state.h1:
-        #                 page_state.h1 = parsed_heading_md
-        #                 heading_md.append("# " + parsed_heading_md)
-        #                 continue
-        #             if not page_state.h2:
-        #                 page_state.h2 = parsed_heading_md
-        #                 heading_md.append("## " + parsed_heading_md)
-        #                 continue
-        #             self.logger.error("Extra heading: %r %s", parsed_heading_md, page_state)
-        #         return "\n".join(heading_md)
-
-        # # 44-211_552_Moving_Assistance_Program.htm misclassifies WD_ProgramName as a WD_SubjectLine,
-        # # so check for H1 before H2
-        # # 69-202_1_Identification_of_Refugees incorrectly uses WD_SubjectLine class for non-heading text
-        # # so ignore it if page_state.h2 is already set
-        # if page_state.h1 and not page_state.h2 and len(h2s):
-        #     if len(h2s) == 2:
-        #         # SSI_SSP_COLA/SSI_SSP_COLA.htm has multiple WD_SubjectLine in the same td
-        #         # so merge them into a single H2
-        #         for td in tds:
-        #             if not page_state.h2:
-        #                 h2s_in_cell = td.xpath(".//p[@class='WD_SubjectLine']")
-        #                 h2 = " ".join(
-        #                     [
-        #                         to_markdown(self._parse_heading(para), base_url)
-        #                         for para in h2s_in_cell
-        #                     ]
-        #                 )
-        #                 page_state.h2 = h2
-        #                 heading_md.append("## " + page_state.h2)
-        #                 continue
-        #             self.logger.error("Extra H2 heading in row: %r %s", h2, page_state)
-        #         return "\n".join(heading_md)
-
-        #     for para in h2s:
-        #         h2 = to_markdown(self._parse_heading(para), base_url)
-        #         if not page_state.h2:
-        #             page_state.h2 = h2
-        #             heading_md.append("## " + page_state.h2)
-        #             continue
-        #         self.logger.error("Extra H2 heading: %r %s", h2, page_state)
-        #     return "\n".join(heading_md)
-
-        if not page_state.h1 or not page_state.h2:
-            if (texts := tds.xpath(".//text()").getall()) and "".join(
-                [text.strip() for text in texts]
-            ):
-                # 40-181_Processing_Redeterminations.htm
-                # does not use the typical WD_ProgramName and WD_SubjectLine classes to identify H1 and H2 headings
-                paras = [p for p in tds.xpath("./p") if p.xpath(".//text()").get().strip()]
-                if len(paras) > 1:
-                    # One page used multiple consecutive <p> tags to split up a single heading title
-                    # For several other pages, this is a sign of a missing H1 or H2 heading
-                    self.logger.info("Expected only one <p> for H1/H2 heading: %s", texts)
-                if set(texts) & self.TYPICAL_SUBHEADINGS:
-                    if page_state.title == "2_3_Comprehensive Intake and Employability Assessment":
-                        page_state.h2 = page_state.title
-                        self.logger.info("Missing H2; using title as H2: %s", page_state)
-                    else:
-                        self.logger.error("Did not find expected H1 or H2 headings: %s", page_state)
-                else:
-                    if page_state.h1 is None:
-                        for para in paras:
-                            h1 = to_markdown(self._parse_heading(para), base_url)
-                            if not page_state.h1:
-                                page_state.h1 = h1
-                                heading_md.append("# " + h1)
-                                continue
-                            self.logger.error("Extra assumed H1 heading: %r %s", h1, page_state)
-                    elif page_state.h2 is None:
-                        for para in paras:
-                            # Some `p` tags don't have the `WD_SubjectLine` class when it should
-                            h2 = to_markdown(self._parse_heading(para), base_url)
-                            if not page_state.h2:
-                                page_state.h2 = h2
-                                heading_md.append("## " + h2)
-                                continue
-                            self.logger.error("Extra assumed H2 heading: %r %s", h2, page_state)
-                    else:
-                        for para in paras:
-                            assumed_heading = "### " + to_markdown(
-                                self._parse_heading(para), base_url
-                            )
-                            self.logger.error("Extra assumed heading: %r", assumed_heading)
-                            heading_md.append(assumed_heading)
-                    return "\n".join(heading_md)
 
     def __check_h2(self, page_state: PageState):
         assert page_state.h2
@@ -466,7 +352,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
     def _convert_to_headings_and_sections(
         self, row: Selector, base_url: str, page_state: PageState
     ) -> str:
-        # FIXME: Record sentences and ensure they exist in the output markdown
+        # TODO: Record sentences and ensure they exist in the output markdown
         tds = row.xpath("./td")
 
         if len(tds) == 1:
