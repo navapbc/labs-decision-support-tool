@@ -20,6 +20,7 @@ if "SCRAPY_PROJECT" not in os.environ:
 OUTPUT_JSON = "edd_scrapings.json"
 SPIDER_NAME = "edd_spider"
 
+
 def run_edd_spider() -> None:
     settings = get_project_settings()
     settings["FEEDS"] = {
@@ -79,6 +80,7 @@ def main() -> None:
 
     if "DEBUG_SCRAPINGS" in os.environ:
         postprocess_json()
+
 
 if __name__ == "__main__":
     run_edd_spider()
