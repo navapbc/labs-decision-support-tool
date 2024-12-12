@@ -1,7 +1,6 @@
 import os
 import pdb
 import re
-import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import chain
@@ -15,11 +14,8 @@ from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.selector import Selector
 
-app_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
-print("Adding app folder to sys.path:", app_folder)
-sys.path.append(app_folder)
-from src.util import string_utils  # noqa: E402
-from src.util.string_utils import count_diffs  # noqa: E402
+from src.util import string_utils
+from src.util.string_utils import count_diffs
 
 
 @dataclass
