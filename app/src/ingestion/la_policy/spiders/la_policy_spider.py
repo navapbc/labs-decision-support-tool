@@ -54,7 +54,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 
     def parse(self, response: HtmlResponse):
-        if False:
+        if not True:
             "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-407_Work_Registration/63-407_Work_Registration.htm"
             page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households/63-504_ESAP_Waiver_for_Elderly_and_Disabled_Households.htm"
 
@@ -79,7 +79,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-405_Citizenship_or_Eligible_Non-Citizen_Status/63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm"
             page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/40-101_19_Extended_Foster_Care_Benefits/40-101_19_Extended_Foster_Care_Benefits.htm"
 
-    # FIXME: 40-101_19_Extended_Foster_Care_Benefits.htm.md, 1210_Overview.htm are missing spaces: "*Whatchanged*?" "Thebrochure"
+            page_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/SSI_SSP_COLA/SSI_SSP_COLA.htm"
 
             yield response.follow(page_url, callback=self.parse_page)
         else:
@@ -114,7 +114,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # FIXME: 63-407_Work_Registration.htm has a table that is outside the top-level table
         # FIXME: In Organ_Transplant_AntiRejection_Medications.htm and Pickle_Program.htm, the H1 and H2 are in the ignored first row
         #     and not classed as WD_ProgramName and WD_SubjectLine
-        if response.url.endswith("63-407_Work_Registration.htm") or response.url.endswith("Organ_Transplant_AntiRejection_Medications.htm") or response.url.endswith("Pickle_Program.htm"):
+        if (
+            response.url.endswith("63-407_Work_Registration.htm")
+            or response.url.endswith("Organ_Transplant_AntiRejection_Medications.htm")
+            or response.url.endswith("Pickle_Program.htm")
+        ):
             extractions["title"] = "SKIPPED"
             return extractions
 
@@ -158,12 +162,18 @@ class LA_PolicyManualSpider(scrapy.Spider):
             "CalFresh",
             "CalWORKs",
             "Child Care",
-            "GAIN", "GAIN/GROW",
-            "GR", "GENERAL RELIEF",
+            "GAIN",
+            "GAIN/GROW",
+            "GR",
+            "GENERAL RELIEF",
             "GROW",
-            "IHSS", "IN-HOME SUPPORTIVE SERVICES", "IN-HOME SUPPORTIVE SERVICES PROGRAM",
-            "Medi-Cal", "MEDI-CAL PROGRAM",
-            "REP", "REFUGEE EMPLOYMENT PROGRAM",
+            "IHSS",
+            "IN-HOME SUPPORTIVE SERVICES",
+            "IN-HOME SUPPORTIVE SERVICES PROGRAM",
+            "Medi-Cal",
+            "MEDI-CAL PROGRAM",
+            "REP",
+            "REFUGEE EMPLOYMENT PROGRAM",
         ]
     }
 
@@ -175,12 +185,15 @@ class LA_PolicyManualSpider(scrapy.Spider):
         heading_md = []
         h1s = tds.xpath(".//p[@class='WD_ProgramName']")
         h2s = tds.xpath(".//p[@class='WD_SubjectLine']")
-        # pdb.set_trace()
         if not page_state.h1 and len(h1s):
             if len(h2s):
                 for para in h1s:
-                    page_state.h1 = to_markdown(self._parse_heading(para), base_url)
-                    heading_md.append("# " + page_state.h1)
+                    h1 = to_markdown(self._parse_heading(para), base_url)
+                    if not page_state.h1:
+                        page_state.h1 = h1
+                        heading_md.append("# " + page_state.h1)
+                        continue
+                    self.logger.error("Extra H1 heading: %r %s", h1, page_state)
                 return "\n".join(heading_md)
             else:
                 # For 4_1_1__GROW_Transition_Age_Youth_Employment_Program.htm, 4_1_2_GROW_Youth_Employment_Program.htm,
@@ -204,10 +217,26 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # 69-202_1_Identification_of_Refugees incorrectly uses WD_SubjectLine class for non-heading text
         # so ignore it if page_state.h2 is already set
         if page_state.h1 and not page_state.h2 and len(h2s):
+            if len(h2s) == 2:
+                # SSI_SSP_COLA/SSI_SSP_COLA.htm has multiple WD_SubjectLine in the same td
+                # so merge them into a single H2
+                for td in tds:
+                    if not page_state.h2:
+                        h2s_in_cell = td.xpath(".//p[@class='WD_SubjectLine']")
+                        h2 = " ".join([to_markdown(self._parse_heading(para), base_url) for para in h2s_in_cell])
+                        page_state.h2 = h2
+                        heading_md.append("## " + page_state.h2)
+                        continue
+                    self.logger.error("Extra H2 heading in row: %r %s", h2, page_state)
+                return "\n".join(heading_md)
+
             for para in h2s:
-                # FIXME: change h1 and h2 to list or boolean
-                page_state.h2 = to_markdown(self._parse_heading(para), base_url)
-                heading_md.append("## " + page_state.h2)
+                h2 = to_markdown(self._parse_heading(para), base_url)
+                if not page_state.h2:
+                    page_state.h2 = h2
+                    heading_md.append("## " + page_state.h2)
+                    continue
+                self.logger.error("Extra H2 heading: %r %s", h2, page_state)
             return "\n".join(heading_md)
 
         if not page_state.h1 or not page_state.h2:
@@ -231,14 +260,20 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     if page_state.h1 is None:
                         for para in paras:
                             h1 = to_markdown(self._parse_heading(para), base_url)
-                            page_state.h1 = h1
-                            heading_md.append("# " + h1)
+                            if not page_state.h1:
+                                page_state.h1 = h1
+                                heading_md.append("# " + h1)
+                                continue
+                            self.logger.error("Extra H1 heading: %r %s", h1, page_state)
                     elif page_state.h2 is None:
                         for para in paras:
                             # Some `p` tags don't have the `WD_SubjectLine` class when it should
                             h2 = to_markdown(self._parse_heading(para), base_url)
-                            page_state.h2 = h2
-                            heading_md.append("## " + h2)
+                            if not page_state.h2:
+                                page_state.h2 = h2
+                                heading_md.append("## " + h2)
+                                continue
+                            self.logger.error("Extra H2 heading: %r %s", h2, page_state)
                     else:
                         for para in paras:
                             assumed_heading = "## " + to_markdown(
@@ -313,7 +348,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     def _parse_section(self, base_url, html: str, heading_level: int) -> str:
         # Remove extraneous whitespace to simplify parsing
-        min_html = "".join(line.strip() for line in html.split("\n")) #.replace("\r\n", "\n")
+        min_html = "".join(line.strip() for line in html.split("\n"))  # .replace("\r\n", "\n")
         soup = BeautifulSoup(min_html, "html.parser")
 
         body = soup.find("td")
@@ -532,7 +567,7 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     )
     # Clean up markdown text: consolidate newlines; replace non-breaking spaces
     markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
-    markdown = re.sub(r'\s\s+', ' ', markdown)
+    markdown = re.sub(r"\s\s+", " ", markdown)
     # r"[\n\r]\n+"
 
     if base_url:
