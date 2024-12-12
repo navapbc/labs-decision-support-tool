@@ -4,9 +4,9 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
+from itertools import chain
 from pathlib import Path
 from typing import Any, Optional, Sequence
-from itertools import chain
 
 import scrapy
 from bs4 import BeautifulSoup
@@ -19,7 +19,7 @@ app_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.
 print("Adding app folder to sys.path:", app_folder)
 sys.path.append(app_folder)
 from src.util import string_utils  # noqa: E402
-from src.util.string_utils import count_diffs
+from src.util.string_utils import count_diffs  # noqa: E402
 
 
 @dataclass
@@ -330,7 +330,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
         for para in self._nonempty_paragraphs(top_rows[1:]):
             self.logger.error("Extra heading: %r", para.get_text())
 
-
     def __check_h2(self, page_state: PageState):
         assert page_state.h2
         if (
@@ -616,6 +615,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 )
 
         table.name = "div"
+
 
 # TODO: if possible, consolidate with edd_spider.to_markdown()
 def to_markdown(html: str, base_url: Optional[str] = None) -> str:

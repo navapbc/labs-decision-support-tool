@@ -13,7 +13,6 @@ print("Adding app folder to sys.path:", app_folder)
 sys.path.append(app_folder)
 from src.util import string_utils  # noqa: E402
 
-
 AccordionSections = dict[str, list[str]]
 
 

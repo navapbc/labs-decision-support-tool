@@ -22,7 +22,6 @@ automatically created for you.
 from install_playwright import install
 from playwright.sync_api import Locator, sync_playwright
 
-
 p = sync_playwright().start()
 install(p.chromium)
 browser = p.chromium.launch()
@@ -54,9 +53,9 @@ def expand_nav_item(li: Locator):
     data_itemkey = li.get_attribute("data-itemkey")
     print(f"Clicking {li.text_content()!r} ({data_itemkey})")
     li.click()
-    page.locator(f'ul.child[data-child="{data_itemkey}"]:not(hidden)').wait_for()
+    page.locator(f'ul.child[data-child={data_itemkey!r}]:not(hidden)').wait_for()
 
-    children = page.locator(f'ul.child[data-child="{data_itemkey}"] > li.book')
+    children = page.locator(f'ul.child[data-child={data_itemkey!r}] > li.book')
     print(f"  has {children.count()} children:", children.all_text_contents())
     for index in range(children.count()):
         child = children.nth(index)

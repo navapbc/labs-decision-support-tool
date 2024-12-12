@@ -49,6 +49,7 @@ def postprocess_json() -> None:
             formatted_json.write(json.dumps(data, indent=4))
             logger.info("Formatted JSON saved to pretty-%s", OUTPUT_JSON)
 
+
 def main() -> None:
     # Scrapy expects the scrapy.cfg file to be in the current working directory
     os.chdir("src/ingestion")
