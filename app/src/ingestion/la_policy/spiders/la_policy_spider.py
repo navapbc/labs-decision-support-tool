@@ -43,7 +43,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     # TODO: Port playwrite code to scrapy via https://github.com/scrapy-plugins/scrapy-playwright?tab=readme-ov-file#executing-actions-on-pages
     start_urls = [
-        "file:////Users/yoom/dev/labs-decision-support-tool/app/src/ingestion/imagine_la/scrape/pagesT1/expanded_all_programs.html"
+        Path(os.path.abspath("./la_policy/scrape/la_policy_nav_bar.html")).as_uri(),
     ]
 
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
@@ -613,7 +613,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         table.name = "div"
 
-
+# TODO: if possible, consolidate with edd_spider.to_markdown()
 def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     markdown = markdownify(
         html,
