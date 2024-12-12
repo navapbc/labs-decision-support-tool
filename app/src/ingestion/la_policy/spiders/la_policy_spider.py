@@ -9,7 +9,7 @@ from typing import Any, Optional, Sequence, Iterable
 from itertools import chain
 
 import scrapy
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, ResultSet
 from bs4.element import NavigableString, Tag
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
@@ -148,7 +148,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
         ]
     }
 
-
     DEBUGGING = False
     # DEBUGGING = True
 
@@ -177,24 +176,34 @@ class LA_PolicyManualSpider(scrapy.Spider):
             for url in self.start_urls:
                 yield scrapy.Request(url=url, callback=self.parse)
 
-    def _h1_paragraphs(self, rows: list[Tag]) -> Iterable[Tag]:
-        for para in chain(*[row.find_all("p", class_="WD_ProgramName") for row in rows]):
-            if para.get_text().strip():
-                yield para
+    def _h1_paragraphs(self, rows: list[Tag]) -> Sequence[Tag]:
+        # return self.__flatten_and_filter_out_blank(*[row.find_all("p", class_="WD_ProgramName") for row in rows])
+        return self.__flatten_and_filter_out_blank(
+            rows, lambda row: row.find_all("p", class_="WD_ProgramName")
+        )
 
-    def _h2_paragraphs(self, rows: list[Tag]):
-        for para in chain(*[row.find_all("p", class_="WD_SubjectLine") for row in rows]):
-            if para.get_text().strip():
-                yield para
+    def _h2_paragraphs(self, rows: list[Tag]) -> Sequence[Tag]:
+        return self.__flatten_and_filter_out_blank(
+            rows, lambda row: row.find_all("p", class_="WD_SubjectLine")
+        )
 
-    def __nonempty_paragraphs(self, rows: list[Tag]) -> Iterable[Tag]:
-        for para in chain(*[row.find_all("p") for row in rows]):
-            if para.get_text().strip():
-                yield para
+    def _nonempty_paragraphs(self, rows: list[Tag]) -> Sequence[Tag]:
+        return self.__flatten_and_filter_out_blank(rows, lambda row: row.find_all("p"))
         # [p.get_text() for ps in [row.find_all("p") for row in top_rows] for p in ps]
 
-    def _linked_nonempty_paragraphs(self, tag: Tag) -> list[Tag]:
-        return [span.parent for span in tag.find_all("span", class_="WD_Hyperlink")]
+    def __flatten_and_filter_out_blank(self, rows, resultset_generator):
+        return [
+            para
+            for para in chain(*[resultset_generator(row) for row in rows])
+            if para.get_text().strip()
+        ]
+
+    def _linked_nonempty_paragraphs(self, tag: Tag) -> Sequence[Tag]:
+        return [
+            span.parent
+            for span in tag.find_all("span", class_="WD_Hyperlink")
+            if span.parent.get_text().strip()
+        ]
 
     def _extract_and_remove_top_headings(self, base_url: str, pstate: PageState):
         "Extract the H1 and H2 headings from the top of the page and remove them so they don't get processed"
@@ -243,9 +252,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
     def __handle_priority_special_cases(self, base_url: str, pstate: PageState, table: Tag):
         "Needs to be handled before parsing the typical headings"
         top_rows = table.find_all("tr", recursive=False, limit=3)
-        h1s = list(self._h1_paragraphs(top_rows))
-        h2s = list(self._h2_paragraphs(top_rows))
-        if len(h1s)==0 and len(h2s)>0:
+
+        if len(self._h1_paragraphs(top_rows)) == 0 and (h2s := self._h2_paragraphs(top_rows)):
             # e.g., 44-211_552_Moving_Assistance_Program, 40-100_National_Voter_Registration_Act_-_Kick-Off
             # These misclassifies H1 heading as a WD_SubjectLine,
             # so there are multiple WD_SubjectLine and no WD_ProgramName
@@ -304,7 +312,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         # In Organ_Transplant_AntiRejection_Medications.htm the H1 and H2 are in the ignored first row
         # Plus Organ_Transplant_AntiRejection_Medications doesn't use WD_ProgramName and WD_SubjectLine
-        if pstate.filename=='Organ_Transplant_AntiRejection_Medications.htm':
+        if pstate.filename == "Organ_Transplant_AntiRejection_Medications.htm":
             paras = top_rows[0].find("td").find_all("p", recursive=False)
             set_headings_by_order(paras)
             return
@@ -313,18 +321,14 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # Residency_for_Out-of-State_Students doesn't use WD_SubjectLine
         # At this point, we can't rely on class annotations, just parse based on order of paragraphs
         # H1 and H2 headings are typically in the second row, so exclude the first row to avoid parsing the page header
-        set_headings_by_order(self.__nonempty_paragraphs(top_rows[1:]))
+        set_headings_by_order(self._nonempty_paragraphs(top_rows[1:]))
 
-        for para in self.__nonempty_paragraphs(top_rows[1:]):
+        for para in self._nonempty_paragraphs(top_rows[1:]):
             self.logger.error("Extra heading: %r", para.get_text())
 
         if self.DEBUGGING and (not pstate.h1 or not pstate.h2):
             ...
         #     # Requery in case paragraphs were removed
-        #     heading_rows = top_rows[1:]
-        #     h1s = list(self._h1_paragraphs(heading_rows))
-        #     h2s = list(self._h2_paragraphs(heading_rows))
-        #     other_ps = list(self.__nonempty_paragraphs(top_rows))
         #     print([para.get_text() for para in self.__nonempty_paragraphs(top_rows)])
         #     print([para.get_text() for para in paras])
         #     pdb.set_trace()
@@ -470,6 +474,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             # because there's a div-wrapped table. The row should have been part of the previous row.
             # Treat the single-column row as if it was the second column of a 2-column row
             return self._parse_section(base_url, tds[0].get(), heading_level=3)
+
         if len(tds) == 8:
             # At the bottom of 63-900_Emergency_CalFresh_Assistance.htm is an extra table with 8 columns;
             # just render it as a table
@@ -489,7 +494,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             paras = tds[0].xpath("./p")
             if not [para.attrib["class"] == "WD_SectionHeading" for para in paras]:
                 # minor inconsistency; mitigation: assume first column is a subheading
-                self.logger.debug(
+                self.logger.info(
                     "Assuming subheading (despite lack of WD_SectionHeading): %s", subheading_md
                 )
 
