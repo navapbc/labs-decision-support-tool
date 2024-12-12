@@ -37,8 +37,6 @@ class PageState:
     h1: Optional[str] = None
     h2: Optional[str] = None
 
-    title_diff_logged: bool = False
-
 
 class LA_PolicyManualSpider(scrapy.Spider):
     name = "la_policy_spider"
@@ -152,7 +150,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
 
     DEBUGGING = False
-    DEBUGGING = True
+    # DEBUGGING = True
 
     def start_requests(self):
         if self.DEBUGGING:
@@ -193,26 +191,22 @@ class LA_PolicyManualSpider(scrapy.Spider):
         for para in chain(*[row.find_all("p") for row in rows]):
             if para.get_text().strip():
                 yield para
+        # [p.get_text() for ps in [row.find_all("p") for row in top_rows] for p in ps]
 
-    # FIXME: In Organ_Transplant_AntiRejection_Medications.htm and Pickle_Program.htm, the H1 and H2 are in the ignored first row
-    #     and not classed as WD_ProgramName and WD_SubjectLine
-    def _unlinked_nonempty_paragraphs(self, rows: list[Tag]) -> Iterable[Tag]:
-        linked_paras = [span.parent for span in rows[0].find_all("span", class_="WD_Hyperlink")]
-        heading_rows = rows[1:]  # Ignore the first row, which is the page header boilerplate
-        for para in self.__nonempty_paragraphs(heading_rows):
-            if para not in linked_paras:
-                yield para
+    def _linked_nonempty_paragraphs(self, tag: Tag) -> list[Tag]:
+        return [span.parent for span in tag.find_all("span", class_="WD_Hyperlink")]
 
     def _extract_and_remove_top_headings(self, base_url: str, pstate: PageState):
         "Extract the H1 and H2 headings from the top of the page and remove them so they don't get processed"
         soup = pstate.soup
         table = soup.find("table")
-        # 69-202_1_Identification_of_Refugees incorrectly uses WD_SubjectLine class for non-heading text "Amerasian" in the body
+        # 69-202_1_Identification_of_Refugees incorrectly uses WD_SubjectLine for non-heading text "Amerasian" in the body
         # so only look at the first few rows
+        # In Pickle_Program.htm, the H1 and H2 are in the first row (they're typically in the second row)
         top_rows = table.find_all("tr", recursive=False, limit=3)
 
         self.__handle_priority_special_cases(base_url, pstate, table)
-        self.logger.info("post-priority: %s:", pstate)
+        # self.logger.info("post-priority: %s:", pstate)
         if pstate.h1 and pstate.h2:
             return
 
@@ -294,28 +288,46 @@ class LA_PolicyManualSpider(scrapy.Spider):
             return
 
         top_rows = table.find_all("tr", recursive=False, limit=3)
+
+        def set_headings_by_order(paras):
+            for para in paras:
+                md_text = to_markdown(para.get_text(), base_url)
+                if not md_text.strip():
+                    continue
+                if not pstate.h1:
+                    pstate.h1 = md_text
+                    para.decompose()
+                elif not pstate.h2:
+                    pstate.h2 = md_text
+                    para.decompose()
+            self.logger.warning("Missing H1,H2 headings; used first likely paragraphs: %s", pstate)
+
+        # In Organ_Transplant_AntiRejection_Medications.htm the H1 and H2 are in the ignored first row
+        # Plus Organ_Transplant_AntiRejection_Medications doesn't use WD_ProgramName and WD_SubjectLine
+        if pstate.filename=='Organ_Transplant_AntiRejection_Medications.htm':
+            paras = top_rows[0].find("td").find_all("p", recursive=False)
+            set_headings_by_order(paras)
+            return
+
         # 40-181_Processing_Redeterminations doesn't use WD_ProgramName or WD_SubjectLine
         # Residency_for_Out-of-State_Students doesn't use WD_SubjectLine
-        for para in self._unlinked_nonempty_paragraphs(top_rows):
-            md_text = to_markdown(para.get_text(), base_url)
-            if not pstate.h1:
-                pstate.h1 = md_text
-                para.decompose()
-            elif not pstate.h2:
-                pstate.h2 = md_text
-                para.decompose()
+        # At this point, we can't rely on class annotations, just parse based on order of paragraphs
+        # H1 and H2 headings are typically in the second row, so exclude the first row to avoid parsing the page header
+        set_headings_by_order(self.__nonempty_paragraphs(top_rows[1:]))
 
-        for para in self._unlinked_nonempty_paragraphs(top_rows):
+        for para in self.__nonempty_paragraphs(top_rows[1:]):
             self.logger.error("Extra heading: %r", para.get_text())
 
         if self.DEBUGGING and (not pstate.h1 or not pstate.h2):
-            # Requery in case paragraphs were removed
-            heading_rows = top_rows[1:]
-            h1s = list(self._h1_paragraphs(heading_rows))
-            h2s = list(self._h2_paragraphs(heading_rows))
-            other_ps = list(self._unlinked_nonempty_paragraphs(top_rows))
-            print([para.get_text() for para in self._unlinked_nonempty_paragraphs(top_rows)])
-            pdb.set_trace()
+            ...
+        #     # Requery in case paragraphs were removed
+        #     heading_rows = top_rows[1:]
+        #     h1s = list(self._h1_paragraphs(heading_rows))
+        #     h2s = list(self._h2_paragraphs(heading_rows))
+        #     other_ps = list(self.__nonempty_paragraphs(top_rows))
+        #     print([para.get_text() for para in self.__nonempty_paragraphs(top_rows)])
+        #     print([para.get_text() for para in paras])
+        #     pdb.set_trace()
 
     def __old_get_headings(self, row: Selector, base_url: str, page_state: PageState):
         tds = row.xpath("./td")
@@ -428,8 +440,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
     def __check_h2(self, page_state: PageState):
         assert page_state.h2
         if (
-            not page_state.title_diff_logged
-            and (page_state.h2.casefold() not in page_state.title.casefold())
+            (page_state.h2.casefold() not in page_state.title.casefold())
             and (page_state.title.casefold() not in page_state.h2.casefold())
             and (
                 count_diffs(page_state.h2.casefold(), page_state.title.casefold())
@@ -437,7 +448,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 > 0.7
             )
         ):
-            page_state.title_diff_logged = True
             if page_state.filename in [
                 "SSI_SSP_COLA.htm",
                 "ABLE_and_CalABLE_Accounts_in_the_CalFresh_Program.htm",
