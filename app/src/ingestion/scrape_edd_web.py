@@ -15,10 +15,10 @@ if "SCRAPY_PROJECT" not in os.environ:
     # The alternative to this is to set the `default` project in scrapy.cfg and run:
     # `scrapy crawl edd_spider -o edd_scrapings.json` instead of this script.
     # This script is useful for postprocessing the json output.
-    os.environ["SCRAPY_PROJECT"] = "edd"
+    os.environ["SCRAPY_PROJECT"] = "scrapy_dst"
 
 OUTPUT_JSON = "edd_scrapings.json"
-
+SPIDER_NAME = "edd_spider"
 
 def run_edd_spider() -> None:
     settings = get_project_settings()
@@ -33,7 +33,7 @@ def run_edd_spider() -> None:
         os.remove(OUTPUT_JSON)
 
     # 'edd_spider' is the name of one of the spiders (see EddSpider.name)
-    process.crawl("edd_spider")
+    process.crawl(SPIDER_NAME)
     process.start()  # the script will block here until the crawling is finished
 
     logger.info("Scraping results saved to %s", OUTPUT_JSON)
@@ -79,3 +79,7 @@ def main() -> None:
 
     if "DEBUG_SCRAPINGS" in os.environ:
         postprocess_json()
+
+if __name__ == "__main__":
+    run_edd_spider()
+    postprocess_json()

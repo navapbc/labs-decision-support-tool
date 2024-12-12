@@ -8,6 +8,7 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import Selector, SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
 
+# FIXME: move this to settings.py if possible
 app_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 print("Adding app folder to sys.path:", app_folder)
 sys.path.append(app_folder)

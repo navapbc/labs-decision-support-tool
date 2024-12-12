@@ -14,9 +14,8 @@ logger = logging.getLogger(__name__)
 # and the folder that Scrapy uses to find Python files.
 if "SCRAPY_PROJECT" not in os.environ:
     # This script is useful for postprocessing the json output.
-    os.environ["SCRAPY_PROJECT"] = "edd"
+    os.environ["SCRAPY_PROJECT"] = "scrapy_dst"
 
-SPIDER_NAME = "la_policy_spider"
 OUTPUT_JSON = "la_policy_scrapings.json"
 
 
@@ -49,7 +48,7 @@ def postprocess_json() -> None:
             formatted_json.write(json.dumps(data, indent=4))
             logger.info("Formatted JSON saved to pretty-%s", OUTPUT_JSON)
 
-
+SPIDER_NAME = "la_policy_spider"
 def main() -> None:
     # Scrapy expects the scrapy.cfg file to be in the current working directory
     os.chdir("src/ingestion")
