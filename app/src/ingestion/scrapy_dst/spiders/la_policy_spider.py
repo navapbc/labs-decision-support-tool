@@ -338,17 +338,17 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         if len(tds) == 1:
             # Near the bottom of 69-202_1_Identification_of_Refugees.htm, the row becomes 1-column
-            # because there's a div-wrapped table. The row should have been part of the previous row.
+            # because there's a div-wrapped table. The row should have been part of the previous row
             # Treat the single-column row as if it was the second column of a 2-column row
             return self._parse_section(base_url, tds[0].get(), heading_level=3)
 
         if len(tds) == 8:
-            # At the bottom of 63-900_Emergency_CalFresh_Assistance.htm is an extra table with 8 columns;
+            # Bottom of 63-900_Emergency_CalFresh_Assistance.htm is an extra table with 8 columns;
             # just render it as a table
             return to_markdown(row.get(), base_url)
 
         if len(tds) == 3:
-            # In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm, there's an erroneous empty 3rd column
+            # 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm has erroneous 3rd column
             # Remove the empty 3rd column and let the next block handle the 2-column rows
             if not tds[2].xpath(".//text()").get().strip():
                 tds[2].remove()
