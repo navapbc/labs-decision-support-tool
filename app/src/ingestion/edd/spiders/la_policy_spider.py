@@ -74,32 +74,30 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
             name = "".join([t for t in li.xpath(".//text()").getall() if t.strip()])
             page_url = f"{self.common_url_prefix}/{href}"
-            self.logger.info("URL for %r => %s", name, page_url)
+            self.logger.debug("URL for %r => %s", name, page_url)
             yield response.follow(page_url, callback=self.parse_page)
 
     # Return value is saved to filename set by scrape_la_policy.OUTPUT_JSON
     def parse_page(self, response: HtmlResponse) -> dict[str, str]:
-        self.logger.info("parse_page %s", response.url)
-        extractions = {"url": response.url}
+        url = response.url
+        title = response.xpath("head/title/text()").get().strip()
+        self.logger.info("parse_page %s", url)
+        extractions = {"url": url}
 
-        # Save html file for debugging
-        filepath = "./scraped/" + response.url.removeprefix(
-            self.common_url_prefix + "/mergedProjects/"
-        )
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-
-        # 40-101_19_Extended_Foster_Care_Benefits.htm and 1210_Overview.htm have extra '\r\n' and missing spaces
-        # `replace("\r\n", "")` fixes this :shrug:
+        # 40-101_19_Extended_Foster_Care_Benefits.htm and 1210_Overview.htm have extra '\r\n' and
+        # results in missing spaces in markdown text -- `replace("\r\n", "")` fixes this :shrug:
         soup = BeautifulSoup(response.body.decode("utf-8").replace("\r\n", ""), "html.parser")
+        response = None  # Don't use old response
         smoothed_html = soup.prettify()
-        if self.DEBUGGING:
+
+        filepath = "./scraped/" + url.removeprefix(self.common_url_prefix + "/mergedProjects/")
+        debug_scrapings = bool(os.environ.get("DEBUG_SCRAPINGS", False))
+        if debug_scrapings:
+            # Save html file for debugging
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
             Path(filepath).write_text(smoothed_html, encoding="utf-8")
 
-        page_state = PageState(
-            filename=response.url.split("/")[-1],
-            title=response.xpath("head/title/text()").get().strip(),
-            soup=soup,
-        )
+        page_state = PageState(filename=url.split("/")[-1], title=title, soup=soup)
         self._extract_and_remove_top_headings(self.common_url_prefix, page_state)
         assert page_state.h1 and page_state.h2, f"Expecting H1 and H2 to be set: {page_state}"
         self.__check_h2(page_state)
@@ -128,9 +126,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 md_list.append(self._convert_to_headings_and_sections(row, self.common_url_prefix))
 
         markdown = "\n\n".join(md_list)
-        Path(f"{filepath}.md").write_text(
-            f"[Source page]({response.url})\n\n" + markdown, encoding="utf-8"
-        )
+        if debug_scrapings:
+            Path(f"{filepath}.md").write_text(
+                f"[Source page]({url})\n\n" + markdown, encoding="utf-8"
+            )
 
         # check that h1 is one of the 10 programs
         if page_state.h1.casefold() not in self.KNOWN_PROGRAMS:
@@ -286,7 +285,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         top_rows = table.find_all("tr", recursive=False, limit=3)
 
-        def set_headings_by_order(paras: list[Tag]) -> None:
+        def set_headings_by_order(paras: Sequence[Tag]) -> None:
             for para in paras:
                 md_text = to_markdown(para.get_text(), base_url)
                 if not md_text.strip():
