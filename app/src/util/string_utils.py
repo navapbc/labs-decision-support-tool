@@ -30,9 +30,12 @@ def basic_ascii(text: str) -> str:
     return "".join([c if 32 <= ord(c) <= 126 else " " for c in text])
 
 
-def count_diffs(str1: str, str2: str) -> int:
+def count_diffs(str1: str, str2: str) -> tuple[int, int]:
     diffs = difflib.ndiff(str1, str2)
-    return sum(1 for line in diffs if line.startswith("+ ") or line.startswith("- "))
+    return (
+        sum(1 for line in diffs if line.startswith("+ ")),
+        sum(1 for line in diffs if line.startswith("- ")),
+    )
 
 
 # Set the nltk.data.path to a relative directory so that it's available in the Docker environment
