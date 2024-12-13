@@ -30,7 +30,7 @@ def basic_ascii(text: str) -> str:
     return "".join([c if 32 <= ord(c) <= 126 else " " for c in text])
 
 
-def count_diffs(str1, str2):
+def count_diffs(str1: str, str2: str) -> int:
     diffs = difflib.ndiff(str1, str2)
     return sum(1 for line in diffs if line.startswith("+ ") or line.startswith("- "))
 

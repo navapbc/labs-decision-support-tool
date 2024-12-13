@@ -27,8 +27,9 @@ install(p.chromium)
 browser = p.chromium.launch()
 
 page = browser.new_page()
-base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
-page.goto(f"{base_url}/index.htm")
+page.goto(
+    "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/index.htm"
+)
 
 # Wait for the page to load by ensuring an element (e.g., an <h2> tag) is present
 page.wait_for_load_state("domcontentloaded")
@@ -39,23 +40,23 @@ page.wait_for_selector('li.book:has-text("Programs")')
 # Helper functions for debugging
 
 
-def html(locator: Locator):
+def html(locator: Locator) -> str:
     return locator.evaluate("el => el.outerHTML")
 
 
-def write_html(filename="la_policy.html"):
+def write_html(filename: str = "la_policy.html") -> None:
     with open(filename, "w", encoding="utf-8") as file:
         file.write(page.content())
     print("Saved to", filename)
 
 
-def expand_nav_item(li: Locator):
+def expand_nav_item(li: Locator) -> None:
     data_itemkey = li.get_attribute("data-itemkey")
     print(f"Clicking {li.text_content()!r} ({data_itemkey})")
     li.click()
-    page.locator(f'ul.child[data-child={data_itemkey!r}]:not(hidden)').wait_for()
+    page.locator(f"ul.child[data-child={data_itemkey!r}]:not(hidden)").wait_for()
 
-    children = page.locator(f'ul.child[data-child={data_itemkey!r}] > li.book')
+    children = page.locator(f"ul.child[data-child={data_itemkey!r}] > li.book")
     print(f"  has {children.count()} children:", children.all_text_contents())
     for index in range(children.count()):
         child = children.nth(index)
@@ -67,6 +68,7 @@ def expand_nav_item(li: Locator):
 
 
 try:
+    # Start with "Programs"-related pages TODO: Add more pages later if needed
     programs = page.locator('li.book:has-text("Programs")')
     expand_nav_item(programs)
     write_html("la_policy_nav_bar.html")

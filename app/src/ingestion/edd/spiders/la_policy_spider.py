@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import chain
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Iterable, Optional, Sequence
 
 import scrapy
 from bs4 import BeautifulSoup
@@ -52,14 +52,30 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 
-    def parse(self, response: HtmlResponse):
+    DEBUGGING = False
+
+    def start_requests(self) -> Iterable[scrapy.Request]:
+        if self.DEBUGGING:
+            urls = [
+                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Organ_Transplant_AntiRejection_Medications/Organ_Transplant_AntiRejection_Medications.htm",
+            ]
+            for url in urls:
+                yield scrapy.Request(url=url, callback=self.parse_page)
+        else:
+            for url in self.start_urls:
+                yield scrapy.Request(url=url, callback=self.parse)
+
+    def parse(self, response: HtmlResponse) -> Iterable[scrapy.Request]:
         lis = response.css("li.book")
-        for li in lis[2:]:  # Start with "Programs"-related pages. TODO: Remove slice
+        for li in lis:
             href = li.css("a::attr(href)").get()
-            if href != "#":
-                page_url = f"{self.common_url_prefix}/{href}"
-                # self.logger.info("Found page URL %s", page_url)
-                yield response.follow(page_url, callback=self.parse_page)
+            if href == "#":
+                continue
+
+            name = "".join([t for t in li.xpath(".//text()").getall() if t.strip()])
+            page_url = f"{self.common_url_prefix}/{href}"
+            self.logger.info("URL for %r => %s", name, page_url)
+            yield response.follow(page_url, callback=self.parse_page)
 
     # Return value is saved to filename set by scrape_la_policy.OUTPUT_JSON
     def parse_page(self, response: HtmlResponse) -> dict[str, str]:
@@ -101,8 +117,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         # Convert table rows into headings and associated sections
         md_list: list[str] = [
-            self._convert_to_headings_and_sections(row, self.common_url_prefix, page_state)
-            for row in rows
+            self._convert_to_headings_and_sections(row, self.common_url_prefix) for row in rows
         ]
 
         # 63-407_Work_Registration.htm has a table that is outside the main top-level table
@@ -110,9 +125,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             self.logger.info("Scraping extra table after main table: %s")
             rows = table.xpath("./tr")
             for row in rows:
-                md_list.append(
-                    self._convert_to_headings_and_sections(row, self.common_url_prefix, page_state)
-                )
+                md_list.append(self._convert_to_headings_and_sections(row, self.common_url_prefix))
 
         markdown = "\n\n".join(md_list)
         Path(f"{filepath}.md").write_text(
@@ -152,36 +165,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
         ]
     }
 
-    DEBUGGING = False
-    # DEBUGGING = True
-
-    def start_requests(self):
-        if self.DEBUGGING:
-            urls = [
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/40-101_19_Extended_Foster_Care_Benefits/40-101_19_Extended_Foster_Care_Benefits.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Child%20Care/Child_Care/1210_Overview/1210_Overview.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/ABLE_and_CalABLE_Accounts_in_the_CalFresh_Program/ABLE_and_CalABLE_Accounts_in_the_CalFresh_Program.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Residency_for_Out-of-State_Students/Residency_for_Out-of-State_Students.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/69-202_1_Identification_of_Refugees/69-202_1_Identification_of_Refugees.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_552_Moving_Assistance_Program/44-211_552_Moving_Assistance_Program.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/SSI_SSP_COLA/SSI_SSP_COLA.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GROW/GROW/4_1_1__GROW_Transition_Age_Youth_Employment_Program/4_1_1__GROW_Transition_Age_Youth_Employment_Program.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GROW/GROW/3_5_Transportation/3_5_Transportation.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-181_Processing_Redeterminations/40-181_Processing_Redeterminations.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GROW/GROW/2_3_Comprehensive_Intake_and_Employability_Assessment/2_3_Comprehensive_Intake_and_Employability_Assessment.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-203_Household_Composition_and_Living_Arrangement/44-203_Household_Composition_and_Living_Arrangement.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GROW/GROW/4_4_Work_Restrictions_Limitations/4_4_Work_Restrictions_Limitations.htm",
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Pickle_Program/Pickle_Program.htm",
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Organ_Transplant_AntiRejection_Medications/Organ_Transplant_AntiRejection_Medications.htm",
-            ]
-            for url in urls:
-                yield scrapy.Request(url=url, callback=self.parse_page)
-        else:
-            for url in self.start_urls:
-                yield scrapy.Request(url=url, callback=self.parse)
-
     def _h1_paragraphs(self, rows: list[Tag]) -> Sequence[Tag]:
-        # return self.__flatten_and_filter_out_blank(*[row.find_all("p", class_="WD_ProgramName") for row in rows])
         return self.__flatten_and_filter_out_blank(
             rows, lambda row: row.find_all("p", class_="WD_ProgramName")
         )
@@ -193,9 +177,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     def _nonempty_paragraphs(self, rows: list[Tag]) -> Sequence[Tag]:
         return self.__flatten_and_filter_out_blank(rows, lambda row: row.find_all("p"))
-        # [p.get_text() for ps in [row.find_all("p") for row in top_rows] for p in ps]
 
-    def __flatten_and_filter_out_blank(self, rows, resultset_generator):
+    def __flatten_and_filter_out_blank(
+        self, rows: list[Tag], resultset_generator: Callable
+    ) -> Sequence[Tag]:
         return [
             para
             for para in chain(*[resultset_generator(row) for row in rows])
@@ -209,7 +194,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             if span.parent.get_text().strip()
         ]
 
-    def _extract_and_remove_top_headings(self, base_url: str, pstate: PageState):
+    def _extract_and_remove_top_headings(self, base_url: str, pstate: PageState) -> None:
         "Extract the H1 and H2 headings from the top of the page and remove them so they don't get processed"
         soup = pstate.soup
         table = soup.find("table")
@@ -253,7 +238,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
         if self.DEBUGGING and (not pstate.h1 or not pstate.h2):
             pdb.set_trace()
 
-    def __handle_priority_special_cases(self, base_url: str, pstate: PageState, table: Tag):
+    def __handle_priority_special_cases(self, base_url: str, pstate: PageState, table: Tag) -> None:
         "Needs to be handled before parsing the typical headings"
         top_rows = table.find_all("tr", recursive=False, limit=3)
 
@@ -291,7 +276,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             return True
         return False
 
-    def __handle_special_cases(self, base_url: str, pstate: PageState, table: Tag):
+    def __handle_special_cases(self, base_url: str, pstate: PageState, table: Tag) -> None:
         # The following handles atypical pages
 
         if pstate.filename == "2_3_Comprehensive_Intake_and_Employability_Assessment.htm":
@@ -301,7 +286,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         top_rows = table.find_all("tr", recursive=False, limit=3)
 
-        def set_headings_by_order(paras):
+        def set_headings_by_order(paras: list[Tag]) -> None:
             for para in paras:
                 md_text = to_markdown(para.get_text(), base_url)
                 if not md_text.strip():
@@ -330,7 +315,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
         for para in self._nonempty_paragraphs(top_rows[1:]):
             self.logger.error("Extra heading: %r", para.get_text())
 
-    def __check_h2(self, page_state: PageState):
+    def __check_h2(self, page_state: PageState) -> None:
         assert page_state.h2
         if (
             (page_state.h2.casefold() not in page_state.title.casefold())
@@ -352,9 +337,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             if not page_state.h2[0].isdigit() and len(page_state.h2) > 100:
                 self.logger.warning("H2 heading may not be a heading: %s", page_state.h2)
 
-    def _convert_to_headings_and_sections(
-        self, row: Selector, base_url: str, page_state: PageState
-    ) -> str:
+    def _convert_to_headings_and_sections(self, row: Selector, base_url: str) -> str:
         # TODO: Record sentences and ensure they exist in the output markdown
         tds = row.xpath("./td")
 
@@ -406,7 +389,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
         return " ".join(raw_texts)
         # return " ".join([text.strip() for text in raw_texts if text.strip()])
 
-    def _parse_section(self, base_url, html: str, heading_level: int) -> str:
+    def _parse_section(self, base_url: str, html: str, heading_level: int) -> str:
         # Remove extraneous whitespace to simplify parsing
         min_html = "".join(line.strip() for line in html.split("\n"))  # .replace("\r\n", "\n")
         soup = BeautifulSoup(min_html, "html.parser")
@@ -424,7 +407,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
         section_md = re.sub(r"\n\n \n\n", "\n\n", section_md)
         return section_md
 
-    def __fix_body(self, heading_level: int, soup, body: Tag | NavigableString):
+    def __fix_body(
+        self, heading_level: int, soup: BeautifulSoup, body: Tag | NavigableString
+    ) -> None:
         "Convert any tags so they can be appropriately converted to markdown"
         state = ScrapingState(soup)
         # Iterate over a copy of body.contents since we may modify the contents
@@ -457,7 +442,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 raise NotImplementedError(f"Unexpected {child.name}: {child}")
 
     # FIXME: replace state with container for current_list and new_tag Callable
-    def __convert_any_paragraph_lists(self, state: ScrapingState, para: Tag):
+    def __convert_any_paragraph_lists(self, state: ScrapingState, para: Tag) -> None:
         if "class" not in para.attrs:
             return
 
@@ -575,7 +560,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
         return False
 
     # FIXME: replace state arg with new_tag Callable
-    def _convert_table_to_sections(self, state: ScrapingState, table: Tag, heading_level: int):
+    def _convert_table_to_sections(
+        self, state: ScrapingState, table: Tag, heading_level: int
+    ) -> None:
         rows = table.find_all("tr", recursive=False)
 
         # Use first row as table headings if all cells are bold
