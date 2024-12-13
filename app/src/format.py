@@ -134,15 +134,13 @@ def build_accordions(
     remapped_citations = remap_citation_ids(subsections, raw_response)
 
     citations_html = ""
-    list_of_accordion_ids = []
+    map_of_accordion_ids = {}
     for document, cited_subsections in _group_by_document(remapped_citations).items():
         _accordion_id += 1
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
         citation_numbers = [citation.id for citation in cited_subsections]
-        list_of_accordion_ids.append(
-            {"citation_numbers": citation_numbers, "accordion_id": _accordion_id}
-        )
+        map_of_accordion_ids[_accordion_id] = citation_numbers
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -162,7 +160,7 @@ def build_accordions(
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a list in response_with_citations
     response_with_citations = to_html(
-        _add_citation_links(raw_response, remapped_citations, config, list_of_accordion_ids)
+        _add_citation_links(raw_response, remapped_citations, config, map_of_accordion_ids)
     )
     if citations_html:
         return (
@@ -368,10 +366,10 @@ def reify_citations(
     response: str,
     subsections: Sequence[Subsection],
     config: FormattingConfig,
-    list_of_accordion_ids: list[dict] | None,
+    map_of_accordion_ids: dict | None,
 ) -> str:
     remapped_citations = remap_citation_ids(subsections, response)
-    return _add_citation_links(response, remapped_citations, config, list_of_accordion_ids)
+    return _add_citation_links(response, remapped_citations, config, map_of_accordion_ids)
 
 
 _footnote_id = random.randint(0, 1000000)
@@ -383,7 +381,7 @@ def _add_citation_links(
     response: str,
     remapped_citations: dict[str, Subsection],
     config: FormattingConfig,
-    list_of_accordion_ids: list[dict] | None,
+    map_of_accordion_ids: dict | None,
 ) -> str:
     global _footnote_id
     _footnote_id += 1
@@ -392,10 +390,9 @@ def _add_citation_links(
     # Replace (citation-<index>) with the appropriate citation
 
     def find_accordion_id(citation_num: str) -> str | None:
-        if list_of_accordion_ids:
-            for accordion_item in list_of_accordion_ids:
-                if citation_num in accordion_item["citation_numbers"]:
-                    return accordion_item["accordion_id"]
+        for key, value in map_of_accordion_ids.items():
+            if citation_num in value:
+                return key
         return None
 
     def replace_citation(match: Match) -> str:
@@ -410,7 +407,7 @@ def _add_citation_links(
         chunk = remapped_citations[citation_id].chunk
         link = config.get_superscript_link(chunk)
         matched_accordion_num = find_accordion_id(remapped_citations[citation_id].id)
-        citation = f"<sup><a class='accordion_item' data-id=a-{matched_accordion_num}>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
+        citation = f"<sup><a class='accordion_item' data-id='a-{matched_accordion_num}' style='cursor:pointer'>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
 
         global _footnote_index
         _footnote_index += 1
