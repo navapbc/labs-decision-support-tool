@@ -1,5 +1,6 @@
 import json
 
+
 def save_user_friendly_markdown(filename: str) -> None:
     with open(filename, "r", encoding="utf-8") as raw_json:
         data = json.load(raw_json)
@@ -29,11 +30,13 @@ def save_user_friendly_markdown(filename: str) -> None:
 OUTPUT_JSON = "edd_scrapings.json"
 SPIDER_NAME = "edd_spider"
 
+
 def main() -> None:
     import os
+
     from .scrapy_runner import run
 
-    debug=bool(os.environ["DEBUG_SCRAPINGS"])
+    debug = bool(os.environ.get("DEBUG_SCRAPINGS", False))
     run(SPIDER_NAME, OUTPUT_JSON, debug)
 
     if debug:
@@ -42,4 +45,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     from scrapy_runner import run
+
     run(SPIDER_NAME, OUTPUT_JSON, debug=True)
