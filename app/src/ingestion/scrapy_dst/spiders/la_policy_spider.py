@@ -49,12 +49,12 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 
-    DEBUGGING = False
+    DEBUGGING = os.environ.get("DEBUGGING", False)
 
     def start_requests(self) -> Iterable[scrapy.Request]:
         if self.DEBUGGING:
             urls = [
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_39_CalFresh_COLA/63-504_39_CalFresh_COLA.htm",
+                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-431_2_Noncitizen_Status/42-431_2_Noncitizen_Status.htm",
             ]
             for url in urls:
                 yield scrapy.Request(url=url, callback=self.parse_page)
@@ -85,7 +85,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         # 40-101_19_Extended_Foster_Care_Benefits.htm and 1210_Overview.htm have extra '\r\n' and
         # results in missing spaces in markdown text -- `replace("\r\n", "")` fixes this :shrug:
-        soup = BeautifulSoup(response.body.decode("utf-8").replace("\r\n", ""), "html.parser")
+        soup = BeautifulSoup(response.body.decode("utf-8").replace("\r\n", " "), "html.parser")
         response = None  # Don't use old response
         smoothed_html = soup.prettify()
 
@@ -213,6 +213,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         self.__handle_special_cases(base_url, pstate, table)
 
+        if self.DEBUGGING and (not pstate.h1 or not pstate.h2):
+            pdb.set_trace()
+
     def __handle_h1_special_cases(self, base_url: str, pstate: PageState, table: Tag) -> None:
         "Set H1 heading for special cases"
         # Only include the first 3 rows of the table
@@ -299,7 +302,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
         "Tries to log a warning if the H2 heading is significantly different from the page title"
         assert page_state.h2
         diffs = count_diffs(page_state.h2.casefold(), page_state.title.casefold())
-        self.logger.info("DIFF: %s", diffs)
         if diffs[0] / len(page_state.h2) > 0.5:
             if page_state.filename in [
                 "SSI_SSP_COLA.htm",
@@ -367,7 +369,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     def __section_to_markdown(self, base_url: str, html: str, heading_level: int) -> str:
         "Convert a table cell `td` (representing a heading section) into a markdown text"
-        soup = BeautifulSoup(html, "html.parser")
+        # To simplify parsing, remove extraneous whitespace to reduce BeautifulSoup elements
+        # Join with a space; otherwise spaces around <span> text disappear causing words to join in markdown
+        min_html = " ".join(line.strip() for line in html.split("\n"))
+        soup = BeautifulSoup(min_html, "html.parser")
 
         # Use soup to convert the table cell into a div
         body = soup.find("td")
@@ -384,7 +389,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
     ) -> None:
         "Convert any tags so they can be appropriately converted to markdown"
         state = HtmlListState(soup)
-        # Iterate over a copy of body.contents since we may modify the contents
+        # Iterate over a copy of body.contents since we may modify body.contents
         for child in list(body.contents):
             if (
                 child.name == "div"
@@ -394,18 +399,20 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # For divs with only one child, ignore the div and process the child
                 # Occurs for a table that is wrapped in a div for centering
                 child = child.contents[0]
+                # pdb.set_trace()
 
             if child.name == "p":
-                # Handle lists presented as paragraphs
+                # Convert lists presented as paragraphs into actual lists
                 self.__convert_any_paragraph_lists(state, child)
             elif child.name == "div":
                 # 63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm has a div wrapping several <p> tags
-                self.logger.info("Atypical div wrapping several tags: %s", child)
+                self.logger.info("div wrapping %i tags: %s", len(child.contents), child)
+                # Recursively process the div's children
                 self.__fix_body(heading_level, soup, child)
             elif child.name == "table":
                 # TODO: Check table for 1-col rows and convert them to headings -- see _convert_table_to_sections
-                if self._should_convert_table(child):
-                    self._convert_table_to_sections(soup, child, heading_level)
+                if self.__should_convert_table(child):
+                    self.__convert_table_to_sections(soup, child, heading_level)
             elif isinstance(child, NavigableString) or child.name in ["ul", "ol"]:
                 pass
             elif child.get_text().strip() == "":
@@ -472,16 +479,16 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # Use `ul` tag rather than `ol` since we'll leave the explicit numbering as is
                 state.current_list = state.soup.new_tag("ul")
 
-    def _should_convert_table(self, table: Tag) -> bool:
-        if self._table_uses_rowspan(table):
+    def __should_convert_table(self, table: Tag) -> bool:
+        if self.__table_uses_rowspan(table):
             row_text = [td.text for td in table.find("tr").find_all(["td", "th"], recursive=False)]
-            # 69-202_1_Identification_of_Refugees.htm
+            # TODO: handle non-default rowspans in 69-202_1_Identification_of_Refugees.htm
             self.logger.info("Leaving table using rowspan as is: %s", row_text)
             return False
 
         # TODO: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
         # many occurrences of a list inappropriately wrapped in a table and is rendered as a curious table in markdown
-        col_sizes = self._size_of_columns(table)
+        col_sizes = self.__size_of_columns(table)
         if len(col_sizes) == 2:
             # First column is usually short and often acts as a heading
             # If the second column is long, then convert the table
@@ -498,15 +505,14 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         return False
 
-    def _table_uses_rowspan(self, table: Tag) -> bool:
+    def __table_uses_rowspan(self, table: Tag) -> bool:
         for row in table.find_all("tr", recursive=False):
             for cell in row.find_all(["td", "th"], recursive=False):
                 if "rowspan" in cell.attrs and int(cell.attrs["rowspan"]) > 1:
-                    # TODO: handle non-default rowspans in 69-202_1_Identification_of_Refugees.htm
                     return True
         return False
 
-    def _size_of_columns(self, table: Tag) -> Sequence[int]:
+    def __size_of_columns(self, table: Tag) -> Sequence[int]:
         col_lengths: defaultdict[int, int] = defaultdict(int)
         for row in table.find_all("tr", recursive=False):
             for i, cell in enumerate(row.find_all(["td", "th"], recursive=False)):
@@ -516,21 +522,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 col_lengths[i] = max(col_lengths[i], size)
         return tuple(col_lengths.values())
 
-    def __table_row_is_heading(self, first_row_cols: Sequence[Tag]) -> bool:
-        # If all columns are bold, then treat the row as a heading
-        if all(cell.find_all("b") for cell in first_row_cols):
-            return True
-
-        # If all columns have a p tag using WD_TableHeading class, then treat the row as a heading
-        if [
-            cell
-            for cell in first_row_cols
-            if cell.find_all("p", attrs={"class": "WD_TableHeading"})
-        ] == first_row_cols:
-            return True
-        return False
-
-    def _convert_table_to_sections(
+    def __convert_table_to_sections(
         self, soup: BeautifulSoup, table: Tag, heading_level: int
     ) -> None:
         rows = table.find_all("tr", recursive=False)
@@ -557,21 +549,29 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 row.name = "div"
                 cols[0].name = f"h{heading_level + 2}"
                 if table_headings[0]:
-                    heading_span = soup.new_tag("span")
-                    heading_span.string = f"{table_headings[0]}: "
-                    cols[0].contents[0].insert_before(heading_span)
+                    cols[0].contents[0].insert_before(f"{table_headings[0]}: ")
                 cols[1].name = "div"
                 self.__fix_body(heading_level, soup, cols[1])
                 if table_headings[1]:
-                    heading_span = soup.new_tag("span")
-                    heading_span.string = f"{table_headings[1]}: "
-                    cols[1].contents[0].insert_before(heading_span)
+                    cols[1].contents[0].insert_before(f"{table_headings[0]}: ")
             else:
-                self.logger.warning(
-                    "Unexpected number of columns in table row: %s: %r", len(cols), cols.strings
-                )
+                raise NotImplementedError(f"Too many columns in row: {len(cols)}: {cols.strings}")
 
         table.name = "div"
+
+    def __table_row_is_heading(self, first_row_cols: Sequence[Tag]) -> bool:
+        # If all columns are bold, then treat the row as a heading
+        if all(cell.find_all("b") for cell in first_row_cols):
+            return True
+
+        # If all columns have a p tag using WD_TableHeading class, then treat the row as a heading
+        if [
+            cell
+            for cell in first_row_cols
+            if cell.find_all("p", attrs={"class": "WD_TableHeading"})
+        ] == first_row_cols:
+            return True
+        return False
 
 
 # endregion
@@ -633,7 +633,7 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
 
     # Workaround 1: https://stackoverflow.com/questions/4270742/how-to-remove-whitespace-in-beautifulsoup
     def _prep_html_1(html: str) -> str:
-        # Need to join with a space; otherwise spaces around <span> text disappear in markdown
+        # Join with a space; otherwise spaces around <span> text disappear causing words to join in markdown
         html = " ".join(line.strip() for line in html.split("\n"))
         return html  # re.sub(r"  +", " ", html)
 
