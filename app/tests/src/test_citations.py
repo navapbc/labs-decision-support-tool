@@ -15,8 +15,14 @@ from tests.src.db.models.factories import ChunkFactory
 
 @pytest.fixture
 def chunks():
-    chunks = ChunkFactory.build_batch(2)
+    chunks = ChunkFactory.build_batch(3)
     chunks[0].content = "This is the first chunk.\n\nWith two subsections"
+    chunks[2].content = (
+        "Chunk with a table\n\n"
+        "| Header 1 | Header 2 |\n"
+        "| -------- | -------- |\n"
+        "| Value 1  | Value 2  |"
+    )
     return chunks
 
 
@@ -53,7 +59,19 @@ Content: With two subsections
 Citation: citation-3
 Document name: {chunks[1].document.name}
 Headings: {" > ".join(chunks[1].headings)}
-Content: {chunks[1].content}"""
+Content: {chunks[1].content}
+
+Citation: citation-4
+Document name: {chunks[2].document.name}
+Headings: {" > ".join(chunks[2].headings)}
+Content: Chunk with a table
+
+Citation: citation-5
+Document name: {chunks[2].document.name}
+Headings: {" > ".join(chunks[2].headings)}
+Content: | Header 1 | Header 2 |
+| -------- | -------- |
+| Value 1  | Value 2  |"""
     )
 
 
@@ -67,6 +85,12 @@ def test_get_context(chunks, subsections):
     assert subsections[2].id == "citation-3"
     assert subsections[2].chunk == chunks[1]
     assert subsections[2].text == chunks[1].content
+    assert subsections[3].text == "Chunk with a table"
+    assert subsections[4].text == (
+        "| Header 1 | Header 2 |\n"  #
+        "| -------- | -------- |\n"  #
+        "| Value 1  | Value 2  |"
+    )
 
 
 def test_remap_citation_ids(subsections):

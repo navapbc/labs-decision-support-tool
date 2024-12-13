@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Optional, Sequence
 
 from asyncer import asyncify
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from literalai import AsyncLiteralClient
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -125,6 +125,53 @@ async def engines(user_id: str) -> list[str]:
         literalai().message(content=str(response), type="system_message", parent_id=request_msg.id)
 
     return response
+
+
+class FeedbackRequest(BaseModel):
+    session_id: str
+    is_positive: bool
+    response_id: str
+    comment: Optional[str] = None
+    user_id: Optional[str] = None
+
+
+@router.post("/feedback")
+async def feedback(
+    request: FeedbackRequest,
+) -> Response:
+    """Endpoint for creating feedback for a chatbot response message
+
+    Args:
+        request (FeedbackRequest):
+        session_id: the session id, used if user_id is None
+        is_positive: if chatbot response answer is helpful or not
+        response_id: the response_id of the chatbot response
+        comment: user comment for the feedback
+        user_id: the user's id
+
+    Returns:
+        FeedbackResponse
+        user_id: the user's id
+        value: 1 if is_positive was "true" and 0 if is_positive was "false"
+        step_id: ID of the step associated with the score
+        comment: the initial user comment for the feedback
+    """
+    user_session_id = request.user_id if request.user_id else request.session_id
+
+    session = await _get_user_session(user_session_id)
+    # API endpoint to send feedback https://docs.literalai.com/guides/logs#add-a-score
+    response = await literalai().api.create_score(
+        step_id=request.response_id,
+        name=session.user.user_id,
+        type="HUMAN",
+        value=1 if request.is_positive else 0,
+        comment=request.comment,
+    )
+    logger.info("Received feedback value: %s for response_id %s", response.value, response.step_id)
+    if response.comment:
+        logger.info("Received comment: %s", response.comment)
+
+    return Response(status_code=200)
 
 
 # endregion
