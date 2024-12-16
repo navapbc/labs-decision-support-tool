@@ -7,6 +7,7 @@ from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
 from src.format import (
     BemFormattingConfig,
     FormattingConfig,
+    _add_citation_links,
     _add_ellipses_for_bem,
     _format_guru_to_accordion_html,
     _get_breadcrumb_html,
@@ -14,7 +15,6 @@ from src.format import (
     format_bem_documents,
     format_guru_cards,
     reify_citations,
-    _add_citation_links,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
