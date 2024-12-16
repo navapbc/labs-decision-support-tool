@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence
 
 import scrapy
+import html2text
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 from markdownify import markdownify
@@ -54,7 +55,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
     def start_requests(self) -> Iterable[scrapy.Request]:
         if self.DEBUGGING:
             urls = [
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/40-101_19_Extended_Foster_Care_Benefits/40-101_19_Extended_Foster_Care_Benefits.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Child%20Care/Child_Care/1210_Overview/1210_Overview.htm",
                 "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-431_2_Noncitizen_Status/42-431_2_Noncitizen_Status.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_39_CalFresh_COLA/63-504_39_CalFresh_COLA.htm",
             ]
             for url in urls:
                 yield scrapy.Request(url=url, callback=self.parse_page)
@@ -81,13 +85,49 @@ class LA_PolicyManualSpider(scrapy.Spider):
         "Parses content pages; return value is add to file set by scrape_la_policy.OUTPUT_JSON"
         url = response.url
         title = response.xpath("head/title/text()").get().strip()
+        html = response.body.decode("utf-8")
         self.logger.info("parse_page %s", url)
 
-        # 40-101_19_Extended_Foster_Care_Benefits.htm and 1210_Overview.htm have extra '\r\n' and
+        # 40-101_19_Extended_Foster_Care_Benefits.htm and 1210_Overview.htm have extra '\r\n'
+        # (eg, 'GENERAL \r\n RELIEF') and
         # results in missing spaces in markdown text -- `replace("\r\n", "")` fixes this :shrug:
-        soup = BeautifulSoup(response.body.decode("utf-8").replace("\r\n", " "), "html.parser")
+        # soup = BeautifulSoup(response.body, "html.parser")
+        # soup = BeautifulSoup(html, "html.parser")
+        # soup = BeautifulSoup(response.body.decode("utf-8").replace("\r\n", " "), "html.parser")
+        # smoothed_html = soup.prettify()
+        # smoothed_html = html
+
+        MODE = "replace"
+
+        if MODE == "no_mod":
+            smoothed_html = html
+            soup = BeautifulSoup(smoothed_html, "html.parser")
+            # Unknown program: 'GENERAL \r\n RELIEF'
+            # First list item and paragraphs have prefix space; H5 headings have extra spaces; span tags are good
+        elif MODE == "no_mod_bytes":
+            smoothed_html = html
+            soup = BeautifulSoup(response.body, "html.parser")
+            # Unknown program: 'GENERAL \r\n RELIEF'
+            # First list item and paragraphs have prefix space; H5 headings have extra spaces; span tags are good
+        elif MODE == "replace":
+            replaced = response.body.decode("utf-8").replace("\r\n", " ")
+            smoothed_html = replaced
+            soup = BeautifulSoup(smoothed_html, "html.parser")
+            # First list item and paragraphs have prefix space; H5 headings have extra spaces; span tags are good
+        elif MODE == "replace_prettify":
+            replaced = response.body.decode("utf-8").replace("\r\n", " ")
+            soup = BeautifulSoup(replaced, "html.parser")
+            smoothed_html = soup.prettify()
+            soup = BeautifulSoup(smoothed_html, "html.parser")
+            # First list item and paragraphs have prefix space; extra spaces around span tags
+        elif MODE == "replace_prettify_partial":
+            replaced = response.body.decode("utf-8").replace("\r\n", " ")
+            soup = BeautifulSoup(replaced, "html.parser")
+            smoothed_html = soup.prettify()
+            # First list item and paragraphs have prefix space; H5 headings have extra spaces; span tags are good
+        else:
+            assert False
         response = None  # Don't use old response
-        smoothed_html = soup.prettify()
 
         filepath = "./scraped/" + url.removeprefix(self.common_url_prefix + "/mergedProjects/")
         debug_scrapings = bool(os.environ.get("DEBUG_SCRAPINGS", False))
@@ -95,13 +135,14 @@ class LA_PolicyManualSpider(scrapy.Spider):
             # Save html file for debugging
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
             Path(filepath).write_text(smoothed_html, encoding="utf-8")
+            # Path(filepath + f"-${MODE}.htm").write_text(smoothed_html, encoding="utf-8")
 
         page_state = PageState(filename=url.split("/")[-1], title=title, soup=soup)
         self._extract_and_remove_top_headings(self.common_url_prefix, page_state)
         assert page_state.h1 and page_state.h2, f"Expecting H1 and H2 to be set: {page_state}"
         self._check_h2_validity(page_state)
 
-        smoothed_response = Selector(text=soup.prettify())
+        smoothed_response = Selector(text=str(page_state.soup))
         tables = smoothed_response.xpath("body/table")
         rows = tables[0].xpath("./tr")
         header_md = to_markdown(rows[0].get())
@@ -113,7 +154,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
         rows = rows[1:]
 
         # Convert table rows into headings and associated sections
-        md_list: list[str] = [
+        md_list: list[str] = [f"# {page_state.h1}", f"## {page_state.h2}"]
+        md_list += [
             self._headings_and_sections_to_markdown(row, self.common_url_prefix) for row in rows
         ]
 
@@ -126,7 +168,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         # Check that h1 is one of the 10 programs
         if page_state.h1.casefold() not in self.KNOWN_PROGRAMS:
-            self.logger.error("Unknown program: %s", page_state.h1)
+            self.logger.error("Unknown program: %r", page_state.h1)
 
         # Fixes
         if page_state.filename == "44-211_2_Recurring_Special_Needs.htm":
@@ -134,9 +176,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
             page_state.title = page_state.h2
 
         # TODO: Ensure original sentences exist in the resulting markdown
-        markdown = "\n\n".join(md_list)
+        markdown = "\n\n".join([md for md in md_list if md.strip()])
         # Remove extraneous spaces
-        markdown = normalize_markdown(markdown)
+        # markdown = normalize_markdown(markdown)
         if debug_scrapings:
             Path(f"{filepath}.md").write_text(
                 f"[Source page]({url})\n\n" + markdown, encoding="utf-8"
@@ -380,8 +422,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
         self.__fix_body(heading_level, soup, body)
 
         # Convert underlined text to italics because markdownify doesn't support underlining
-        for tag in soup.find_all("u"):
-            tag.name = "i"
+        # for tag in soup.find_all("u"):
+        #     tag.name = "i"
+        # DEFINITELY NOT THIS, try different formatter: return to_markdown(soup.prettify(), base_url)
         return to_markdown(str(soup), base_url)
 
     def __fix_body(
@@ -490,6 +533,18 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # many occurrences of a list inappropriately wrapped in a table and is rendered as a curious table in markdown
         col_sizes = self.__size_of_columns(table)
         if len(col_sizes) == 2:
+            # # 42-431_2_Noncitizen_Status/42-431_2_Noncitizen_Status.htm
+            # # If the first column is just bullets and there are 2-columns, then don't convert the table
+            # col1_length = 0
+            # for row in table.find_all("tr", recursive=False):
+            #     col1 = row.find(["td", "th"], recursive=False)
+            #     size = len(col1.get_text().strip())
+            #     col1_length = max(col1_length, size)
+            # self.logger.info("================= First column length: %s", col1_length)
+            # # TODO: Convert to table with bullets in first column to list; be careful of nested tables acting as a sublist (42-431_2_Noncitizen_Status/42-431_2_Noncitizen_Status.htm)
+            # if col1_length == 1:
+            #     return False
+
             # First column is usually short and often acts as a heading
             # If the second column is long, then convert the table
             # TODO: Check for nested tables or lists in the second column
@@ -525,6 +580,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
     def __convert_table_to_sections(
         self, soup: BeautifulSoup, table: Tag, heading_level: int
     ) -> None:
+        # print(table)
         rows = table.find_all("tr", recursive=False)
 
         # Use first row as table headings if all cells are bold
@@ -542,22 +598,38 @@ class LA_PolicyManualSpider(scrapy.Spider):
             cols = row.find_all(["td", "th"], recursive=False)
             if len(cols) == 1:
                 # Treat single column rows as a heading
-                row.name = "div"
+                row.name = "span"
+                row.attrs = {}
                 cols[0].name = f"h{heading_level + 1}"
             elif len(cols) == 2:
                 # Treat 2-column rows as a subheading and its associated body
-                row.name = "div"
+                row.name = "span"
+                row.attrs = {}
+                # Use first column as a subheading
                 cols[0].name = f"h{heading_level + 2}"
+                cols[0].attrs = {}
+                for child in cols[0].contents:
+                    if child.name:
+                        child.name = "span"  # to prevent line break
                 if table_headings[0]:
+                    if cols[0].contents[0].name:
+                        cols[0].contents[0].name = "span"  # to prevent line break
                     cols[0].contents[0].insert_before(f"{table_headings[0]}: ")
+                # Use second column as the section text under the subheading
                 cols[1].name = "div"
+                cols[1].attrs = {}
                 self.__fix_body(heading_level, soup, cols[1])
                 if table_headings[1]:
-                    cols[1].contents[0].insert_before(f"{table_headings[0]}: ")
+                    if cols[1].contents[0].name:
+                        cols[1].contents[0].name = "span"  # to prevent line break
+                    cols[1].contents[0].insert_before(f"{table_headings[1]}: ")
+
             else:
                 raise NotImplementedError(f"Too many columns in row: {len(cols)}: {cols.strings}")
 
-        table.name = "div"
+        table.name = "span"
+        table.attrs = {}
+        # pdb.set_trace()
 
     def __table_row_is_heading(self, first_row_cols: Sequence[Tag]) -> bool:
         # If all columns are bold, then treat the row as a heading
@@ -645,24 +717,47 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
         text = re.sub("\1\1\1+", "\n\n", text)
         return re.sub("\1+ *", " ", text).strip()
 
-    prepped_html = _prep_html_1(html)
-    markdown = markdownify(
-        prepped_html,
-        heading_style="ATX",
-        escape_asterisks=False,
-        escape_underscores=False,
-        escape_misc=False,
-        sup_symbol="<sup>",
-        sub_symbol="<sub>",
-    )
+    prepped_html = html  # _prep_html_1(html)
+    # markdown = markdownify(
+    #     prepped_html,
+    #     heading_style="ATX",
+    #     escape_asterisks=False,
+    #     escape_underscores=False,
+    #     escape_misc=False,
+    #     sup_symbol="<sup>",
+    #     sub_symbol="<sub>",
+    # )
 
-    # Clean up markdown text: consolidate newlines; replace non-breaking spaces
-    markdown = re.sub(r"^ +\n", "\n", markdown, flags=re.MULTILINE)
-    markdown = re.sub(r"\n\n+", "\n\n", markdown)
-    markdown.replace("\u00A0", " ")
-    markdown = re.sub(r"  +", " ", markdown)
+    markdown = html_to_text(prepped_html, base_url)
 
-    if base_url:
-        # Replace non-absolute URLs with absolute URLs
-        markdown = string_utils.resolve_urls(base_url, markdown)
+    # Clean up markdown text: replace non-breaking spaces; consolidate newlines
+    # markdown = markdown.replace("\u00A0", " ")
+    # markdown = re.sub(r"^ +\n", "\n", markdown, flags=re.MULTILINE)
+    # markdown = re.sub(r"\n\n+", "\n\n", markdown)
+
+    # Remove headings with only a bullet, such as 42-431_2_Noncitizen_Status.htm
+    markdown = re.sub("^#####  ·\n\n", "- ", markdown, flags=re.MULTILINE)
+
     return markdown.strip()
+
+
+def html_to_text(html_text, url):
+    h = html2text.HTML2Text()
+
+    # Refer to https://github.com/Alir3z4/html2text/blob/master/docs/usage.md and html2text.config
+    # for options:
+    # 0 for no wrapping
+    h.body_width = 0
+    h.wrap_links = False
+    h.baseurl = url
+    # TODO: Enable and test, if this is desired
+    # h.skip_internal_links = False
+
+    # wrap 'pre' blocks with [code]...[/code] tags
+    h.mark_code = True
+    # Include the <sup> and <sub> tags
+    h.include_sup_sub = True
+
+    md_text = h.handle(html_text)
+
+    return md_text
