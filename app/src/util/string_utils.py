@@ -134,7 +134,7 @@ def resolve_urls(base_url: str, markdown: str) -> str:
     if not base_url.endswith("/"):
         base_url += "/"
     # Hint: Use https://regex101.com/ to create and test regex
-    markdown = re.sub(r"\]\((?!\/|\#|https?:\/\/)", rf"]({base_url}", markdown)
+    markdown = re.sub(r"\]\((?!\/|https?:\/\/)", rf"]({base_url}", markdown)
     return markdown
 
 
