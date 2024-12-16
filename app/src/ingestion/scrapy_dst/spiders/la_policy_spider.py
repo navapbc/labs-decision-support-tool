@@ -7,16 +7,13 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence
 
-import scrapy
 import html2text
+import scrapy
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
-from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.selector import Selector
 
-from src.ingestion.markdown_tree import normalize_markdown
-from src.util import string_utils
 from src.util.string_utils import count_diffs
 
 
