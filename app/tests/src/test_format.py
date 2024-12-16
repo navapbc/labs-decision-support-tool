@@ -3,20 +3,17 @@ import re
 from sqlalchemy import delete
 
 from src.citations import CitationFactory, split_into_subsections
-from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
+from src.db.models.document import Document
 from src.format import (
-    BemFormattingConfig,
     FormattingConfig,
-    _add_ellipses_for_bem,
     _format_guru_to_accordion_html,
     _get_breadcrumb_html,
     build_accordions,
-    format_bem_documents,
     format_guru_cards,
     reify_citations,
 )
 from src.retrieve import retrieve_with_scores
-from tests.src.db.models.factories import ChunkFactory, DocumentFactory
+from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_retrieve import _create_chunks
 
 
@@ -100,69 +97,10 @@ def test__format_guru_to_accordion_html(app_config, db_session, enable_factory_c
     assert "<p>Similarity Score: 0.92</p>" in html
 
 
-def test_format_bem_documents():
-    docs = DocumentFactory.build_batch(4)
-    for doc in docs:
-        doc.name += "BEM 123"
-
-    chunks_with_scores = [
-        # This document is ignored because below chunks_shown_min_score
-        ChunkWithScore(ChunkFactory.build(document=docs[0]), 0.90),
-        # This document is excluded because chunks_shown_max_num = 2,
-        # and it has the lowest score of the three documents with chunks over
-        # the chunks_shown_min_score threshold
-        ChunkWithScore(ChunkFactory.build(document=docs[1]), 0.92),
-        # This document is included because a chunk puts
-        # it over the chunks_shown_min_score threshold
-        ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.90),
-        ChunkWithScore(ChunkFactory.build(document=docs[2]), 0.93),
-        # This document is included, but only once
-        # And it will be displayed first because it has the highest score
-        ChunkWithScore(ChunkFactory.build(document=docs[3]), 0.94),
-        ChunkWithScore(ChunkFactory.build(document=docs[3]), 0.95),
-    ]
-
-    html = format_bem_documents(
-        chunks_shown_max_num=2,
-        chunks_shown_min_score=0.91,
-        chunks_with_scores=chunks_with_scores,
-        subsections=to_subsections(chunks_with_scores),
-        raw_response="",
-    )
-
-    assert docs[0].content not in html
-    assert docs[1].content not in html
-    assert docs[3].content in html
-    assert "Citation 2" in html
-    assert "Citation 3" not in html
-
-
-def test__add_ellipses():
-    one_chunk = Chunk(num_splits=0, split_index=0, content="This is the only chunk.")
-    assert _add_ellipses_for_bem(one_chunk) == "This is the only chunk."
-
-    first_chunk = Chunk(num_splits=3, split_index=0, content="This is the first chunk of 3.")
-    assert _add_ellipses_for_bem(first_chunk) == "This is the first chunk of 3. ..."
-
-    middle_chunk = Chunk(num_splits=3, split_index=2, content="This is a chunk in between.")
-    assert _add_ellipses_for_bem(middle_chunk) == "... This is a chunk in between. ..."
-
-    last_chunk = Chunk(num_splits=3, split_index=3, content="This is the last chunk.")
-    assert _add_ellipses_for_bem(last_chunk) == "... This is the last chunk."
-
-    multiple_ellipses = Chunk(
-        num_splits=3, split_index=0, content="This is a chunk with multiple ellipses......"
-    )
-    assert (
-        _add_ellipses_for_bem(multiple_ellipses)
-        == "This is a chunk with multiple ellipses...... ..."
-    )
-
-
-def test_build_accordions_for_bem(chunks_with_scores):
+def test_build_accordions(chunks_with_scores):
     subsections = to_subsections(chunks_with_scores)
 
-    config = BemFormattingConfig()
+    config = FormattingConfig()
     assert build_accordions(subsections, "", config) == "<div></div>"
     assert (
         build_accordions([], "Non-existant citation: (citation-0)", config)
@@ -174,8 +112,6 @@ def test_build_accordions_for_bem(chunks_with_scores):
         == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
     )
 
-    chunks_with_scores[0].chunk.document.name = "BEM 100: Intro"
-    chunks_with_scores[1].chunk.document.name = "BEM 101: Another"
     html = build_accordions(subsections, "Some real citations: (citation-1) (citation-2)", config)
     assert len(_unique_accordion_ids(html)) == 2
 
@@ -213,46 +149,3 @@ def test__get_breadcrumb_html():
     # Omit headings that match doc name
     headings = ["Doc name", "Heading 2"]
     assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 2</b></div>"
-
-
-def test__get_citation_link():
-    doc = DocumentFactory.build_batch(2)
-    chunk_list = ChunkFactory.build_batch(2)
-    doc[0].name = "BEM 234"
-    doc[1].source = "webpage 1"
-
-    chunk_list[0].document = doc[0]
-    chunk_list[0].page_number = 3
-
-    chunk_list[1].document = doc[1]
-    chunk_list[1].page_number = 3
-
-    bem_link = BemFormattingConfig().get_citation_link(
-        Subsection("1", chunk_list[0], "Subsection 1")
-    )
-
-    assert "Open document to page 3" in bem_link
-    assert "Source" not in bem_link
-
-    web_link = FormattingConfig().get_citation_link(Subsection("2", chunk_list[1], "Subsection 1"))
-    assert "page 3" not in web_link
-    assert "Source" in web_link
-
-
-def test_build_accordions(chunks_with_scores):
-    subsections = to_subsections(chunks_with_scores)
-
-    config = FormattingConfig()
-    assert build_accordions(subsections, "", config) == "<div></div>"
-    assert (
-        build_accordions([], "Non-existant citation: (citation-0)", config)
-        == "<div><p>Non-existant citation: </p></div>"
-    )
-
-    assert (
-        build_accordions([], "List intro sentence: \n- item 1\n- item 2", config)
-        == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
-    )
-
-    html = build_accordions(subsections, "Some real citations: (citation-1) (citation-2)", config)
-    assert len(_unique_accordion_ids(html)) == 2

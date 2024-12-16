@@ -47,7 +47,7 @@ class Styling:
 
 
 def extract_stylings(pdf: BinaryIO | PDFDocument) -> list[Styling]:
-    parser = OutlineAwarePdfParser(pdf, BemTagExtractor)
+    parser = OutlineAwarePdfParser(pdf, GenericTagExtractor)
     extracted_texts = parser.flatten_xml(parser.extract_xml())
 
     stylings: list[Styling] = []
@@ -319,15 +319,11 @@ class OutlineAwarePdfParser:
         return Phrase(text=child.data, bold=bolded)
 
 
-class BemTagExtractor(TagExtractor):
+class GenericTagExtractor(TagExtractor):
     """
-    This class will write XML to the specified outfp, and is customized for BEM PDF files:
+    This class will write XML to the specified outfp, and is customized for PDF files:
     - detects bold text
     - addresses Span tags that are not closed properly
-
-    Methods in this class are called by the PDFPageInterpreter as it reads the PDF.
-    This class is adapted from pdfminer.pdfdevice.TagExtractor used by
-        pdfminer.high_level.py:extract_text_to_fp(), which is used in pdf2txt.py.
     """
 
     def __init__(self, rsrcmgr: PDFResourceManager, outfp: BinaryIO, codec: str = "utf-8") -> None:
@@ -361,7 +357,6 @@ class BemTagExtractor(TagExtractor):
 
     def begin_tag(self, tag: PSLiteral, props: Optional[PDFStackT] = None) -> None:
         # Workaround for Span tags that are not closed properly
-        # (i.e., BEM 101.pdf, 105.pdf, 203.pdf, 225.pdf, 400.pdf)
         if self._stack and self._stack[-1].name == "Span":
             self._stack.pop(-1)
             self._write("</Span>")
