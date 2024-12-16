@@ -23,7 +23,7 @@ let observer = new MutationObserver(function (mutations, observer) {
     }
 });
 
-observer.observe(document.body, {
+observer.observe(document.getElementById("root"), {
     subtree: true,
     attributes: true
 });
