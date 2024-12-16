@@ -1,10 +1,20 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from chainlit.utils import mount_chainlit
 from src.app_config import app_config
 from src.healthcheck import healthcheck_router
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://dev-social-benefits-navigator--nava-chatbot-haucptvn.web.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(healthcheck_router)
 
 if app_config.enable_chat_api:
