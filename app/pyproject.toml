@@ -35,6 +35,7 @@ markdown = "^3.7"
 langchain-text-splitters = "^0.3.0"
 mistletoe = "^1.4.0"
 nutree = "^0.9.0"
+html2text = "^2024.2.26"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
