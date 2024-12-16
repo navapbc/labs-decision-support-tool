@@ -14,6 +14,7 @@ from src.format import (
     format_bem_documents,
     format_guru_cards,
     reify_citations,
+    _add_citation_links,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
@@ -198,7 +199,35 @@ def test_reify_citations():
             config,
             None,
         )
-        == "This is a citation <sup><a class='accordion_item' data-id=a-None>1</a>&nbsp;</sup> and another <sup><a class='accordion_item' data-id=a-None>2</a>&nbsp;</sup>."
+        == "This is a citation <sup><a class='accordion_item' data-id='a-None' style='cursor:pointer'>1</a>&nbsp;</sup> and another <sup><a class='accordion_item' data-id='a-None' style='cursor:pointer'>2</a>&nbsp;</sup>."
+    )
+
+
+def test_add_citation_links():
+    chunks = ChunkFactory.build_batch(3)
+
+    remapped_citations = {
+        "citation-1": Subsection(chunk=chunks[0], text=chunks[0].content, id="1"),
+        "citation-44": Subsection(chunk=chunks[1], text=chunks[1].content, id="3"),
+        "citation-3": Subsection(chunk=chunks[2], text=chunks[2].content, id="23"),
+    }
+
+    config = FormattingConfig()
+
+    assert (
+        _add_citation_links(
+            "This is a citation (citation-1). This is another value citation (citation-44). And another not found(citation-5).",
+            remapped_citations,
+            config,
+            {
+                "599299": ["1"],
+                "599300": ["2", "3"],
+                "599301": ["4"],
+                "599302": ["5"],
+                "599303": ["44"],
+            },
+        )
+        == "This is a citation <sup><a class='accordion_item' data-id='a-599299' style='cursor:pointer'>1</a>&nbsp;</sup>. This is another value citation <sup><a class='accordion_item' data-id='a-599300' style='cursor:pointer'>3</a>&nbsp;</sup>. And another not found."
     )
 
 
