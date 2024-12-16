@@ -23,7 +23,8 @@ let observer = new MutationObserver(function (mutations, observer) {
     }
 });
 
-observer.observe(document.body, {
+let steps = document.getElementsByClassName("step")
+observer.observe(steps, {
     subtree: true,
     attributes: true
 });
