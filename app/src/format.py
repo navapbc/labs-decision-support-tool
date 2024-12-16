@@ -73,7 +73,7 @@ def format_guru_cards(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations(raw_response, subsections, FormattingConfig(), None)
+    response_with_citations = reify_citations(raw_response, subsections, FormattingConfig(), {})
 
     cards_html = ""
     for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
@@ -246,9 +246,7 @@ def format_bem_documents(
     subsections: Sequence[Subsection],
     raw_response: str,
 ) -> str:
-    response_with_citations = reify_citations(
-        raw_response, subsections, BemFormattingConfig(), None
-    )
+    response_with_citations = reify_citations(raw_response, subsections, BemFormattingConfig(), {})
 
     documents = _get_bem_documents_to_show(
         chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
@@ -366,7 +364,7 @@ def reify_citations(
     response: str,
     subsections: Sequence[Subsection],
     config: FormattingConfig,
-    map_of_accordion_ids: dict | None,
+    map_of_accordion_ids: dict,
 ) -> str:
     remapped_citations = remap_citation_ids(subsections, response)
     return _add_citation_links(response, remapped_citations, config, map_of_accordion_ids)
@@ -381,7 +379,7 @@ def _add_citation_links(
     response: str,
     remapped_citations: dict[str, Subsection],
     config: FormattingConfig,
-    map_of_accordion_ids: dict | None,
+    map_of_accordion_ids: dict,
 ) -> str:
     global _footnote_id
     _footnote_id += 1
@@ -390,9 +388,10 @@ def _add_citation_links(
     # Replace (citation-<index>) with the appropriate citation
 
     def find_accordion_id(citation_num: str) -> str | None:
-        for key, value in map_of_accordion_ids.items():
-            if citation_num in value:
-                return key
+        if map_of_accordion_ids:
+            for key, value in map_of_accordion_ids.items():
+                if citation_num in value:
+                    return key
         return None
 
     def replace_citation(match: Match) -> str:
