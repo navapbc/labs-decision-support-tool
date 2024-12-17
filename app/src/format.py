@@ -388,14 +388,6 @@ def _add_citation_links(
     footnote_list = []
 
     # Replace (citation-<index>) with the appropriate citation
-
-    def find_accordion_id(citation_num: str) -> str | None:
-        return (
-            map_of_accordion_ids[citation_num]
-            if map_of_accordion_ids and citation_num in map_of_accordion_ids
-            else None
-        )
-
     def replace_citation(match: Match) -> str:
         citation_id = match.group(1)
         # Remove citation for chunks that don't exist alone
@@ -407,7 +399,13 @@ def _add_citation_links(
 
         chunk = remapped_citations[citation_id].chunk
         link = config.get_superscript_link(chunk)
-        matched_accordion_num = find_accordion_id(remapped_citations[citation_id].id)
+
+        matched_accordion_num = (
+            map_of_accordion_ids[remapped_citations[citation_id].id]
+            if map_of_accordion_ids and remapped_citations[citation_id].id in map_of_accordion_ids
+            else None
+        )
+
         citation = f"<sup><a class='accordion_item' data-id='a-{matched_accordion_num}' style='cursor:pointer'>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
 
         global _footnote_index
