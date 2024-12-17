@@ -73,7 +73,7 @@ custom_css = "https://cdnjs.cloudflare.com/ajax/libs/uswds/3.8.1/css/uswds.min.c
 
 # Specify a Javascript file that can be used to customize the user interface.
 # The Javascript file can be served from the public directory.
-custom_js = "https://cdnjs.cloudflare.com/ajax/libs/uswds/3.8.1/js/uswds.min.js"
+custom_js = "/public/custom_script.js"
 
 # Specify a custom font url.
 # custom_font = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap"

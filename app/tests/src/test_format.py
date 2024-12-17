@@ -7,6 +7,7 @@ from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
 from src.format import (
     BemFormattingConfig,
     FormattingConfig,
+    _add_citation_links,
     _add_ellipses_for_bem,
     _format_guru_to_accordion_html,
     _get_breadcrumb_html,
@@ -186,15 +187,48 @@ def test_reify_citations():
     subsections = split_into_subsections(chunks, factory=CitationFactory())
     config = FormattingConfig()
 
-    assert reify_citations("This is a citation (citation-0)", [], config) == "This is a citation "
+    assert (
+        reify_citations("This is a citation (citation-0)", [], config, None)
+        == "This is a citation "
+    )
 
     assert (
         reify_citations(
             f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
             subsections,
             config,
+            None,
         )
-        == "This is a citation <sup><a href='#'>1</a>&nbsp;</sup> and another <sup><a href='#'>2</a>&nbsp;</sup>."
+        == "This is a citation <sup><a class='accordion_item' data-id='a-None' style='cursor:pointer'>1</a>&nbsp;</sup> and another <sup><a class='accordion_item' data-id='a-None' style='cursor:pointer'>2</a>&nbsp;</sup>."
+    )
+
+
+def test_add_citation_links():
+    chunks = ChunkFactory.build_batch(3)
+
+    remapped_citations = {
+        "citation-1": Subsection(chunk=chunks[0], text=chunks[0].content, id="1"),
+        "citation-44": Subsection(chunk=chunks[1], text=chunks[1].content, id="3"),
+        "citation-3": Subsection(chunk=chunks[2], text=chunks[2].content, id="23"),
+    }
+
+    config = FormattingConfig()
+
+    assert (
+        _add_citation_links(
+            "This is a citation (citation-1). This is another value citation (citation-44). And another not found(citation-5).",
+            remapped_citations,
+            config,
+            {
+                "1": "599299",
+                "2": "599300",
+                "3": "599300",
+                "4": "599301",
+                "5": "599302",
+                "44": "599303",
+            },
+        )
+        == "This is a citation <sup><a class='accordion_item' data-id='a-599299' style='cursor:pointer'>1</a>&nbsp;</sup>. This is another value citation <sup><a class='accordion_item' data-id='a-599300' style='cursor:pointer'>3</a>&nbsp;</sup>. And another not found."
     )
 
 
