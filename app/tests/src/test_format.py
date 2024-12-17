@@ -220,11 +220,12 @@ def test_add_citation_links():
             remapped_citations,
             config,
             {
-                "599299": ["1"],
-                "599300": ["2", "3"],
-                "599301": ["4"],
-                "599302": ["5"],
-                "599303": ["44"],
+                "1": "599299",
+                "2": "599300",
+                "3": "599300",
+                "4": "599301",
+                "5": "599302",
+                "44": "599303",
             },
         )
         == "This is a citation <sup><a class='accordion_item' data-id='a-599299' style='cursor:pointer'>1</a>&nbsp;</sup>. This is another value citation <sup><a class='accordion_item' data-id='a-599300' style='cursor:pointer'>3</a>&nbsp;</sup>. And another not found."

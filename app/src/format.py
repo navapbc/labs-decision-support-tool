@@ -140,7 +140,9 @@ def build_accordions(
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
         citation_numbers = [citation.id for citation in cited_subsections]
-        map_of_accordion_ids[_accordion_id] = citation_numbers
+
+        for citation_number in citation_numbers:
+            map_of_accordion_ids[citation_number] = _accordion_id
         citations_html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
@@ -388,11 +390,11 @@ def _add_citation_links(
     # Replace (citation-<index>) with the appropriate citation
 
     def find_accordion_id(citation_num: str) -> str | None:
-        if map_of_accordion_ids:
-            for key, value in map_of_accordion_ids.items():
-                if citation_num in value:
-                    return key
-        return None
+        return (
+            map_of_accordion_ids[citation_num]
+            if map_of_accordion_ids and citation_num in map_of_accordion_ids
+            else None
+        )
 
     def replace_citation(match: Match) -> str:
         citation_id = match.group(1)
