@@ -103,7 +103,10 @@ def test_reify_citations():
     subsections = split_into_subsections(chunks, factory=CitationFactory())
     config = FormattingConfig()
 
-    assert reify_citations("This is a citation (citation-0)", [], config, None) == "This is a citation "
+    assert (
+        reify_citations("This is a citation (citation-0)", [], config, None)
+        == "This is a citation "
+    )
 
     result = reify_citations(
         f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
