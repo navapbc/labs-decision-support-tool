@@ -1,14 +1,23 @@
-from src.ingestion.pdf_elements import Heading
-from src.ingestion.pdf_stylings import Styling, extract_stylings
+from src.ingestion.pdf_elements import Heading, Styling
 
 
-def test_extract_styles():
-    with open("/app/tests/src/util/707.pdf", "rb") as fp:
-        _stylings = extract_stylings(fp)
+def test_styling_dataclass():
+    """Test the Styling data structure"""
+    styling = Styling(
+        text="test text",
+        pageno=1,
+        headings=[Heading(title="Test Heading", level=1, pageno=1)],
+        wider_text="test text in context",
+        bold=True
+    )
+    assert styling.text == "test text"
+    assert styling.pageno == 1
+    assert styling.headings[0].title == "Test Heading"
+    assert styling.wider_text == "test text in context"
+    assert styling.bold is True
 
-    assert _stylings == []
 
-
+# Used by test_pdf_postprocess.py
 all_expected_stylings = [
     Styling(
         text="CDC not eligible due to 6 month penalty period",
