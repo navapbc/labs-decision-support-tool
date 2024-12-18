@@ -10,6 +10,7 @@ from src.format import (
     _get_breadcrumb_html,
     format_guru_cards,
     reify_citations,
+    build_accordions,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory
@@ -139,3 +140,30 @@ def test__get_breadcrumb_html():
     # Omit headings that match doc name
     headings = ["Doc name", "Heading 2"]
     assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 2</b></div>"
+
+
+def test_build_accordions(chunks_with_scores):
+    subsections = to_subsections(chunks_with_scores)
+
+    config = FormattingConfig()
+    # Test empty response
+    assert build_accordions(subsections, "", config) == "<div></div>"
+
+    # Test non-existent citation
+    assert (
+        build_accordions([], "Non-existent citation: (citation-0)", config)
+        == "<div><p>Non-existent citation: </p></div>"
+    )
+
+    # Test markdown list formatting
+    assert (
+        build_accordions([], "List intro sentence: \n- item 1\n- item 2", config)
+        == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
+    )
+
+    # Test real citations
+    html = build_accordions(subsections, "Some real citations: (citation-1) (citation-2)", config)
+    assert len(_unique_accordion_ids(html)) == 2
+    assert "Source(s)" in html
+    assert "usa-accordion__button" in html
+    assert "usa-accordion__content" in html
