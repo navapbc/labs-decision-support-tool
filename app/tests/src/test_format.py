@@ -6,11 +6,6 @@ from src.citations import CitationFactory, split_into_subsections
 from src.db.models.document import Document
 from src.format import (
     FormattingConfig,
-<<<<<<< HEAD
-=======
-    _add_citation_links,
-    _add_ellipses_for_bem,
->>>>>>> f57c2e8 (feat: Citation footnotes open accordions (#155))
     _format_guru_to_accordion_html,
     _get_breadcrumb_html,
     build_accordions,

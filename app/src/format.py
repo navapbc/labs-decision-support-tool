@@ -211,26 +211,6 @@ def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> 
     return f"<div><b>{' → '.join(headings)}</b></div>"
 
 
-<<<<<<< HEAD
-=======
-# TODO: This is not called. Remove it?
-def format_bem_documents(
-    chunks_shown_max_num: int,
-    chunks_shown_min_score: float,
-    chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[Subsection],
-    raw_response: str,
-) -> str:
-    response_with_citations = reify_citations(raw_response, subsections, BemFormattingConfig(), {})
-
-    documents = _get_bem_documents_to_show(
-        chunks_shown_max_num, chunks_shown_min_score, list(chunks_with_scores)
-    )
-
-    return response_with_citations + _format_bem_to_accordion_group_html(documents)
-
-
->>>>>>> f57c2e8 (feat: Citation footnotes open accordions (#155))
 def _format_guru_to_accordion_html(document: Document, score: float) -> str:
     global _accordion_id
     _accordion_id += 1
