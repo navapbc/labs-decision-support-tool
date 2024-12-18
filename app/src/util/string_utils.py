@@ -1,3 +1,4 @@
+import difflib
 import logging
 import os
 import re
@@ -27,6 +28,14 @@ def join_list(joining_list: Optional[list], join_txt: str = "\n") -> str:
 def basic_ascii(text: str) -> str:
     # See https://www.ascii-code.com/
     return "".join([c if 32 <= ord(c) <= 126 else " " for c in text])
+
+
+def count_diffs(str1: str, str2: str) -> tuple[int, int]:
+    diffs = difflib.ndiff(str1, str2)
+    return (
+        sum(1 for line in diffs if line.startswith("+ ")),
+        sum(1 for line in diffs if line.startswith("- ")),
+    )
 
 
 # Set the nltk.data.path to a relative directory so that it's available in the Docker environment
@@ -124,6 +133,7 @@ def resolve_urls(base_url: str, markdown: str) -> str:
     # Insert the base URL of the web page before the link
     if not base_url.endswith("/"):
         base_url += "/"
+    # Hint: Use https://regex101.com/ to create and test regex
     markdown = re.sub(r"\]\((?!\/|https?:\/\/)", rf"]({base_url}", markdown)
     return markdown
 

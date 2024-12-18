@@ -35,6 +35,7 @@ markdown = "^3.7"
 langchain-text-splitters = "^0.3.0"
 mistletoe = "^1.4.0"
 nutree = "^0.9.0"
+html2text = "^2024.2.26"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
@@ -72,6 +73,7 @@ ingest-policy-pdfs = "src.ingest_policy_pdfs:main"
 ingest-edd-web = "src.ingest_edd_web:main"
 scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 ingest-imagine-la = "src.ingestion.imagine_la.ingest:main"
+scrape-la-policy = "src.ingestion.scrape_la_policy:main"
 
 [tool.black]
 line-length = 100
