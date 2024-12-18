@@ -1,17 +1,7 @@
 import re
 
-from sqlalchemy import delete
-
 from src.citations import CitationFactory, split_into_subsections
-from src.db.models.document import Document
-from src.format import (
-    FormattingConfig,
-    _format_guru_to_accordion_html,
-    _get_breadcrumb_html,
-    build_accordions,
-    format_guru_cards,
-    reify_citations,
-)
+from src.format import FormattingConfig, _get_breadcrumb_html, build_accordions, reify_citations
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_retrieve import _create_chunks
@@ -30,71 +20,6 @@ def _unique_accordion_ids(html):
 
 def to_subsections(chunks_with_scores):
     return split_into_subsections([c.chunk for c in chunks_with_scores], factory=CitationFactory())
-
-
-def test_format_guru_cards_with_score(monkeypatch, app_config, db_session, enable_factory_create):
-    db_session.execute(delete(Document))
-
-    chunks_with_scores = _get_chunks_with_scores()
-    subsections = to_subsections(chunks_with_scores)
-
-    html = format_guru_cards(
-        chunks_shown_max_num=2,
-        chunks_shown_min_score=0.0,
-        chunks_with_scores=chunks_with_scores,
-        subsections=subsections,
-        raw_response="",
-    )
-    assert len(_unique_accordion_ids(html)) == len(chunks_with_scores)
-    assert "Related Guru cards" in html
-    assert chunks_with_scores[0].chunk.document.name in html
-    assert chunks_with_scores[0].chunk.document.content in html
-    assert chunks_with_scores[1].chunk.document.name in html
-    assert chunks_with_scores[1].chunk.document.content in html
-    assert "Similarity Score" in html
-
-    # Check that a second call doesn't re-use the IDs
-    next_html = format_guru_cards(
-        chunks_shown_max_num=2,
-        chunks_shown_min_score=0.0,
-        chunks_with_scores=chunks_with_scores,
-        subsections=subsections,
-        raw_response="",
-    )
-    assert len(_unique_accordion_ids(html + next_html)) == 2 * len(chunks_with_scores)
-
-
-def test_format_guru_cards_given_chunks_shown_max_num(chunks_with_scores):
-    html = format_guru_cards(
-        chunks_shown_max_num=2,
-        chunks_shown_min_score=0.8,
-        chunks_with_scores=chunks_with_scores,
-        subsections=to_subsections(chunks_with_scores),
-        raw_response="",
-    )
-    assert len(_unique_accordion_ids(html)) == 2
-
-
-def test_format_guru_cards_given_chunks_shown_max_num_and_min_score(chunks_with_scores):
-    html = format_guru_cards(
-        chunks_shown_max_num=2,
-        chunks_shown_min_score=0.91,
-        chunks_with_scores=chunks_with_scores,
-        subsections=to_subsections(chunks_with_scores),
-        raw_response="",
-    )
-    assert len(_unique_accordion_ids(html)) == 1
-
-
-def test__format_guru_to_accordion_html(app_config, db_session, enable_factory_create):
-    db_session.execute(delete(Document))
-    chunks_with_scores = _get_chunks_with_scores()
-    document = chunks_with_scores[0].chunk.document
-    score = 0.92
-    html = _format_guru_to_accordion_html(document=document, score=score)
-    assert document.name in html
-    assert document.content in html
-    assert "<p>Similarity Score: 0.92</p>" in html
 
 
 def test_reify_citations():
