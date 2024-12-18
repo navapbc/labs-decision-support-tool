@@ -8,7 +8,7 @@ def test_styling_dataclass():
         pageno=1,
         headings=[Heading(title="Test Heading", level=1, pageno=1)],
         wider_text="test text in context",
-        bold=True
+        bold=True,
     )
     assert styling.text == "test text"
     assert styling.pageno == 1

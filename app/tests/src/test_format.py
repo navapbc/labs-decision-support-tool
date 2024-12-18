@@ -8,9 +8,9 @@ from src.format import (
     FormattingConfig,
     _format_guru_to_accordion_html,
     _get_breadcrumb_html,
+    build_accordions,
     format_guru_cards,
     reify_citations,
-    build_accordions,
 )
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory
@@ -103,16 +103,13 @@ def test_reify_citations():
     subsections = split_into_subsections(chunks, factory=CitationFactory())
     config = FormattingConfig()
 
-    assert (
-        reify_citations("This is a citation (citation-0)", [], config, None)
-        == "This is a citation "
-    )
+    assert reify_citations("This is a citation (citation-0)", [], config, None) == "This is a citation "
 
     result = reify_citations(
         f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
         subsections,
         config,
-        None
+        None,
     )
 
     # Check that citations were added
