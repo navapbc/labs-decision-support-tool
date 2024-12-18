@@ -1,4 +1,4 @@
-# Scrapy settings for edd project
+# Scrapy settings for scrapy_dst project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -7,16 +7,20 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = "EDD.CA.Gov Bot"
+BOT_NAME = "DST Bot"
 
-SPIDER_MODULES = ["edd.spiders"]
-NEWSPIDER_MODULE = "edd.spiders"
+SPIDER_MODULES = ["scrapy_dst.spiders"]
+# where to create new spiders using the genspider command
+NEWSPIDER_MODULE = "scrapy_dst.spiders"
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0"
 
 LOG_LEVEL = "INFO"
 DEPTH_STATS_VERBOSE = True
+
+# the maximum number of errors to receive before closing the spider
+# CLOSESPIDER_ERRORCOUNT = 1
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
@@ -47,13 +51,13 @@ ROBOTSTXT_OBEY = True
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 # SPIDER_MIDDLEWARES = {
-#    "edd.middlewares.EddSpiderMiddleware": 543,
+#    "scrapy_dst.middlewares.EddSpiderMiddleware": 543,
 # }
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-    #    "edd.middlewares.EddDownloaderMiddleware": 543,
+    #    "scrapy_dst.middlewares.EddDownloaderMiddleware": 543,
     # see https://www.quora.com/Can-you-make-Scrapy-keep-all-the-HTML-it-downloads
     # To make Scrapy keep all the HTML it downloads, you can use the HttpCompressionMiddleware and set the COMPRESS_RESPONSE setting to False in your Scrapy project.
     # Scrapy will now keep the full HTML content of the downloaded pages in your project's data files (i.e., under ingestion/.scrapy/).
@@ -74,7 +78,7 @@ HTTPCACHE_DIR = "httpcache"
 # HTTPCACHE_IGNORE_HTTP_CODES = []
 # Based on https://doc.scrapy.org/en/latest/topics/downloader-middleware.html#module-scrapy.downloadermiddlewares.httpcache
 # and https://stackoverflow.com/questions/51432471/how-to-set-same-cache-folder-for-different-spiders-now-scrapy-creates-subfolder
-HTTPCACHE_STORAGE = "edd.cache.FolderBasedFSCacheStorage"
+HTTPCACHE_STORAGE = "scrapy_dst.cache.FolderBasedFSCacheStorage"
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
@@ -85,7 +89,7 @@ HTTPCACHE_STORAGE = "edd.cache.FolderBasedFSCacheStorage"
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 # ITEM_PIPELINES = {
-#    "edd.pipelines.EddPipeline": 300,
+#    "scrapy_dst.pipelines.EddPipeline": 300,
 # }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
