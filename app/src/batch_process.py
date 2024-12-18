@@ -49,7 +49,7 @@ def _process_question(question: str, engine: ChatEngineInterface) -> dict[str, s
     for subsection in final_result.subsections:
         citation_key = "citation_" + subsection.id
         formatted_headings = (
-            " > ".join(subsection.chunk.headings) if subsection.chunk.headings else ""
+            " > ".join(subsection.text_headings) if subsection.text_headings else ""
         )
         result_table |= {
             citation_key + "_name": subsection.chunk.document.name,

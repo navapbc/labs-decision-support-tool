@@ -1,5 +1,8 @@
+import pytest
+
 from src.util.string_utils import (
     headings_as_markdown,
+    parse_heading_markdown,
     remove_links,
     resolve_urls,
     split_list,
@@ -93,6 +96,13 @@ def test_headings_as_markdown():
         headings_as_markdown(["Heading 1", "Heading 2", "Heading 3"])
         == "# Heading 1\n## Heading 2\n### Heading 3"
     )
+
+
+def test_parse_heading_markdown():
+    assert parse_heading_markdown("# Heading at level 1") == (1, "Heading at level 1")
+    assert parse_heading_markdown("### Heading at level 3") == (3, "Heading at level 3")
+    with pytest.raises(ValueError):
+        assert parse_heading_markdown("Non-heading text")
 
 
 def test_remove_links():

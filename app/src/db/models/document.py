@@ -1,5 +1,5 @@
 import logging
-from typing import NamedTuple
+from typing import NamedTuple, Optional, Sequence
 from uuid import UUID
 
 import numpy as np
@@ -80,8 +80,20 @@ class DocumentWithMaxScore(NamedTuple):
     max_score: float
 
 
-class Subsection(NamedTuple):
-    id: str
-    chunk: Chunk
-    # specific substring within chunk.text
-    text: str
+class Subsection:
+
+    def __init__(
+        self, id: str, chunk: Chunk, text: str, text_headings: Optional[Sequence[str]] = None
+    ) -> None:
+        # user-friendly, consecutive identifier for the subsection starting from 1
+        self.id = id
+        # chunk containing the subsection
+        self.chunk = chunk
+        # specific substring within chunk.text
+        self.text = text
+        # parent headings for the text
+        self.text_headings = text_headings or chunk.headings or []
+        # text_headings should start with the chunk headings
+        assert all(
+            self.text_headings[i] == heading for i, heading in enumerate(chunk.headings or [])
+        ), f"Text headings {self.text_headings!r} do not start with chunk headings {chunk.headings!r}"

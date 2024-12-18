@@ -147,7 +147,7 @@ class Citation(BaseModel):
     source_name: str
     page_number: Optional[int] | None
     uri: Optional[str] | None
-    headings: Optional[list[str]] | None
+    headings: Sequence[str]
     citation_text: str
 
     @staticmethod
@@ -159,7 +159,7 @@ class Citation(BaseModel):
             source_name=chunk.document.name,
             page_number=chunk.page_number,
             uri=chunk.document.source,
-            headings=chunk.headings,
+            headings=subsection.text_headings,
             citation_text=subsection.text,
         )
 
