@@ -9,7 +9,7 @@ from src.citations import (
     split_into_subsections,
 )
 from src.db.models.document import ChunkWithScore, Subsection
-from src.format import BemFormattingConfig, FormattingConfig, format_guru_cards
+from src.format import FormattingConfig, format_guru_cards
 from src.generate import PROMPT, ChatHistory, MessageAttributes, analyze_message, generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
@@ -168,21 +168,6 @@ class GuruSnapEngine(BaseEngine):
     name: str = "Guru SNAP Chat Engine"
     datasets = ["guru-snap"]
     formatter = staticmethod(format_guru_cards)
-
-
-class BridgesEligibilityManualEngine(BaseEngine):
-    retrieval_k: int = 10
-    retrieval_k_min_score: float = -1
-
-    # Note: currently not used
-    chunks_shown_min_score: float = -1
-    chunks_shown_max_num: int = 8
-
-    engine_id: str = "bridges-eligibility-manual"
-    name: str = "Michigan Bridges Eligibility Manual Chat Engine"
-    datasets = ["bridges-eligibility-manual"]
-
-    formatting_config = BemFormattingConfig()
 
 
 class CaEddWebEngine(BaseEngine):

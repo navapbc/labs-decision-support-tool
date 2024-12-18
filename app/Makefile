@@ -251,12 +251,6 @@ endif
 ingest-guru-cards: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-guru-cards "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
 
-ingest-policy-pdfs: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-policy-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
-
-ingest-bem-pdfs: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-bem-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
-
 ingest-edd-web: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-edd-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
 

@@ -1,7 +1,6 @@
 import logging
 
-from src.ingestion.pdf_elements import EnrichedText, TextType
-from src.ingestion.pdf_stylings import Styling
+from src.ingestion.pdf_elements import EnrichedText, Styling, TextType
 from src.util.string_utils import basic_ascii
 
 logger = logging.getLogger(__name__)
