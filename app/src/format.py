@@ -3,7 +3,7 @@ import random
 import re
 from collections import defaultdict
 from itertools import groupby
-from typing import Match, OrderedDict, Sequence
+from typing import Match, Sequence
 
 import markdown
 
@@ -63,34 +63,6 @@ def format_guru_cards(
         )
 
     return response_with_citations + "<h3>Related Guru cards</h3>" + cards_html
-
-
-def _get_documents_to_show(
-    chunks_shown_max_num: int,
-    chunks_shown_min_score: float,
-    chunks_with_scores: list[ChunkWithScore],
-) -> OrderedDict[Document, list[ChunkWithScore]]:
-    chunks_with_scores.sort(key=lambda c: c.score, reverse=True)
-
-    # Build a dictionary of documents with their associated chunks,
-    # Ordered by the highest score of each chunk associated with the document
-    documents: OrderedDict[Document, list[ChunkWithScore]] = OrderedDict()
-    for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
-        document = chunk_with_score.chunk.document
-        if chunk_with_score.score < chunks_shown_min_score:
-            logger.info(
-                "Skipping chunk with score less than %f: %s",
-                chunks_shown_min_score,
-                chunk_with_score.chunk.document.name,
-            )
-            continue
-
-        if document in documents:
-            documents[document].append(chunk_with_score)
-        else:
-            documents[document] = [chunk_with_score]
-
-    return documents
 
 
 def to_html(text: str) -> str:

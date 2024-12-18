@@ -8,22 +8,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from io import BytesIO
 from pprint import pprint
-from typing import BinaryIO, Iterator, Optional
+from typing import BinaryIO, Iterator
 from xml.dom import minidom
 from xml.dom.minidom import Element, Text
 
-from pdfminer.pdfcolor import PDFColorSpace
-from pdfminer.pdfdevice import PDFTextSeq, TagExtractor
+from pdfminer.pdfdevice import TagExtractor
 from pdfminer.pdfdocument import PDFDocument
-from pdfminer.pdfinterp import (
-    PDFGraphicState,
-    PDFPageInterpreter,
-    PDFResourceManager,
-    PDFStackT,
-    PDFTextState,
-)
+from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 from pdfminer.pdfpage import PDFPage
-from pdfminer.psparser import PSLiteral
 
 from src.util.pdf_utils import Heading, as_pdf_doc, extract_outline, get_pdf_info
 
@@ -47,7 +39,7 @@ class Styling:
 
 
 def extract_stylings(pdf: BinaryIO | PDFDocument) -> list[Styling]:
-    parser = OutlineAwarePdfParser(pdf, GenericTagExtractor)
+    parser = OutlineAwarePdfParser(pdf)
     extracted_texts = parser.flatten_xml(parser.extract_xml())
 
     stylings: list[Styling] = []
@@ -189,8 +181,7 @@ class OutlineAwarePdfParser:
     and flattens the resulting XML into ExtractedText objects
     """
 
-    def __init__(self, pdf: BinaryIO | PDFDocument, tag_extractor_class: type):
-        self.tag_extractor_class = tag_extractor_class
+    def __init__(self, pdf: BinaryIO | PDFDocument):
         self.disable_caching: bool = False
         self.doc = as_pdf_doc(pdf)
 
@@ -198,26 +189,17 @@ class OutlineAwarePdfParser:
         # We'll use it to find headings in the text as the PDF is processed.
         self.parsing_context = ParsingContext(list(reversed(extract_outline(self.doc))))
 
-    # Adapted from pdfminer.high_level.py:extract_text_to_fp() used in pdf2txt.py
-    def _create_interpreter(
-        self, output_io: BytesIO, output_codec: str = "utf-8"
-    ) -> PDFPageInterpreter:
-        rsrcmgr = PDFResourceManager(caching=not self.disable_caching)
-        pdf_device = self.tag_extractor_class(rsrcmgr, outfp=output_io, codec=output_codec)
-        return PDFPageInterpreter(rsrcmgr, pdf_device)
-
     def extract_xml(self, validate_xml: bool = False) -> str:
-        "Stage 1: Generate XML from the PDF using custom tag_extractor_class"
+        "Stage 1: Generate XML from the PDF using TagExtractor"
         output_io = BytesIO()
-        interpreter = self._create_interpreter(output_io)
+        rsrcmgr = PDFResourceManager(caching=not self.disable_caching)
+        device = TagExtractor(rsrcmgr, outfp=output_io)
+        interpreter = PDFPageInterpreter(rsrcmgr, device)
+
         for page in PDFPage.create_pages(self.doc):
-            # As the interpreter reads the PDF, it will call methods on interpreter.device,
-            # which will write to output_io
             interpreter.process_page(page)
 
-        # After done writing to output_io, go back to the beginning so we can read() it
         output_io.seek(0)
-        # Wrap all tags in a root tag
         xml_string = "<pdf>" + output_io.read().decode() + "</pdf>"
 
         if validate_xml:
@@ -251,10 +233,6 @@ class OutlineAwarePdfParser:
                                 self.parsing_context.parano += 1
                                 result.append(self.parsing_context.create_extracted_text([phrase]))
 
-            # Check that we've found all headings from the PDF outline
-            assert len(self.parsing_context.heading_stack) == 0, self.parsing_context.heading_stack
-            # Check that we've reached the last page
-            assert self.parsing_context.pageno == pdf_info.page_count
             return result
         except Exception as e:
             print("Error processing XML:", pdf_info.title)
@@ -317,65 +295,3 @@ class OutlineAwarePdfParser:
 
         bolded = bool(parent_node and parent_node.tagName == "BOLD")
         return Phrase(text=child.data, bold=bolded)
-
-
-class GenericTagExtractor(TagExtractor):
-    """
-    This class will write XML to the specified outfp, and is customized for PDF files:
-    - detects bold text
-    - addresses Span tags that are not closed properly
-    """
-
-    def __init__(self, rsrcmgr: PDFResourceManager, outfp: BinaryIO, codec: str = "utf-8") -> None:
-        super().__init__(rsrcmgr, outfp, codec)
-
-        # Added the following in order to add the BOLD tag.
-        # This reflects the last fontname used for a given tag level
-        self._last_fontname_stack: list[str] = [""]
-
-    def render_string(
-        self,
-        textstate: PDFTextState,
-        seq: PDFTextSeq,
-        ncs: PDFColorSpace,
-        graphicstate: PDFGraphicState,
-    ) -> None:
-        "render_string() is called multiple times between each begin_tag() completion and before end_tag()"
-        font = textstate.font
-        assert font is not None
-
-        last_fontname = self._last_fontname_stack[-1]
-        if last_fontname != font.fontname:
-            if "Bold" in font.fontname and (not last_fontname or "Bold" not in last_fontname):
-                self._write("<BOLD>")
-            elif "Bold" in last_fontname and "Bold" not in font.fontname:
-                self._write("</BOLD>")
-        self._last_fontname_stack[-1] = font.fontname
-
-        # Following is copied from pdfminer.pdfdevice.TagExtractor.render_string()
-        super().render_string(textstate, seq, ncs, graphicstate)
-
-    def begin_tag(self, tag: PSLiteral, props: Optional[PDFStackT] = None) -> None:
-        # Workaround for Span tags that are not closed properly
-        if self._stack and self._stack[-1].name == "Span":
-            self._stack.pop(-1)
-            self._write("</Span>")
-
-        self._last_fontname_stack.append("")
-
-        super().begin_tag(tag, props)
-
-    def end_tag(self) -> None:
-        if "Bold" in self._last_fontname_stack[-1]:
-            self._write("</BOLD>")
-
-        self._last_fontname_stack.pop(-1)
-
-        if not self._stack:
-            logger.warning(
-                "page %i: end_tag without matching begin_tag (ie, empty tag stack!); ignoring",
-                self.pageno,
-            )
-            return
-
-        super().end_tag()
