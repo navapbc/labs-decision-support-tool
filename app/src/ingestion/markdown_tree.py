@@ -258,6 +258,7 @@ def create_markdown_tree(
     tree.system_root.set_meta("sync_token", True)
     # Initialize prep_funcs meta attribute to record tree prep functions applied to the tree
     tree.system_root.set_meta("prep_funcs", [])
+    logger.debug(tree.format())
     if prepare:
         with assert_no_mismatches(tree):
             _prepare_tree(tree)
@@ -959,7 +960,7 @@ def _add_intro_attrib(node: Node) -> bool:
             # Mark the node being used as the intro as a hint when chunking to keep intro with the List/Table
             prev_node.data["is_intro"] = True
             return True
-        elif prev_node.data_type in ["List", "BlockCode", "ThematicBreak"]:
+        elif prev_node.data_type in ["List", "BlockCode", "ThematicBreak", "Table"]:
             # ThematicBreak example: horizontal rule
             pass
         else:

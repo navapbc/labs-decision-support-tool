@@ -181,7 +181,7 @@ class ImagineLaEngine(BaseEngine):
 
     engine_id: str = "imagine-la"
     name: str = "Imagine LA Chat Engine"
-    datasets = ["CA EDD", "Imagine LA"]
+    datasets = ["CA EDD", "Imagine LA", "LA County Policy"]
 
     system_prompt = f"""You are an assistant to navigators who support clients-such as claimants, beneficiaries, families, and individuals-during the screening, application, and receipt of public benefits in California.
 If you can't find information about the user's prompt in your context, don't answer it. If the user asks a question about a program not available in California, don't answer beyond pointing the user to the relevant trusted website for more information.
