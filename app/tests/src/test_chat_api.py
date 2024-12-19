@@ -274,5 +274,5 @@ def test_citation_formatting():
 
     assert (
         highlighted_url
-        == "https://edd.ca.gov/en/about_edd/additional_resources#:~:text=CalFresh%20https%20www%20getcalfresh%20org,receive%20nutrition%20support%20at%20WIC"
+        == "https://edd.ca.gov/en/disability/options_to_file_for_pfl_benefits#:~:text=CalFresh%20https%20www%20getcalfresh%20org,receive%20nutrition%20support%20at%20WIC"
     )
