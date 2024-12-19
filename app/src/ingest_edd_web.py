@@ -185,6 +185,7 @@ def _chunk_page(
         splits = _create_splits_using_markdown_tree(document, common_base_url)
     else:
         splits = []
+        assert document.content
         for headings, text in split_markdown_by_heading(
             f"# {document.name}\n\n" + document.content
         ):
@@ -212,6 +213,7 @@ def _create_splits_using_markdown_tree(
     splits: list[SplitWithContextText] = []
     chunking_config = DefaultChunkingConfig()
     try:
+        assert document.content
         tree = create_markdown_tree(
             document.content, doc_name=document.name, doc_source=document.source
         )

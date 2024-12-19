@@ -85,7 +85,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_561_Homeless_Case_Management_Program/44-211_561_Homeless_Case_Management_Program.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm"
+                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm"
             ]
             for url in urls:
                 yield scrapy.Request(url=url, callback=self.parse_page)
