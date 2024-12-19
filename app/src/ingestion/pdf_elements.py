@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import List
 
-from src.ingestion.pdf_stylings import Styling
 from src.util.pdf_utils import Heading
 
 
@@ -12,6 +11,20 @@ class TextType(StrEnum):
     LIST = "List"
     # For Title elements that cannot be found as a heading in the outline
     TITLE = "Title"
+
+
+@dataclass
+class Styling:
+    # The text with the style
+    text: str
+    # Page number where the styled text is located
+    pageno: int
+    # Nested parent headings where the styled text is located
+    headings: List[Heading]
+    # Other text before and after the styled text
+    wider_text: str
+    # Style attributes
+    bold: bool = False
 
 
 @dataclass
