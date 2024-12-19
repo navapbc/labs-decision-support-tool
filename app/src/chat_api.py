@@ -199,7 +199,7 @@ class Citation(BaseModel):
     citation_text: str
 
     @staticmethod
-    def format_highlighted_uri(source_url: str, subsection_text: str) -> str:
+    def format_highlighted_uri(source_url: str | None, subsection_text: str) -> str | None:
         if not source_url:
             return None
         citation_without_special_chars = re.sub(r"\W+", " ", subsection_text).strip()
