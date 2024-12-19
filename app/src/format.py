@@ -8,7 +8,7 @@ from typing import Match, Sequence
 import markdown
 
 from src.citations import CITATION_PATTERN, remap_citation_ids
-from src.db.models.document import Chunk, ChunkWithScore, Document, Subsection
+from src.db.models.document import Chunk, Document, Subsection
 
 logger = logging.getLogger(__name__)
 
@@ -37,32 +37,6 @@ class FormattingConfig:
 
     def format_accordion_body(self, citation_body: str) -> str:
         return to_html(citation_body)
-
-
-def format_guru_cards(
-    chunks_shown_max_num: int,
-    chunks_shown_min_score: float,
-    chunks_with_scores: Sequence[ChunkWithScore],
-    subsections: Sequence[Subsection],
-    raw_response: str,
-) -> str:
-    response_with_citations = reify_citations(raw_response, subsections, FormattingConfig(), {})
-
-    cards_html = ""
-    for chunk_with_score in chunks_with_scores[:chunks_shown_max_num]:
-        document = chunk_with_score.chunk.document
-        if chunk_with_score.score < chunks_shown_min_score:
-            logger.info(
-                "Skipping chunk with score less than %f: %s",
-                chunks_shown_min_score,
-                document.name,
-            )
-            continue
-        cards_html += _format_guru_to_accordion_html(
-            document=document, score=chunk_with_score.score
-        )
-
-    return response_with_citations + "<h3>Related Guru cards</h3>" + cards_html
 
 
 def to_html(text: str) -> str:
@@ -181,31 +155,6 @@ def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> 
         headings = headings[1:]
 
     return f"<div><b>{' → '.join(headings)}</b></div>"
-
-
-def _format_guru_to_accordion_html(document: Document, score: float) -> str:
-    global _accordion_id
-    _accordion_id += 1
-    similarity_score = f"<p>Similarity Score: {str(score)}</p>"
-
-    return f"""
-    <div class="usa-accordion" id=accordion-{_accordion_id}>
-        <h4 class="usa-accordion__heading">
-            <button
-                type="button"
-                class="usa-accordion__button"
-                aria-expanded="false"
-                aria-controls="a-{_accordion_id}"
-                >
-                <a href='https://link'>{document.name}</a>
-            </button>
-        </h4>
-        <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
-            "<p>" + " → ".join(chunk.headings) + "</p>" if chunk.headings else ""
-            {"<p>" + document.content.strip() if document.content else ""}</p>
-            {similarity_score}
-        </div>
-    </div>"""
 
 
 def reify_citations(
