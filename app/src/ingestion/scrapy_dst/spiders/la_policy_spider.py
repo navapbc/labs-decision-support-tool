@@ -40,7 +40,6 @@ class TargetElementType(Enum):
     LIST = auto()
     SECTIONS = auto()  # headings with associated sections
     RAW_TEXT = auto()  # extract raw text
-    BODY = auto()  # body without heading
 
 
 # 42-431_2_Noncitizen_Status.htm, 42-200_Property.htm use all these as bullets
@@ -73,7 +72,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/43-109_Unrelated_Adult_Male/43-109_Unrelated_Adult_Male.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-200_Property/42-200_Property.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-103_3_Application/40-103_3_Application.htm",
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/82-620_Intentional_Program_Violation/82-620_Intentional_Program_Violation.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/82-620_Intentional_Program_Violation/82-620_Intentional_Program_Violation.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/89-201_Minor_Parent/89-201_Minor_Parent.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-405_Absence_from_California/42-405_Absence_from_California.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-405_Citizenship_or_Eligible_Non-Citizen_Status/63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm",
@@ -84,7 +83,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_49_Sponsored_Noncitizen/63-503_49_Sponsored_Noncitizen.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-300_Time_Limit_Requirements/42-300_Time_Limit_Requirements.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_41_Self-Employment_Income/63-503_41_Self-Employment_Income.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm",
+                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_561_Homeless_Case_Management_Program/44-211_561_Homeless_Case_Management_Program.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm",
@@ -420,24 +419,21 @@ class LA_PolicyManualSpider(scrapy.Spider):
         state = HtmlListState(soup)
         # Iterate over a copy of body.contents since we may modify body.contents
         for child in list(body.contents):
-            # if (
-            #     child.name == "div"
-            #     and len(child.contents) == 1
-            #     and child.contents[0].name in ["table", "p"]
-            # ):
-            #     # For divs with only one child, ignore the div and process the child
-            #     # Occurs for a table that is wrapped in a div for centering
-            #     child = child.contents[0]
-            #     # pdb.set_trace()
-
+            # if "Whenever a meal voucher will expire on" in child.get_text():
+            #     pdb.set_trace()
             if child.name == "p":
                 # Convert lists presented as paragraphs into actual lists
                 self.__convert_any_paragraph_lists(state, child)
 
-                # TODO: Detect a list item not in a table; 40-103_3_Application.htm: "An aid payment; and"
+                # TODO: Detect a list item not in a table; 40-103_3_Application.htm: "An aid payment; and" and Pickle_Program.htm: "Old age;"
 
-                # Remove blank paragraphs AFTER __convert_any_paragraph_lists() in case they're blank WD_ListParagraphCxSpFirst
-                if child.get_text().strip() == "":
+                # Remove blank paragraphs AFTER __convert_any_paragraph_lists() in case they're blank WD_ListParagraphCxSpFirst that would trigger a new list be created
+                if (
+                    child.get_text().strip() == ""
+                    and child.attrs
+                    and "class" in child.attrs
+                    and any("ListParagraph" in c for c in child["class"])
+                ):
                     child.decompose()
                     continue
 
@@ -504,8 +500,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                         self.__convert_table_to_list(soup, table)
                     elif target_type == TargetElementType.SECTIONS:
                         self.__convert_table_to_subsections(soup, table, heading_level)
-                    elif target_type == TargetElementType.BODY:
-                        pdb.set_trace()
                     elif target_type == TargetElementType.RAW_TEXT:
                         self.__table_to_raw_text(table)
                     else:
@@ -525,7 +519,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
         self.logger.info(
             "Extracting text from complex or ill-formed table: %s", stripped_table_text
         )
-        # TODO: Handle some of these cases
+        # TODO: Handle some of these cases better (e.g. 610_SIP_Approval.htm: "Note:..." in first table is concatenated with prior paragraph)
         table.name = "div"
         for row in table.find_all("tr", recursive=False):
             row.name = "p"
@@ -565,7 +559,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 )
                 state.current_list = state.soup.new_tag("ul")
 
-            self.logger.debug("paragraph/list contents: %s", para.contents)
             para.wrap(state.current_list)
             # Remove extraneous space and bullet character at the beginning of para.contents
             for c in para.contents[:4]:
@@ -573,12 +566,13 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 if c.name == "span":
                     if stripped_text in ["", "·"]:
                         # Removes `ltr` (left-to-right?) span -- not sure what this is for
-                        # Removes the explicit bullet character and extra spaces
+                        # Replace the explicit bullet character and extra spaces with a single space
+                        c.replace_with(" ")
                         c.decompose()
                 elif stripped_text == "":
                     # for NavigableString (raw text) which doesn't have decompose()
-                    # Removes extraneous space (after bullet character)
-                    # Removes number and period (e.g., "1.") that prefix ordered list items
+                    # Replace extraneous space (after bullet character) with a single space
+                    c.replace_with(" ")
                     c.extract()
 
         if "WD_ListParagraphCxSpLast" in para["class"]:
@@ -603,11 +597,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
             else:
                 table.decompose()
                 return TargetElementType.NONE
-
-        if len(col_sizes) == 1:
-            # 42-300_Time_Limit_Requirements.htm
-            # FIXME: Is this used?
-            return TargetElementType.BODY
 
         if len(col_sizes) == 2:
             # 42-431_2_Noncitizen_Status.htm, 43-109_Unrelated_Adult_Male.htm
@@ -668,10 +657,12 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # If all rows start with a bullet character, then convert the table to a list
         # 42-200_Property.htm has a non-bulleted "Note:" and "SB 169 (2021):" as a list item
         # 44-211_561_Homeless_Case_Management_Program.htm uses digits instead of bullets
+        # 63-402_4_Residents_of_Institutions.htm has deeply nested list items prefixed with "a." and "1)"
         if all(
             row_texts[0] in BULLETS
             or re.match(r".+:", row_texts[0])
-            or re.match(r"\d+\.", row_texts[0])
+            or re.match(r"\d+[\.\)]", row_texts[0])
+            or re.match(r"^[a-z].$", row_texts[0])
             for row_texts in rows_nonempty_text
         ):
             return TargetElementType.LIST
@@ -718,11 +709,13 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 return i  # The note should be treated as a sublist since it can be a note about the prior list item
             # 44-211_561_Homeless_Case_Management_Program.htm uses digits followed by "." instead of bullets
             # 610_SIP_Approval.htm has digits instead of bullets; its not obvious if the digits are meaningful
+            # 63-402_4_Residents_of_Institutions.htm has deeply nested list items prefixed with "1)"
             # Just treat them as bullets
-            if text.rstrip(".").isdigit():
+            if text.rstrip(").").isdigit():
                 return i
-            # if text != "":
-            #     pdb.set_trace()
+            # 63-402_4_Residents_of_Institutions.htm has deeply nested list items prefixed with "a."
+            if re.match(r"^[a-z].$", text.strip()):
+                return i
             assert text == "", f"Unexpected text before list bullet: {text!r}"
         raise ValueError(f"No bullet found in text list: {texts!r}")
 
@@ -744,6 +737,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
         ul_stack = [table]
         START_DEBUG = False
         for row in rows:
+            if "Whenever a meal voucher will expire on" in row.get_text():
+                pdb.set_trace()
             if not row.get_text().strip():
                 # Ignore empty rows
                 row.decompose()
@@ -801,8 +796,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
             else:
                 # 44-211_561_Homeless_Case_Management_Program.htm uses digits followed by "." instead of bullets
                 # 610_SIP_Approval.htm has digits instead of bullets; its not obvious if the digits are meaningful
-                # Just treat them as bullets
-                if stripped_text.rstrip(".").isdigit():
+                # 63-402_4_Residents_of_Institutions.htm has deeply nested list items prefixed with "a." and "1)"
+                if stripped_text.rstrip(".)").isdigit() or re.match(r"^[a-z].$", stripped_text):
                     prefix = stripped_text
                 else:
                     assert (
@@ -834,9 +829,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # to prevent line break immediately after bullet character
                 content_col.contents[0].name = "span"
 
-            # if any(text.strip().startswith("Home – applicant/participant leaves home due") for text in col_texts):
-            #     pdb.set_trace()
-
             for child in content_col.contents:
                 if child.name == "table":
                     # Handle nested tables acting as a sublist (42-431_2_Noncitizen_Status.htm)
@@ -867,10 +859,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # Use first row as table headings if all cells are bold
         cols = rows[0].find_all(["td", "th"], recursive=False)
 
-        # table_headings = [cell.get_text().strip() for cell in cols]
-        # if table_headings[0] == "Allowable Purpose":
-        #     pdb.set_trace()
-
         if len(cols) == 2 and self.__table_row_is_heading(cols):
             # Since all cells are bold, treat them as table headings
             table_headings = [cell.get_text().strip() for cell in cols]
@@ -882,10 +870,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
             table_headings = ["" for _ in range(2)]
 
         has_single_column_row = self.__has_single_column_row(rows)
-
-        # if table_headings[0] == "Allowable Purpose":
-        #     pdb.set_trace()
-
         for row in rows:
             cols = row.find_all(["td", "th"], recursive=False)
             if len(cols) == 1:
@@ -898,8 +882,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 else:
                     cols[0].name = f"h{heading_level + 1}"
             elif len(cols) == 2:
-                # if row.get_text().strip().startswith("Qualified noncitizens who entered on or after August 22, 1996"):
-                #     pdb.set_trace()
                 # Treat 2-column rows as a subheading and its associated body
                 row.name = "div"
                 row.attrs = {}
@@ -913,12 +895,12 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
                 # Handle multiple lines in the first column (42-431_2_Noncitizen_Status.htm: "Qualified noncitizens who ...")
                 splits = split_block_tags(cols[0])
-                col1_remainder = soup.new_tag("div")
+                col0_remainder = soup.new_tag("div")
                 for split in splits[2:]:
                     for s in split:
-                        col1_remainder.append(s)
-                self.__fix_body(curr_heading_level, soup, col1_remainder)
-                cols[0].insert_after(col1_remainder)
+                        col0_remainder.append(s)
+                self.__fix_body(curr_heading_level, soup, col0_remainder)
+                cols[0].insert_after(col0_remainder)
 
                 for child in cols[0].contents:
                     if child.name:
@@ -1051,10 +1033,8 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     # TODO: Enable and test, if this is desired
     # h.skip_internal_links = False
 
-    # wrap 'pre' blocks with [code]...[/code] tags
-    h2t.mark_code = True
-    # Include the <sup> and <sub> tags
-    h2t.include_sup_sub = True
+    # Exclude the <sup> and <sub> tags
+    h2t.include_sup_sub = False
 
     markdown = h2t.handle(html)
     # Remove headings with only a bullet, such as 42-431_2_Noncitizen_Status.htm
@@ -1069,8 +1049,18 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     # Pickle_Program.htm produces "~~~~" which gets interpreted as a code block when chunking
     markdown = markdown.replace("~~~~", "")
 
+    # 44-220_Emergency_Aid.htm produces extraneous "****"
+    markdown = re.sub(r"^\*\*\*\*\n", "", markdown, flags=re.MULTILINE)
+
     # 63-503_41_Self-Employment_Income.htm produces "---" after a 1-column,1-row table
     # Remove "---" lines, which causes the previous line to be interpreted as a heading
     markdown = re.sub(r"^\-\-\- *\n", "", markdown, flags=re.MULTILINE)
+
+    # Ill-formatted lists causes markdown chunking error (44-220_Emergency_Aid.htm)
+    # Remove bullet before "Note:" text
+    markdown = re.sub(r"^ *\* \*\*_Note_\*\*", "**_Note_**", markdown, flags=re.MULTILINE)
+
+    # Consolidate newlines
+    markdown = re.sub(r"\n\n+", "\n\n", markdown)
 
     return markdown.strip()
