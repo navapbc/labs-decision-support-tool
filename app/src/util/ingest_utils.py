@@ -7,11 +7,13 @@ from logging import Logger
 from typing import Callable, Optional, Sequence
 
 from smart_open import open
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, select
+from sqlalchemy.sql import exists
 
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
+from src.ingestion.markdown_chunking import ChunkingConfig
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,22 @@ def _drop_existing_dataset(db_session: db.Session, dataset: str) -> bool:
     if dataset_exists:
         db_session.execute(delete(Document).where(Document.dataset == dataset))
     return dataset_exists is not None
+
+
+def document_exists(db_session: db.Session, url: str, doc_attribs: dict[str, str]) -> bool:
+    # Existing documents are determined by the source URL; could use document.content instead
+    if db_session.query(
+        exists().where(
+            and_(
+                Document.source == url,
+                Document.dataset == doc_attribs["dataset"],
+                Document.program == doc_attribs["program"],
+                Document.region == doc_attribs["region"],
+            )
+        )
+    ).scalar():
+        return True
+    return False
 
 
 def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call: Callable) -> None:
@@ -59,6 +77,7 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
             dropped = _drop_existing_dataset(db_session, args.dataset_id)
             if dropped:
                 logger.warning("Dropped existing dataset %s", args.dataset_id)
+            db_session.commit()
             ingestion_call(db_session, args.file_path, doc_attribs)
         db_session.commit()
 
@@ -235,3 +254,11 @@ def save_json(file_path: str, chunks: list[Chunk]) -> None:
 
     with open(file_path + ".json", "w") as file:
         file.write(json.dumps(chunks_as_json))
+
+
+class DefaultChunkingConfig(ChunkingConfig):
+    def __init__(self) -> None:
+        super().__init__(app_config.sentence_transformer.max_seq_length)
+
+    def text_length(self, text: str) -> int:
+        return len(tokenize(text))

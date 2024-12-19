@@ -253,3 +253,6 @@ ingest-edd-web: check-ingest-arguments
 
 ingest-imagine-la: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-imagine-la "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
+
+ingest-la-county-policy: check-ingest-arguments
+	$(PY_RUN_CMD) ingest-la-policy "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
