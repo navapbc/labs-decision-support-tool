@@ -38,7 +38,8 @@ class PageState:
 class TargetElementType(Enum):
     NONE = auto()
     LIST = auto()
-    SECTIONS = auto()  # heading sections
+    SECTIONS = auto()  # headings with associated sections
+    RAW_TEXT = auto()  # extract raw text
     BODY = auto()  # body without heading
 
 
@@ -82,10 +83,14 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-300_Time_Limit_Requirements/42-300_Time_Limit_Requirements.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_41_Self-Employment_Income/63-503_41_Self-Employment_Income.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm"
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm"
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_561_Homeless_Case_Management_Program/44-211_561_Homeless_Case_Management_Program.htm"
                 # FIXME: Why Term-Definition not supported?
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Social_Security_Requirement/Social_Security_Requirement.htm"
-                # FIXME: Why Term-Description not supported?
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Social_Security_Requirement/Social_Security_Requirement.htm"
+                # FIXME: Why Term-Description not supported? 'Leaving table as is: (1, 1): ['Term', 'Description']'
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Retroactive_Medi-Cal_for_Individuals_Transitioning_from_APTC/Retroactive_Medi-Cal_for_Individuals_Transitioning_from_APTC.htm"
+                # FIXME: WARNING: Improperly annotated list item! Creating a new list for 'Definition'
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm"
             ]
             for url in urls:
                 yield scrapy.Request(url=url, callback=self.parse_page)
@@ -431,6 +436,12 @@ class LA_PolicyManualSpider(scrapy.Spider):
             if child.name == "p":
                 # Convert lists presented as paragraphs into actual lists
                 self.__convert_any_paragraph_lists(state, child)
+
+                # Remove blank paragraphs AFTER __convert_any_paragraph_lists() in case they're blank WD_ListParagraphCxSpFirst
+                if child.get_text().strip() == "":
+                    child.decompose()
+                    continue
+
             elif child.name == "div":
                 # 63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm has a div wrapping several <p> tags
                 self.logger.info(
@@ -495,10 +506,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
                         self.__convert_table_to_subsections(soup, table, heading_level)
                     elif target_type == TargetElementType.BODY:
                         pdb.set_trace()
+                    elif target_type == TargetElementType.RAW_TEXT:
+                        self.__table_to_raw_text(table)
                     else:
-                        self.__table_to_raw_text(child)
-                        # if "Allowable Purpose   Examples of Proof     Education" in table.get_text():
-                        #     pdb.set_trace()
+                        ...
             elif isinstance(child, NavigableString) or child.name in ["ul", "ol"]:
                 pass
             elif child.get_text().strip() == "":
@@ -538,7 +549,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             ]
             for c in para["class"]
         ):
-            if para.get_text().strip() == "":
+            if (stripped_text := para.get_text().strip()) == "":
                 # Remove blank list items
                 para.decompose()
                 return
@@ -549,7 +560,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
             if state.current_list is None:
                 # In CalFresh/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions.htm
                 # incorrectly uses a mix of both in the same list
-                self.logger.warning("Improperly annotated list item! Creating a new list.")
+                self.logger.warning(
+                    "Improperly annotated list item! Creating a new list for %r", stripped_text
+                )
                 state.current_list = state.soup.new_tag("ul")
 
             self.logger.debug("paragraph/list contents: %s", para.contents)
@@ -584,8 +597,16 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # many occurrences of a list inappropriately wrapped in a table and is rendered as a curious table in markdown
         col_sizes = self.__size_of_columns(table)
 
+        if len(col_sizes) == 0:
+            if stripped_text := table.get_text().strip():
+                raise NotImplementedError(f"Unexpected 0-column table with text: {stripped_text}")
+            else:
+                table.decompose()
+                return TargetElementType.NONE
+
         if len(col_sizes) == 1:
             # 42-300_Time_Limit_Requirements.htm
+            # FIXME: Is this used?
             return TargetElementType.BODY
 
         if len(col_sizes) == 2:
@@ -633,33 +654,35 @@ class LA_PolicyManualSpider(scrapy.Spider):
             if col_sizes[1] > 2:
                 return TargetElementType.SECTIONS
 
-        if len(col_sizes) > 2:
-            # 42-431_2_Noncitizen_Status.htm and CalWORKs/42-200_Property.htm
-            # use a 3-column table to create a list and sublist
-            rows_nonempty_text = [
-                [
-                    td.text.strip()
-                    for td in row.find_all(["td", "th"], recursive=False)
-                    if td.text.strip()
-                ]
-                for row in table.find_all("tr")
+        # 42-431_2_Noncitizen_Status.htm and CalWORKs/42-200_Property.htm
+        # use a 3-column table to create a list and sublist
+        rows_nonempty_text = [
+            [
+                td.text.strip()
+                for td in row.find_all(["td", "th"], recursive=False)
+                if td.text.strip()
             ]
-            # If all rows start with a bullet character, then convert the table to a list
-            # 42-200_Property.htm has a non-bulleted "Note:" as a list item
-            if all(
-                row_texts[0] in BULLETS or row_texts[0].startswith("Note:")
-                for row_texts in rows_nonempty_text
-            ):
-                return TargetElementType.LIST
+            for row in table.find_all("tr")
+        ]
+        # If all rows start with a bullet character, then convert the table to a list
+        # 42-200_Property.htm has a non-bulleted "Note:" as a list item
+        # 44-211_561_Homeless_Case_Management_Program.htm uses digits instead of bullets
+        if all(
+            row_texts[0] in BULLETS
+            or row_texts[0].startswith("Note:")
+            or re.match(r"\d+\.", row_texts[0])
+            for row_texts in rows_nonempty_text
+        ):
+            return TargetElementType.LIST
 
+        if table.find("table"):
+            # 44-211_561_Homeless_Case_Management_Program.htm has nested table
             self.logger.info(
-                "Leaving %s-column table as is: %s: %r",
-                len(col_sizes),
-                col_sizes,
-                rows_nonempty_text[0],
+                "Converting table to raw text: %s: %r", col_sizes, rows_nonempty_text[0]
             )
-            return TargetElementType.NONE
+            return TargetElementType.RAW_TEXT
 
+        self.logger.info("Leaving table as is: %s: %r", col_sizes, rows_nonempty_text[0])
         return TargetElementType.NONE
 
     def __table_uses_rowspan(self, table: Tag) -> bool:
@@ -687,9 +710,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
             # CalWORKs/42-200_Property.htm has a non-bulleted "Note:" as a list item
             if text.startswith("Note:"):
                 return i  # The note should be treated as a sublist since it can be a note about the prior list item
+            # 44-211_561_Homeless_Case_Management_Program.htm uses digits followed by "." instead of bullets
             # 610_SIP_Approval.htm has digits instead of bullets; its not obvious if the digits are meaningful
             # Just treat them as bullets
-            if text.isdigit():
+            if text.rstrip(".").isdigit():
                 return i
             # if text != "":
             #     pdb.set_trace()
@@ -764,9 +788,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
             if stripped_text.startswith("Note:"):
                 content_col = cols[0]
             else:
+                # 44-211_561_Homeless_Case_Management_Program.htm uses digits followed by "." instead of bullets
                 # 610_SIP_Approval.htm has digits instead of bullets; its not obvious if the digits are meaningful
                 # Just treat them as bullets
-                if stripped_text.isdigit():
+                if stripped_text.rstrip(".").isdigit():
                     prefix = stripped_text
                 else:
                     assert (
@@ -789,7 +814,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 content_col = cols[0]
 
             if prefix:
-                content_col.insert_before(f"{prefix}: ")
+                if prefix[-1] not in [".", ":", ")"]:
+                    # Add some delimiter to separate the prefix from the content
+                    prefix += ":"
+                content_col.insert_before(f"{prefix} ")
             content_col.name = "span"
             _remove_empty_elements(content_col.contents)
             if content_col.contents[0].name and content_col.contents[0].name in ["p"]:
@@ -805,7 +833,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     target_type = self.__table_conversion_type(child)
                     if target_type == TargetElementType.LIST:
                         self.__convert_table_to_list(soup, child)
-                    else:
+                    elif target_type == TargetElementType.RAW_TEXT:
                         self.__table_to_raw_text(child)
                 elif child.name == "p":
                     # Replace <p> tags with <span> tags to keep content visually within the list item (42-200_Property.htm)
