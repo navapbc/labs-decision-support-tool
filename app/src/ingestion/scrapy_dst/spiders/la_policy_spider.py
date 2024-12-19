@@ -85,11 +85,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_561_Homeless_Case_Management_Program/44-211_561_Homeless_Case_Management_Program.htm"
-                # FIXME: Why Term-Definition not supported?
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Social_Security_Requirement/Social_Security_Requirement.htm"
-                # FIXME: Why Term-Description not supported? 'Leaving table as is: (1, 1): ['Term', 'Description']'
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Retroactive_Medi-Cal_for_Individuals_Transitioning_from_APTC/Retroactive_Medi-Cal_for_Individuals_Transitioning_from_APTC.htm"
-                # FIXME: WARNING: Improperly annotated list item! Creating a new list for 'Definition'
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm"
             ]
             for url in urls:
@@ -682,6 +677,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
             )
             return TargetElementType.RAW_TEXT
 
+        # Coverage_for_Immigrants.htm has <br> tags in the table cells causing a new table row to be created
+        # Replace them with spaces
+        for br in table.find_all("br"):
+            br.replace_with("  ")
         self.logger.info("Leaving table as is: %s: %r", col_sizes, rows_nonempty_text[0])
         return TargetElementType.NONE
 
