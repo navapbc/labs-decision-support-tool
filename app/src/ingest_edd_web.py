@@ -3,7 +3,7 @@ import logging
 import os
 import re
 import sys
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 from nutree import Tree
 from smart_open import open as smart_open
@@ -29,44 +29,6 @@ from src.util.string_utils import remove_links, split_markdown_by_heading
 logger = logging.getLogger(__name__)
 
 common_base_url = "https://edd.ca.gov/en/"
-
-
-def _ingest_edd_web(
-    db_session: db.Session,
-    json_filepath: str,
-    doc_attribs: dict[str, str],
-    resume: bool = False,
-) -> None:
-    with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
-        json_items = json.load(json_file)
-
-    if resume:
-        json_items = [
-            item for item in json_items if not document_exists(db_session, item["url"], doc_attribs)
-        ]
-
-    # First, split all json_items into chunks (fast) to debug any issues quickly
-    all_chunks = _create_chunks(json_items, doc_attribs)
-    logger.info(
-        "Done splitting %d webpages into %d chunks",
-        len(json_items),
-        sum(len(chunks) for _, chunks, _ in all_chunks),
-    )
-    for document, chunks, splits in all_chunks:
-        if not chunks:
-            logger.warning("No chunks for %r", document.source)
-            continue
-
-        logger.info("Adding embeddings for %r", document.source)
-        # Next, add embeddings to each chunk (slow)
-        add_embeddings(chunks, [s.text_to_encode for s in splits])
-        logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
-
-        # Then, add to the database
-        db_session.add(document)
-        db_session.add_all(chunks)
-        if resume:
-            db_session.commit()
 
 
 class SplitWithContextText:
@@ -105,9 +67,77 @@ class SplitWithContextText:
         return False
 
 
-def _create_chunks(
-    json_items: Sequence[dict[str, str]],
+def _ingest_edd_web(
+    db_session: db.Session,
+    json_filepath: str,
     doc_attribs: dict[str, str],
+    resume: bool = False,
+) -> None:
+    def prep_json_item(item: dict[str, str]) -> dict[str, str]:
+        markdown = item.get("main_content", item.get("main_primary", None))
+        assert markdown, f"Item {item['url']} has no main_content or main_primary"
+        item["markdown"] = _fix_input_markdown(markdown)
+        return item
+
+    ingest_json(db_session, json_filepath, doc_attribs, resume, prep_json_item)
+
+
+def ingest_json(
+    db_session: db.Session,
+    json_filepath: str,
+    doc_attribs: dict[str, str],
+    resume: bool = False,
+    prep_json_item: Callable[[dict[str, str]], dict[str, str]] = lambda x: x,
+) -> None:
+    json_items = load_json_items(db_session, json_filepath, doc_attribs, resume)
+
+    for item in json_items:
+        item = prep_json_item(item)
+
+    # First, split all json_items into chunks (fast) to debug any issues quickly
+    all_chunks = _create_chunks(json_items, doc_attribs, common_base_url)
+    # Then save to DB, which is slow since embeddings are computed
+    save_to_db(db_session, resume, all_chunks)
+
+
+def load_json_items(
+    db_session: db.Session, json_filepath: str, doc_attribs: dict[str, str], resume: bool = False
+):
+    with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
+        json_items = json.load(json_file)
+
+    if resume:
+        json_items = [
+            item for item in json_items if not document_exists(db_session, item["url"], doc_attribs)
+        ]
+
+    return json_items
+
+
+def save_to_db(
+    db_session: db.Session,
+    resume: bool,
+    all_chunks: Sequence[tuple[Document, Sequence[Chunk], Sequence[SplitWithContextText]]],
+) -> None:
+    for document, chunks, splits in all_chunks:
+        if not chunks:
+            logger.warning("No chunks for %r", document.source)
+            continue
+
+        logger.info("Adding embeddings for %r", document.source)
+        # Next, add embeddings to each chunk (slow)
+        add_embeddings(chunks, [s.text_to_encode for s in splits])
+        logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
+
+        # Then, add to the database
+        db_session.add(document)
+        db_session.add_all(chunks)
+        if resume:
+            db_session.commit()
+
+
+def _create_chunks(
+    json_items: Sequence[dict[str, str]], doc_attribs: dict[str, str], common_base_url: str
 ) -> Sequence[tuple[Document, Sequence[Chunk], Sequence[SplitWithContextText]]]:
     urls_processed: set[str] = set()
     result = []
@@ -120,13 +150,20 @@ def _create_chunks(
         logger.info("Processing: %s", item["url"])
         urls_processed.add(item["url"])
 
-        content = item.get("main_content", item.get("main_primary"))
-        assert content, f"Item {item['url']} has no main_content or main_primary"
+        assert "markdown" in item, f"Item {item['url']} has no markdown content"
+        content = item["markdown"]
 
-        document = Document(name=item["title"], content=content, source=item["url"], **doc_attribs)
-        chunks, splits = _chunk_page(document, content)
-        logger.info("Split into %d chunks: %s", len(chunks), item["title"])
+        assert "title" in item, f"Item {item['url']} has no title"
+        title = item["title"]
+        document = Document(name=title, content=content, source=item["url"], **doc_attribs)
+        chunks, splits = _chunk_page(document, content, common_base_url)
+        logger.info("Split into %d chunks: %s", len(chunks), title)
         result.append((document, chunks, splits))
+    logger.info(
+        "Done splitting %d webpages into %d chunks",
+        len(json_items),
+        sum(len(chunks) for _, chunks, _ in result),
+    )
     return result
 
 
@@ -134,7 +171,7 @@ USE_MARKDOWN_TREE = True
 
 
 def _chunk_page(
-    document: Document, content: str
+    document: Document, content: str, common_base_url: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     if USE_MARKDOWN_TREE:
         splits = _create_splits_using_markdown_tree(content, document, common_base_url)
@@ -164,7 +201,6 @@ def _create_splits_using_markdown_tree(
 ) -> list[SplitWithContextText]:
     splits: list[SplitWithContextText] = []
     chunking_config = DefaultChunkingConfig()
-    content = _fix_input_markdown(content)
     try:
         tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
         tree_chunks = chunk_tree(tree, chunking_config)

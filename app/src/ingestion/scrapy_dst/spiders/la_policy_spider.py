@@ -83,7 +83,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_41_Self-Employment_Income/63-503_41_Self-Employment_Income.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm"
                 # FIXME: Why Term-Definition not supported?
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Social_Security_Requirement/Social_Security_Requirement.htm"
+                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Social_Security_Requirement/Social_Security_Requirement.htm"
                 # FIXME: Why Term-Description not supported?
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Retroactive_Medi-Cal_for_Individuals_Transitioning_from_APTC/Retroactive_Medi-Cal_for_Individuals_Transitioning_from_APTC.htm"
             ]
