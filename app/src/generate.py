@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, Optional
 
 from litellm import completion
 from pydantic import BaseModel
@@ -117,7 +117,7 @@ def completion_args(llm: str) -> dict[str, Any]:
 class MessageAttributes(BaseModel):
     original_language: str
     is_in_english: bool
-    message_in_english: str
+    message_in_english: Optional[str]
     needs_context: bool
 
 
