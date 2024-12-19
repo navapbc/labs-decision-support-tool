@@ -2,7 +2,6 @@ import logging
 import sys
 
 from src.adapters import db
-
 # TODO: move ingest_json() to ingest_utils.py
 from src.ingest_edd_web import ingest_json
 from src.util.ingest_utils import process_and_ingest_sys_args

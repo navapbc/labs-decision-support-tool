@@ -434,6 +434,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # Convert lists presented as paragraphs into actual lists
                 self.__convert_any_paragraph_lists(state, child)
 
+                # TODO: Detect a list item not in a table; 40-103_3_Application.htm: "An aid payment; and"
+
                 # Remove blank paragraphs AFTER __convert_any_paragraph_lists() in case they're blank WD_ListParagraphCxSpFirst
                 if child.get_text().strip() == "":
                     child.decompose()
@@ -470,18 +472,19 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # Split table into separate tables
                 tables = [table]
                 for row in table.find_all("tr", recursive=False):
-                    row_texts = [
-                        td.get_text() for td in row.find_all(["td", "th"], recursive=False)
+                    col_texts = [
+                        td.get_text().strip() for td in row.find_all(["td", "th"], recursive=False)
                     ]
-                    # self.logger.warning("row_texts: %r", first_row_texts)
+                    # self.logger.warning("col_texts: %r", first_row_texts)
                     # cols = row1.find_all(["td", "th"], recursive=False)
-                    # if "SECONDARY HEAVY USER CRITERIA" in row_texts[0].strip():
+                    # if "SECONDARY HEAVY USER CRITERIA" in col_texts[0].strip():
                     #     pdb.set_trace()
-                    if len(row_texts) == 1:
-                        if heading_level < 6:
+                    if len(col_texts) == 1:
+                        if heading_level < 6 and len(col_texts[0]) < 120:
+                            # 82-620_Intentional_Program_Violation.htm has a long text that shouldn't be a heading
                             row.name = f"h{heading_level + 1}"
                         else:
-                            row.name = "p"  # use <p> tag for deep headings
+                            row.name = "p"  # use <p> tag for deep or long headings
                         for c in row.find_all(["p", "td"]):
                             c.name = "span"
                         tables[-1].insert_after(row)
@@ -748,8 +751,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
             row.name = "li"
             cols = row.find_all(["td", "th"], recursive=False)
-            row_texts = [self.__td_to_text(td) for td in cols]
-            indent_level = self.__indent_level(row_texts)
+            col_texts = [self.__td_to_text(td) for td in cols]
+            indent_level = self.__indent_level(col_texts)
 
             # 42-431_2_Noncitizen_Status.htm and CalWORKs/42-200_Property.htm
             # use a single 3-column table to create a list and sublist
@@ -782,10 +785,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 for col in cols[:indent_level]:
                     col.decompose()
                 cols = row.find_all(["td", "th"], recursive=False)
-                row_texts = [td.text.strip() for td in cols]
+                col_texts = [td.text.strip() for td in cols]
 
             if START_DEBUG or any(
-                text.strip().startswith("Allowable Purpose") for text in row_texts
+                text.strip().startswith("Allowable Purpose") for text in col_texts
             ):
                 START_DEBUG = True
                 # pdb.set_trace()
@@ -814,10 +817,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     if col.get_text().strip() == "":
                         col.decompose()
                 cols = row.find_all(["td", "th"], recursive=False)
-                row_texts = [td.text.strip() for td in cols]
+                col_texts = [td.text.strip() for td in cols]
                 # if len(cols) != 1:
                 #     pdb.set_trace()
-                assert len(cols) == 1, f"Expected only 1 non-empty column but got: {row_texts!r}"
+                assert len(cols) == 1, f"Expected only 1 non-empty column but got: {col_texts!r}"
                 content_col = cols[0]
 
             if prefix:
@@ -831,7 +834,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # to prevent line break immediately after bullet character
                 content_col.contents[0].name = "span"
 
-            # if any(text.strip().startswith("Home – applicant/participant leaves home due") for text in row_texts):
+            # if any(text.strip().startswith("Home – applicant/participant leaves home due") for text in col_texts):
             #     pdb.set_trace()
 
             for child in content_col.contents:
@@ -889,7 +892,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # Treat single column rows as a heading
                 row.name = "span"
                 row.attrs = {}  # remove any attributes to clear clutter
-                cols[0].name = f"h{heading_level + 1}"
+                if len(row.get_text().strip()) > 120:
+                    raise ValueError(f"Row text seems too long for a heading: {row.get_text()!r}")
+                    # cols[0].name = "span"
+                else:
+                    cols[0].name = f"h{heading_level + 1}"
             elif len(cols) == 2:
                 # if row.get_text().strip().startswith("Qualified noncitizens who entered on or after August 22, 1996"):
                 #     pdb.set_trace()
