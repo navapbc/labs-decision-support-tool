@@ -125,9 +125,17 @@ class BaseEngine(ChatEngineInterface):
         attributes: MessageAttributes,
         chat_history: Optional[ChatHistory] = None,
     ) -> OnMessageResult:
-        question_for_retrieval = (
-            question if attributes.is_in_english else attributes.message_in_english
-        )
+
+        if attributes.is_in_english:
+            question_for_retrieval = question
+        elif not attributes.message_in_english:
+            question_for_retrieval = question
+            logger.error(
+                "Message_in_english was omitted even though a translation was expected for: %s",
+                question,
+            )
+        else:
+            question_for_retrieval = attributes.message_in_english
 
         chunks_with_scores = retrieve_with_scores(
             question_for_retrieval,
