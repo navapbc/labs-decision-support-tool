@@ -209,7 +209,7 @@ def _fix_input_markdown(markdown: str) -> str:
 def _save_splits_to_files(
     uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
 ) -> None:  # pragma: no cover
-    url_path = "chunks-log/" + uri.removeprefix("https://edd.ca.gov/en/").rstrip("/")
+    url_path = "chunks-log/" + uri.removeprefix("https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/").rstrip("/")
     os.makedirs(os.path.dirname(url_path), exist_ok=True)
     with open(f"{url_path}.json", "w", encoding="utf-8") as file:
         file.write(f"{uri} => {len(splits)} chunks\n")
