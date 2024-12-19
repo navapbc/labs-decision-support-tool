@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import sys
+from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from nutree import Tree
@@ -12,7 +13,7 @@ from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.markdown_chunking import chunk_tree
-from src.ingestion.markdown_tree import create_markdown_tree
+from src.ingestion.markdown_tree import create_markdown_tree, normalize_markdown
 from src.util.ingest_utils import (
     DefaultChunkingConfig,
     add_embeddings,
@@ -155,12 +156,15 @@ def _create_chunks(
         urls_processed.add(item["url"])
 
         assert "markdown" in item, f"Item {item['url']} has no markdown content"
-        content = item["markdown"]
+        # Use normalize_markdown() like it is used before chunking
+        content = normalize_markdown(item["markdown"])
 
         assert "title" in item, f"Item {item['url']} has no title"
         title = item["title"]
         document = Document(name=title, content=content, source=item["url"], **doc_attribs)
-        chunks, splits = _chunk_page(document, content, common_base_url)
+        if os.path.exists("SAVE_CHUNKS"):
+            _save_markdown_to_file(document, common_base_url)
+        chunks, splits = _chunk_page(document, common_base_url)
         logger.info("Split into %d chunks: %s", len(chunks), title)
         result.append((document, chunks, splits))
     logger.info(
@@ -175,13 +179,15 @@ USE_MARKDOWN_TREE = True
 
 
 def _chunk_page(
-    document: Document, content: str, common_base_url: str
+    document: Document, common_base_url: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     if USE_MARKDOWN_TREE:
-        splits = _create_splits_using_markdown_tree(content, document, common_base_url)
+        splits = _create_splits_using_markdown_tree(document, common_base_url)
     else:
         splits = []
-        for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
+        for headings, text in split_markdown_by_heading(
+            f"# {document.name}\n\n" + document.content
+        ):
             # Start a new split for each heading
             section_splits = _split_heading_section(headings, text)
             splits.extend(section_splits)
@@ -201,12 +207,14 @@ def _chunk_page(
 
 
 def _create_splits_using_markdown_tree(
-    content: str, document: Document, common_base_url: str
+    document: Document, common_base_url: str
 ) -> list[SplitWithContextText]:
     splits: list[SplitWithContextText] = []
     chunking_config = DefaultChunkingConfig()
     try:
-        tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
+        tree = create_markdown_tree(
+            document.content, doc_name=document.name, doc_source=document.source
+        )
         tree_chunks = chunk_tree(tree, chunking_config)
 
         for chunk in tree_chunks:
@@ -222,7 +230,7 @@ def _create_splits_using_markdown_tree(
         if os.path.exists("SAVE_CHUNKS"):
             assert document.source
             path = "chunks-log/" + document.source.removeprefix(common_base_url).rstrip("/")
-            _save_splits_to_files(f"{path}.json", document.source, content, splits, tree)
+            _save_splits_to_files(f"{path}.json", document.source, document.content, splits, tree)
     except (Exception, KeyboardInterrupt) as e:  # pragma: no cover
         logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
         logger.error(tree.format())
@@ -253,12 +261,21 @@ def _fix_input_markdown(markdown: str) -> str:
     return markdown
 
 
+def _save_markdown_to_file(document: Document, common_base_url: str) -> None:
+    assert document.source
+    file_path = "chunks-log/" + document.source.removeprefix(common_base_url).rstrip("/")
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    logger.info("Saving markdown to %r", f"{file_path}.md")
+    assert document.content
+    Path(f"{file_path}.md").write_text(document.content, encoding="utf-8")
+
+
 def _save_splits_to_files(
     file_path: str, uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
 ) -> None:  # pragma: no cover
     logger.info("Saving chunks to %r", file_path)
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(f"{file_path}.json", "w", encoding="utf-8") as file:
+    with open(file_path, "w", encoding="utf-8") as file:
         file.write(f"{uri} => {len(splits)} chunks\n")
         file.write("\n")
         for split in splits:
