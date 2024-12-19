@@ -8,7 +8,7 @@ from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
 from src.ingest_la_county_policy import _ingest_la_county_policy
 
-from .test_ingest_edd_web import check_database_contents, sample_cards
+from .test_ingest_edd_web import check_database_contents, sample_cards  # noqa: F401
 
 
 @pytest.fixture
