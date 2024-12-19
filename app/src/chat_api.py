@@ -6,6 +6,7 @@ This creates API endpoints using FastAPI, which is compatible with Chainlit.
 
 import functools
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
@@ -198,14 +199,32 @@ class Citation(BaseModel):
     citation_text: str
 
     @staticmethod
+    def format_highlighted_uri(source_url: str | None, subsection_text: str) -> str | None:
+        if not source_url:
+            return None
+        citation_without_special_chars = re.sub(r"\W+", " ", subsection_text).strip()
+        citation_arr = citation_without_special_chars.split(" ")
+        formatted_text_to_highlight = (
+            "%20".join(citation_arr[:5]) + "," + "%20".join(citation_arr[-5:])
+        )
+        return (
+            (source_url[:-1] if source_url.endswith("/") else source_url)
+            + "#:~:text="
+            + formatted_text_to_highlight
+        )
+
+    @staticmethod
     def from_subsection(subsection: Subsection) -> "Citation":
         chunk = subsection.chunk
+        highlighted_text_src = Citation.format_highlighted_uri(
+            chunk.document.source, subsection.text
+        )
         return Citation(
             citation_id=f"citation-{subsection.id}",
             source_id=str(chunk.document.id),
             source_name=chunk.document.name,
             page_number=chunk.page_number,
-            uri=chunk.document.source,
+            uri=highlighted_text_src,
             headings=subsection.text_headings,
             citation_text=subsection.text,
         )
