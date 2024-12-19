@@ -14,6 +14,7 @@ from src.db.models.document import Chunk, Document
 from src.ingestion.markdown_chunking import chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
+    DefaultChunkingConfig,
     add_embeddings,
     deconstruct_list,
     deconstruct_table,
@@ -22,7 +23,6 @@ from src.util.ingest_utils import (
     reconstruct_list,
     reconstruct_table,
     tokenize,
-    DefaultChunkingConfig,
 )
 from src.util.string_utils import remove_links, split_markdown_by_heading
 

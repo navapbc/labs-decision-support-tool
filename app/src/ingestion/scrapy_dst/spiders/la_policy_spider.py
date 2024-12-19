@@ -1,9 +1,9 @@
 import os
 import pdb
 import re
-from enum import Enum, auto
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from itertools import chain
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence
@@ -11,12 +11,12 @@ from typing import Any, Callable, Iterable, Optional, Sequence
 import html2text
 import scrapy
 from bs4 import BeautifulSoup
-from bs4.element import NavigableString, Tag, PageElement
+from bs4.element import NavigableString, PageElement, Tag
 from scrapy.http import HtmlResponse
 from scrapy.selector import Selector
 
-from src.util.string_utils import count_diffs
 from src.ingestion.markdown_tree import normalize_markdown
+from src.util.string_utils import count_diffs
 
 
 @dataclass
@@ -39,7 +39,7 @@ class TargetElementType(Enum):
     NONE = auto()
     LIST = auto()
     SECTIONS = auto()  # heading sections
-    BODY = auto() # body without heading
+    BODY = auto()  # body without heading
 
 
 # 42-431_2_Noncitizen_Status.htm, 42-200_Property.htm use all these as bullets
@@ -82,7 +82,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-300_Time_Limit_Requirements/42-300_Time_Limit_Requirements.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_41_Self-Employment_Income/63-503_41_Self-Employment_Income.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm"
-
                 # FIXME: Why Term-Definition not supported?
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Social_Security_Requirement/Social_Security_Requirement.htm"
                 # FIXME: Why Term-Description not supported?
@@ -434,7 +433,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 self.__convert_any_paragraph_lists(state, child)
             elif child.name == "div":
                 # 63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm has a div wrapping several <p> tags
-                self.logger.info("div wrapping %i tags: %r", len(child.contents), [c.name for c in child.contents])
+                self.logger.info(
+                    "div wrapping %i tags: %r",
+                    len(child.contents),
+                    [c.name for c in child.contents],
+                )
                 # Recursively process the div's children
                 self.__fix_body(heading_level, soup, child)
             elif child.name == "table":
@@ -448,7 +451,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 if len(col_sizes) == 1:
                     # bottom of 63-503_49_Sponsored_Noncitizen.htm has a 1-column table
                     # Convert the table to a body content
-                    table.name="div"
+                    table.name = "div"
                     for tr in table.find_all("tr", recursive=False):
                         tr.name = "p"
                         tr.td.name = "span"
@@ -459,7 +462,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # Split table into separate tables
                 tables = [table]
                 for row in table.find_all("tr", recursive=False):
-                    row_texts = [td.get_text() for td in row.find_all(["td", "th"], recursive=False)]
+                    row_texts = [
+                        td.get_text() for td in row.find_all(["td", "th"], recursive=False)
+                    ]
                     # self.logger.warning("row_texts: %r", first_row_texts)
                     # cols = row1.find_all(["td", "th"], recursive=False)
                     # if "SECONDARY HEAVY USER CRITERIA" in row_texts[0].strip():
@@ -481,7 +486,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     tables.remove(tables[0])
                 if len(tables) > 1:
                     self.logger.info("Split table into %i tables", len(tables))
-                
+
                 for table in tables:
                     target_type = self.__table_conversion_type(table)
                     if target_type == TargetElementType.LIST:
@@ -506,9 +511,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
             table.decompose()
             return
 
-        self.logger.info("Extracting text from complex or ill-formed table: %s", stripped_table_text)
+        self.logger.info(
+            "Extracting text from complex or ill-formed table: %s", stripped_table_text
+        )
         # TODO: Handle some of these cases
-        table.name="div"
+        table.name = "div"
         for row in table.find_all("tr", recursive=False):
             row.name = "p"
             row.string = row.get_text()
@@ -576,7 +583,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # TODO: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
         # many occurrences of a list inappropriately wrapped in a table and is rendered as a curious table in markdown
         col_sizes = self.__size_of_columns(table)
-        
+
         if len(col_sizes) == 1:
             # 42-300_Time_Limit_Requirements.htm
             return TargetElementType.BODY
@@ -644,7 +651,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 for row_texts in rows_nonempty_text
             ):
                 return TargetElementType.LIST
-            
+
             self.logger.info(
                 "Leaving %s-column table as is: %s: %r",
                 len(col_sizes),
@@ -721,7 +728,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 ul_stack.append(ul)
                 row.insert_before(ul)
                 curr_indent_level = indent_level
-                
+
             elif indent_level < curr_indent_level:
                 while len(ul_stack) > indent_level + 1:
                     ul_stack.pop()
@@ -731,8 +738,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 raise NotImplementedError(
                     f"Unexpected indent level: {indent_level} vs {curr_indent_level}"
                 )
-            
-            assert len(ul_stack) == indent_level + 1, f"Expected {indent_level + 1} stack size but got {len(ul_stack)}"
+
+            assert (
+                len(ul_stack) == indent_level + 1
+            ), f"Expected {indent_level + 1} stack size but got {len(ul_stack)}"
 
             if ul != table:
                 ul.append(row)
@@ -780,7 +789,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 content_col = cols[0]
 
             if prefix:
-               content_col.insert_before(f"{prefix}: ")
+                content_col.insert_before(f"{prefix}: ")
             content_col.name = "span"
             _remove_empty_elements(content_col.contents)
             if content_col.contents[0].name and content_col.contents[0].name in ["p"]:

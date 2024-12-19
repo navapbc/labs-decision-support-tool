@@ -7,12 +7,8 @@ from smart_open import open as smart_open
 
 from src.adapters import db
 from src.db.models.document import Chunk, Document
-from src.util.ingest_utils import (
-    add_embeddings,
-    document_exists,
-    process_and_ingest_sys_args,
-)
 from src.ingest_edd_web import SplitWithContextText, _create_splits_using_markdown_tree
+from src.util.ingest_utils import add_embeddings, document_exists, process_and_ingest_sys_args
 
 logger = logging.getLogger(__name__)
 
