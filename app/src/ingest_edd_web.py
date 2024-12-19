@@ -13,7 +13,7 @@ from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.markdown_chunking import chunk_tree
-from src.ingestion.markdown_tree import create_markdown_tree, normalize_markdown
+from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
     DefaultChunkingConfig,
     add_embeddings,
@@ -156,8 +156,7 @@ def _create_chunks(
         urls_processed.add(item["url"])
 
         assert "markdown" in item, f"Item {item['url']} has no markdown content"
-        # Use normalize_markdown() like it is used before chunking
-        content = normalize_markdown(item["markdown"])
+        content = item["markdown"]
 
         assert "title" in item, f"Item {item['url']} has no title"
         title = item["title"]

@@ -197,9 +197,6 @@ def test__ingest_edd(
 
     # Document[3] has a table
     assert len(documents[3].chunks) == 2
-    for chunk in documents[3].chunks:
-        print("======")
-        print(chunk.content)
     assert documents[3].chunks[0].content == (
         "**Career Center Orientation**\n\n"
         "| Location | Date/Time | Other Information |\n"
@@ -304,7 +301,7 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
         _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, resume=True)
 
     skipped_logs = {
-        msg for msg in caplog.messages if msg.startswith("Skipping -- item already exists:")
+        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists:")
     }
     assert len(skipped_logs) == 4
     assert db_session.query(Document.id).count() == 4
