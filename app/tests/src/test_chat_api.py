@@ -271,8 +271,7 @@ def test_citation_formatting():
     subsection_text = "* [CalFresh](https://www.getcalfresh.org/?source=edd) (formerly known as Food Stamps)  \n  CalFresh provides monthly food assistance to people and families with low income, including those who lost their job because of the pandemic. Visit [GetCalFresh.org](https://www.getcalfresh.org/?source=edd) to apply online.\n* [California Association of Food Banks](http://www.cafoodbanks.org/)  \n  In California, federal, state, and local community organizations coordinate to make sure that groceries are available at local food banks.\n* [Free Summer Lunch Programs](http://www.cde.ca.gov/ds/sh/sn/summersites.asp)  \n  Free lunches are available to all children under 18, regardless of income.\n* [School Meals](https://www.fns.usda.gov/school-meals/applying-free-and-reduced-price-school-meals)  \n  Free or reduced-price breakfast and lunch at public schools when in session.\n* [Women, Infants and Children (WIC) Program](https://www.cdph.ca.gov/Programs/CFH/DWICSN/Pages/Program-Landing1.aspx)  \n  Pregnant women and children under age 5 receive nutrition support at WIC."
     source_url = "https://edd.ca.gov/en/disability/options_to_file_for_pfl_benefits/"
     highlighted_url = Citation.format_highlighted_uri(source_url, subsection_text)
-    assert "*" not in highlighted_url
-    assert " " not in highlighted_url
+
     assert (
         highlighted_url
         == "https://edd.ca.gov/en/about_edd/additional_resources#:~:text=CalFresh%20https%20www%20getcalfresh%20org,receive%20nutrition%20support%20at%20WIC"

@@ -200,6 +200,8 @@ class Citation(BaseModel):
 
     @staticmethod
     def format_highlighted_uri(source_url: str, subsection_text: str) -> str:
+        if not source_url:
+            return None
         citation_without_special_chars = re.sub(r"\W+", " ", subsection_text).strip()
         citation_arr = citation_without_special_chars.split(" ")
         formatted_text_to_highlight = (
@@ -316,7 +318,6 @@ async def run_query(
     logger.info("Response: %s", result.response)
 
     final_result = simplify_citation_numbers(result)
-    print(final_result.subsections)
     citations = [Citation.from_subsection(subsection) for subsection in final_result.subsections]
     return QueryResponse(response_text=final_result.response, citations=citations)
 
