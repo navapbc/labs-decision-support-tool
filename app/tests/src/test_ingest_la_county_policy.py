@@ -8,7 +8,8 @@ from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
 from src.ingest_la_county_policy import _ingest_la_county_policy
 
-from .test_ingest_edd_web import sample_cards, check_database_contents
+from .test_ingest_edd_web import check_database_contents, sample_cards
+
 
 @pytest.fixture
 def sample_markdown(sample_cards):
@@ -31,6 +32,7 @@ doc_attribs = {
     "program": "mixed",
     "region": "California:LA County",
 }
+
 
 def test_ingestion(caplog, app_config, db_session, la_county_policy_local_file):
     # Force a short max_seq_length to test chunking
