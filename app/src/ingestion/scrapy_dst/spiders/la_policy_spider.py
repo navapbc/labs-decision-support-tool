@@ -72,20 +72,22 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_39_CalFresh_COLA/63-504_39_CalFresh_COLA.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/43-109_Unrelated_Adult_Male/43-109_Unrelated_Adult_Male.htm"
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-200_Property/42-200_Property.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/89-201_Minor_Parent/89-201_Minor_Parent.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-405_Absence_from_California/42-405_Absence_from_California.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-405_Citizenship_or_Eligible_Non-Citizen_Status/63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm"
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-103_3_Application/40-103_3_Application.htm",
+                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/82-620_Intentional_Program_Violation/82-620_Intentional_Program_Violation.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/89-201_Minor_Parent/89-201_Minor_Parent.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-405_Absence_from_California/42-405_Absence_from_California.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-405_Citizenship_or_Eligible_Non-Citizen_Status/63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-105_40_Immunizations/40-105_40_Immunizations.htm",
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/46-102_Single_Adult_Model/46-102_Single_Adult_Model.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GAIN/GAIN/610_SIP_Approval/610_SIP_Approval.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-402_4_Residents_of_Institutions/63-402_4_Residents_of_Institutions.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_49_Sponsored_Noncitizen/63-503_49_Sponsored_Noncitizen.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-300_Time_Limit_Requirements/42-300_Time_Limit_Requirements.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_41_Self-Employment_Income/63-503_41_Self-Employment_Income.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm"
-                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_561_Homeless_Case_Management_Program/44-211_561_Homeless_Case_Management_Program.htm"
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm"
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/46-102_Single_Adult_Model/46-102_Single_Adult_Model.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GAIN/GAIN/610_SIP_Approval/610_SIP_Approval.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-402_4_Residents_of_Institutions/63-402_4_Residents_of_Institutions.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_49_Sponsored_Noncitizen/63-503_49_Sponsored_Noncitizen.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-300_Time_Limit_Requirements/42-300_Time_Limit_Requirements.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_41_Self-Employment_Income/63-503_41_Self-Employment_Income.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_561_Homeless_Case_Management_Program/44-211_561_Homeless_Case_Management_Program.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm",
             ]
             for url in urls:
                 yield scrapy.Request(url=url, callback=self.parse_page)
@@ -658,13 +660,14 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 if td.text.strip()
             ]
             for row in table.find_all("tr")
+            if row.get_text().strip()
         ]
         # If all rows start with a bullet character, then convert the table to a list
-        # 42-200_Property.htm has a non-bulleted "Note:" as a list item
+        # 42-200_Property.htm has a non-bulleted "Note:" and "SB 169 (2021):" as a list item
         # 44-211_561_Homeless_Case_Management_Program.htm uses digits instead of bullets
         if all(
             row_texts[0] in BULLETS
-            or row_texts[0].startswith("Note:")
+            or re.match(r".+:", row_texts[0])
             or re.match(r"\d+\.", row_texts[0])
             for row_texts in rows_nonempty_text
         ):
@@ -682,6 +685,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
         for br in table.find_all("br"):
             br.replace_with("  ")
         self.logger.info("Leaving table as is: %s: %r", col_sizes, rows_nonempty_text[0])
+        # pdb.set_trace()
         return TargetElementType.NONE
 
     def __table_uses_rowspan(self, table: Tag) -> bool:
@@ -706,8 +710,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
         for i, text in enumerate(texts):
             if text in BULLETS:
                 return i
-            # CalWORKs/42-200_Property.htm has a non-bulleted "Note:" as a list item
-            if text.startswith("Note:"):
+            # 42-200_Property.htm has a non-bulleted "Note:" and "SB 169 (2021):" as a list item
+            if re.match(r".+:", text):
                 return i  # The note should be treated as a sublist since it can be a note about the prior list item
             # 44-211_561_Homeless_Case_Management_Program.htm uses digits followed by "." instead of bullets
             # 610_SIP_Approval.htm has digits instead of bullets; its not obvious if the digits are meaningful
@@ -717,7 +721,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             # if text != "":
             #     pdb.set_trace()
             assert text == "", f"Unexpected text before list bullet: {text!r}"
-        raise ValueError("No bullet found in text list: {texts!r}")
+        raise ValueError(f"No bullet found in text list: {texts!r}")
 
     def __td_to_text(self, td: Tag) -> str:
         stripped_text = td.get_text().strip()
@@ -737,6 +741,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
         ul_stack = [table]
         START_DEBUG = False
         for row in rows:
+            if not row.get_text().strip():
+                # Ignore empty rows
+                row.decompose()
+                continue
+
             row.name = "li"
             cols = row.find_all(["td", "th"], recursive=False)
             row_texts = [self.__td_to_text(td) for td in cols]
@@ -783,8 +792,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
             prefix = ""
             stripped_text = cols[0].get_text().strip()
-            # CalWORKs/42-200_Property.htm has a non-bulleted "Note:" as a list item
-            if stripped_text.startswith("Note:"):
+            # 42-200_Property.htm has a non-bulleted "Note:" and "SB 169 (2021):" as a list item
+            if re.match(r".+:", stripped_text):
                 content_col = cols[0]
             else:
                 # 44-211_561_Homeless_Case_Management_Program.htm uses digits followed by "." instead of bullets
@@ -805,7 +814,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     if col.get_text().strip() == "":
                         col.decompose()
                 cols = row.find_all(["td", "th"], recursive=False)
-
                 row_texts = [td.text.strip() for td in cols]
                 # if len(cols) != 1:
                 #     pdb.set_trace()
