@@ -10,9 +10,6 @@ from src.util.ingest_utils import process_and_ingest_sys_args
 logger = logging.getLogger(__name__)
 
 
-common_base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/"
-
-
 def _ingest_la_county_policy(
     db_session: db.Session,
     json_filepath: str,
@@ -24,7 +21,8 @@ def _ingest_la_county_policy(
         item["title"] = item["h2"]
         return item
 
-    ingest_json(db_session, json_filepath, doc_attribs, resume, prep_json_item)
+    common_base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/"
+    ingest_json(db_session, json_filepath, doc_attribs, common_base_url, resume, prep_json_item)
 
 
 def main() -> None:

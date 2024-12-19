@@ -28,8 +28,6 @@ from src.util.string_utils import remove_links, split_markdown_by_heading
 
 logger = logging.getLogger(__name__)
 
-common_base_url = "https://edd.ca.gov/en/"
-
 
 class SplitWithContextText:
 
@@ -79,13 +77,15 @@ def _ingest_edd_web(
         item["markdown"] = _fix_input_markdown(markdown)
         return item
 
-    ingest_json(db_session, json_filepath, doc_attribs, resume, prep_json_item)
+    common_base_url = "https://edd.ca.gov/en/"
+    ingest_json(db_session, json_filepath, doc_attribs, common_base_url, resume, prep_json_item)
 
 
 def ingest_json(
     db_session: db.Session,
     json_filepath: str,
     doc_attribs: dict[str, str],
+    common_base_url: str,
     resume: bool = False,
     prep_json_item: Callable[[dict[str, str]], dict[str, str]] = lambda x: x,
 ) -> None:
@@ -102,14 +102,18 @@ def ingest_json(
 
 def load_json_items(
     db_session: db.Session, json_filepath: str, doc_attribs: dict[str, str], resume: bool = False
-):
+) -> Sequence[dict[str, str]]:
     with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
         json_items = json.load(json_file)
 
+    def verbose_document_exists(item: dict[str, str]) -> bool:
+        if document_exists(db_session, item["url"], doc_attribs):
+            logger.info("Skipping -- document already exists: %s", item["url"])
+            return True
+        return False
+
     if resume:
-        json_items = [
-            item for item in json_items if not document_exists(db_session, item["url"], doc_attribs)
-        ]
+        json_items = [item for item in json_items if not verbose_document_exists(item)]
 
     return json_items
 
@@ -218,7 +222,7 @@ def _create_splits_using_markdown_tree(
         if os.path.exists("SAVE_CHUNKS"):
             assert document.source
             path = "chunks-log/" + document.source.removeprefix(common_base_url).rstrip("/")
-            _save_splits_to_files(path, document.source, content, splits, tree)
+            _save_splits_to_files(f"{path}.json", document.source, content, splits, tree)
     except (Exception, KeyboardInterrupt) as e:  # pragma: no cover
         logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
         logger.error(tree.format())
@@ -250,10 +254,11 @@ def _fix_input_markdown(markdown: str) -> str:
 
 
 def _save_splits_to_files(
-    url_path: str, uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
+    file_path: str, uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
 ) -> None:  # pragma: no cover
-    os.makedirs(os.path.dirname(url_path), exist_ok=True)
-    with open(f"{url_path}.json", "w", encoding="utf-8") as file:
+    logger.info("Saving chunks to %r", file_path)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(f"{file_path}.json", "w", encoding="utf-8") as file:
         file.write(f"{uri} => {len(splits)} chunks\n")
         file.write("\n")
         for split in splits:
