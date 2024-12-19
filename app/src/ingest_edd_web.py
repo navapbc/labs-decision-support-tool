@@ -7,43 +7,28 @@ from typing import Optional, Sequence
 
 from nutree import Tree
 from smart_open import open as smart_open
-from sqlalchemy import and_
-from sqlalchemy.sql import exists
 
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
+from src.ingestion.markdown_chunking import chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
     add_embeddings,
     deconstruct_list,
     deconstruct_table,
+    document_exists,
     process_and_ingest_sys_args,
     reconstruct_list,
     reconstruct_table,
     tokenize,
+    DefaultChunkingConfig,
 )
 from src.util.string_utils import remove_links, split_markdown_by_heading
 
 logger = logging.getLogger(__name__)
 
-
-def _item_exists(db_session: db.Session, item: dict[str, str], doc_attribs: dict[str, str]) -> bool:
-    # Existing documents are determined by the source URL; could use document.content instead
-    if db_session.query(
-        exists().where(
-            and_(
-                Document.source == item["url"],
-                Document.dataset == doc_attribs["dataset"],
-                Document.program == doc_attribs["program"],
-                Document.region == doc_attribs["region"],
-            )
-        )
-    ).scalar():
-        logger.info("Skipping -- item already exists: %r", item["url"])
-        return True
-    return False
+common_base_url = "https://edd.ca.gov/en/"
 
 
 def _ingest_edd_web(
@@ -57,7 +42,7 @@ def _ingest_edd_web(
 
     if resume:
         json_items = [
-            item for item in json_items if not _item_exists(db_session, item, doc_attribs)
+            item for item in json_items if not document_exists(db_session, item["url"], doc_attribs)
         ]
 
     # First, split all json_items into chunks (fast) to debug any issues quickly
@@ -152,7 +137,7 @@ def _chunk_page(
     document: Document, content: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     if USE_MARKDOWN_TREE:
-        splits = _create_splits_using_markdown_tree(content, document)
+        splits = _create_splits_using_markdown_tree(content, document, common_base_url)
     else:
         splits = []
         for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
@@ -174,19 +159,11 @@ def _chunk_page(
     return chunks, splits
 
 
-class EddChunkingConfig(ChunkingConfig):
-    def __init__(self) -> None:
-        super().__init__(app_config.sentence_transformer.max_seq_length)
-
-    def text_length(self, text: str) -> int:
-        return len(tokenize(text))
-
-
 def _create_splits_using_markdown_tree(
-    content: str, document: Document
+    content: str, document: Document, common_base_url: str
 ) -> list[SplitWithContextText]:
     splits: list[SplitWithContextText] = []
-    chunking_config = EddChunkingConfig()
+    chunking_config = DefaultChunkingConfig()
     content = _fix_input_markdown(content)
     try:
         tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
@@ -204,7 +181,8 @@ def _create_splits_using_markdown_tree(
                 split.data_ids = ", ".join(chunk.data_ids)
         if os.path.exists("SAVE_CHUNKS"):
             assert document.source
-            _save_splits_to_files(document.source, content, splits, tree)
+            path = "chunks-log/" + document.source.removeprefix(common_base_url).rstrip("/")
+            _save_splits_to_files(path, document.source, content, splits, tree)
     except (Exception, KeyboardInterrupt) as e:  # pragma: no cover
         logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
         logger.error(tree.format())
@@ -226,7 +204,6 @@ def _fix_input_markdown(markdown: str) -> str:
     # Tab labels are parsed into list items with headings; remove them
     markdown = re.sub(r"^\s*\* #+", "", markdown, flags=re.MULTILINE)
 
-
     # Blank sublist '* +" in https://edd.ca.gov/en/unemployment/Employer_Information/
     # Empty sublist '4. * ' in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
     # Remove empty nested sublists
@@ -237,9 +214,8 @@ def _fix_input_markdown(markdown: str) -> str:
 
 
 def _save_splits_to_files(
-    uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
+    url_path: str, uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
 ) -> None:  # pragma: no cover
-    url_path = "chunks-log/" + uri.removeprefix("https://edd.ca.gov/en/").rstrip("/")
     os.makedirs(os.path.dirname(url_path), exist_ok=True)
     with open(f"{url_path}.json", "w", encoding="utf-8") as file:
         file.write(f"{uri} => {len(splits)} chunks\n")

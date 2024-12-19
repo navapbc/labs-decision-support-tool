@@ -1,45 +1,23 @@
 import json
 import logging
-import os
-import re
 import sys
-from typing import Optional, Sequence
+from typing import Sequence
 
-from nutree import Tree
 from smart_open import open as smart_open
-from sqlalchemy import and_
-from sqlalchemy.sql import exists
 
 from src.adapters import db
-from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
-from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
     add_embeddings,
+    document_exists,
     process_and_ingest_sys_args,
-    tokenize,
 )
-from src.util.string_utils import remove_links
+from src.ingest_edd_web import SplitWithContextText, _create_splits_using_markdown_tree
 
 logger = logging.getLogger(__name__)
 
 
-def _item_exists(db_session: db.Session, item: dict[str, str], doc_attribs: dict[str, str]) -> bool:
-    # Existing documents are determined by the source URL; could use document.content instead
-    if db_session.query(
-        exists().where(
-            and_(
-                Document.source == item["url"],
-                Document.dataset == doc_attribs["dataset"],
-                Document.program == doc_attribs["program"],
-                Document.region == doc_attribs["region"],
-            )
-        )
-    ).scalar():
-        logger.info("Skipping -- item already exists: %r", item["url"])
-        return True
-    return False
+common_base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/"
 
 
 def _ingest_la_county_policy(
@@ -53,7 +31,7 @@ def _ingest_la_county_policy(
 
     if resume:
         json_items = [
-            item for item in json_items if not _item_exists(db_session, item, doc_attribs)
+            item for item in json_items if not document_exists(db_session, item["url"], doc_attribs)
         ]
 
     # First, split all json_items into chunks (fast) to debug any issues quickly
@@ -78,42 +56,6 @@ def _ingest_la_county_policy(
         db_session.add_all(chunks)
         if resume:
             db_session.commit()
-
-
-class SplitWithContextText:
-
-    def __init__(
-        self,
-        headings: Sequence[str],
-        text: str,
-        context_str: str,
-        text_to_encode: Optional[str] = None,
-    ):
-        self.headings = headings
-        self.text = text
-        if text_to_encode:
-            self.text_to_encode = text_to_encode
-        else:
-            self.text_to_encode = f"{context_str.strip()}\n\n" + remove_links(text)
-        self.token_count = len(tokenize(self.text_to_encode))
-        self.chunk_id = ""
-        self.data_ids = ""
-
-    def add_if_within_limit(self, paragraph: str, delimiter: str = "\n\n") -> bool:
-        new_text_to_encode = f"{self.text_to_encode}{delimiter}{remove_links(paragraph)}"
-        token_count = len(tokenize(new_text_to_encode))
-        if token_count <= app_config.sentence_transformer.max_seq_length:
-            self.text += f"{delimiter}{paragraph}"
-            self.text_to_encode = new_text_to_encode
-            self.token_count = token_count
-            return True
-        return False
-
-    def exceeds_limit(self) -> bool:
-        if self.token_count > app_config.sentence_transformer.max_seq_length:
-            logger.warning("Text too long! %i tokens: %s", self.token_count, self.text_to_encode)
-            return True
-        return False
 
 
 def _create_chunks(
@@ -148,7 +90,7 @@ USE_MARKDOWN_TREE = True
 def _chunk_page(
     document: Document, content: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
-    splits = _create_splits_using_markdown_tree(content, document)
+    splits = _create_splits_using_markdown_tree(content, document, common_base_url)
 
     chunks = [
         Chunk(
@@ -164,67 +106,9 @@ def _chunk_page(
     return chunks, splits
 
 
-class EddChunkingConfig(ChunkingConfig):
-    def __init__(self) -> None:
-        super().__init__(app_config.sentence_transformer.max_seq_length)
-
-    def text_length(self, text: str) -> int:
-        return len(tokenize(text))
-
-
-def _create_splits_using_markdown_tree(
-    content: str, document: Document
-) -> list[SplitWithContextText]:
-    splits: list[SplitWithContextText] = []
-    chunking_config = EddChunkingConfig()
-    content = _fix_input_markdown(content)
-    try:
-        tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
-        tree_chunks = chunk_tree(tree, chunking_config)
-
-        for chunk in tree_chunks:
-            split = SplitWithContextText(
-                chunk.headings, chunk.markdown, chunk.context_str, chunk.embedding_str
-            )
-            assert split.token_count == chunk.length
-            splits.append(split)
-            if os.path.exists("SAVE_CHUNKS"):
-                # Add some extra info for debugging
-                split.chunk_id = chunk.id
-                split.data_ids = ", ".join(chunk.data_ids)
-        if os.path.exists("SAVE_CHUNKS"):
-            assert document.source
-            _save_splits_to_files(document.source, content, splits, tree)
-    except (Exception, KeyboardInterrupt) as e:  # pragma: no cover
-        logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
-        logger.error(tree.format())
-        raise e
-    return splits
-
-
 def _fix_input_markdown(markdown: str) -> str:
+    "Placeholder hook for fixing input markdown"
     return markdown
-
-
-def _save_splits_to_files(
-    uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
-) -> None:  # pragma: no cover
-    url_path = "chunks-log/" + uri.removeprefix("https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/").rstrip("/")
-    os.makedirs(os.path.dirname(url_path), exist_ok=True)
-    with open(f"{url_path}.json", "w", encoding="utf-8") as file:
-        file.write(f"{uri} => {len(splits)} chunks\n")
-        file.write("\n")
-        for split in splits:
-            file.write(f">>> {split.chunk_id!r} (length {split.token_count}) {split.headings}\n")
-            file.write(split.text)
-            file.write("\n--------------------------------------------------\n")
-        file.write("\n\n")
-        json_str = json.dumps([split.__dict__ for split in splits], indent=2)
-        file.write(json_str)
-        file.write("\n\n")
-        file.write(tree.format())
-        file.write("\n\n")
-        file.write(content)
 
 
 def main() -> None:
