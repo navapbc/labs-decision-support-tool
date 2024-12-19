@@ -12,7 +12,7 @@ from .test_ingest_edd_web import check_database_contents, sample_cards  # noqa: 
 
 
 @pytest.fixture
-def sample_markdown(sample_cards):
+def sample_markdown(sample_cards):  # noqa: F811
     items = json.loads(sample_cards)
     for item in items:
         item["h2"] = item["title"]
