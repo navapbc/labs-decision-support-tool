@@ -1,5 +1,5 @@
 from src import chat_engine
-from src.chat_engine import CaEddWebEngine, ImagineLaEngine, BaseEngine
+from src.chat_engine import CaEddWebEngine, ImagineLaEngine
 from src.generate import MessageAttributes
 from tests.mock import mock_completion
 
