@@ -1,3 +1,18 @@
+# /// script
+# dependencies = [
+#   "install-playwright",
+#   "playwright",
+#   "scrapy",
+#   "markdownify",
+#   "nltk",
+#   "langchain_text_splitters",
+#   "html2text",
+#   "mistletoe",
+#   "nutree",
+# ]
+# ///
+# (This comment enables `uv run` to automatically create a virtual environment)
+
 SPIDER_NAME = "la_policy_spider"
 OUTPUT_JSON = "la_policy_scrapings.json"
 

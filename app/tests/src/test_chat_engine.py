@@ -23,4 +23,4 @@ def test_create_engine_Imagine_LA():
     engine = chat_engine.create_engine(engine_id)
     assert engine is not None
     assert engine.name == ImagineLaEngine.name
-    assert engine.datasets == ["CA EDD", "Imagine LA"]
+    assert engine.datasets == ["CA EDD", "Imagine LA", "LA County Policy"]
