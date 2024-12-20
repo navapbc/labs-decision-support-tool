@@ -60,6 +60,8 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 
+    # To scrape individual pages, update urls in start_requests() and run:
+    # cd app/src/ingestion; DEBUGGING=true DEBUG_SCRAPINGS=true python scrape_la_policy.py
     DEBUGGING = os.environ.get("DEBUGGING", False)
 
     def start_requests(self) -> Iterable[scrapy.Request]:
@@ -419,8 +421,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
         state = HtmlListState(soup)
         # Iterate over a copy of body.contents since we may modify body.contents
         for child in list(body.contents):
-            # if "Whenever a meal voucher will expire on" in child.get_text():
-            #     pdb.set_trace()
             if child.name == "p":
                 # Convert lists presented as paragraphs into actual lists
                 self.__convert_any_paragraph_lists(state, child)
@@ -471,10 +471,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     col_texts = [
                         td.get_text().strip() for td in row.find_all(["td", "th"], recursive=False)
                     ]
-                    # self.logger.warning("col_texts: %r", first_row_texts)
-                    # cols = row1.find_all(["td", "th"], recursive=False)
-                    # if "SECONDARY HEAVY USER CRITERIA" in col_texts[0].strip():
-                    #     pdb.set_trace()
                     if len(col_texts) == 1:
                         if heading_level < 6 and len(col_texts[0]) < 120:
                             # 82-620_Intentional_Program_Violation.htm has a long text that shouldn't be a heading
@@ -502,8 +498,12 @@ class LA_PolicyManualSpider(scrapy.Spider):
                         self.__convert_table_to_subsections(soup, table, heading_level)
                     elif target_type == TargetElementType.RAW_TEXT:
                         self.__table_to_raw_text(table)
+                    elif target_type == TargetElementType.NONE:
+                        pass
                     else:
-                        ...
+                        raise NotImplementedError(
+                            f"Unexpected table conversion type: {target_type}"
+                        )
             elif isinstance(child, NavigableString) or child.name in ["ul", "ol"]:
                 pass
             elif child.get_text().strip() == "":
@@ -562,18 +562,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
             para.wrap(state.current_list)
             # Remove extraneous space and bullet character at the beginning of para.contents
             for c in para.contents[:4]:
-                stripped_text = c.get_text().strip()
-                if c.name == "span":
-                    if stripped_text in ["", "·"]:
-                        # Removes `ltr` (left-to-right?) span -- not sure what this is for
-                        # Replace the explicit bullet character and extra spaces with a single space
-                        c.replace_with(" ")
-                        c.decompose()
-                elif stripped_text == "":
-                    # for NavigableString (raw text) which doesn't have decompose()
-                    # Replace extraneous space (after bullet character) with a single space
+                if c.get_text().strip() in ["", "·"]:
+                    # Replace the explicit bullet character and extra spaces with a single space
+                    # Also includes `ltr` (left-to-right?) span -- not sure what this is for
+                    # Removing it entirely would result in no space between bullet and text, e.g. "1.Sentence"
                     c.replace_with(" ")
-                    c.extract()
 
         if "WD_ListParagraphCxSpLast" in para["class"]:
             state.current_list = None
@@ -606,9 +599,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 col1 = row.find(["td", "th"], recursive=False)
                 size = len(col1.get_text().strip())
                 col1_length = max(col1_length, size)
-            # self.logger.warning(
-            #     "------------------ %s %r %i", col1.get_text(), col_sizes, col1_length
-            # )
             if col1_length <= 1:
                 # 43-109_Unrelated_Adult_Male.htm uses a blank <ul> tag in the first column, so col1_length=0
                 return TargetElementType.LIST
@@ -620,23 +610,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 if col2.find("table"):
                     # 42-200_Property.htm
                     return TargetElementType.SECTIONS
-
-            # rows = table.find_all("tr", recursive=False)
-            # rows_text = [[td.text for td in row.find_all(["td", "th"], recursive=False)] for row in rows]
-            # if ' Education ' in rows_text[1][0]:
-            #     pdb.set_trace()
-            # rows_nonempty_text = [
-            #     [
-            #         td.text.strip()
-            #         for td in row.find_all(["td", "th"], recursive=False)
-            #         if td.text.strip()
-            #     ]
-            #     for row in table.find_all("tr")
-            # ]
-            # if any(
-            #         text.startswith("Allowable Purpose") for texts in rows_nonempty_text for text in texts
-            #     ):
-            #         pdb.set_trace()
 
             # First column is usually short and often acts as a heading
             # If the second column is long, then convert the table
@@ -813,8 +786,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
                         col.decompose()
                 cols = row.find_all(["td", "th"], recursive=False)
                 col_texts = [td.text.strip() for td in cols]
-                # if len(cols) != 1:
-                #     pdb.set_trace()
                 assert len(cols) == 1, f"Expected only 1 non-empty column but got: {col_texts!r}"
                 content_col = cols[0]
 
@@ -862,7 +833,6 @@ class LA_PolicyManualSpider(scrapy.Spider):
         if len(cols) == 2 and self.__table_row_is_heading(cols):
             # Since all cells are bold, treat them as table headings
             table_headings = [cell.get_text().strip() for cell in cols]
-            # self.logger.warning("table_headings: %r", table_headings)
             rows[0].decompose()
             rows = rows[1:]
         else:
@@ -875,10 +845,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
             if len(cols) == 1:
                 # Treat single column rows as a heading
                 row.name = "span"
-                row.attrs = {}  # remove any attributes to clear clutter
+                row.attrs = {}  # remove any attributes to clear clutter while debugging
                 if len(row.get_text().strip()) > 120:
                     raise ValueError(f"Row text seems too long for a heading: {row.get_text()!r}")
-                    # cols[0].name = "span"
                 else:
                     cols[0].name = f"h{heading_level + 1}"
             elif len(cols) == 2:
@@ -1037,8 +1006,6 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     h2t.include_sup_sub = False
 
     markdown = h2t.handle(html)
-    # Remove headings with only a bullet, such as 42-431_2_Noncitizen_Status.htm
-    # markdown = re.sub("^#####  ·\n\n", "- ", markdown, flags=re.MULTILINE)
 
     # Remove the bullet before list items prefixed with a number/letter and dot/')'
     # (eg, 41-400_Deprivation.htm, Coverage_for_Immigrants.htm)
