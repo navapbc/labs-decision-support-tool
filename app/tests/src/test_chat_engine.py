@@ -1,5 +1,7 @@
 from src import chat_engine
-from src.chat_engine import CaEddWebEngine, ImagineLaEngine
+from src.chat_engine import CaEddWebEngine, ImagineLaEngine, BaseEngine
+from src.generate import MessageAttributes
+from tests.mock import mock_completion
 
 
 def test_available_engines():
@@ -24,3 +26,25 @@ def test_create_engine_Imagine_LA():
     assert engine is not None
     assert engine.name == ImagineLaEngine.name
     assert engine.datasets == ["CA EDD", "Imagine LA"]
+
+
+def test_build_response(monkeypatch, caplog):
+    new_eng = CaEddWebEngine()
+    message = MessageAttributes(
+        original_language="spanish",
+        is_in_english=False,
+        needs_context=False,
+    )
+
+    monkeypatch.setattr(
+        "src.generate.completion",
+        mock_completion.mock_completion("gpt-4o", ""),
+    )
+
+    new_eng._build_response_with_context("what is ssi?", message)
+    logger_message = caplog.records[-1]
+    assert (
+        "Message_in_english was omitted even though a translation was expected"
+        in logger_message.message
+    )
+    monkeypatch.undo()
