@@ -47,4 +47,3 @@ def test_build_response(monkeypatch, caplog):
         "Message_in_english was omitted even though a translation was expected"
         in logger_message.message
     )
-    monkeypatch.undo()
