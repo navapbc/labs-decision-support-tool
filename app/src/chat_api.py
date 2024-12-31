@@ -42,6 +42,8 @@ def literalai() -> AsyncLiteralClient:
     This needs to be a function so that it's not immediately instantiated upon
     import of this module and so that it can mocked in tests.
     """
+    if app_config.literal_api_key_for_api:
+        return AsyncLiteralClient(api_key=app_config.literal_api_key_for_api)
     return AsyncLiteralClient()
 
 
