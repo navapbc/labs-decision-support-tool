@@ -25,6 +25,7 @@ from src.db.models.conversation import ChatMessage
 from src.db.models.document import Subsection
 from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
+from src.util.string_utils import format_highlighted_uri
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Chat API"])
@@ -201,26 +202,9 @@ class Citation(BaseModel):
     citation_text: str
 
     @staticmethod
-    def format_highlighted_uri(source_url: str | None, subsection_text: str) -> str | None:
-        if not source_url:
-            return None
-        citation_without_special_chars = re.sub(r"\W+", " ", subsection_text).strip()
-        citation_arr = citation_without_special_chars.split(" ")
-        formatted_text_to_highlight = (
-            "%20".join(citation_arr[:5]) + "," + "%20".join(citation_arr[-5:])
-        )
-        return (
-            (source_url[:-1] if source_url.endswith("/") else source_url)
-            + "#:~:text="
-            + formatted_text_to_highlight
-        )
-
-    @staticmethod
     def from_subsection(subsection: Subsection) -> "Citation":
         chunk = subsection.chunk
-        highlighted_text_src = Citation.format_highlighted_uri(
-            chunk.document.source, subsection.text
-        )
+        highlighted_text_src = format_highlighted_uri(chunk.document.source, subsection.text)
         return Citation(
             citation_id=f"citation-{subsection.id}",
             source_id=str(chunk.document.id),

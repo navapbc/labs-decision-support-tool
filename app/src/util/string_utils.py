@@ -179,3 +179,16 @@ def parse_heading_markdown(md: str) -> tuple[int, str]:
 def remove_links(markdown: str) -> str:
     # Remove markdown links, e.g., `[This is a link](https://example.com/relative/path) and [another](https://example.com/absolute/path)` -> `This is a link and another`
     return re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", markdown)
+
+
+def format_highlighted_uri(source_url: str | None, subsection_text: str) -> str | None:
+    if not source_url:
+        return None
+    citation_without_special_chars = re.sub(r"\W+", " ", subsection_text).strip()
+    citation_arr = citation_without_special_chars.split(" ")
+    formatted_text_to_highlight = "%20".join(citation_arr[:5]) + "," + "%20".join(citation_arr[-5:])
+    return (
+        (source_url[:-1] if source_url.endswith("/") else source_url)
+        + "#:~:text="
+        + formatted_text_to_highlight
+    )
