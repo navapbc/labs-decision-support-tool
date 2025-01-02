@@ -6,6 +6,7 @@ This creates API endpoints using FastAPI, which is compatible with Chainlit.
 
 import functools
 import logging
+from dataclasses import dataclass
 from typing import Optional, Sequence
 
 from asyncer import asyncify
