@@ -11,7 +11,6 @@ from literalai import Score
 from src import chat_api
 from src.chat_api import (
     ChatEngineSettings,
-    Citation,
     QueryResponse,
     UserInfo,
     UserSession,
