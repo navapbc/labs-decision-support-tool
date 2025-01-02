@@ -24,6 +24,7 @@ from src.db.models.conversation import ChatMessage
 from src.db.models.document import Subsection
 from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
+from src.util.string_utils import format_highlighted_uri
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Chat API"])
@@ -202,12 +203,13 @@ class Citation(BaseModel):
     @staticmethod
     def from_subsection(subsection: Subsection) -> "Citation":
         chunk = subsection.chunk
+        highlighted_text_src = format_highlighted_uri(chunk.document.source, subsection.text)
         return Citation(
             citation_id=f"citation-{subsection.id}",
             source_id=str(chunk.document.id),
             source_name=chunk.document.name,
             page_number=chunk.page_number,
-            uri=chunk.document.source,
+            uri=highlighted_text_src,
             headings=subsection.text_headings,
             citation_text=subsection.text,
         )
