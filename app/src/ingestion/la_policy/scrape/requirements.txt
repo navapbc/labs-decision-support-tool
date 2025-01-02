@@ -5,3 +5,5 @@ markdownify
 nltk
 langchain_text_splitters
 html2text
+mistletoe
+nutree

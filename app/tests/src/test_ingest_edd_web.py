@@ -197,9 +197,6 @@ def test__ingest_edd(
 
     # Document[3] has a table
     assert len(documents[3].chunks) == 2
-    for chunk in documents[3].chunks:
-        print("======")
-        print(chunk.content)
     assert documents[3].chunks[0].content == (
         "**Career Center Orientation**\n\n"
         "| Location | Date/Time | Other Information |\n"
@@ -230,6 +227,20 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
     with caplog.at_level(logging.WARNING):
         _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, resume=True)
 
+    check_database_contents(db_session, caplog)
+
+    # Re-ingesting the same data should not add any new documents
+    with caplog.at_level(logging.INFO):
+        _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, resume=True)
+
+    skipped_logs = {
+        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists:")
+    }
+    assert len(skipped_logs) == 4
+    assert db_session.query(Document.id).count() == 4
+
+
+def check_database_contents(db_session, caplog):
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 4
 
@@ -298,13 +309,3 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
     # Last section
     assert doc2.chunks[3].headings == ["State Unemployment Tax Act Dumping"]
     assert doc2.chunks[3].content.startswith("### [SUTA Dumping Schemes]")
-
-    # Re-ingesting the same data should not add any new documents
-    with caplog.at_level(logging.INFO):
-        _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, resume=True)
-
-    skipped_logs = {
-        msg for msg in caplog.messages if msg.startswith("Skipping -- item already exists:")
-    }
-    assert len(skipped_logs) == 4
-    assert db_session.query(Document.id).count() == 4

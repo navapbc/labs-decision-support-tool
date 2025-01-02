@@ -3,6 +3,7 @@ import pdb
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from itertools import chain
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence
@@ -10,10 +11,11 @@ from typing import Any, Callable, Iterable, Optional, Sequence
 import html2text
 import scrapy
 from bs4 import BeautifulSoup
-from bs4.element import NavigableString, Tag
+from bs4.element import NavigableString, PageElement, Tag
 from scrapy.http import HtmlResponse
 from scrapy.selector import Selector
 
+from src.ingestion.markdown_tree import normalize_markdown
 from src.util.string_utils import count_diffs
 
 
@@ -33,6 +35,17 @@ class PageState:
     h2: Optional[str] = None
 
 
+class TargetElementType(Enum):
+    NONE = auto()
+    LIST = auto()
+    SECTIONS = auto()  # headings with associated sections
+    RAW_TEXT = auto()  # extract raw text
+
+
+# 42-431_2_Noncitizen_Status.htm, 42-200_Property.htm use all these as bullets
+BULLETS = ["·", "•", "Ø", "o", "§"]
+
+
 class LA_PolicyManualSpider(scrapy.Spider):
     name = "la_policy_spider"
 
@@ -47,15 +60,35 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 
+    # To scrape individual pages, update urls in start_requests() and run:
+    # cd app/src/ingestion; DEBUGGING=true DEBUG_SCRAPINGS=true python scrape_la_policy.py
     DEBUGGING = os.environ.get("DEBUGGING", False)
 
     def start_requests(self) -> Iterable[scrapy.Request]:
         if self.DEBUGGING:
             urls = [
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/40-101_19_Extended_Foster_Care_Benefits/40-101_19_Extended_Foster_Care_Benefits.htm",
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Child%20Care/Child_Care/1210_Overview/1210_Overview.htm",
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-431_2_Noncitizen_Status/42-431_2_Noncitizen_Status.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/40-101_19_Extended_Foster_Care_Benefits/40-101_19_Extended_Foster_Care_Benefits.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Child%20Care/Child_Care/1210_Overview/1210_Overview.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-431_2_Noncitizen_Status/42-431_2_Noncitizen_Status.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-504_39_CalFresh_COLA/63-504_39_CalFresh_COLA.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/43-109_Unrelated_Adult_Male/43-109_Unrelated_Adult_Male.htm"
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-200_Property/42-200_Property.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-103_3_Application/40-103_3_Application.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/82-620_Intentional_Program_Violation/82-620_Intentional_Program_Violation.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/89-201_Minor_Parent/89-201_Minor_Parent.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-405_Absence_from_California/42-405_Absence_from_California.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-405_Citizenship_or_Eligible_Non-Citizen_Status/63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/40-105_40_Immunizations/40-105_40_Immunizations.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/46-102_Single_Adult_Model/46-102_Single_Adult_Model.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GAIN/GAIN/610_SIP_Approval/610_SIP_Approval.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-402_4_Residents_of_Institutions/63-402_4_Residents_of_Institutions.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_49_Sponsored_Noncitizen/63-503_49_Sponsored_Noncitizen.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-300_Time_Limit_Requirements/42-300_Time_Limit_Requirements.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_41_Self-Employment_Income/63-503_41_Self-Employment_Income.htm",
+                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_561_Homeless_Case_Management_Program/44-211_561_Homeless_Case_Management_Program.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm",
             ]
             for url in urls:
                 yield scrapy.Request(url=url, callback=self.parse_page)
@@ -133,8 +166,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # TODO: Add checks to ensure original sentences exist in the resulting markdown
         markdown = "\n\n".join([md for md in md_list if md.strip()])
         if debug_scrapings:
+            # Use normalize_markdown() like it is used before chunking
             Path(f"{filepath}.md").write_text(
-                f"[Source page]({url})\n\n" + markdown, encoding="utf-8"
+                f"[Source page]({url})\n\n" + normalize_markdown(markdown), encoding="utf-8"
             )
 
         # More often than not, the h2 heading is better suited as the title
@@ -345,20 +379,25 @@ class LA_PolicyManualSpider(scrapy.Spider):
         ### Typical case
 
         if len(cols) == 2:
+            md_texts = []
             # Use first column as a subheading
             raw_texts = cols[0].xpath(".//text()").getall()
-            subheading_md = "### " + to_markdown(" ".join(raw_texts), base_url)
-            # Check for WD_SectionHeading class in the first column
-            paras = cols[0].xpath("./p")
-            if not [para.attrib["class"] == "WD_SectionHeading" for para in paras]:
-                # minor inconsistency; mitigation: assume first column is a subheading
-                self.logger.info(
-                    "Assuming subheading (despite lack of WD_SectionHeading): %s", subheading_md
-                )
+            md_str = to_markdown(" ".join(raw_texts), base_url)
+            if md_str:
+                subheading_md = "### " + md_str
+                # Check for WD_SectionHeading class in the first column
+                paras = cols[0].xpath("./p")
+                if not [para.attrib["class"] == "WD_SectionHeading" for para in paras]:
+                    # minor inconsistency; mitigation: assume first column is a subheading
+                    self.logger.info(
+                        "Assuming subheading (despite lack of WD_SectionHeading): %s", subheading_md
+                    )
+                md_texts.append(subheading_md)
 
             # Use second column as the section text under the subheading
             section_md = self.__section_to_markdown(base_url, cols[1].get(), heading_level=3)
-            return "\n\n".join([subheading_md, section_md])
+            md_texts.append(section_md)
+            return "\n\n".join(md_texts)
 
         raise NotImplementedError(f"Unexpected number of columns in row: {len(cols)}: {row.get()}")
 
@@ -382,34 +421,109 @@ class LA_PolicyManualSpider(scrapy.Spider):
         state = HtmlListState(soup)
         # Iterate over a copy of body.contents since we may modify body.contents
         for child in list(body.contents):
-            if (
-                child.name == "div"
-                and len(child.contents) == 1
-                and child.contents[0].name in ["table", "p"]
-            ):
-                # For divs with only one child, ignore the div and process the child
-                # Occurs for a table that is wrapped in a div for centering
-                child = child.contents[0]
-                # pdb.set_trace()
-
             if child.name == "p":
                 # Convert lists presented as paragraphs into actual lists
                 self.__convert_any_paragraph_lists(state, child)
+
+                # TODO: Detect a list item not in a table; 40-103_3_Application.htm: "An aid payment; and" and Pickle_Program.htm: "Old age;"
+
+                # Remove blank paragraphs AFTER __convert_any_paragraph_lists() in case they're blank WD_ListParagraphCxSpFirst that would trigger a new list be created
+                if (
+                    child.get_text().strip() == ""
+                    and child.attrs
+                    and "class" in child.attrs
+                    and any("ListParagraph" in c for c in child["class"])
+                ):
+                    child.decompose()
+                    continue
+
             elif child.name == "div":
                 # 63-405_Citizenship_or_Eligible_Non-Citizen_Status.htm has a div wrapping several <p> tags
-                self.logger.info("div wrapping %i tags: %s", len(child.contents), child)
+                self.logger.info(
+                    "div wrapping %i tags: %r",
+                    len(child.contents),
+                    [c.name for c in child.contents],
+                )
                 # Recursively process the div's children
                 self.__fix_body(heading_level, soup, child)
             elif child.name == "table":
-                # TODO: Check table for 1-col rows and convert them to headings -- see _convert_table_to_sections
-                if self.__should_convert_table(child):
-                    self.__convert_table_to_sections(soup, child, heading_level)
+                table = child
+                if self.__table_uses_rowspan(table):
+                    # 69-202_1_Identification_of_Refugees.htm
+                    self.__table_to_raw_text(table)
+                    continue
+
+                col_sizes = self.__size_of_columns(table)
+                if len(col_sizes) == 1:
+                    # bottom of 63-503_49_Sponsored_Noncitizen.htm has a 1-column table
+                    # Convert the table to a body content
+                    table.name = "div"
+                    for tr in table.find_all("tr", recursive=False):
+                        tr.name = "p"
+                        tr.td.name = "span"
+                    continue
+
+                # 40-105_40_Immunizations.htm: first row of table is acting as a heading
+                # 46-102_Single_Adult_Model.htm: has middle rows are acting as headings
+                # Split table into separate tables
+                tables = [table]
+                for row in table.find_all("tr", recursive=False):
+                    col_texts = [
+                        td.get_text().strip() for td in row.find_all(["td", "th"], recursive=False)
+                    ]
+                    if len(col_texts) == 1:
+                        if heading_level < 6 and len(col_texts[0]) < 120:
+                            # 82-620_Intentional_Program_Violation.htm has a long text that shouldn't be a heading
+                            row.name = f"h{heading_level + 1}"
+                        else:
+                            row.name = "p"  # use <p> tag for deep or long headings
+                        for c in row.find_all(["p", "td"]):
+                            c.name = "span"
+                        tables[-1].insert_after(row)
+                        table = soup.new_tag("table")
+                        row.insert_after(table)
+                        tables.append(table)
+                    else:
+                        table.append(row)
+                if not tables[0].get_text().strip():
+                    tables.remove(tables[0])
+                if len(tables) > 1:
+                    self.logger.info("Split table into %i tables", len(tables))
+
+                for table in tables:
+                    target_type = self.__table_conversion_type(table)
+                    if target_type == TargetElementType.LIST:
+                        self.__convert_table_to_list(soup, table)
+                    elif target_type == TargetElementType.SECTIONS:
+                        self.__convert_table_to_subsections(soup, table, heading_level)
+                    elif target_type == TargetElementType.RAW_TEXT:
+                        self.__table_to_raw_text(table)
+                    elif target_type == TargetElementType.NONE:
+                        pass
+                    else:
+                        raise NotImplementedError(
+                            f"Unexpected table conversion type: {target_type}"
+                        )
             elif isinstance(child, NavigableString) or child.name in ["ul", "ol"]:
                 pass
             elif child.get_text().strip() == "":
                 pass
             else:
                 raise NotImplementedError(f"Unexpected {child.name}: {child}")
+
+    def __table_to_raw_text(self, table: Tag) -> None:
+        if not (stripped_table_text := table.get_text().strip()):
+            table.decompose()
+            return
+
+        self.logger.info(
+            "Extracting text from complex or ill-formed table: %s", stripped_table_text
+        )
+        # TODO: Handle some of these cases better (e.g. 610_SIP_Approval.htm: "Note:..." in first table is concatenated with prior paragraph)
+        table.name = "div"
+        for row in table.find_all("tr", recursive=False):
+            row.name = "p"
+            row.string = row.get_text()
 
     def __convert_any_paragraph_lists(self, state: HtmlListState, para: Tag) -> None:
         if "class" not in para.attrs:
@@ -429,7 +543,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
             ]
             for c in para["class"]
         ):
-            if para.get_text().strip() == "":
+            if (stripped_text := para.get_text().strip()) == "":
                 # Remove blank list items
                 para.decompose()
                 return
@@ -440,24 +554,19 @@ class LA_PolicyManualSpider(scrapy.Spider):
             if state.current_list is None:
                 # In CalFresh/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions/63-410_3_Able-Bodied_Adults_Without_Dependents_Exemptions.htm
                 # incorrectly uses a mix of both in the same list
-                self.logger.warning("Improperly annotated list item! Creating a new list.")
+                self.logger.warning(
+                    "Improperly annotated list item! Creating a new list for %r", stripped_text
+                )
                 state.current_list = state.soup.new_tag("ul")
 
-            self.logger.debug("paragraph/list contents: %s", para.contents)
             para.wrap(state.current_list)
             # Remove extraneous space and bullet character at the beginning of para.contents
             for c in para.contents[:4]:
-                stripped_text = c.get_text().strip()
-                if c.name == "span":
-                    if stripped_text in ["", "·"]:
-                        # Removes `ltr` (left-to-right?) span -- not sure what this is for
-                        # Removes the explicit bullet character and extra spaces
-                        c.decompose()
-                elif stripped_text == "":
-                    # for NavigableString (raw text) which doesn't have decompose()
-                    # Removes extraneous space (after bullet character)
-                    # Removes number and period (e.g., "1.") that prefix ordered list items
-                    c.extract()
+                if c.get_text().strip() in ["", "·"]:
+                    # Replace the explicit bullet character and extra spaces with a single space
+                    # Also includes `ltr` (left-to-right?) span -- not sure what this is for
+                    # Removing it entirely would result in no space between bullet and text, e.g. "1.Sentence"
+                    c.replace_with(" ")
 
         if "WD_ListParagraphCxSpLast" in para["class"]:
             state.current_list = None
@@ -470,44 +579,81 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # Use `ul` tag rather than `ol` since we'll leave the explicit numbering as is
                 state.current_list = state.soup.new_tag("ul")
 
-    def __should_convert_table(self, table: Tag) -> bool:
-        if self.__table_uses_rowspan(table):
-            row_text = [td.text for td in table.find("tr").find_all(["td", "th"], recursive=False)]
-            # TODO: handle non-default rowspans in 69-202_1_Identification_of_Refugees.htm
-            self.logger.info("Leaving table using rowspan as is: %s", row_text)
-            return False
-
+    def __table_conversion_type(self, table: Tag) -> TargetElementType:
         # TODO: In 40-103_44__Medi-Cal_For_CalWORKs_Ineligible_Members.htm
         # many occurrences of a list inappropriately wrapped in a table and is rendered as a curious table in markdown
         col_sizes = self.__size_of_columns(table)
+
+        if len(col_sizes) == 0:
+            if stripped_text := table.get_text().strip():
+                raise NotImplementedError(f"Unexpected 0-column table with text: {stripped_text}")
+            else:
+                table.decompose()
+                return TargetElementType.NONE
+
         if len(col_sizes) == 2:
-            # TODO: Convert to table with bullets in first column to list; be careful of nested tables acting as a sublist (42-431_2_Noncitizen_Status/42-431_2_Noncitizen_Status.htm)
-            # For now, convert it and replace the headings that have only a bullet into a list item after it's converted to_markdown()
-            # 42-431_2_Noncitizen_Status/42-431_2_Noncitizen_Status.htm
-            # If the first column is just bullets and there are 2-columns, then don't convert the table
-            # col1_length = 0
-            # for row in table.find_all("tr", recursive=False):
-            #     col1 = row.find(["td", "th"], recursive=False)
-            #     size = len(col1.get_text().strip())
-            #     col1_length = max(col1_length, size)
-            # self.logger.info("================= First column length: %s", col1_length)
-            # if col1_length == 1:
-            #     return False
+            # 42-431_2_Noncitizen_Status.htm, 43-109_Unrelated_Adult_Male.htm
+            # If the first column is just bullets, then convert the 2-column table to a list
+            col1_length = 0
+            for row in table.find_all("tr", recursive=False):
+                col1 = row.find(["td", "th"], recursive=False)
+                size = len(col1.get_text().strip())
+                col1_length = max(col1_length, size)
+            if col1_length <= 1:
+                # 43-109_Unrelated_Adult_Male.htm uses a blank <ul> tag in the first column, so col1_length=0
+                return TargetElementType.LIST
+
+            # If second column has a table, then convert the table to sections
+            for row in table.find_all("tr", recursive=False):
+                cols = row.find_all("td", recursive=False)
+                col2 = cols[1]
+                if col2.find("table"):
+                    # 42-200_Property.htm
+                    return TargetElementType.SECTIONS
 
             # First column is usually short and often acts as a heading
             # If the second column is long, then convert the table
-            # TODO: Check for nested tables or lists in the second column
             if col_sizes[1] > 2:
-                return True
+                return TargetElementType.SECTIONS
 
-        if len(col_sizes) > 2:
-            row_text = [td.text for td in table.find("tr").find_all(["td", "th"], recursive=False)]
+        # 42-431_2_Noncitizen_Status.htm and CalWORKs/42-200_Property.htm
+        # use a 3-column table to create a list and sublist
+        rows_nonempty_text = [
+            [
+                td.text.strip()
+                for td in row.find_all(["td", "th"], recursive=False)
+                if td.text.strip()
+            ]
+            for row in table.find_all("tr")
+            if row.get_text().strip()
+        ]
+        # If all rows start with a bullet character, then convert the table to a list
+        # 42-200_Property.htm has a non-bulleted "Note:" and "SB 169 (2021):" as a list item
+        # 44-211_561_Homeless_Case_Management_Program.htm uses digits instead of bullets
+        # 63-402_4_Residents_of_Institutions.htm has deeply nested list items prefixed with "a." and "1)"
+        if all(
+            row_texts[0] in BULLETS
+            or re.match(r".+:", row_texts[0])
+            or re.match(r"\d+[\.\)]", row_texts[0])
+            or re.match(r"^[a-z].$", row_texts[0])
+            for row_texts in rows_nonempty_text
+        ):
+            return TargetElementType.LIST
+
+        if table.find("table"):
+            # 44-211_561_Homeless_Case_Management_Program.htm has nested table
             self.logger.info(
-                "Leaving %s-column table as is: %s: %r", len(col_sizes), col_sizes, row_text
+                "Converting table to raw text: %s: %r", col_sizes, rows_nonempty_text[0]
             )
-            return False
+            return TargetElementType.RAW_TEXT
 
-        return False
+        # Coverage_for_Immigrants.htm has <br> tags in the table cells causing a new table row to be created
+        # Replace them with spaces
+        for br in table.find_all("br"):
+            br.replace_with("  ")
+        self.logger.info("Leaving table as is: %s: %r", col_sizes, rows_nonempty_text[0])
+        # pdb.set_trace()
+        return TargetElementType.NONE
 
     def __table_uses_rowspan(self, table: Tag) -> bool:
         for row in table.find_all("tr", recursive=False):
@@ -526,13 +672,164 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 col_lengths[i] = max(col_lengths[i], size)
         return tuple(col_lengths.values())
 
-    def __convert_table_to_sections(
+    def __indent_level(self, texts: Sequence[str]) -> int:
+        "Return 0 for a top-level list, 1 for a sublist, etc."
+        for i, text in enumerate(texts):
+            if text in BULLETS:
+                return i
+            # 42-200_Property.htm has a non-bulleted "Note:" and "SB 169 (2021):" as a list item
+            if re.match(r".+:", text):
+                return i  # The note should be treated as a sublist since it can be a note about the prior list item
+            # 44-211_561_Homeless_Case_Management_Program.htm uses digits followed by "." instead of bullets
+            # 610_SIP_Approval.htm has digits instead of bullets; its not obvious if the digits are meaningful
+            # 63-402_4_Residents_of_Institutions.htm has deeply nested list items prefixed with "1)"
+            # Just treat them as bullets
+            if text.rstrip(").").isdigit():
+                return i
+            # 63-402_4_Residents_of_Institutions.htm has deeply nested list items prefixed with "a."
+            if re.match(r"^[a-z].$", text.strip()):
+                return i
+            assert text == "", f"Unexpected text before list bullet: {text!r}"
+        raise ValueError(f"No bullet found in text list: {texts!r}")
+
+    def __td_to_text(self, td: Tag) -> str:
+        stripped_text = td.get_text().strip()
+        # 42-405_Absence_from_California.htm uses an empty li tag to create a bullet
+        # Unfortunately this is indistinguishable from an empty string when td.get_text().strip() is called
+        # Since we need to distinguish between empty string and a bullet in __indent_level(),
+        # we need to detect and handle this case.
+        if stripped_text == "" and td.find("ul"):
+            return "•"  # Use any character from BULLETS
+        return stripped_text
+
+    def __convert_table_to_list(self, soup: BeautifulSoup, table: Tag) -> None:
+        table.name = "ul"
+        rows = table.find_all("tr", recursive=False)
+        curr_indent_level = 0
+        ul = table
+        ul_stack = [table]
+        START_DEBUG = False
+        for row in rows:
+            if "Whenever a meal voucher will expire on" in row.get_text():
+                pdb.set_trace()
+            if not row.get_text().strip():
+                # Ignore empty rows
+                row.decompose()
+                continue
+
+            row.name = "li"
+            cols = row.find_all(["td", "th"], recursive=False)
+            col_texts = [self.__td_to_text(td) for td in cols]
+            indent_level = self.__indent_level(col_texts)
+
+            # 42-431_2_Noncitizen_Status.htm and CalWORKs/42-200_Property.htm
+            # use a single 3-column table to create a list and sublist
+            if indent_level == curr_indent_level:
+                pass
+            elif indent_level == curr_indent_level + 1:
+                ul = soup.new_tag("ul")
+                ul_stack.append(ul)
+                row.insert_before(ul)
+                curr_indent_level = indent_level
+
+            elif indent_level < curr_indent_level:
+                while len(ul_stack) > indent_level + 1:
+                    ul_stack.pop()
+                ul = ul_stack[-1]
+                curr_indent_level = indent_level
+            else:
+                raise NotImplementedError(
+                    f"Unexpected indent level: {indent_level} vs {curr_indent_level}"
+                )
+
+            assert (
+                len(ul_stack) == indent_level + 1
+            ), f"Expected {indent_level + 1} stack size but got {len(ul_stack)}"
+
+            if ul != table:
+                ul.append(row)
+
+            if indent_level != 0:
+                for col in cols[:indent_level]:
+                    col.decompose()
+                cols = row.find_all(["td", "th"], recursive=False)
+                col_texts = [td.text.strip() for td in cols]
+
+            if START_DEBUG or any(
+                text.strip().startswith("Allowable Purpose") for text in col_texts
+            ):
+                START_DEBUG = True
+                # pdb.set_trace()
+
+            prefix = ""
+            stripped_text = cols[0].get_text().strip()
+            # 42-200_Property.htm has a non-bulleted "Note:" and "SB 169 (2021):" as a list item
+            if re.match(r".+:", stripped_text):
+                content_col = cols[0]
+            else:
+                # 44-211_561_Homeless_Case_Management_Program.htm uses digits followed by "." instead of bullets
+                # 610_SIP_Approval.htm has digits instead of bullets; its not obvious if the digits are meaningful
+                # 63-402_4_Residents_of_Institutions.htm has deeply nested list items prefixed with "a." and "1)"
+                if stripped_text.rstrip(".)").isdigit() or re.match(r"^[a-z].$", stripped_text):
+                    prefix = stripped_text
+                else:
+                    assert (
+                        stripped_text == "" or stripped_text in BULLETS
+                    ), f"First column: {stripped_text!r}"
+                # Remove bullet column
+                cols[0].decompose()
+
+                # 89-201_Minor_Parent.htm has a empty 3rd column
+                # remove empty columns
+                for col in row.find_all(["td", "th"], recursive=False):
+                    if col.get_text().strip() == "":
+                        col.decompose()
+                cols = row.find_all(["td", "th"], recursive=False)
+                col_texts = [td.text.strip() for td in cols]
+                assert len(cols) == 1, f"Expected only 1 non-empty column but got: {col_texts!r}"
+                content_col = cols[0]
+
+            if prefix:
+                if prefix[-1] not in [".", ":", ")"]:
+                    # Add some delimiter to separate the prefix from the content
+                    prefix += ":"
+                content_col.insert_before(f"{prefix} ")
+            content_col.name = "span"
+            _remove_empty_elements(content_col.contents)
+            if content_col.contents[0].name and content_col.contents[0].name in ["p"]:
+                # to prevent line break immediately after bullet character
+                content_col.contents[0].name = "span"
+
+            for child in content_col.contents:
+                if child.name == "table":
+                    # Handle nested tables acting as a sublist (42-431_2_Noncitizen_Status.htm)
+                    target_type = self.__table_conversion_type(child)
+                    if target_type == TargetElementType.LIST:
+                        self.__convert_table_to_list(soup, child)
+                    elif target_type == TargetElementType.RAW_TEXT:
+                        self.__table_to_raw_text(child)
+                elif child.name == "p":
+                    # Replace <p> tags with <span> tags to keep content visually within the list item (42-200_Property.htm)
+                    child.name = "span"
+                    child.insert_before(soup.new_tag("br"))
+                elif child.name in ["span", "p"]:
+                    pass
+
+    def __has_single_column_row(self, rows: list[Tag]) -> bool:
+        for row in rows:
+            cols = row.find_all(["td", "th"], recursive=False)
+            if len(cols) == 1:
+                return True
+        return False
+
+    def __convert_table_to_subsections(
         self, soup: BeautifulSoup, table: Tag, heading_level: int
     ) -> None:
         rows = table.find_all("tr", recursive=False)
 
         # Use first row as table headings if all cells are bold
         cols = rows[0].find_all(["td", "th"], recursive=False)
+
         if len(cols) == 2 and self.__table_row_is_heading(cols):
             # Since all cells are bold, treat them as table headings
             table_headings = [cell.get_text().strip() for cell in cols]
@@ -542,20 +839,38 @@ class LA_PolicyManualSpider(scrapy.Spider):
             # Since all cells are not bold, assume they are not table headings
             table_headings = ["" for _ in range(2)]
 
+        has_single_column_row = self.__has_single_column_row(rows)
         for row in rows:
             cols = row.find_all(["td", "th"], recursive=False)
             if len(cols) == 1:
                 # Treat single column rows as a heading
                 row.name = "span"
-                row.attrs = {}  # remove any attributes to clear clutter
-                cols[0].name = f"h{heading_level + 1}"
+                row.attrs = {}  # remove any attributes to clear clutter while debugging
+                if len(row.get_text().strip()) > 120:
+                    raise ValueError(f"Row text seems too long for a heading: {row.get_text()!r}")
+                else:
+                    cols[0].name = f"h{heading_level + 1}"
             elif len(cols) == 2:
                 # Treat 2-column rows as a subheading and its associated body
                 row.name = "div"
                 row.attrs = {}
+
                 # Use first column as a subheading
-                cols[0].name = f"h{heading_level + 2}"
+                curr_heading_level = (
+                    heading_level + 2 if has_single_column_row else heading_level + 1
+                )
+                cols[0].name = f"h{curr_heading_level}"
                 cols[0].attrs = {}
+
+                # Handle multiple lines in the first column (42-431_2_Noncitizen_Status.htm: "Qualified noncitizens who ...")
+                splits = split_block_tags(cols[0])
+                col0_remainder = soup.new_tag("div")
+                for split in splits[2:]:
+                    for s in split:
+                        col0_remainder.append(s)
+                self.__fix_body(curr_heading_level, soup, col0_remainder)
+                cols[0].insert_after(col0_remainder)
+
                 for child in cols[0].contents:
                     if child.name:
                         child.name = "span"  # to prevent line break
@@ -563,15 +878,15 @@ class LA_PolicyManualSpider(scrapy.Spider):
                     if cols[0].contents[0].name:
                         cols[0].contents[0].name = "span"  # to prevent line break
                     cols[0].contents[0].insert_before(f"{table_headings[0]}: ")
+
                 # Use second column as the section text under the subheading
                 cols[1].name = "div"
                 cols[1].attrs = {}
-                self.__fix_body(heading_level, soup, cols[1])
+                self.__fix_body(curr_heading_level, soup, cols[1])
                 if table_headings[1]:
                     if cols[1].contents[0].name:
                         cols[1].contents[0].name = "span"  # to prevent line break
                     cols[1].contents[0].insert_before(f"{table_headings[1]}: ")
-
             else:
                 raise NotImplementedError(f"Too many columns in row: {len(cols)}: {cols.strings}")
 
@@ -582,7 +897,9 @@ class LA_PolicyManualSpider(scrapy.Spider):
     def __table_row_is_heading(self, first_row_cols: Sequence[Tag]) -> bool:
         # If all columns are bold, then treat the row as a heading
         if all(cell.find_all("b") for cell in first_row_cols):
-            return True
+            # unless there is a table in any cell, then it's not a heading (42-431_2_Noncitizen_Status.htm)
+            if not any(cell.find_all("table") for cell in first_row_cols):
+                return True
 
         # If all columns have a p tag using WD_TableHeading class, then treat the row as a heading
         if [
@@ -614,6 +931,18 @@ def _nonempty_paragraphs(rows: list[Tag]) -> Sequence[Tag]:
     return __flatten_and_filter_out_blank(rows, lambda row: row.find_all("p"))
 
 
+def _remove_empty_elements(contents: list[Tag]) -> None:
+    # Iterate over a copy of contents since list will be modified, esp. when contents is Tag.contents
+    for c in list(contents):
+        stripped_text = c.get_text().strip()
+        if stripped_text in [""]:
+            if isinstance(c, NavigableString):
+                # for NavigableString (raw text) which doesn't have decompose()
+                c.extract()
+            else:
+                c.decompose()
+
+
 def __flatten_and_filter_out_blank(rows: list[Tag], resultset_generator: Callable) -> Sequence[Tag]:
     return [
         para
@@ -640,6 +969,22 @@ TYPICAL_TOC_LINKS = {
 }
 
 
+def split_block_tags(tag: Tag) -> list[list[Tag]]:
+    "Split block-level tags into separate tags for each line"
+    splits = []
+    curr_split: list[PageElement] = []
+    for c in tag.contents:
+        if c.name in ["p", "div", "table"]:
+            if curr_split:
+                splits.append(curr_split)
+            curr_split = [c]
+        else:
+            curr_split.append(c)
+    if curr_split:
+        splits.append(curr_split)
+    return splits
+
+
 # endregion
 
 
@@ -657,12 +1002,32 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     # TODO: Enable and test, if this is desired
     # h.skip_internal_links = False
 
-    # wrap 'pre' blocks with [code]...[/code] tags
-    h2t.mark_code = True
-    # Include the <sup> and <sub> tags
-    h2t.include_sup_sub = True
+    # Exclude the <sup> and <sub> tags
+    h2t.include_sup_sub = False
 
     markdown = h2t.handle(html)
-    # Remove headings with only a bullet, such as 42-431_2_Noncitizen_Status.htm
-    markdown = re.sub("^#####  ·\n\n", "- ", markdown, flags=re.MULTILINE)
+
+    # Remove the bullet before list items prefixed with a number/letter and dot/')'
+    # (eg, 41-400_Deprivation.htm, Coverage_for_Immigrants.htm)
+    # because this causes markdown_tree (i.e., mistletoe) to treat a single list item
+    # as an unordered list item with a nested ordered sublist item
+    markdown = re.sub(r"^( *)[\*|\-|\+] (\w{1,2}+[\.|\)] )", r"\1\2", markdown, flags=re.MULTILINE)
+
+    # Pickle_Program.htm produces "~~~~" which gets interpreted as a code block when chunking
+    markdown = markdown.replace("~~~~", "")
+
+    # 44-220_Emergency_Aid.htm produces extraneous "****"
+    markdown = re.sub(r"^\*\*\*\*\n", "", markdown, flags=re.MULTILINE)
+
+    # 63-503_41_Self-Employment_Income.htm produces "---" after a 1-column,1-row table
+    # Remove "---" lines, which causes the previous line to be interpreted as a heading
+    markdown = re.sub(r"^\-\-\- *\n", "", markdown, flags=re.MULTILINE)
+
+    # Ill-formatted lists causes markdown chunking error (44-220_Emergency_Aid.htm)
+    # Remove bullet before "Note:" text
+    markdown = re.sub(r"^ *\* \*\*_Note_\*\*", "**_Note_**", markdown, flags=re.MULTILINE)
+
+    # Consolidate newlines
+    markdown = re.sub(r"\n\n+", "\n\n", markdown)
+
     return markdown.strip()

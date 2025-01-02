@@ -72,6 +72,7 @@ ingest-edd-web = "src.ingest_edd_web:main"
 scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 ingest-imagine-la = "src.ingestion.imagine_la.ingest:main"
 scrape-la-policy = "src.ingestion.scrape_la_policy:main"
+ingest-la-policy = "src.ingest_la_county_policy:main"
 
 [tool.black]
 line-length = 100

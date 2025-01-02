@@ -3,22 +3,23 @@ import logging
 import os
 import re
 import sys
-from typing import Optional, Sequence
+from pathlib import Path
+from typing import Callable, Optional, Sequence
 
 from nutree import Tree
 from smart_open import open as smart_open
-from sqlalchemy import and_
-from sqlalchemy.sql import exists
 
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
-from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
+from src.ingestion.markdown_chunking import chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
+    DefaultChunkingConfig,
     add_embeddings,
     deconstruct_list,
     deconstruct_table,
+    document_exists,
     process_and_ingest_sys_args,
     reconstruct_list,
     reconstruct_table,
@@ -27,61 +28,6 @@ from src.util.ingest_utils import (
 from src.util.string_utils import remove_links, split_markdown_by_heading
 
 logger = logging.getLogger(__name__)
-
-
-def _item_exists(db_session: db.Session, item: dict[str, str], doc_attribs: dict[str, str]) -> bool:
-    # Existing documents are determined by the source URL; could use document.content instead
-    if db_session.query(
-        exists().where(
-            and_(
-                Document.source == item["url"],
-                Document.dataset == doc_attribs["dataset"],
-                Document.program == doc_attribs["program"],
-                Document.region == doc_attribs["region"],
-            )
-        )
-    ).scalar():
-        logger.info("Skipping -- item already exists: %r", item["url"])
-        return True
-    return False
-
-
-def _ingest_edd_web(
-    db_session: db.Session,
-    json_filepath: str,
-    doc_attribs: dict[str, str],
-    resume: bool = False,
-) -> None:
-    with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
-        json_items = json.load(json_file)
-
-    if resume:
-        json_items = [
-            item for item in json_items if not _item_exists(db_session, item, doc_attribs)
-        ]
-
-    # First, split all json_items into chunks (fast) to debug any issues quickly
-    all_chunks = _create_chunks(json_items, doc_attribs)
-    logger.info(
-        "Done splitting %d webpages into %d chunks",
-        len(json_items),
-        sum(len(chunks) for _, chunks, _ in all_chunks),
-    )
-    for document, chunks, splits in all_chunks:
-        if not chunks:
-            logger.warning("No chunks for %r", document.source)
-            continue
-
-        logger.info("Adding embeddings for %r", document.source)
-        # Next, add embeddings to each chunk (slow)
-        add_embeddings(chunks, [s.text_to_encode for s in splits])
-        logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
-
-        # Then, add to the database
-        db_session.add(document)
-        db_session.add_all(chunks)
-        if resume:
-            db_session.commit()
 
 
 class SplitWithContextText:
@@ -120,9 +66,83 @@ class SplitWithContextText:
         return False
 
 
-def _create_chunks(
-    json_items: Sequence[dict[str, str]],
+def _ingest_edd_web(
+    db_session: db.Session,
+    json_filepath: str,
     doc_attribs: dict[str, str],
+    resume: bool = False,
+) -> None:
+    def prep_json_item(item: dict[str, str]) -> dict[str, str]:
+        markdown = item.get("main_content", item.get("main_primary", None))
+        assert markdown, f"Item {item['url']} has no main_content or main_primary"
+        item["markdown"] = _fix_input_markdown(markdown)
+        return item
+
+    common_base_url = "https://edd.ca.gov/en/"
+    ingest_json(db_session, json_filepath, doc_attribs, common_base_url, resume, prep_json_item)
+
+
+def ingest_json(
+    db_session: db.Session,
+    json_filepath: str,
+    doc_attribs: dict[str, str],
+    common_base_url: str,
+    resume: bool = False,
+    prep_json_item: Callable[[dict[str, str]], dict[str, str]] = lambda x: x,
+) -> None:
+    json_items = load_json_items(db_session, json_filepath, doc_attribs, resume)
+
+    for item in json_items:
+        item = prep_json_item(item)
+
+    # First, split all json_items into chunks (fast) to debug any issues quickly
+    all_chunks = _create_chunks(json_items, doc_attribs, common_base_url)
+    # Then save to DB, which is slow since embeddings are computed
+    save_to_db(db_session, resume, all_chunks)
+
+
+def load_json_items(
+    db_session: db.Session, json_filepath: str, doc_attribs: dict[str, str], resume: bool = False
+) -> Sequence[dict[str, str]]:
+    with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
+        json_items = json.load(json_file)
+
+    def verbose_document_exists(item: dict[str, str]) -> bool:
+        if document_exists(db_session, item["url"], doc_attribs):
+            logger.info("Skipping -- document already exists: %s", item["url"])
+            return True
+        return False
+
+    if resume:
+        json_items = [item for item in json_items if not verbose_document_exists(item)]
+
+    return json_items
+
+
+def save_to_db(
+    db_session: db.Session,
+    resume: bool,
+    all_chunks: Sequence[tuple[Document, Sequence[Chunk], Sequence[SplitWithContextText]]],
+) -> None:
+    for document, chunks, splits in all_chunks:
+        if not chunks:
+            logger.warning("No chunks for %r", document.source)
+            continue
+
+        logger.info("Adding embeddings for %r", document.source)
+        # Next, add embeddings to each chunk (slow)
+        add_embeddings(chunks, [s.text_to_encode for s in splits])
+        logger.info("Embedded webpage across %d chunks: %r", len(chunks), document.name)
+
+        # Then, add to the database
+        db_session.add(document)
+        db_session.add_all(chunks)
+        if resume:
+            db_session.commit()
+
+
+def _create_chunks(
+    json_items: Sequence[dict[str, str]], doc_attribs: dict[str, str], common_base_url: str
 ) -> Sequence[tuple[Document, Sequence[Chunk], Sequence[SplitWithContextText]]]:
     urls_processed: set[str] = set()
     result = []
@@ -135,13 +155,22 @@ def _create_chunks(
         logger.info("Processing: %s", item["url"])
         urls_processed.add(item["url"])
 
-        content = item.get("main_content", item.get("main_primary"))
-        assert content, f"Item {item['url']} has no main_content or main_primary"
+        assert "markdown" in item, f"Item {item['url']} has no markdown content"
+        content = item["markdown"]
 
-        document = Document(name=item["title"], content=content, source=item["url"], **doc_attribs)
-        chunks, splits = _chunk_page(document, content)
-        logger.info("Split into %d chunks: %s", len(chunks), item["title"])
+        assert "title" in item, f"Item {item['url']} has no title"
+        title = item["title"]
+        document = Document(name=title, content=content, source=item["url"], **doc_attribs)
+        if os.path.exists("SAVE_CHUNKS"):
+            _save_markdown_to_file(document, common_base_url)
+        chunks, splits = _chunk_page(document, common_base_url)
+        logger.info("Split into %d chunks: %s", len(chunks), title)
         result.append((document, chunks, splits))
+    logger.info(
+        "Done splitting %d webpages into %d chunks",
+        len(json_items),
+        sum(len(chunks) for _, chunks, _ in result),
+    )
     return result
 
 
@@ -149,13 +178,16 @@ USE_MARKDOWN_TREE = True
 
 
 def _chunk_page(
-    document: Document, content: str
+    document: Document, common_base_url: str
 ) -> tuple[Sequence[Chunk], Sequence[SplitWithContextText]]:
     if USE_MARKDOWN_TREE:
-        splits = _create_splits_using_markdown_tree(content, document)
+        splits = _create_splits_using_markdown_tree(document, common_base_url)
     else:
         splits = []
-        for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + content):
+        assert document.content
+        for headings, text in split_markdown_by_heading(
+            f"# {document.name}\n\n" + document.content
+        ):
             # Start a new split for each heading
             section_splits = _split_heading_section(headings, text)
             splits.extend(section_splits)
@@ -174,22 +206,16 @@ def _chunk_page(
     return chunks, splits
 
 
-class EddChunkingConfig(ChunkingConfig):
-    def __init__(self) -> None:
-        super().__init__(app_config.sentence_transformer.max_seq_length)
-
-    def text_length(self, text: str) -> int:
-        return len(tokenize(text))
-
-
 def _create_splits_using_markdown_tree(
-    content: str, document: Document
+    document: Document, common_base_url: str
 ) -> list[SplitWithContextText]:
     splits: list[SplitWithContextText] = []
-    chunking_config = EddChunkingConfig()
-    content = _fix_input_markdown(content)
+    chunking_config = DefaultChunkingConfig()
     try:
-        tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
+        assert document.content
+        tree = create_markdown_tree(
+            document.content, doc_name=document.name, doc_source=document.source
+        )
         tree_chunks = chunk_tree(tree, chunking_config)
 
         for chunk in tree_chunks:
@@ -204,7 +230,8 @@ def _create_splits_using_markdown_tree(
                 split.data_ids = ", ".join(chunk.data_ids)
         if os.path.exists("SAVE_CHUNKS"):
             assert document.source
-            _save_splits_to_files(document.source, content, splits, tree)
+            path = "chunks-log/" + document.source.removeprefix(common_base_url).rstrip("/")
+            _save_splits_to_files(f"{path}.json", document.source, document.content, splits, tree)
     except (Exception, KeyboardInterrupt) as e:  # pragma: no cover
         logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
         logger.error(tree.format())
@@ -222,6 +249,10 @@ def _fix_input_markdown(markdown: str) -> str:
     # in https://edd.ca.gov/en/about_edd/eddnext
     markdown = markdown.replace("* + ", "    + ")
 
+    # Blank sublist '* ###" in https://edd.ca.gov/en/unemployment/Employer_Information/
+    # Tab labels are parsed into list items with headings; remove them
+    markdown = re.sub(r"^\s*\* #+", "", markdown, flags=re.MULTILINE)
+
     # Blank sublist '* +" in https://edd.ca.gov/en/unemployment/Employer_Information/
     # Empty sublist '4. * ' in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
     # Remove empty nested sublists
@@ -231,12 +262,21 @@ def _fix_input_markdown(markdown: str) -> str:
     return markdown
 
 
+def _save_markdown_to_file(document: Document, common_base_url: str) -> None:
+    assert document.source
+    file_path = "chunks-log/" + document.source.removeprefix(common_base_url).rstrip("/")
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    logger.info("Saving markdown to %r", f"{file_path}.md")
+    assert document.content
+    Path(f"{file_path}.md").write_text(document.content, encoding="utf-8")
+
+
 def _save_splits_to_files(
-    uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
+    file_path: str, uri: str, content: str, splits: list[SplitWithContextText], tree: Tree
 ) -> None:  # pragma: no cover
-    url_path = "chunks-log/" + uri.removeprefix("https://edd.ca.gov/en/").rstrip("/")
-    os.makedirs(os.path.dirname(url_path), exist_ok=True)
-    with open(f"{url_path}.json", "w", encoding="utf-8") as file:
+    logger.info("Saving chunks to %r", file_path)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, "w", encoding="utf-8") as file:
         file.write(f"{uri} => {len(splits)} chunks\n")
         file.write("\n")
         for split in splits:
