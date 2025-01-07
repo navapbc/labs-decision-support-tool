@@ -20,7 +20,7 @@ def _ingest_la_county_policy(
         return item
 
     common_base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/"
-    ingest_json(db_session, json_filepath, doc_attribs, common_base_url, resume, prep_json_item)
+    ingest_json(db_session, json_filepath, doc_attribs, "la_policy_md", common_base_url, resume, prep_json_item)
 
 
 def main() -> None:
