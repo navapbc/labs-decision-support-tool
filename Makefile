@@ -27,6 +27,7 @@ __check_defined = \
 
 
 .PHONY : \
+	clean-build \
 	help \
 	infra-check-app-database-roles \
 	infra-check-compliance-checkov \
@@ -184,6 +185,10 @@ endif
 # Generate an informational tag so we can see where every image comes from.
 DATE := $(shell date -u '+%Y%m%d.%H%M%S')
 INFO_TAG := $(DATE).$(USER)
+
+clean-build: ## Clean docker containers
+	@:$(call check_defined, APP_NAME, the name of subdirectory of /infra that holds the application's infrastructure code)
+	cd $(APP_NAME) && $(MAKE) clean-build \
 
 release-build: ## Build release for $APP_NAME and tag it with current git hash
 	@:$(call check_defined, APP_NAME, the name of subdirectory of /infra that holds the application's infrastructure code)

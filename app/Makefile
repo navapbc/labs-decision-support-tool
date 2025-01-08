@@ -69,6 +69,9 @@ release-build:
 		$(OPTS) \
 		.
 
+clean-build:
+	docker volume rm $(docker volume ls -qf dangling=true)
+
 ##################################################
 # Local Development Environment Setup
 ##################################################
