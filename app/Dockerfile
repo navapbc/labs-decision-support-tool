@@ -23,6 +23,8 @@ RUN apt-get update \
     python3-opencv \
     # Reduce the image size by clear apt cached lists
     # Complies with https://github.com/codacy/codacy-hadolint/blob/master/codacy-hadolint/docs/description/DL3009.md
+    && rm -fr /tmp/fanal-* \
+    && rm -fr /tmp/stereoscope-* \
     && rm -fr /var/lib/apt/lists/* \
     && rm /etc/ssl/private/ssl-cert-snakeoil.key
 
