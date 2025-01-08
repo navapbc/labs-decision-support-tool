@@ -70,7 +70,7 @@ release-build:
 		.
 
 clean-build:
-	docker volume rm $(docker volume ls -qf dangling=true)
+	docker volume prune
 
 ##################################################
 # Local Development Environment Setup
