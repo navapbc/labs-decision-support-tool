@@ -10,7 +10,6 @@ FROM python:3.12-slim AS base
 # https://python-poetry.org
 RUN pip install --no-cache-dir poetry==1.5
 
-# hadolint ignore=DL3008
 RUN apt-get update \
     # Install security updates
     # https://pythonspeed.com/articles/security-updates-in-docker/
