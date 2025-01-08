@@ -139,8 +139,12 @@ def ingest_json(
 
     # First, chunk all json_items into splits (fast) to debug any issues quickly
     all_splits = _chunk_into_splits_from_json(base_dir, json_items, doc_attribs, common_base_url)
-    # Then save to DB, which is slow since embeddings are computed
-    save_to_db(db_session, resume, all_splits)
+
+    if os.path.exists("SKIP_DB"):
+        logger.info("Skip saving to DB")
+    else:
+        # Then save to DB, which is slow since embeddings are computed
+        save_to_db(db_session, resume, all_splits)
 
 
 def load_json_items(
@@ -150,7 +154,9 @@ def load_json_items(
         json_items = json.load(json_file)
 
     def verbose_document_exists(item: dict[str, str]) -> bool:
-        if document_exists(db_session, item["url"], doc_attribs):
+        if os.path.exists("SKIP_DB"):
+            logger.debug("Skip DB lookup for %s", item["url"])
+        elif document_exists(db_session, item["url"], doc_attribs):
             logger.info("Skipping -- document already exists in DB: %s", item["url"])
             return True
         return False
@@ -203,21 +209,21 @@ def _chunk_into_splits_from_json(
     urls_processed: set[str] = set()
     result = []
     for item in json_items:
-        if item["url"] in urls_processed:
+        assert "url" in item, f"Item {item['url']} has no url"
+        url = item["url"]
+        if url in urls_processed:
             # Workaround for duplicate items from web scraping
-            logger.warning("Skipping duplicate URL: %s", item["url"])
+            logger.warning("Skipping duplicate URL: %s", url)
             continue
 
-        logger.info("Processing: %s", item["url"])
-        urls_processed.add(item["url"])
+        logger.info("Processing: %s", url)
+        urls_processed.add(url)
 
-        assert "markdown" in item, f"Item {item['url']} has no markdown content"
-        assert "title" in item, f"Item {item['url']} has no title"
+        assert "title" in item, f"Item {url} has no title"
+        assert "markdown" in item, f"Item {url} has no markdown content"
         document = Document(
-            name=item["title"], content=item["markdown"], source=item["url"], **doc_attribs
+            name=item["title"], content=item["markdown"], source=url, **doc_attribs
         )
-        assert document.content
-        assert document.source
 
         file_path = _file_base_path(base_dir, common_base_url, document)
         md_file_path = f"{file_path}.md"
@@ -237,6 +243,7 @@ def _chunk_into_splits_from_json(
         else:
             splits = _chunk_page(document)
             logger.info("  Chunked into %d splits: %r", len(splits), document.name)
+            assert document.source
             _save_splits_to_files(chunks_file_path, document.source, splits)
 
         result.append((document, splits))
@@ -297,13 +304,13 @@ def _create_splits_using_markdown_tree(document: Document) -> list[Split]:
 
 
 def _save_markdown_to_file(md_file_path: str, document: Document) -> None:
-    logger.info("Saving markdown to %r", md_file_path)
+    logger.info("  Saving markdown to %r", md_file_path)
     assert document.content
     Path(md_file_path).write_text(document.content, encoding="utf-8")
 
 
 def _save_splits_to_files(file_path: str, uri: str, splits: Sequence[Split]) -> None:
-    logger.info("Saving splits to %r", file_path)
+    logger.info("  Saving splits to %r", file_path)
     splits_json = json.dumps([split.__dict__ for split in splits], indent=2)
     Path(file_path).write_text(splits_json, encoding="utf-8")
 
