@@ -16,9 +16,13 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
         rows = list(reader)  # Convert reader to list to preserve order
         questions = [row["question"] for row in rows]
 
-        # Process questions in parallel while preserving order
-        with ThreadPoolExecutor() as executor:
-            processed_data = list(executor.map(lambda q: _process_question(q, engine), questions))
+        # Process questions sequentially to avoid thread-safety issues with LiteLLM
+        # Previous parallel implementation caused high CPU usage due to potential thread-safety
+        # concerns in the underlying LLM client libraries
+        processed_data = []
+        for q in questions:
+            processed_data.append(_process_question(q, engine))
+
 
         # Update rows with processed data while preserving original order
         for row, data in zip(rows, processed_data, strict=True):
