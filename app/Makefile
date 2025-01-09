@@ -175,6 +175,9 @@ test-audit: ## Run audit logging tests
 test-watch: ## Run tests continually and watch for changes
 	$(PY_RUN_CMD) pytest-watch --clear $(args)
 
+test-performance: ## Run performance tests with verbose output
+	$(PY_RUN_CMD) pytest -v -m "performance" $(args)
+
 test-coverage: ## Run tests and generate coverage report
 	$(PY_RUN_CMD) coverage run --branch --source=src -m pytest -m "not audit" $(args)
 	$(PY_RUN_CMD) coverage report

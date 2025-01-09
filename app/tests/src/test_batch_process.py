@@ -1,7 +1,11 @@
+import csv
+import os
+import tempfile
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from src import chat_engine
-from src.batch_process import _process_question, batch_process
+from src.batch_process import _process_question_worker, batch_process
 from src.chat_engine import OnMessageResult
 from src.db.models.document import Subsection
 from tests.src.db.models.factories import ChunkFactory
@@ -44,7 +48,7 @@ async def test_batch_process(monkeypatch, sample_csv, engine):
             return {"answer": "Answer to What is AI?", "field_2": "value_2"}
         return {"answer": "Answer to Second question", "field_3": "value_3"}
 
-    monkeypatch.setattr("src.batch_process._process_question", mock__process_question)
+    monkeypatch.setattr("src.batch_process._process_question_worker", mock__process_question)
 
     result = await batch_process(sample_csv, engine)
     with open(result) as f:
@@ -66,7 +70,7 @@ def test_process_question(monkeypatch, engine):
     )
 
     monkeypatch.setattr(engine, "on_message", lambda question, chat_history: mock_result)
-    assert _process_question("What is AI?", engine) == {
+    assert _process_question_worker("What is AI?", engine) == {
         "answer": "Answer to question.(citation-1)",
         "citation_1_name": mock_result.subsections[0].chunk.document.name,
         "citation_1_headings": " > ".join(mock_result.subsections[0].text_headings),
