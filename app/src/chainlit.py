@@ -255,17 +255,15 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
 
     try:
         engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
-        
         result_file_path = await batch_process(file.path, engine)
 
         # E.g., "abcd.csv" to "abcd_results.csv"
         result_file_name = file.name.removesuffix(".csv") + "_results.csv"
 
         elements = [cl.File(name=result_file_name, path=result_file_path)]
-        
         await cl.Message(
             author="backend",
-            content=f"File processed, results attached.",
+            content="File processed, results attached.",
             metadata={
                 "status": "processing_complete",
                 "original_file": file.name,
@@ -280,7 +278,7 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
             content=f"Error processing file: {err}",
             metadata={
                 "status": "processing_error",
-                "error_class": err.__class__.__name__, 
+                "error_class": err.__class__.__name__,
                 "error": str(err)
-            },
+            }
         ).send()
