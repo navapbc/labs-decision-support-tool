@@ -1,6 +1,5 @@
 import csv
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
 
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
@@ -22,7 +21,6 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
         processed_data = []
         for q in questions:
             processed_data.append(_process_question(q, engine))
-
 
         # Update rows with processed data while preserving original order
         for row, data in zip(rows, processed_data, strict=True):
