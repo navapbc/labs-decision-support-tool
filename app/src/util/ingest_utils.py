@@ -2,11 +2,13 @@ import argparse
 import inspect
 import json
 import logging
+import os
 import re
 from logging import Logger
+from pathlib import Path
 from typing import Callable, Optional, Sequence
 
-from smart_open import open
+from smart_open import open as smart_open
 from sqlalchemy import and_, delete, select
 from sqlalchemy.sql import exists
 
@@ -249,11 +251,49 @@ def _join_up_to_max_seq_length(
     return chunks
 
 
+def create_file_path(base_dir: str, common_base_url: str, source_url: str) -> str:
+    assert common_base_url.endswith("/")
+    relative_path = source_url.removeprefix(common_base_url)
+    assert not relative_path.startswith("/")
+    file_path = os.path.join(base_dir, relative_path)
+
+    if file_path == "" or file_path.endswith("/"):
+        # Ensure that the file_path ends with a filename
+        file_path += "_index"
+    return file_path
+
+
+def load_or_save_doc_markdown(file_path: str, document: Document) -> str:
+    md_file_path = f"{file_path}.md"
+    if os.path.exists(md_file_path):
+        # Load the markdown content from the file in case it's been manually edited
+        logger.info("  Loading markdown from file: %r", md_file_path)
+        document.content = Path(md_file_path).read_text(encoding="utf-8")
+    else:
+        logger.info("  Saving markdown to %r", md_file_path)
+        assert document.content
+        os.makedirs(os.path.dirname(md_file_path), exist_ok=True)
+        Path(md_file_path).write_text(document.content, encoding="utf-8")
+    return file_path
+
+
 def save_json(file_path: str, chunks: list[Chunk]) -> None:
     chunks_as_json = [chunk.to_json() for chunk in chunks]
-
-    with open(file_path + ".json", "w") as file:
+    with smart_open(file_path, "w") as file:
         file.write(json.dumps(chunks_as_json))
+
+    # Save prettified chunks to a markdown file for manual inspection
+    with open(f"{os.path.splitext(file_path)[0]}.md", "w", encoding="utf-8") as file:
+        file.write(f"{len(chunks)} chunks\n")
+        file.write("\n")
+        for chunk in chunks:
+            if not chunk.tokens:
+                chunk.tokens = len(tokenize(chunk.content))
+
+            file.write(f"---\nlength:   {chunk.tokens}\nheadings: {chunk.headings}\n---\n")
+            file.write(chunk.content)
+            file.write("\n====================================\n")
+        file.write("\n\n")
 
 
 class DefaultChunkingConfig(ChunkingConfig):
