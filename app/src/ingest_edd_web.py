@@ -88,6 +88,7 @@ def _ingest_edd_web(
     db_session: db.Session,
     json_filepath: str,
     doc_attribs: dict[str, str],
+    skip_db: bool = False,
     resume: bool = False,
 ) -> None:
     def prep_json_item(item: dict[str, str]) -> dict[str, str]:
@@ -98,7 +99,14 @@ def _ingest_edd_web(
 
     common_base_url = "https://edd.ca.gov/en/"
     ingest_json(
-        db_session, json_filepath, doc_attribs, "edd_md", common_base_url, resume, prep_json_item
+        db_session,
+        json_filepath,
+        doc_attribs,
+        "edd_md",
+        common_base_url,
+        skip_db,
+        resume,
+        prep_json_item,
     )
 
 
@@ -131,10 +139,11 @@ def ingest_json(
     doc_attribs: dict[str, str],
     md_base_dir: str,
     common_base_url: str,
+    skip_db: bool = False,
     resume: bool = False,
     prep_json_item: Callable[[dict[str, str]], dict[str, str]] = lambda x: x,
 ) -> None:
-    json_items = load_json_items(db_session, json_filepath, doc_attribs, resume)
+    json_items = load_json_items(db_session, json_filepath, doc_attribs, skip_db, resume)
 
     for item in json_items:
         item = prep_json_item(item)
@@ -142,7 +151,7 @@ def ingest_json(
     # First, chunk all json_items into splits (fast) to debug any issues quickly
     all_splits = _chunk_into_splits_from_json(md_base_dir, json_items, doc_attribs, common_base_url)
 
-    if os.path.exists("SKIP_DB"):
+    if skip_db:
         logger.info("Skip saving to DB")
     else:
         # Then save to DB, which is slow since embeddings are computed
@@ -150,13 +159,17 @@ def ingest_json(
 
 
 def load_json_items(
-    db_session: db.Session, json_filepath: str, doc_attribs: dict[str, str], resume: bool = False
+    db_session: db.Session,
+    json_filepath: str,
+    doc_attribs: dict[str, str],
+    skip_db: bool = False,
+    resume: bool = False,
 ) -> Sequence[dict[str, str]]:
     with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
         json_items = json.load(json_file)
 
     def verbose_document_exists(item: dict[str, str]) -> bool:
-        if os.path.exists("SKIP_DB"):
+        if skip_db:
             logger.debug("Skip DB lookup for %s", item["url"])
         elif document_exists(db_session, item["url"], doc_attribs):
             logger.info("Skipping -- document already exists in DB: %s", item["url"])

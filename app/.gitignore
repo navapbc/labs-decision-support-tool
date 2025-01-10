@@ -47,7 +47,3 @@ documents/
 
 # intermediate markdown files during ingestion
 /*_md/
-
-# temp files for configuring ingestion
-SKIP_DB
-

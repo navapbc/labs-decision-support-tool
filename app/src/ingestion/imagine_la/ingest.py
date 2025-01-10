@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 from typing import Sequence
 
@@ -94,6 +93,7 @@ def _ingest_content_hub(
     db_session: db.Session,
     html_file_dir: str,
     doc_attribs: dict[str, str],
+    skip_db: bool = False,
 ) -> None:
     file_list = sorted(get_files(html_file_dir))
 
@@ -115,7 +115,7 @@ def _ingest_content_hub(
         result = _parse_html(md_base_dir, common_base_url, file_path, doc_attribs)
         all_chunks.append(result)
 
-    if os.path.exists("SKIP_DB"):
+    if skip_db:
         logger.info("Skip saving to DB")
     else:
         for document, chunks, chunk_texts_to_encode in all_chunks:

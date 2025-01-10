@@ -55,15 +55,22 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
     parser.add_argument("benefit_region")
     parser.add_argument("file_path")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--skip_db", action="store_true")
     args = parser.parse_args(argv[1:])
 
+    params = inspect.signature(ingestion_call).parameters
     if args.resume:
-        params = inspect.signature(ingestion_call).parameters
         if "resume" not in params:
             raise NotImplementedError(
                 f"Ingestion function does not support `resume`: {ingestion_call}"
             )
         logger.info("Enabled resuming from previous run.")
+    if args.skip_db:
+        if "skip_db" not in params:
+            raise NotImplementedError(
+                f"Ingestion function does not support `skip_db`: {ingestion_call}"
+            )
+        logger.info("Skipping reading or writing to the DB.")
 
     doc_attribs = {
         "dataset": args.dataset_id,
@@ -74,13 +81,15 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
 
     with app_config.db_session() as db_session:
         if args.resume:
-            ingestion_call(db_session, args.file_path, doc_attribs, resume=args.resume)
+            ingestion_call(
+                db_session, args.file_path, doc_attribs, skip_db=args.skip_db, resume=args.resume
+            )
         else:
             dropped = _drop_existing_dataset(db_session, args.dataset_id)
             if dropped:
                 logger.warning("Dropped existing dataset %s", args.dataset_id)
             db_session.commit()
-            ingestion_call(db_session, args.file_path, doc_attribs)
+            ingestion_call(db_session, args.file_path, doc_attribs, skip_db=args.skip_db)
         db_session.commit()
 
     logger.info("Finished ingesting")
@@ -283,7 +292,7 @@ def save_json(file_path: str, chunks: list[Chunk]) -> None:
         file.write(json.dumps(chunks_as_json))
 
     # Save prettified chunks to a markdown file for manual inspection
-    with open(f"{os.path.splitext(file_path)[0]}.md", "w", encoding="utf-8") as file:
+    with smart_open(f"{os.path.splitext(file_path)[0]}.md", "w", encoding="utf-8") as file:
         file.write(f"{len(chunks)} chunks\n")
         file.write("\n")
         for chunk in chunks:

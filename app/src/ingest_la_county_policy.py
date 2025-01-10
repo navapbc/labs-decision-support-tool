@@ -12,6 +12,7 @@ def _ingest_la_county_policy(
     db_session: db.Session,
     json_filepath: str,
     doc_attribs: dict[str, str],
+    skip_db: bool = False,
     resume: bool = False,
 ) -> None:
     def prep_json_item(item: dict[str, str]) -> dict[str, str]:
@@ -26,6 +27,7 @@ def _ingest_la_county_policy(
         doc_attribs,
         "la_policy_md",
         common_base_url,
+        skip_db,
         resume,
         prep_json_item,
     )
