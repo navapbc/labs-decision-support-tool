@@ -1,5 +1,6 @@
 import json
 import logging
+from tempfile import TemporaryDirectory
 
 import pytest
 from sqlalchemy import delete, select
@@ -110,11 +111,11 @@ def test__ingest_edd(
 
     db_session.execute(delete(Document))
 
-    with caplog.at_level(logging.WARNING):
+    with TemporaryDirectory(suffix="edd_md") as md_base_dir, caplog.at_level(logging.WARNING):
         if file_location == "local":
-            _ingest_edd_web(db_session, edd_web_local_file, doc_attribs)
+            _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, md_base_dir=md_base_dir)
         else:
-            _ingest_edd_web(db_session, edd_web_s3_file, doc_attribs)
+            _ingest_edd_web(db_session, edd_web_s3_file, doc_attribs, md_base_dir=md_base_dir)
 
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 4
@@ -224,17 +225,22 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
 
     db_session.execute(delete(Document))
 
-    with caplog.at_level(logging.WARNING):
-        _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, resume=True)
+    with TemporaryDirectory(suffix="edd_md") as md_base_dir:
+        with caplog.at_level(logging.WARNING):
+            _ingest_edd_web(
+                db_session, edd_web_local_file, doc_attribs, md_base_dir=md_base_dir, resume=True
+            )
 
-    check_database_contents(db_session, caplog)
+        check_database_contents(db_session, caplog)
 
-    # Re-ingesting the same data should not add any new documents
-    with caplog.at_level(logging.INFO):
-        _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, resume=True)
+        # Re-ingesting the same data should not add any new documents
+        with caplog.at_level(logging.INFO):
+            _ingest_edd_web(
+                db_session, edd_web_local_file, doc_attribs, md_base_dir=md_base_dir, resume=True
+            )
 
     skipped_logs = {
-        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists:")
+        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists")
     }
     assert len(skipped_logs) == 4
     assert db_session.query(Document.id).count() == 4

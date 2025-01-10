@@ -1,5 +1,6 @@
 import json
 import logging
+from tempfile import TemporaryDirectory
 
 import pytest
 from sqlalchemy import delete
@@ -40,17 +41,30 @@ def test_ingestion(caplog, app_config, db_session, la_county_policy_local_file):
 
     db_session.execute(delete(Document))
 
-    with caplog.at_level(logging.WARNING):
-        _ingest_la_county_policy(db_session, la_county_policy_local_file, doc_attribs, resume=True)
+    with TemporaryDirectory(suffix="la_policy_md") as md_base_dir:
+        with caplog.at_level(logging.WARNING):
+            _ingest_la_county_policy(
+                db_session,
+                la_county_policy_local_file,
+                doc_attribs,
+                md_base_dir=md_base_dir,
+                resume=True,
+            )
 
-    check_database_contents(db_session, caplog)
+        check_database_contents(db_session, caplog)
 
-    # Re-ingesting the same data should not add any new documents
-    with caplog.at_level(logging.INFO):
-        _ingest_la_county_policy(db_session, la_county_policy_local_file, doc_attribs, resume=True)
+        # Re-ingesting the same data should not add any new documents
+        with caplog.at_level(logging.INFO):
+            _ingest_la_county_policy(
+                db_session,
+                la_county_policy_local_file,
+                doc_attribs,
+                md_base_dir=md_base_dir,
+                resume=True,
+            )
 
     skipped_logs = {
-        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists:")
+        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists")
     }
     assert len(skipped_logs) == 4
     assert db_session.query(Document.id).count() == 4

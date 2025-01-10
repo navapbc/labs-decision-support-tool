@@ -83,6 +83,7 @@ def test_process_and_ingest_sys_args_calls_ingest(caplog):
                 "program": "SNAP",
                 "region": "Michigan",
             },
+            skip_db=False,
         )
 
 
@@ -153,7 +154,9 @@ def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_c
         )
 
     # Use an unmocked function so that the resume parameter is detectable by process_and_ingest_sys_args()
-    def ingest_with_resume(db_session, json_filepath, doc_attribs, resume=False) -> None:
+    def ingest_with_resume(
+        db_session, json_filepath, doc_attribs, skip_db=False, resume=False
+    ) -> None:
         logger.info("Ingesting with resume: %r", resume)
 
     DocumentFactory.create(dataset="CA EDD")
@@ -278,8 +281,9 @@ def test__save_json(file_location, mock_s3_bucket_resource):
         if file_location == "s3"
         else os.path.join(tempfile.mkdtemp(), "test.pdf")
     )
-    save_json(file_path, chunks)
-    saved_json = json.loads(open(file_path + ".json", "r").read())
+    json_file = f"{file_path}.json"
+    save_json(json_file, chunks)
+    saved_json = json.loads(open(json_file, "r").read())
     assert saved_json == [
         {
             "id": str(chunks[0].id),

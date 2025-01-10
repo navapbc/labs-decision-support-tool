@@ -2,11 +2,13 @@ import argparse
 import inspect
 import json
 import logging
+import os
 import re
 from logging import Logger
+from pathlib import Path
 from typing import Callable, Optional, Sequence
 
-from smart_open import open
+from smart_open import open as smart_open
 from sqlalchemy import and_, delete, select
 from sqlalchemy.sql import exists
 
@@ -53,15 +55,22 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
     parser.add_argument("benefit_region")
     parser.add_argument("file_path")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--skip_db", action="store_true")
     args = parser.parse_args(argv[1:])
 
+    params = inspect.signature(ingestion_call).parameters
     if args.resume:
-        params = inspect.signature(ingestion_call).parameters
         if "resume" not in params:
             raise NotImplementedError(
                 f"Ingestion function does not support `resume`: {ingestion_call}"
             )
         logger.info("Enabled resuming from previous run.")
+    if args.skip_db:
+        if "skip_db" not in params:
+            raise NotImplementedError(
+                f"Ingestion function does not support `skip_db`: {ingestion_call}"
+            )
+        logger.info("Skipping reading or writing to the DB.")
 
     doc_attribs = {
         "dataset": args.dataset_id,
@@ -72,13 +81,15 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
 
     with app_config.db_session() as db_session:
         if args.resume:
-            ingestion_call(db_session, args.file_path, doc_attribs, resume=args.resume)
+            ingestion_call(
+                db_session, args.file_path, doc_attribs, skip_db=args.skip_db, resume=args.resume
+            )
         else:
             dropped = _drop_existing_dataset(db_session, args.dataset_id)
             if dropped:
                 logger.warning("Dropped existing dataset %s", args.dataset_id)
             db_session.commit()
-            ingestion_call(db_session, args.file_path, doc_attribs)
+            ingestion_call(db_session, args.file_path, doc_attribs, skip_db=args.skip_db)
         db_session.commit()
 
     logger.info("Finished ingesting")
@@ -249,11 +260,49 @@ def _join_up_to_max_seq_length(
     return chunks
 
 
+def create_file_path(base_dir: str, common_base_url: str, source_url: str) -> str:
+    assert common_base_url.endswith("/")
+    relative_path = source_url.removeprefix(common_base_url)
+    assert not relative_path.startswith("/")
+    file_path = os.path.join(base_dir, relative_path)
+
+    if file_path == "" or file_path.endswith("/"):
+        # Ensure that the file_path ends with a filename
+        file_path += "_index"
+    return file_path
+
+
+def load_or_save_doc_markdown(file_path: str, document: Document) -> str:
+    md_file_path = f"{file_path}.md"
+    if os.path.exists(md_file_path):
+        # Load the markdown content from the file in case it's been manually edited
+        logger.info("  Loading markdown from file: %r", md_file_path)
+        document.content = Path(md_file_path).read_text(encoding="utf-8")
+    else:
+        logger.info("  Saving markdown to %r", md_file_path)
+        assert document.content
+        os.makedirs(os.path.dirname(md_file_path), exist_ok=True)
+        Path(md_file_path).write_text(document.content, encoding="utf-8")
+    return file_path
+
+
 def save_json(file_path: str, chunks: list[Chunk]) -> None:
     chunks_as_json = [chunk.to_json() for chunk in chunks]
-
-    with open(file_path + ".json", "w") as file:
+    with smart_open(file_path, "w") as file:
         file.write(json.dumps(chunks_as_json))
+
+    # Save prettified chunks to a markdown file for manual inspection
+    with smart_open(f"{os.path.splitext(file_path)[0]}.md", "w", encoding="utf-8") as file:
+        file.write(f"{len(chunks)} chunks\n")
+        file.write("\n")
+        for chunk in chunks:
+            if not chunk.tokens:
+                chunk.tokens = len(tokenize(chunk.content))
+
+            file.write(f"---\nlength:   {chunk.tokens}\nheadings: {chunk.headings}\n---\n")
+            file.write(chunk.content)
+            file.write("\n====================================\n")
+        file.write("\n\n")
 
 
 class DefaultChunkingConfig(ChunkingConfig):

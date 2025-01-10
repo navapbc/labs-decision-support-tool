@@ -49,11 +49,9 @@ Accordion 22 Body"""
 
     with caplog.at_level(logging.INFO):
         if file_location == "local":
-            _ingest_content_hub(
-                db_session, "/app/tests/docs/imagine_la/", doc_attribs, should_save_json=False
-            )
+            _ingest_content_hub(db_session, "/app/tests/docs/imagine_la/", doc_attribs)
         else:
-            _ingest_content_hub(db_session, s3_html, doc_attribs, should_save_json=False)
+            _ingest_content_hub(db_session, s3_html, doc_attribs)
 
         assert any(text.startswith("Processing file: ") for text in caplog.messages)
 

@@ -43,5 +43,7 @@ documents/
 .chainlit/translations/*.json
 !.chainlit/translations/en-US.json
 
-/chunks-log/
 /src/ingestion/imagine_la/scrape/pages/*
+
+# intermediate markdown files during ingestion
+/*_md/

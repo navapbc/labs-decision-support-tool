@@ -12,6 +12,8 @@ def _ingest_la_county_policy(
     db_session: db.Session,
     json_filepath: str,
     doc_attribs: dict[str, str],
+    md_base_dir: str = "la_policy_md",
+    skip_db: bool = False,
     resume: bool = False,
 ) -> None:
     def prep_json_item(item: dict[str, str]) -> dict[str, str]:
@@ -20,7 +22,16 @@ def _ingest_la_county_policy(
         return item
 
     common_base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/"
-    ingest_json(db_session, json_filepath, doc_attribs, common_base_url, resume, prep_json_item)
+    ingest_json(
+        db_session,
+        json_filepath,
+        doc_attribs,
+        md_base_dir,
+        common_base_url,
+        skip_db,
+        resume,
+        prep_json_item,
+    )
 
 
 def main() -> None:
