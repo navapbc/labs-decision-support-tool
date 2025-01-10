@@ -279,8 +279,9 @@ def test__save_json(file_location, mock_s3_bucket_resource):
         if file_location == "s3"
         else os.path.join(tempfile.mkdtemp(), "test.pdf")
     )
-    save_json(file_path, chunks)
-    saved_json = json.loads(open(file_path + ".json", "r").read())
+    json_file = f"{file_path}.json"
+    save_json(json_file, chunks)
+    saved_json = json.loads(open(json_file, "r").read())
     assert saved_json == [
         {
             "id": str(chunks[0].id),

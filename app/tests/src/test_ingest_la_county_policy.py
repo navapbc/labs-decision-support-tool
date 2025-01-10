@@ -50,7 +50,7 @@ def test_ingestion(caplog, app_config, db_session, la_county_policy_local_file):
         _ingest_la_county_policy(db_session, la_county_policy_local_file, doc_attribs, resume=True)
 
     skipped_logs = {
-        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists:")
+        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists")
     }
     assert len(skipped_logs) == 4
     assert db_session.query(Document.id).count() == 4
