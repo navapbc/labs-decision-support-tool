@@ -20,7 +20,7 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
         # Previous parallel implementation caused high CPU usage due to potential thread-safety
         # concerns in the underlying LLM client libraries
         processed_data = []
-        
+
         # Create a progress message that we'll update
         import chainlit as cl
         progress_msg = cl.Message(content="Received file, starting batch processing...")
@@ -30,7 +30,7 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
             # Update progress message
             progress_msg.content = f"Processing question {i} of {total_questions}..."
             await progress_msg.update()
-            
+
             processed_data.append(_process_question(q, engine))
 
         # Clean up progress message
