@@ -213,6 +213,7 @@ async def on_message(message: cl.Message) -> None:
             metadata=_get_retrieval_metadata(result),
         ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
+        logger.exception("Error processing message: %r", message.content)
         await cl.Message(
             author="backend",
             metadata={"error_class": err.__class__.__name__, "error": str(err)},
@@ -248,26 +249,21 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
 
 
 async def _batch_proccessing(file: AskFileResponse) -> None:
-    await cl.Message(
-        author="backend",
-        content="Received file, processing...",
-    ).send()
-
     try:
         engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
         result_file_path = await batch_process(file.path, engine)
 
         # E.g., "abcd.csv" to "abcd_results.csv"
         result_file_name = file.name.removesuffix(".csv") + "_results.csv"
-
         await cl.Message(
+            author="backend",
             content="File processed, results attached.",
             elements=[cl.File(name=result_file_name, path=result_file_path)],
         ).send()
 
     except ValueError as err:
+        logger.error("Error processing file %r: %s", file.name, err)
         await cl.Message(
             author="backend",
-            metadata={"error_class": err.__class__.__name__, "error": str(err)},
-            content=f"{err.__class__.__name__}: {err}",
+            content=f"Error processing file: {err}",
         ).send()
