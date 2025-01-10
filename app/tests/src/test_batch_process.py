@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 from src import chat_engine
 from src.batch_process import _process_question, batch_process
@@ -30,6 +31,22 @@ def invalid_csv(tmp_path):
     return str(csv_path)
 
 
+@pytest.fixture
+def mock_chainlit_message(monkeypatch):
+    mock_message = MagicMock()
+    mock_message.send = AsyncMock()
+    mock_message.update = AsyncMock()
+    mock_message.remove = AsyncMock()
+    
+    class MockMessage:
+        def __init__(self, content):
+            self.content = content
+            for attr, value in mock_message.__dict__.items():
+                setattr(self, attr, value)
+    
+    monkeypatch.setattr("chainlit.Message", MockMessage)
+
+
 @pytest.mark.asyncio
 async def test_batch_process_invalid(invalid_csv, engine):
     engine = chat_engine.create_engine("ca-edd-web")
@@ -38,7 +55,7 @@ async def test_batch_process_invalid(invalid_csv, engine):
 
 
 @pytest.mark.asyncio
-async def test_batch_process(monkeypatch, sample_csv, engine):
+async def test_batch_process(monkeypatch, sample_csv, engine, mock_chainlit_message):
     def mock__process_question(question, engine):
         if question == "What is AI?":
             return {"answer": "Answer to What is AI?", "field_2": "value_2"}

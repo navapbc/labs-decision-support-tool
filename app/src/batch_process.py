@@ -1,6 +1,7 @@
 import csv
 import tempfile
 
+import chainlit as cl
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 
@@ -21,8 +22,6 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
         # concerns in the underlying LLM client libraries
         processed_data = []
 
-        # Create a progress message that we'll update
-        import chainlit as cl
         progress_msg = cl.Message(content="Received file, starting batch processing...")
         await progress_msg.send()
 

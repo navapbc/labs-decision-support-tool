@@ -257,7 +257,7 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
         await cl.Message(
             author="backend",
             content="File processed, results attached.",
-            elements=[cl.File(name=result_file_name, path=result_file_path)]
+            elements=[cl.File(name=result_file_name, path=result_file_path)],
         ).send()
 
     except ValueError as err:
