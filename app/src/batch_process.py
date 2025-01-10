@@ -18,9 +18,7 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
         # Process questions sequentially to avoid thread-safety issues with LiteLLM
         # Previous parallel implementation caused high CPU usage due to potential thread-safety
         # concerns in the underlying LLM client libraries
-        processed_data = []
-        for q in questions:
-            processed_data.append(_process_question(q, engine))
+        processed_data = [_process_question(q, engine) for q in questions]
 
         # Update rows with processed data while preserving original order
         for row, data in zip(rows, processed_data, strict=True):
