@@ -213,6 +213,7 @@ async def on_message(message: cl.Message) -> None:
             metadata=_get_retrieval_metadata(result),
         ).send()
     except Exception as err:  # pylint: disable=broad-exception-caught
+        logger.exception("Error processing message: %r", message.content)
         await cl.Message(
             author="backend",
             metadata={"error_class": err.__class__.__name__, "error": str(err)},
@@ -261,6 +262,7 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
         ).send()
 
     except ValueError as err:
+        logger.error("Error processing file %r: %s", file.name, err)
         await cl.Message(
             author="backend",
             content=f"Error processing file: {err}",
