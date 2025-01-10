@@ -260,7 +260,6 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
         # E.g., "abcd.csv" to "abcd_results.csv"
         result_file_name = file.name.removesuffix(".csv") + "_results.csv"
 
-        elements = [cl.File(name=result_file_name, path=result_file_path)]
         await cl.Message(
             author="backend",
             content="File processed, results attached.",
@@ -269,7 +268,7 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
                 "original_file": file.name,
                 "result_file": result_file_name
             },
-            elements=elements
+            elements=[cl.File(name=result_file_name, path=result_file_path)]
         ).send()
 
     except ValueError as err:
