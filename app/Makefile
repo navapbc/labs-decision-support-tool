@@ -248,11 +248,28 @@ ifndef FILEPATH
 	$(error FILEPATH is undefined)
 endif
 
+scrape-edd-web:
+	$(PY_RUN_CMD) scrape-edd-web
+
 ingest-edd-web: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-edd-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
 
+
+scrape-imagine-la:
+	cd src/ingestion/imagine_la/scrape; uv run --no-project scrape_content_hub.py https://socialbenefitsnavigator25.web.app/contenthub $(CONTENTHUB_PASSWORD)
+
 ingest-imagine-la: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-imagine-la "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
+
+
+scrape-la-county-policy:
+	# Use playwright to scrape dynamic la_policy_nav_bar.html, required for the next step
+	cd src/ingestion/la_policy/scrape; uv run --no-project scrape_la_policy_nav_bar.py
+
+	# Now that we have the expanded nav bar, scrape all the links in the nav bar
+	# Either should work:
+	# DEBUG_SCRAPINGS=true uv run --no-project scrape_la_policy.py &> out.log
+	$(PY_RUN_CMD) scrape-la-policy 2>&1 | tee out.log
 
 ingest-la-county-policy: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-la-policy "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)

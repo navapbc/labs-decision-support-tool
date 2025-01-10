@@ -67,6 +67,17 @@ poetry run scrape-edd-web
 
 To load into the vector database, see sections above but use `make ingest-edd-web DATASET_ID="CA EDD" BENEFIT_PROGRAM=employment BENEFIT_REGION=California FILEPATH=src/ingestion/edd_scrapings.json`.
 
+
+### To Skip Access to the DB
+
+For dry-runs or exporting of markdown files, avoid reading and writing to the DB during ingestion by adding the `--skip_db` argument like so:
+```
+make ingest-edd-web DATASET_ID="CA EDD test" BENEFIT_PROGRAM=employment BENEFIT_REGION=California FILEPATH=src/ingestion/edd_scrapings.json INGEST_ARGS="--skip_db"
+```
+
+See PR #171 for other examples.
+
+
 ## Batch processing
 
 To have answers generated for multiple questions at once, create a .csv file with a `question` column, for example:

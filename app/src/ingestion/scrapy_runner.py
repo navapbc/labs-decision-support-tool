@@ -33,7 +33,7 @@ def run_spider(spider_name: str, output_json_filename: str) -> None:
     process.crawl(spider_name)
     process.start()  # the script will block here until the crawling is finished
 
-    logger.info("Scraping results saved to %s", output_json_filename)
+    logger.info("Scraping results saved to %s", os.path.realpath(output_json_filename))
 
 
 def postprocess_json(input_filename: str) -> None:

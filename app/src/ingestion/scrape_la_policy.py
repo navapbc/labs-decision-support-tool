@@ -22,7 +22,7 @@ def main() -> None:
 
     from .scrapy_runner import run
 
-    run(SPIDER_NAME, OUTPUT_JSON, debug=bool(os.environ["DEBUG_SCRAPINGS"]))
+    run(SPIDER_NAME, OUTPUT_JSON, debug=bool(os.environ.get("DEBUG_SCRAPINGS", False)))
 
 
 if __name__ == "__main__":
