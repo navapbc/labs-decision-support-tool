@@ -154,7 +154,9 @@ def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_c
         )
 
     # Use an unmocked function so that the resume parameter is detectable by process_and_ingest_sys_args()
-    def ingest_with_resume(db_session, json_filepath, doc_attribs, skip_db=False, resume=False) -> None:
+    def ingest_with_resume(
+        db_session, json_filepath, doc_attribs, skip_db=False, resume=False
+    ) -> None:
         logger.info("Ingesting with resume: %r", resume)
 
     DocumentFactory.create(dataset="CA EDD")

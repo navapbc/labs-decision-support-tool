@@ -12,6 +12,7 @@ def _ingest_la_county_policy(
     db_session: db.Session,
     json_filepath: str,
     doc_attribs: dict[str, str],
+    md_base_dir: str = "la_policy_md",
     skip_db: bool = False,
     resume: bool = False,
 ) -> None:
@@ -25,7 +26,7 @@ def _ingest_la_county_policy(
         db_session,
         json_filepath,
         doc_attribs,
-        "la_policy_md",
+        md_base_dir,
         common_base_url,
         skip_db,
         resume,

@@ -93,6 +93,7 @@ def _ingest_content_hub(
     db_session: db.Session,
     html_file_dir: str,
     doc_attribs: dict[str, str],
+    md_base_dir: str = "imagine_la_md",
     skip_db: bool = False,
 ) -> None:
     file_list = sorted(get_files(html_file_dir))
@@ -104,7 +105,6 @@ def _ingest_content_hub(
         doc_attribs,
     )
     common_base_url = "https://socialbenefitsnavigator25.web.app/contenthub/"
-    md_base_dir = "imagine_la_md"
 
     all_chunks: list[tuple[Document, Sequence[Chunk], Sequence[str]]] = []
     for file_path in file_list:
