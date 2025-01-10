@@ -14,11 +14,27 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
 
         rows = list(reader)  # Convert reader to list to preserve order
         questions = [row["question"] for row in rows]
+        total_questions = len(questions)
 
         # Process questions sequentially to avoid thread-safety issues with LiteLLM
         # Previous parallel implementation caused high CPU usage due to potential thread-safety
         # concerns in the underlying LLM client libraries
-        processed_data = [_process_question(q, engine) for q in questions]
+        processed_data = []
+        
+        # Create a progress message that we'll update
+        import chainlit as cl
+        progress_msg = cl.Message(content="Received file, starting batch processing...")
+        await progress_msg.send()
+
+        for i, q in enumerate(questions, 1):
+            # Update progress message
+            progress_msg.content = f"Processing question {i} of {total_questions}..."
+            await progress_msg.update()
+            
+            processed_data.append(_process_question(q, engine))
+
+        # Clean up progress message
+        await progress_msg.remove()
 
         # Update rows with processed data while preserving original order
         for row, data in zip(rows, processed_data, strict=True):
