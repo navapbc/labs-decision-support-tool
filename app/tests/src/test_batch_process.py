@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from src import chat_engine
 from src.batch_process import _process_question, batch_process
@@ -37,13 +38,13 @@ def mock_chainlit_message(monkeypatch):
     mock_message.send = AsyncMock()
     mock_message.update = AsyncMock()
     mock_message.remove = AsyncMock()
-    
+
     class MockMessage:
         def __init__(self, content):
             self.content = content
             for attr, value in mock_message.__dict__.items():
                 setattr(self, attr, value)
-    
+
     monkeypatch.setattr("chainlit.Message", MockMessage)
 
 
