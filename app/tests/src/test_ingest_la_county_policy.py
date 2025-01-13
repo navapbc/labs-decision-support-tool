@@ -29,7 +29,7 @@ def la_county_policy_local_file(tmp_path, sample_markdown):
 
 
 doc_attribs = {
-    "dataset": "LA County Policy",
+    "dataset": "DPSS Policy",
     "program": "mixed",
     "region": "California:LA County",
 }
