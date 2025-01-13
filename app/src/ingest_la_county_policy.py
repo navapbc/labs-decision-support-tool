@@ -16,12 +16,18 @@ def _ingest_la_county_policy(
     skip_db: bool = False,
     resume: bool = False,
 ) -> None:
+    common_base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/"
+
     def prep_json_item(item: dict[str, str]) -> dict[str, str]:
         # More often than not, the h2 heading is better suited as the title
         item["title"] = item["h2"]
+
+        # Include the program name in the document title
+        program_name = item["h1"]
+        item["title"] = f"{program_name}: {item['title']}"
+        item["program_short_name"] = doc_attribs["url"].removeprefix(common_base_url).split("/")[0]
         return item
 
-    common_base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/"
     ingest_json(
         db_session,
         json_filepath,
