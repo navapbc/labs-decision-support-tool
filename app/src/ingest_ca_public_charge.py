@@ -2,10 +2,10 @@ import logging
 import sys
 
 from src.adapters import db
-from src.ingest_edd_web import (
+from src.ingest_edd_web import (  # TODO: move ingest_json() to ingest_utils.py
     _fix_input_markdown,
     ingest_json,
-)  # TODO: move ingest_json() to ingest_utils.py
+)
 from src.util.ingest_utils import process_and_ingest_sys_args
 
 logger = logging.getLogger(__name__)
