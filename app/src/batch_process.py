@@ -62,6 +62,7 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
     logger.info("Batch processing complete. Results written to: %r", result_file.name)
     return result_file.name
 
+
 def _process_question(question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
     logger.debug("Processing question: %r", question)
     result = engine.on_message(question=question, chat_history=[])
@@ -83,4 +84,3 @@ def _process_question(question: str, engine: ChatEngineInterface) -> dict[str, s
 
     logger.debug("Question processed with %d citations", len(final_result.subsections))
     return result_table
-
