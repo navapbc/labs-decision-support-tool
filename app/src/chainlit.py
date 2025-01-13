@@ -251,7 +251,8 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
 async def _batch_proccessing(file: AskFileResponse) -> None:
     try:
         engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
-        result_file_path = await batch_process(file.path, engine)
+        # Make the synchronous batch_process function non-blocking
+        result_file_path = await cl.make_async(batch_process)(file.path, engine)
 
         # E.g., "abcd.csv" to "abcd_results.csv"
         result_file_name = file.name.removesuffix(".csv") + "_results.csv"
