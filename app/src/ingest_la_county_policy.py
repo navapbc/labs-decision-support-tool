@@ -25,7 +25,6 @@ def _ingest_la_county_policy(
         # Include the program name in the document title
         program_name = item["h1"]
         item["title"] = f"{program_name}: {item['title']}"
-        item["program_short_name"] = doc_attribs["url"].removeprefix(common_base_url).split("/")[0]
         return item
 
     ingest_json(

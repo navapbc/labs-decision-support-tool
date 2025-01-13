@@ -16,6 +16,7 @@ from .test_ingest_edd_web import check_database_contents, sample_cards  # noqa: 
 def sample_markdown(sample_cards):  # noqa: F811
     items = json.loads(sample_cards)
     for item in items:
+        item["h1"] = "Test Benefit Program"
         item["h2"] = item["title"]
         item["markdown"] = item.get("main_content", item.get("main_primary"))
     return json.dumps(items)
