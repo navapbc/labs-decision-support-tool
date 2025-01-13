@@ -3,7 +3,7 @@ import re
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
-from scrapy.selector import Selector, SelectorList
+from scrapy.selector import SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
 
 from src.util import string_utils  # noqa: E402
