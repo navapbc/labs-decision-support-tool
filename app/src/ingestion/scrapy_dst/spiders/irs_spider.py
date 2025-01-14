@@ -1,5 +1,7 @@
 import re
+from typing import Any, Callable, Iterable, Optional, Sequence
 
+import html2text
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
@@ -10,10 +12,42 @@ from src.util import string_utils  # noqa: E402
 
 AccordionSections = dict[str, list[str]]
 
+"""
+Use web browser to identify patterns across webpages (e.g., heading structure, common CSS classes) to do the scraping
+Test scraping in the Scrapy shell: cd src/ingestion/; scrapy shell https://www.irs.gov/credits-deductions/family-dependents-and-students-credits
+    # Grab the title for document.name
+    title = response.css("h1.pup-page-node-type-article-page__title::text").get().strip()
+    # Get element with non-boilerplate content
+    pup = response.css("div.pup-main-container").get()
+    # Remove elements to declutter desired content
+    response.css("div.sidebar-left").drop()
+    # Re-query after dropping
+    pup = response.css("div.pup-main-container").get()
+    # Convert to markdown
+    import html2text
+    h2t = html2text.HTML2Text()
+    h2t.body_width = 0
+    h2t.wrap_links = False
+    # Check that it has all the desired content
+    print(h2t.handle(pup))
+Incorporate code into Scrapy spider
+Run the spider:
+    Set `CLOSESPIDER_ERRORCOUNT = 1` in app/src/ingestion/scrapy_dst/settings.py so that it stops on the first error
+    Keep an eye on the cache in src/ingestion/.scrapy/httpcache/
+    DEBUG_SCRAPINGS=true poetry run scrape-irs-web
+Update spider with assertions and logger warnings to identify webpages that don't meet expectations
+    Use `allow`, `deny`, and `restrict_css` to limit the crawl scope of the spider
+Iterate
+
+Examine irs_web_scrapings.json-pretty.json
+Ingest: make ingest-irs-web DATASET_ID="IRS" BENEFIT_PROGRAM="tax credit" BENEFIT_REGION="US" FILEPATH=src/ingestion/irs_web_scrapings.json INGEST_ARGS="--skip_db"
+Examine markdown files under irs_web_md/
+"""
+
 
 class IrsSpider(CrawlSpider):
     # This name is used on the commandline: scrapy crawl edd_spider
-    name = "irs_spider"
+    name = "irs_web_spider"
     allowed_domains = ["irs.gov"]
     start_urls = ["https://www.irs.gov/credits-deductions/family-dependents-and-students-credits"]
 
@@ -23,13 +57,11 @@ class IrsSpider(CrawlSpider):
     rules = (
         Rule(
             LinkExtractor(
-                allow=r"credits-deductions/",
-                deny=(
-                ),
+                allow="www.irs.gov/credits-deductions/",
+                deny=("www.irs.gov/credits-deductions/businesses"),
                 allow_domains=allowed_domains,
-                deny_domains=(
-                ),
-                restrict_css=(),
+                deny_domains=(),
+                restrict_css=("div.pup-main-container"),
                 canonicalize=True,
                 unique=True,
             ),
@@ -39,93 +71,52 @@ class IrsSpider(CrawlSpider):
     )
 
     def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
+        self.logger.info("Parsing %s", response.url)
         extractions = {"url": response.url}
 
-        title = response.css("div.full-width-title h1::text").get()
-        if len(response.css("h1::text").getall()) == 1:
-            title = response.css("h1::text").get()
-            extractions["title"] = title.strip()
+        if (h1_count := len(response.css("h1").getall())) > 1:
+            self.logger.warning("Found %i h1 elements for %r", h1_count, response.url)
+            raise ValueError("Multiple h1 elements found")
+
+        if title_elem := response.css("h1.pup-page-node-type-article-page__title"):
+            extractions["title"] = title_elem.css("::text").get().strip()
+        elif title_elem := response.css("h1.pup-page-node-type-landing-page__title"):
+            extractions["title"] = title_elem.css("::text").get().strip()
         else:
-            titles = ";".join(response.css("h1::text").getall())
-            extractions["title"] = titles
+            self.logger.warning("No title for %r", response.url)
+            raise ValueError("No title found")
 
         base_url = response.url
-        if two_thirds := response.css("div.two-thirds"):
-            # Remove buttons from the main content, i.e., "Show All"
-            two_thirds.css("button").drop()
-            extractions |= self.parse_entire_two_thirds(base_url, two_thirds)
+        if pup := response.css("div.pup-main-container"):
+            # Remove elements to declutter desired content
+            response.css("div.sidebar-left").drop()
 
-            if not extractions.get("main_content"):
-                self.logger.warning(
-                    "Insufficient div.two-thirds content, fallback to parsing entire main-content for %s",
-                    response.url,
-                )
-                # The main-content div often has boilerplate navigation content that we usually ignore.
-                # For these 'en/about_edd/news_releases_and_announcements' pages, the navigation content doesn't exist
-                extractions |= self.parse_main_content(base_url, response.css("div#main-content"))
-
-            if accordions := two_thirds.css("div.panel-group.accordion"):
-                if len(accordions) > 1:
-                    self.logger.info("Multiple accordions found at %s", response.url)
-
-                # If these parse methods become more complicated, move them to items.py
-                # and use ItemLoaders https://docs.scrapy.org/en/latest/topics/loaders.html
-                extractions |= self.parse_nonaccordion(base_url, two_thirds)
-                extractions |= self.parse_accordions(base_url, two_thirds)
-
-        elif main_primary := response.css("main.main-primary"):
-            main_primary.css("button").drop()
-            extractions |= self.parse_main_primary(base_url, main_primary)
+            pup_html = pup.get()
+            markdown = to_markdown(pup_html, base_url)
+            extractions["markdown"] = markdown
         else:
-            pass
+            raise ValueError(f"No pup-main-container found in {response.url}")
 
         return extractions
 
-    def to_markdown(self, base_url: str, html: str) -> str:
-        markdown = markdownify(
-            html,
-            heading_style="ATX",
-            escape_asterisks=False,
-            escape_underscores=False,
-            escape_misc=False,
-            sup_symbol="<sup>",
-            sub_symbol="<sub>",
-        )
-        # Clean up markdown text: consolidate newlines; replace non-breaking spaces
-        markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
 
-        # Replace non-absolute URLs with absolute URLs
-        markdown = string_utils.resolve_urls(base_url, markdown)
-        return markdown.strip()
+def to_markdown(html: str, base_url: Optional[str] = None) -> str:
+    h2t = html2text.HTML2Text()
 
-    def parse_main_primary(self, base_url: str, main_primary: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(base_url, main_primary.get())
-        return {"main_primary": markdown}
+    # Refer to https://github.com/Alir3z4/html2text/blob/master/docs/usage.md and html2text.config
+    # for options:
+    # 0 for no wrapping
+    h2t.body_width = 0
+    h2t.wrap_links = False
 
-    def parse_main_content(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(base_url, main_content.get())
-        return {"main_content": markdown}
+    if base_url:
+        h2t.baseurl = base_url
 
-    def parse_entire_two_thirds(self, base_url: str, two_thirds: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(base_url, two_thirds.get())
-        cleaned_markdown = re.sub(r"\[(.*?)\]\(#collapse-(.*?)\)", r"\1", markdown)
-        # FIXME: parse tab panes correctly -- https://irs.ca.gov/en/unemployment/
-        cleaned_markdown = re.sub(r"\[(.*?)\]\(#pane-(.*?)\)", r"\1", cleaned_markdown)
-        return {"main_content": cleaned_markdown}
+    # Exclude the <sup> and <sub> tags
+    h2t.include_sup_sub = False
 
-    def parse_nonaccordion(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
-        # Create a copy for modification without affecting the original
-        nonaccordion = Selector(text=main_content.get())
-        nonaccordion.css("div.panel-group.accordion").drop()
-        return {"nonaccordion": self.to_markdown(base_url, nonaccordion.get())}
+    markdown = h2t.handle(html)
 
-    def parse_accordions(
-        self, base_url: str, main_content: SelectorList
-    ) -> dict[str, AccordionSections]:
-        sections: AccordionSections = {}
-        for p in main_content.css("div.panel.panel-default"):
-            heading = p.css("div.panel-heading :is(h2, h3, h4, h5, h6) a::text").get().strip()
-            paragraphs = p.css("div.panel-body")
-            sections[heading] = [self.to_markdown(base_url, para.get()) for para in paragraphs]
-
-        return {"accordions": sections}
+    # Consolidate newlines
+    markdown = re.sub(r"\n\n+", "\n\n", markdown)
+    return markdown.strip()
