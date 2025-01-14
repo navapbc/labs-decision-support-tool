@@ -11,6 +11,12 @@
         },
         {
             "pattern": "https://navalabs.atlassian.net/browse/DST-"
+        },
+        {
+            "pattern": ".*{{.*}}.*.jinja"
+        },
+        {
+            "pattern": "../../app/migrations.sql"
         }
     ],
     "replacementPatterns": [
