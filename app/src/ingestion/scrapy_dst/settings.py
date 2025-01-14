@@ -20,7 +20,7 @@ LOG_LEVEL = "INFO"
 DEPTH_STATS_VERBOSE = True
 
 # the maximum number of errors to receive before closing the spider
-# CLOSESPIDER_ERRORCOUNT = 1
+CLOSESPIDER_ERRORCOUNT = 1
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True

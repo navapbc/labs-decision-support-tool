@@ -1,48 +1,12 @@
 import re
-from typing import Any, Callable, Iterable, Optional, Sequence
+from typing import Optional
 
 import html2text
-from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
-from scrapy.selector import Selector, SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
 
-from src.util import string_utils  # noqa: E402
-
 AccordionSections = dict[str, list[str]]
-
-"""
-Use web browser to identify patterns across webpages (e.g., heading structure, common CSS classes) to do the scraping
-Test scraping in the Scrapy shell: cd src/ingestion/; scrapy shell https://www.irs.gov/credits-deductions/family-dependents-and-students-credits
-    # Grab the title for document.name
-    title = response.css("h1.pup-page-node-type-article-page__title::text").get().strip()
-    # Get element with non-boilerplate content
-    pup = response.css("div.pup-main-container").get()
-    # Remove elements to declutter desired content
-    response.css("div.sidebar-left").drop()
-    # Re-query after dropping
-    pup = response.css("div.pup-main-container").get()
-    # Convert to markdown
-    import html2text
-    h2t = html2text.HTML2Text()
-    h2t.body_width = 0
-    h2t.wrap_links = False
-    # Check that it has all the desired content
-    print(h2t.handle(pup))
-Incorporate code into Scrapy spider
-Run the spider:
-    Set `CLOSESPIDER_ERRORCOUNT = 1` in app/src/ingestion/scrapy_dst/settings.py so that it stops on the first error
-    Keep an eye on the cache in src/ingestion/.scrapy/httpcache/
-    DEBUG_SCRAPINGS=true poetry run scrape-irs-web
-Update spider with assertions and logger warnings to identify webpages that don't meet expectations
-    Use `allow`, `deny`, and `restrict_css` to limit the crawl scope of the spider
-Iterate
-
-Examine irs_web_scrapings.json-pretty.json
-Ingest: make ingest-irs-web DATASET_ID="IRS" BENEFIT_PROGRAM="tax credit" BENEFIT_REGION="US" FILEPATH=src/ingestion/irs_web_scrapings.json INGEST_ARGS="--skip_db"
-Examine markdown files under irs_web_md/
-"""
 
 
 class IrsSpider(CrawlSpider):
