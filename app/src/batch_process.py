@@ -9,7 +9,7 @@ from src.citations import simplify_citation_numbers
 logger = logging.getLogger(__name__)
 
 
-def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
+async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
     logger.info("Starting batch processing of file: %r", file_path)
     with open(file_path, mode="r", newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
