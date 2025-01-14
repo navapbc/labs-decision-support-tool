@@ -11,15 +11,6 @@
         },
         {
             "pattern": "https://navalabs.atlassian.net/browse/DST-"
-        },
-        {
-            "pattern": ".*%7B%7B.*%7D%7D.*.jinja"
-        },
-        {
-            "pattern": "../../app/migrations.sql"
-        },
-        {
-            "pattern": "^https://medium.com/"
         }
     ],
     "replacementPatterns": [
