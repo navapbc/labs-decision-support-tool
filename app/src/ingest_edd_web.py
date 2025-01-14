@@ -93,11 +93,10 @@ def _ingest_edd_web(
     skip_db: bool = False,
     resume: bool = False,
 ) -> None:
-    def prep_json_item(item: dict[str, str]) -> dict[str, str]:
+    def prep_json_item(item: dict[str, str]) -> None:
         markdown = item.get("main_content", item.get("main_primary", None))
         assert markdown, f"Item {item['url']} has no main_content or main_primary"
         item["markdown"] = _fix_input_markdown(markdown)
-        return item
 
     common_base_url = "https://edd.ca.gov/en/"
     ingest_json(
@@ -143,13 +142,13 @@ def ingest_json(
     common_base_url: str,
     skip_db: bool = False,
     resume: bool = False,
-    prep_json_item: Callable[[dict[str, str]], dict[str, str]] = lambda x: x,
+    prep_json_item: Callable[[dict[str, str]], None] = lambda x: x,
     chunking_config: Optional[ChunkingConfig] = None,
 ) -> None:
     json_items = load_json_items(db_session, json_filepath, doc_attribs, skip_db, resume)
 
     for item in json_items:
-        item = prep_json_item(item)
+        prep_json_item(item)
 
     if not chunking_config:
         chunking_config = DefaultChunkingConfig()
