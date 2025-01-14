@@ -3,7 +3,7 @@ import sys
 
 from src.adapters import db
 from src.ingest_edd_web import ingest_json  # TODO: move ingest_json() to ingest_utils.py
-from src.util.ingest_utils import process_and_ingest_sys_args
+from src.util.ingest_utils import DefaultChunkingConfig, process_and_ingest_sys_args
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,9 @@ def _ingest_la_county_policy(
         item["title"] = f"{program_name}: {item['title']}"
         return item
 
+    chunking_config = DefaultChunkingConfig()
+    # The document name is the same as item["h2"], so it is redundant to include it in the headings
+    chunking_config.include_doc_name_in_headings = False
     ingest_json(
         db_session,
         json_filepath,
@@ -36,6 +39,7 @@ def _ingest_la_county_policy(
         skip_db,
         resume,
         prep_json_item,
+        chunking_config,
     )
 
 

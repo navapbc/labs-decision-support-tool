@@ -3,23 +3,73 @@ import logging
 from tempfile import TemporaryDirectory
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
 from src.ingest_la_county_policy import _ingest_la_county_policy
 
-from .test_ingest_edd_web import check_database_contents, sample_cards  # noqa: F401
-
 
 @pytest.fixture
-def sample_markdown(sample_cards):  # noqa: F811
-    items = json.loads(sample_cards)
-    for item in items:
-        item["h1"] = "Test Benefit Program"
-        item["h2"] = item["title"]
-        item["markdown"] = item.get("main_content", item.get("main_primary"))
-    return json.dumps(items)
+def sample_markdown():
+    return json.dumps(
+        [
+            {
+                "url": "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm",
+                "title": "63-300 Application Process",
+                "h1": "CALFRESH",
+                "h2": "63-300 Application Process",
+                "markdown": """
+# CALFRESH
+
+## 63-300 Application Process
+
+### Purpose
+
+( ) To release a new policy
+
+( ) To release a new form
+
+( X ) To convert existing policy to new writing style only - No concept changes
+
+( X ) Revision of existing policy and/or form(s).
+""",
+            },
+            {
+                "url": "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-133_Treatment_of_Income/44-133_Treatment_of_Income.htm",
+                "title": "44-133 Treatment of Income-v1",
+                "h1": "CalWORKs",
+                "h2": "44-133 Treatment of Income",
+                "markdown": """
+# CalWORKs
+
+## 44-133 Treatment of Income
+
+### Requirements
+
+All income must be reported to the County during the:
+
+  * Intake process;
+  * Redetermination interview;
+  * On the SAR 7 report; and
+  * As a mid-period report.""",
+            },
+            {
+                "url": "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-115_Inkind_Income/44-115_Inkind_Income.htm",
+                "title": "44-115 Inkind Income",
+                "h1": "CalWORKs",
+                "h2": "44-115 Income-In-Kind",
+                "markdown": """
+# CalWORKs
+
+## 44-115 Income-In-Kind
+
+### Background
+
+In accordance with the Welfare and Institution Code 11453, IIK levels are to be adjusted annually to reflect any increases or decreases in COLA.""",
+            },
+        ]
+    )
 
 
 @pytest.fixture
@@ -64,8 +114,38 @@ def test_ingestion(caplog, app_config, db_session, la_county_policy_local_file):
                 resume=True,
             )
 
-    skipped_logs = {
-        msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists")
-    }
-    assert len(skipped_logs) == 4
-    assert db_session.query(Document.id).count() == 4
+
+def check_database_contents(db_session, caplog):
+    documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
+    assert len(documents) == 3
+
+    assert documents[0].name == "CALFRESH: 63-300 Application Process"
+    assert (
+        documents[0].source
+        == "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm"
+    )
+
+    assert documents[1].name == "CalWORKs: 44-115 Income-In-Kind"
+    assert (
+        documents[1].source
+        == "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-115_Inkind_Income/44-115_Inkind_Income.htm"
+    )
+
+    assert documents[2].name == "CalWORKs: 44-133 Treatment of Income"
+    assert (
+        documents[2].source
+        == "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-133_Treatment_of_Income/44-133_Treatment_of_Income.htm"
+    )
+
+    doc0 = documents[0]
+    assert len(doc0.chunks) == 2
+    assert doc0.chunks[0].content.startswith("## 63-300 Application Process\n\n### Purpose\n\n")
+    assert doc0.chunks[0].headings == ["CALFRESH"]
+    assert doc0.chunks[1].content.startswith("# CALFRESH")
+    assert doc0.chunks[1].headings == []
+
+    # Document[1] is short
+    doc1 = documents[1]
+    assert len(doc1.chunks) == 1
+    assert doc1.chunks[0].content.startswith("# CalWORKs\n\n## 44-115 Income-In-Kind\n\n")
+    assert doc1.chunks[0].headings == []
