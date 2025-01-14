@@ -172,7 +172,7 @@ If a prompt is about an EDD program, but you can't tell which one, detect and cl
 
 
 class ImagineLaEngine(BaseEngine):
-    retrieval_k: int = 50
+    retrieval_k: int = 25
     retrieval_k_min_score: float = -1
 
     # Note: currently not used
