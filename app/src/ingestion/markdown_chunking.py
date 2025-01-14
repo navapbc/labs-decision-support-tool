@@ -105,8 +105,8 @@ class ChunkingConfig:
 
     def __init__(self, max_length: int) -> None:
         self.max_length = max_length
-
         self.full_enough_threshold = 0.65
+        self.include_doc_name_in_headings = True
         self.reset()
 
     def reset(self) -> None:
@@ -182,10 +182,11 @@ class ChunkingConfig:
 
     def _headings_with_doc_name(self, node: Node) -> list[str]:
         headings = get_parent_headings_raw(node)
-        document_node = node.tree.first_child()
-        assert document_node.data_type == "Document"
-        if doc_name := document_node.data["name"]:
-            headings.insert(0, doc_name)
+        if self.include_doc_name_in_headings:
+            document_node = node.tree.first_child()
+            assert document_node.data_type == "Document"
+            if doc_name := document_node.data["name"]:
+                headings.insert(0, doc_name)
         return headings
 
     def add_chunks_for_node(self, node_with_intro: NodeWithIntro) -> None:
