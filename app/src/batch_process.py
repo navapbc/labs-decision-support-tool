@@ -42,7 +42,8 @@ async def batch_process(
 
         processed_data = []
 
-        # Process questions with progress updates
+        # Process in smaller batches to manage memory
+        BATCH_SIZE = 10
         for i, q in enumerate(questions, 1):
             logger.info("Processing question %d/%d", i, total_questions)
 
@@ -51,9 +52,13 @@ async def batch_process(
 
             processed_data.append(_process_question(q, engine))
 
-            # Add small delay to prevent overwhelming the system
-            if i % 10 == 0:  # Every 10 questions
+            # Add delay and clear memory after each batch
+            if i % BATCH_SIZE == 0:
                 await asyncio.sleep(0.1)
+                # Force garbage collection to free memory
+                import gc
+
+                gc.collect()
 
         # Update rows with processed data
         for row, data in zip(rows, processed_data, strict=True):
