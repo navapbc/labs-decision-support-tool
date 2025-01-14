@@ -78,11 +78,13 @@ class CaPublicChargeSpider(CrawlSpider):
         return {"main_primary": markdown}
 
     def parse_main_content(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
-        column_detail = ""
+        markdown = ""
         two_column_details = main_content.css("div.list-twocolumn").getall()
+        middler_details = main_content.css("div.middler").getall()
         if two_column_details:
             for one_column in two_column_details:
-                column_detail = self.to_markdown(base_url, one_column)
-        markdown = self.to_markdown(base_url, main_content.get())
-
-        return {"main_content": markdown, "column_details": column_detail}
+                markdown += self.to_markdown(base_url, one_column)
+        if middler_details:
+            for middle_detail in middler_details:
+                markdown += self.to_markdown(base_url, middle_detail)
+        return {"main_content": markdown}
