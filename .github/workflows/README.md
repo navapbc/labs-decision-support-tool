@@ -10,7 +10,7 @@ Each app should have:
 
 - `ci-[app_name]`: must be created; should run linting and testing
 - `ci-[app_name]-vulnerability-scans`: calls `vulnerability-scans`
-  - Based on [ci-app-vulnerability-scans](https://github.com/navapbc/template-infra/blob/main/.github/workflows/ci-app-vulnerability-scans.yml)
+  - Based on [ci-app-vulnerability-scans.yml.jinja](./ci-{{app_name}}-vulnerability-scans.yml.jinja)
 
 ### App-agnostic workflows
 
@@ -23,7 +23,7 @@ Each app should have:
 Each app should have:
 
 - `cd-[app_name]`: deploys an application
-  - Based on [`cd-app`](https://github.com/navapbc/template-infra/blob/main/.github/workflows/cd-app.yml)
+  - Based on [`cd-app.yml.jinja`](./cd-{{app_name}}.yml.jinja)
 
 The CD workflow uses these reusable workflows:
 
