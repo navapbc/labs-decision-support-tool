@@ -14,6 +14,7 @@ from src.db.models.document import Chunk, Document
 from src.ingestion.markdown_chunking import chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
+    ChunkingConfig,
     DefaultChunkingConfig,
     add_embeddings,
     create_file_path,
@@ -143,14 +144,19 @@ def ingest_json(
     skip_db: bool = False,
     resume: bool = False,
     prep_json_item: Callable[[dict[str, str]], dict[str, str]] = lambda x: x,
+    chunking_config: Optional[ChunkingConfig] = None,
 ) -> None:
     json_items = load_json_items(db_session, json_filepath, doc_attribs, skip_db, resume)
 
     for item in json_items:
         item = prep_json_item(item)
 
+    if not chunking_config:
+        chunking_config = DefaultChunkingConfig()
     # First, chunk all json_items into splits (fast) to debug any issues quickly
-    all_splits = _chunk_into_splits_from_json(md_base_dir, json_items, doc_attribs, common_base_url)
+    all_splits = _chunk_into_splits_from_json(
+        md_base_dir, json_items, doc_attribs, common_base_url, chunking_config
+    )
 
     if skip_db:
         logger.info("Skip saving to DB")
@@ -221,6 +227,7 @@ def _chunk_into_splits_from_json(
     json_items: Sequence[dict[str, str]],
     doc_attribs: dict[str, str],
     common_base_url: str,
+    chunking_config: ChunkingConfig,
 ) -> Sequence[tuple[Document, Sequence[Split]]]:
     urls_processed: set[str] = set()
     result = []
@@ -249,7 +256,7 @@ def _chunk_into_splits_from_json(
             splits: Sequence[Split] = [Split.from_dict(split_dict) for split_dict in splits_dicts]
             logger.info("  Loaded %d splits from file: %r", len(splits), chunks_file_path)
         else:
-            splits = _chunk_page(document)
+            splits = _chunk_page(document, chunking_config)
             logger.info("  Chunked into %d splits: %r", len(splits), document.name)
             _save_splits_to_files(chunks_file_path, url, splits)
 
@@ -265,16 +272,17 @@ def _chunk_into_splits_from_json(
 USE_MARKDOWN_TREE = True
 
 
-def _chunk_page(document: Document) -> Sequence[Split]:
+def _chunk_page(document: Document, chunking_config: ChunkingConfig) -> Sequence[Split]:
     if USE_MARKDOWN_TREE:
-        return _create_splits_using_markdown_tree(document)
+        return _create_splits_using_markdown_tree(document, chunking_config)
     else:
         return _create_splits_using_headings(document)
 
 
-def _create_splits_using_markdown_tree(document: Document) -> list[Split]:
+def _create_splits_using_markdown_tree(
+    document: Document, chunking_config: ChunkingConfig
+) -> list[Split]:
     splits: list[Split] = []
-    chunking_config = DefaultChunkingConfig()
     try:
         assert document.content
         tree = create_markdown_tree(

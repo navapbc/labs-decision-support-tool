@@ -85,10 +85,11 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
                 db_session, args.file_path, doc_attribs, skip_db=args.skip_db, resume=args.resume
             )
         else:
-            dropped = _drop_existing_dataset(db_session, args.dataset_id)
-            if dropped:
-                logger.warning("Dropped existing dataset %s", args.dataset_id)
-            db_session.commit()
+            if not args.skip_db:
+                dropped = _drop_existing_dataset(db_session, args.dataset_id)
+                if dropped:
+                    logger.warning("Dropped existing dataset %s", args.dataset_id)
+                db_session.commit()
             ingestion_call(db_session, args.file_path, doc_attribs, skip_db=args.skip_db)
         db_session.commit()
 
