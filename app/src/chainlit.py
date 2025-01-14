@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import pprint
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
+import os
 
 from asyncer import asyncify
 
@@ -20,6 +21,8 @@ from src.login import require_login
 logger = logging.getLogger(__name__)
 
 require_login()
+
+BATCH_RESULTS: dict[str, str] = {}  # Store file paths of completed batch results
 
 
 @cl.on_chat_start
@@ -248,22 +251,66 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
     }
 
 
+@cl.action_callback("download_batch_results")
+async def on_download(action):
+    """Handle downloading of completed batch results"""
+    file_path = BATCH_RESULTS.get(action.value)
+    if file_path and os.path.exists(file_path):
+        await cl.Message(
+            content="Here are your processed results:",
+            elements=[
+                cl.File(name=os.path.basename(file_path), path=file_path)
+            ]
+        ).send()
+        # Optionally cleanup
+        BATCH_RESULTS.pop(action.value)
+    else:
+        await cl.Message(content="Results no longer available").send()
+
+
 async def _batch_proccessing(file: AskFileResponse) -> None:
     try:
-        engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
-        result_file_path = await batch_process(file.path, engine)
+        engine: ChatEngineInterface = cl.user_session.get("chat_engine")
+        
+        # Create a progress message that we'll update
+        progress_msg = cl.Message(content="Starting batch processing...")
+        await progress_msg.send()
 
-        # E.g., "abcd.csv" to "abcd_results.csv"
-        result_file_name = file.name.removesuffix(".csv") + "_results.csv"
-        await cl.Message(
-            author="backend",
-            content="File processed, results attached.",
-            elements=[cl.File(name=result_file_name, path=result_file_path)],
-        ).send()
+        # Process in background task
+        task_id = f"batch_{file.name}_{id(file)}"
+        
+        async def process_and_notify():
+            try:
+                result_file_path = await batch_process(
+                    file.path, 
+                    engine,
+                    progress_callback=lambda current, total: progress_msg.update(
+                        content=f"Processing {current}/{total} questions..."
+                    )
+                )
+                
+                BATCH_RESULTS[task_id] = result_file_path
+                
+                # Update progress message with download action
+                await progress_msg.update(
+                    content="Processing complete! Click to download results:",
+                    actions=[
+                        cl.Action(
+                            name="download_batch_results",
+                            value=task_id,
+                            label="Download Results"
+                        )
+                    ]
+                )
+            except Exception as e:
+                logger.exception("Batch processing failed")
+                await progress_msg.update(content=f"Processing failed: {str(e)}")
 
-    except ValueError as err:
+        # Start processing in background
+        asyncio.create_task(process_and_notify())
+        
+    except Exception as err:
         logger.error("Error processing file %r: %s", file.name, err)
         await cl.Message(
-            author="backend",
             content=f"Error processing file: {err}",
         ).send()
