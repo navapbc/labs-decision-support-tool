@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import gc
 import logging
 import tempfile
 from typing import Awaitable, Callable, Optional
@@ -52,12 +53,11 @@ async def batch_process(
 
             processed_data.append(_process_question(q, engine))
 
-            # Add delay and clear memory after each batch
+            # Clear memory after each batch
             if i % BATCH_SIZE == 0:
+                # Add small delay to prevent overwhelming the system
                 await asyncio.sleep(0.1)
                 # Force garbage collection to free memory
-                import gc
-
                 gc.collect()
 
         # Update rows with processed data
