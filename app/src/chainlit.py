@@ -1,14 +1,16 @@
 import asyncio
 import logging
-import pprint
-from typing import Any, Optional
-from urllib.parse import parse_qs, urlparse
 import os
+import pprint
+from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from asyncer import asyncify
 
 import chainlit as cl
+from chainlit.action import Action
 from chainlit.input_widget import InputWidget, Select, Slider, TextInput
+from chainlit.message import Message
 from chainlit.types import AskFileResponse
 from src import chat_engine
 from src.app_config import app_config
@@ -252,15 +254,13 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
 
 
 @cl.action_callback("download_batch_results")
-async def on_download(action):
+async def on_download(action: Action) -> None:
     """Handle downloading of completed batch results"""
     file_path = BATCH_RESULTS.get(action.value)
     if file_path and os.path.exists(file_path):
         await cl.Message(
             content="Here are your processed results:",
-            elements=[
-                cl.File(name=os.path.basename(file_path), path=file_path)
-            ]
+            elements=[cl.File(name=os.path.basename(file_path), path=file_path)],
         ).send()
         # Optionally cleanup
         BATCH_RESULTS.pop(action.value)
@@ -271,46 +271,47 @@ async def on_download(action):
 async def _batch_proccessing(file: AskFileResponse) -> None:
     try:
         engine: ChatEngineInterface = cl.user_session.get("chat_engine")
-        
-        # Create a progress message that we'll update
-        progress_msg = cl.Message(content="Starting batch processing...")
+
+        # Create initial progress message
+        progress_msg = Message(content="Starting batch processing...")
         await progress_msg.send()
 
         # Process in background task
         task_id = f"batch_{file.name}_{id(file)}"
-        
-        async def process_and_notify():
+
+        async def process_and_notify() -> None:
             try:
+
+                async def update_progress(current: int, total: int) -> None:
+                    # Create new message with updated content
+                    progress_msg.content = f"Processing {current}/{total} questions..."
+                    await progress_msg.update()
+
                 result_file_path = await batch_process(
-                    file.path, 
+                    file.path,
                     engine,
-                    progress_callback=lambda current, total: progress_msg.update(
-                        content=f"Processing {current}/{total} questions..."
-                    )
+                    progress_callback=update_progress,
                 )
-                
+
                 BATCH_RESULTS[task_id] = result_file_path
-                
-                # Update progress message with download action
-                await progress_msg.update(
-                    content="Processing complete! Click to download results:",
-                    actions=[
-                        cl.Action(
-                            name="download_batch_results",
-                            value=task_id,
-                            label="Download Results"
-                        )
-                    ]
-                )
+
+                # Update final message
+                progress_msg.content = "Processing complete! Click to download results:"
+                progress_msg.actions = [
+                    cl.Action(
+                        name="download_batch_results", value=task_id, label="Download Results"
+                    )
+                ]
+                await progress_msg.update()
+
             except Exception as e:
                 logger.exception("Batch processing failed")
-                await progress_msg.update(content=f"Processing failed: {str(e)}")
+                progress_msg.content = f"Processing failed: {str(e)}"
+                await progress_msg.update()
 
         # Start processing in background
         asyncio.create_task(process_and_notify())
-        
+
     except Exception as err:
         logger.error("Error processing file %r: %s", file.name, err)
-        await cl.Message(
-            content=f"Error processing file: {err}",
-        ).send()
+        await cl.Message(content=f"Error processing file: {err}").send()

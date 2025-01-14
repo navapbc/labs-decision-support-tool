@@ -1,10 +1,9 @@
+import asyncio
 import csv
 import logging
 import tempfile
-from typing import Callable, Optional
-import asyncio
+from typing import Awaitable, Callable, Optional
 
-import chainlit as cl
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 
@@ -12,26 +11,26 @@ logger = logging.getLogger(__name__)
 
 
 async def batch_process(
-    file_path: str, 
+    file_path: str,
     engine: ChatEngineInterface,
-    progress_callback: Optional[Callable[[int, int], None]] = None
+    progress_callback: Optional[Callable[[int, int], Awaitable[None]]] = None,
 ) -> str:
     """
     Process a batch of questions from a CSV file.
-    
+
     Args:
         file_path: Path to input CSV file
         engine: Chat engine instance to use
         progress_callback: Optional callback for progress updates
-    
+
     Returns:
         Path to results file
     """
     logger.info("Starting batch processing of file: %r", file_path)
-    
+
     with open(file_path, mode="r", newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
-        
+
         if not reader.fieldnames or "question" not in reader.fieldnames:
             logger.error("Invalid CSV format: missing 'question' column in %r", file_path)
             raise ValueError("CSV file must contain a 'question' column.")
@@ -46,10 +45,10 @@ async def batch_process(
         # Process questions with progress updates
         for i, q in enumerate(questions, 1):
             logger.info("Processing question %d/%d", i, total_questions)
-            
+
             if progress_callback:
                 await progress_callback(i, total_questions)
-                
+
             processed_data.append(_process_question(q, engine))
 
             # Add small delay to prevent overwhelming the system
@@ -61,19 +60,17 @@ async def batch_process(
             row.update(data)
 
         # Prepare output file
-        all_fieldnames = list({
-            f: None for f in 
-            list(reader.fieldnames) + [key for p in processed_data for key in p.keys()]
-        }.keys())
+        all_fieldnames = list(
+            {
+                f: None
+                for f in list(reader.fieldnames) + [key for p in processed_data for key in p.keys()]
+            }.keys()
+        )
 
         result_file = tempfile.NamedTemporaryFile(
-            delete=False, 
-            mode="w",
-            newline="",
-            encoding="utf-8",
-            suffix=".csv"
+            delete=False, mode="w", newline="", encoding="utf-8", suffix=".csv"
         )
-        
+
         writer = csv.DictWriter(result_file, fieldnames=all_fieldnames)
         writer.writeheader()
         writer.writerows(rows)
