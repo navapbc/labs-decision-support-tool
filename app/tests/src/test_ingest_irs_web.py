@@ -14,6 +14,35 @@ from src.ingest_irs_web import _ingest_irs_web
 def sample_markdown():
     return json.dumps(
         [
+            {
+                "url": "https://www.irs.gov/credits-deductions/family-dependents-and-students-credits",
+                "title": "Family, dependents and students credits",
+                "markdown": """Credits can help reduce your taxes or increase your refund.
+
+## Earned Income Tax Credit (EITC)
+
+[The Earned Income Tax Credit (EITC)](https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit-eitc "Earned Income Tax Credit (EITC)") helps low- to moderate-income workers and families.
+""",
+            },
+            {
+                "url": "https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit-eitc",
+                "title": "Earned Income Tax Credit (EITC)",
+                "markdown": """### More In Credits & Deductions
+
+__
+
+  * [Family, dependents and students](https://www.irs.gov/credits-deductions/family-dependents-and-students-credits "Family, dependents and students")
+    * [Earned Income Tax Credit](https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit-eitc "Earned Income Tax Credit")
+      * [EITC Qualification Assistant](https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/use-the-eitc-assistant "EITC Qualification Assistant")
+      * [Who qualifies for the EITC](https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/who-qualifies-for-the-earned-income-tax-credit-eitc "Who qualifies for the EITC")
+      * [Qualifying child or relative for the EITC](https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/qualifying-child-rules "Qualifying child or relative for the EITC")
+      * [Earned income and credit tables](https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/earned-income-and-earned-income-tax-credit-eitc-tables "Earned income and credit tables")
+    * [Child Tax Credit](https://www.irs.gov/credits-deductions/individuals/child-tax-credit "Child Tax Credit")
+    * [Educational credits](https://www.irs.gov/credits-deductions/individuals/education-credits-aotc-llc "Educational credits")
+  * [Clean energy and vehicle credits](https://www.irs.gov/credits-deductions/clean-vehicle-and-energy-credits "Clean energy and vehicle credits")
+  * [Individuals credits and deductions](https://www.irs.gov/credits-and-deductions-for-individuals "Individuals credits and deductions")
+  * [Business credits and deductions](https://www.irs.gov/credits-deductions/businesses "Business credits and deductions")""",
+            },
         ]
     )
 
@@ -48,7 +77,7 @@ def test_ingestion(caplog, app_config, db_session, irs_web_local_file):
                 resume=True,
             )
 
-        # check_database_contents(db_session, caplog)
+        check_database_contents(db_session, caplog)
 
         # Re-ingesting the same data should not add any new documents
         with caplog.at_level(logging.INFO):
@@ -63,35 +92,32 @@ def test_ingestion(caplog, app_config, db_session, irs_web_local_file):
 
 def check_database_contents(db_session, caplog):
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
-    assert len(documents) == 3
+    assert len(documents) == 2
 
-    assert documents[0].name == "CALFRESH: 63-300 Application Process"
+    assert documents[0].name == "Earned Income Tax Credit (EITC)"
     assert (
         documents[0].source
-        == "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm"
+        == "https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit-eitc"
     )
 
-    assert documents[1].name == "CalWORKs: 44-115 Income-In-Kind"
+    assert documents[1].name == "Family, dependents and students credits"
     assert (
         documents[1].source
-        == "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-115_Inkind_Income/44-115_Inkind_Income.htm"
-    )
-
-    assert documents[2].name == "CalWORKs: 44-133 Treatment of Income"
-    assert (
-        documents[2].source
-        == "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-133_Treatment_of_Income/44-133_Treatment_of_Income.htm"
+        == "https://www.irs.gov/credits-deductions/family-dependents-and-students-credits"
     )
 
     doc0 = documents[0]
     assert len(doc0.chunks) == 2
-    assert doc0.chunks[0].content.startswith("## 63-300 Application Process\n\n### Purpose\n\n")
-    assert doc0.chunks[0].headings == ["CALFRESH"]
-    assert doc0.chunks[1].content.startswith("# CALFRESH")
-    assert doc0.chunks[1].headings == []
+    assert doc0.chunks[0].content.startswith("### More In Credits & Deductions\n\n")
+    assert doc0.chunks[0].headings == ["Earned Income Tax Credit (EITC)"]
+    assert doc0.chunks[1].content.startswith(
+        "__\n\n* * [Child Tax Credit](https://www.irs.gov/credits-deductions/individuals/child-tax-credit"
+    )
+    assert doc0.chunks[1].headings == ["Earned Income Tax Credit (EITC)"]
 
-    # Document[1] is short
     doc1 = documents[1]
     assert len(doc1.chunks) == 1
-    assert doc1.chunks[0].content.startswith("# CalWORKs\n\n## 44-115 Income-In-Kind\n\n")
-    assert doc1.chunks[0].headings == []
+    assert doc1.chunks[0].content.startswith(
+        "Credits can help reduce your taxes or increase your refund.\n\n"
+    )
+    assert doc1.chunks[0].headings == ["Family, dependents and students credits"]
