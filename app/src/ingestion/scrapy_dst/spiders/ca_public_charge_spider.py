@@ -51,6 +51,9 @@ class CaPublicChargeSpider(CrawlSpider):
             extractions["title"] = titles
         base_url = response.url
 
+        # remove icon text
+        response.css("div.ic-icon").drop()
+
         extractions |= self.parse_main_primary(base_url, response.css("div.module-full"))
         extractions |= self.parse_main_content(base_url, response.css("div.GTM-1"))
 
@@ -63,8 +66,6 @@ class CaPublicChargeSpider(CrawlSpider):
         )
         html = re.sub(larger_font_pattern, r"<h3\1>\2</h3>", html)
 
-        # remove icon element
-        html = re.sub(r'<div class="ic-icon">(.*)</div>', "", html)
         markdown = markdownify(
             html,
             heading_style="ATX",
