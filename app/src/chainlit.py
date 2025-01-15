@@ -274,6 +274,9 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
 
         # Create initial progress message
         progress_msg = Message(content="Starting batch processing...")
+        logger.info("Temporarily disable data_layer: %r", cl.data._data_layer)
+        data_layer = cl.data._data_layer
+        cl.data._data_layer = None
         await progress_msg.send()
 
         # Process in background task
@@ -284,8 +287,10 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
 
                 async def update_progress(current: int, total: int) -> None:
                     # Create new message with updated content
-                    progress_msg.content = f"Processing {current}/{total} questions..."
-                    await progress_msg.update()
+                    status_msg = f"Processing {current}/{total} questions..."
+                    logger.info(status_msg)
+                    # progress_msg.content = status_msg
+                    # await progress_msg.update()
 
                 result_file_path = await batch_process(
                     file.path,
@@ -295,19 +300,21 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
 
                 BATCH_RESULTS[task_id] = result_file_path
 
-                # Update final message
-                progress_msg.content = "Processing complete! Click to download results:"
-                progress_msg.actions = [
+                cl.data._data_layer = data_layer
+                logger.info("Restored data_layer: %r", cl.data._data_layer)
+                # Final message
+                complete_msg = Message(content="Processing complete! Click to download results:")
+                complete_msg.actions = [
                     cl.Action(
                         name="download_batch_results", value=task_id, label="Download Results"
                     )
                 ]
-                await progress_msg.update()
+                await complete_msg.send()
 
             except Exception as e:
                 logger.exception("Batch processing failed")
-                progress_msg.content = f"Processing failed: {str(e)}"
-                await progress_msg.update()
+                complete_msg.content = f"Processing failed: {str(e)}"
+                await complete_msg.update()
 
         # Start processing in background
         asyncio.create_task(process_and_notify())
