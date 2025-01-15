@@ -1,11 +1,12 @@
 import re
 
-import html2text
-
+from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
+
+from src.util import string_utils  # noqa: E402
 
 AccordionSections = dict[str, list[str]]
 
@@ -65,24 +66,23 @@ class CaPublicChargeSpider(CrawlSpider):
         )
         html = re.sub(larger_font_pattern, r"<h3\1>\2</h3>", html)
 
-        h2t = html2text.HTML2Text()
+        markdown = markdownify(
+            html,
+            heading_style="ATX",
+            escape_asterisks=False,
+            escape_underscores=False,
+            escape_misc=False,
+            sup_symbol="<sup>",
+            sub_symbol="<sub>",
+            strip=["img", "i"],
+        )
 
-        # Refer to https://github.com/Alir3z4/html2text/blob/master/docs/usage.md and html2text.config
-        # for options:
-        # 0 for no wrapping
-        h2t.body_width = 0
-        h2t.wrap_links = False
-
-        if base_url:
-            h2t.baseurl = base_url
-
-        # Exclude the <sup> and <sub> tags
-        h2t.include_sup_sub = False
-
-        markdown = h2t.handle(html)
-
-        # Consolidate newlines, replace unicode char with dash
-        markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\n\u2022", "-")
+        # Clean up markdown text: consolidate newlines; replace non-breaking spaces; replace unicode char with dash,
+        markdown = (
+            re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ").replace("\n\u2022", "-")
+        )
+        # Replace non-absolute URLs with absolute URLs
+        markdown = string_utils.resolve_urls(base_url, markdown)
         return markdown.strip()
 
     def parse_main_primary(self, base_url: str, main_primary: SelectorList) -> dict[str, str]:
