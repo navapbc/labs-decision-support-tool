@@ -1,14 +1,3 @@
-# /// script
-# dependencies = [
-#   "scrapy",
-#   "markdownify",
-#   "nltk",
-#   "langchain_text_splitters",
-#   "html2text",
-# ]
-# ///
-# (This comment enables `uv run` to automatically create a virtual environment)
-
 SPIDER_NAME = "irs_web_spider"
 OUTPUT_JSON = "irs_web_scrapings.json"
 
