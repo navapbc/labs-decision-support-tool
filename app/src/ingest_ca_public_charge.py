@@ -19,11 +19,10 @@ def _ingest_ca_public_charge(
     skip_db: bool = False,
     resume: bool = False,
 ) -> None:
-    def prep_json_item(item: dict[str, str]) -> dict[str, str]:
+    def prep_json_item(item: dict[str, str]) -> None:
         markdown = item.get("main_content", item.get("main_primary", None))
         assert markdown, f"Item {item['url']} has no main_content or main_primary"
         item["markdown"] = _fix_input_markdown(markdown)
-        return item
 
     common_base_url = "https://keepyourbenefits.org/en/ca/"
     ingest_json(
