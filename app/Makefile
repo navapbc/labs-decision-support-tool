@@ -248,6 +248,13 @@ ifndef FILEPATH
 	$(error FILEPATH is undefined)
 endif
 
+
+scrape-ca-public-charge:
+	$(PY_RUN_CMD) scrape-ca-public-charge
+
+ingest-ca-public-charge: check-ingest-arguments
+	$(PY_RUN_CMD) ingest-ca-public-charge "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
+
 scrape-edd-web:
 	$(PY_RUN_CMD) scrape-edd-web
 
