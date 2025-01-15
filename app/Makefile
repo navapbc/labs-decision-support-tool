@@ -280,3 +280,10 @@ scrape-la-county-policy:
 
 ingest-la-county-policy: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-la-policy "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
+
+
+scrape-irs-web:
+	$(PY_RUN_CMD) scrape-irs-web
+
+ingest-irs-web: check-ingest-arguments
+	$(PY_RUN_CMD) ingest-irs-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
