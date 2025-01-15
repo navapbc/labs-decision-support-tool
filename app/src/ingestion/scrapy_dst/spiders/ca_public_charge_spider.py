@@ -28,9 +28,11 @@ class CaPublicChargeSpider(CrawlSpider):
                     "es/ca/public-charge",  # has non-English content
                     "media/",
                     "_ima/",
+                    "use-the-guide",
+                    "find-help",
                 ),
                 allow_domains=allowed_domains,
-                deny_domains=("https://s3.amazonaws.com"),
+                deny_domains=("https://s3.amazonaws.com",),
                 canonicalize=True,
                 unique=True,
             ),
@@ -55,6 +57,14 @@ class CaPublicChargeSpider(CrawlSpider):
         return extractions
 
     def to_markdown(self, base_url: str, html: str) -> str:
+        # convert larger text to header
+        larger_font_pattern = (
+            r'<p class="title fontsize-30 weightier colored text-center"([^>]*?)>(.*?)<\/p>'
+        )
+        html = re.sub(larger_font_pattern, r"<h3\1>\2</h3>", html)
+
+        # remove icon element
+        html = re.sub(r'<div class="ic-icon">(.*)</div>', "", html)
         markdown = markdownify(
             html,
             heading_style="ATX",
@@ -63,12 +73,13 @@ class CaPublicChargeSpider(CrawlSpider):
             escape_misc=False,
             sup_symbol="<sup>",
             sub_symbol="<sub>",
+            strip=["img", "i"],
         )
-        # Clean up markdown text: consolidate newlines; replace non-breaking spaces; replace unicode char with dash
+
+        # Clean up markdown text: consolidate newlines; replace non-breaking spaces; replace unicode char with dash,
         markdown = (
             re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ").replace("\n\u2022", "-")
         )
-
         # Replace non-absolute URLs with absolute URLs
         markdown = string_utils.resolve_urls(base_url, markdown)
         return markdown.strip()
@@ -80,11 +91,14 @@ class CaPublicChargeSpider(CrawlSpider):
     def parse_main_content(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
         markdown = ""
         two_column_details = main_content.css("div.list-twocolumn").getall()
-        middler_details = main_content.css("div.middler").getall()
+        # first middler element is state selection dropdown item
+        middler_details = main_content.css("div.middler").getall()[1:]
+
         if two_column_details:
             for one_column in two_column_details:
-                markdown += self.to_markdown(base_url, one_column)
+                markdown += "\n" + self.to_markdown(base_url, one_column)
         if middler_details:
             for middle_detail in middler_details:
-                markdown += self.to_markdown(base_url, middle_detail)
+                markdown += "\n" + self.to_markdown(base_url, middle_detail)
+
         return {"main_content": markdown}
