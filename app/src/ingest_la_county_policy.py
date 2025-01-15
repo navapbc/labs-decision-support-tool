@@ -18,14 +18,13 @@ def _ingest_la_county_policy(
 ) -> None:
     common_base_url = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/"
 
-    def prep_json_item(item: dict[str, str]) -> dict[str, str]:
+    def prep_json_item(item: dict[str, str]) -> None:
         # More often than not, the h2 heading is better suited as the title
         item["title"] = item["h2"]
 
         # Include the program name in the document title
         program_name = item["h1"]
         item["title"] = f"{program_name}: {item['title']}"
-        return item
 
     chunking_config = DefaultChunkingConfig()
     # The document name is the same as item["h2"], so it is redundant to include it in the headings
