@@ -313,8 +313,9 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
 
             except Exception as e:
                 logger.exception("Batch processing failed")
-                complete_msg.content = f"Processing failed: {str(e)}"
-                await complete_msg.update()
+                error_msg = Message(content="Processing complete! Click to download results:")
+                error_msg.content = f"Processing failed: {str(e)}"
+                await error_msg.send()
 
         # Start processing in background
         asyncio.create_task(process_and_notify())
