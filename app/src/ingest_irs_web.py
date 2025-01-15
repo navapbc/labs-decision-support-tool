@@ -18,9 +18,6 @@ def _ingest_irs_web(
 ) -> None:
     common_base_url = "https://www.irs.gov/"
 
-    def prep_json_item(item: dict[str, str]) -> None:
-        pass
-
     ingest_json(
         db_session,
         json_filepath,
@@ -29,9 +26,8 @@ def _ingest_irs_web(
         common_base_url,
         skip_db,
         resume,
-        prep_json_item,
     )
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     process_and_ingest_sys_args(sys.argv, logger, _ingest_irs_web)

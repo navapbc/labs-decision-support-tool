@@ -22,7 +22,16 @@ class IrsSpider(CrawlSpider):
         Rule(
             LinkExtractor(
                 allow="www.irs.gov/credits-deductions/",
-                deny=("www.irs.gov/credits-deductions/businesses"),
+                deny=(
+                    "www.irs.gov/credits-deductions/businesses",
+                    # These are about pandemic era changes to the child tax credit that aren't active anymore
+                    # Exclude since they could be misleading if they get cited
+                    r"2021-child-tax-credit-and-advance-child-tax-credit-payments.*",
+                    r"tax-year-2021-filing-season-2022-child-tax-credit-frequently-asked-questions.*",
+                    "advance-child-tax-credit-payments-in-2021/",
+                    # Irrelavant pages
+                    "clean-vehicle-and-energy-credits",
+                ),
                 allow_domains=allowed_domains,
                 deny_domains=(),
                 restrict_css=("div.pup-main-container"),
