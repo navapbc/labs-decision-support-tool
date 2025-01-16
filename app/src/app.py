@@ -9,6 +9,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
+    # Imagine LA uses port 5173 for development
     allow_origins=["http://localhost:5173"],
     allow_origin_regex=r"https://dev-social-benefits-navigator--nava-chatbot-.*\.web\.app",
     allow_credentials=True,
