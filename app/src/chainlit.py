@@ -196,7 +196,7 @@ async def on_message(message: cl.Message) -> None:
         ).send()
 
         if files:
-            await asyncio.create_task(_batch_proccessing(files[0]))
+            asyncio.create_task(_batch_proccessing(files[0]))
         return
 
     try:
@@ -255,6 +255,10 @@ async def async_step_tool() -> None:
         await cl.Message(content=f"Sleeping {i}").send()
     await cl.Message(content="Done sleeping").send()
 
+@cl.step(type="tool")
+async def async_bp_tool(file, engine) -> str:
+    return await batch_process(file.path, engine)
+
 async def _batch_proccessing(file: AskFileResponse) -> None:
     await cl.Message(
         author="backend",
@@ -265,8 +269,11 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
         engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
 
         # result_file_path = await batch_process(file.path, engine)
-        await async_step_tool()
-        result_file_path = "/tmp/tmpjan8_yq2"
+
+        result_file_path = await async_bp_tool(file, engine)
+
+        # await async_step_tool()
+        # result_file_path = "/tmp/tmpjan8_yq2"
 
         # E.g., "abcd.csv" to "abcd_results.csv"
         result_file_name = file.name.removesuffix(".csv") + "_results.csv"

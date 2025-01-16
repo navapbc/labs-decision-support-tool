@@ -9,6 +9,7 @@ from src.citations import simplify_citation_numbers
 
 logger = logging.getLogger(__name__)
 
+import concurrent.futures
 async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
     with open(file_path, mode="r", newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -19,13 +20,27 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
         rows = list(reader)  # Convert reader to list to preserve order
         questions = [row["question"] for row in rows]
 
+        if not True:
+            # await asyncio.sleep(65)  # Works
+            time.sleep(65)  # Doesn't work
+            logger.info("Writing results to OLD file /tmp/tmpjan8_yq2")
+            return "/tmp/tmpjan8_yq2"
+
         # Process questions in parallel while preserving order
+        processed_data = []
         with ThreadPoolExecutor() as executor:
-            processed_data = list(executor.map(lambda args: _process_question(args[0], args[1], engine), enumerate(questions)))
+            # processed_data = list(executor.map(lambda args: _process_question(args[0], args[1], engine), enumerate(questions)))
+
+            future_to_url = {executor.submit(_process_question, i, q, engine): q for i, q in enumerate(questions)}
+
+            loop = asyncio.get_running_loop()
+            # blocking_call(processed_data, future_to_url)
+            await loop.run_in_executor(executor, blocking_call, processed_data, future_to_url)
+        logger.info("Got %i results", len(processed_data))
 
         # Update rows with processed data while preserving original order
         for row, data in zip(rows, processed_data, strict=True):
-            row.update(await data)
+            row.update(data)    # ROOT CAUSE?: Blocking call
         logger.info("Updated results: %r", rows[0].keys())
 
         # Update fieldnames to include new columns
@@ -36,7 +51,7 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
         all_fieldnames = list(all_fieldnames_dict.keys())
 
     result_file = tempfile.NamedTemporaryFile(delete=False, mode="w", newline="", encoding="utf-8")
-    logger.info("Writing results to file %r...", result_file)
+    logger.info("Writing results to file %r", result_file.name)
     writer = csv.DictWriter(result_file, fieldnames=all_fieldnames)
     writer.writeheader()
     writer.writerows(rows)
@@ -44,8 +59,19 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
 
     return result_file.name
 
+def blocking_call(processed_data, future_to_url):
+    for future in concurrent.futures.as_completed(future_to_url): # This blocks as well!
+        url = future_to_url[future]
+        try:
+            data = future.result()
+            processed_data.append(data)
+        except Exception as exc:
+            print('%r generated an exception: %s' % (url, exc))
+        else:
+            print('%r page is %d bytes' % (url, len(data)))
+
 import asyncio
-async def _process_question(index: int, question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
+def _process_question(index: int, question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
     # FIXME: catch and handle exceptions
     logger.info("Processing question %i: %s...", index, question[:50])
     if True:
@@ -62,7 +88,7 @@ async def _process_question(index: int, question: str, engine: ChatEngineInterfa
             ],
         )
         # time.sleep(65)
-        await asyncio.sleep(65)
+        asyncio.run(asyncio.sleep(65))
     else:
         result = engine.on_message(question=question, chat_history=[])
         final_result = simplify_citation_numbers(result)
