@@ -1,4 +1,3 @@
-import time
 import logging
 import csv
 import tempfile
@@ -9,7 +8,7 @@ from src.citations import simplify_citation_numbers
 
 logger = logging.getLogger(__name__)
 
-import concurrent.futures
+
 async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
     with open(file_path, mode="r", newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -20,33 +19,24 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
         rows = list(reader)  # Convert reader to list to preserve order
         questions = [row["question"] for row in rows]
 
-        if not True:
-            # await asyncio.sleep(65)  # Works
-            time.sleep(65)  # Doesn't work
-            logger.info("Writing results to OLD file /tmp/tmpjan8_yq2")
-            return "/tmp/tmpjan8_yq2"
-
-        # Process questions in parallel while preserving order
-        processed_data = []
+        # Follow example usage https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor-example
         with ThreadPoolExecutor() as executor:
-            # processed_data = list(executor.map(lambda args: _process_question(args[0], args[1], engine), enumerate(questions)))
+            # Process questions in parallel while preserving order
+            futures = [
+                executor.submit(_process_question, i, q, engine)
+                for i, q in enumerate(questions, start=1)
+            ]
+            logger.info("Submitted %i questions for processing", len(futures))
 
-            future_to_url = {executor.submit(_process_question, i, q, engine): q for i, q in enumerate(questions)}
-
-            loop = asyncio.get_running_loop()
-
-            # await loop.run_in_executor(executor, blocking_call, processed_data, future_to_url)
-            # logger.info("Got %i results", len(processed_data))
-
-            processed_data = await loop.run_in_executor(executor, blocking_call2, rows, future_to_url)
-            logger.info("Updated results: %r", rows[0].keys())
+            # Waiting for results is blocking so run_in_executor
+            # https://docs.python.org/3/library/asyncio-eventloop.html#executing-code-in-thread-or-process-pools
+            await asyncio.get_running_loop().run_in_executor(executor, update_rows, rows, futures)
 
         # Update fieldnames to include new columns
-        all_fieldnames_dict = {
-            f: None
-            for f in list(reader.fieldnames) + [key for p in processed_data for key in p.keys()]
-        }
-        all_fieldnames = list(all_fieldnames_dict.keys())
+        all_row_fieldnames = list(reader.fieldnames) + [key for p in rows for key in p.keys()]
+        # Use dict.keys() to get an ordered set of fieldnames
+        all_fieldnames = list({f: None for f in all_row_fieldnames}.keys())
+        logger.info("all_fieldnames: %r", all_fieldnames)
 
     result_file = tempfile.NamedTemporaryFile(delete=False, mode="w", newline="", encoding="utf-8")
     logger.info("Writing results to file %r", result_file.name)
@@ -57,61 +47,58 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
 
     return result_file.name
 
-def blocking_call2(rows, future_to_url):
-    processed_data = [f.result() for f, url in future_to_url.items()]
+
+def update_rows(rows, futures):
+    logger.info("Waiting for results...")
     # Update rows with processed data while preserving original order
-    for row, data in zip(rows, processed_data, strict=True):
-        row.update(data)    # ROOT CAUSE?: Blocking call
-    return processed_data
+    for row, f in zip(rows, futures, strict=True):
+        row.update(f.result())  # f.result() is a blocking call
+    logger.info("Updated %i rows", len(rows))
 
-
-def blocking_call(processed_data, future_to_url):
-    for future in concurrent.futures.as_completed(future_to_url): # This blocks as well!
-        url = future_to_url[future]
-        try:
-            data = future.result()
-            processed_data.append(data)
-        except Exception as exc:
-            print('%r generated an exception: %s' % (url, exc))
-        else:
-            print('%r page is %d bytes' % (url, len(data)))
 
 import asyncio
-def _process_question(index: int, question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
-    # FIXME: catch and handle exceptions
-    logger.info("Processing question %i: %s...", index, question[:50])
-    if True:
-        from src.citations import ResponseWithSubsections
-        from src.db.models.document import Chunk, Document, Subsection
 
-        document = Document(name="dummy document", source="dummy source")
-        final_result = ResponseWithSubsections(
-            "dummy response",
-            [
-                Subsection(
-                    "1", Chunk(content="markdown", document=document, headings=["headings"]), ""
-                )
-            ],
-        )
-        # time.sleep(65)
-        asyncio.run(asyncio.sleep(95))
-    else:
-        result = engine.on_message(question=question, chat_history=[])
-        final_result = simplify_citation_numbers(result)
 
-    result_table: dict[str, str | None] = {"answer": final_result.response}
+def _process_question(
+    index: int, question: str, engine: ChatEngineInterface
+) -> dict[str, str | None]:
+    try:
+        logger.info("Processing question %i: %s...", index, question[:50])
+        if True:
+            from src.citations import ResponseWithSubsections
+            from src.db.models.document import Chunk, Document, Subsection
 
-    for subsection in final_result.subsections:
-        citation_key = "citation_" + subsection.id
-        formatted_headings = (
-            " > ".join(subsection.text_headings) if subsection.text_headings else ""
-        )
-        result_table |= {
-            citation_key + "_name": subsection.chunk.document.name,
-            citation_key + "_headings": formatted_headings,
-            citation_key + "_source": subsection.chunk.document.source,
-            citation_key + "_text": subsection.text,
-        }
+            document = Document(name="dummy document", source="dummy source")
+            final_result = ResponseWithSubsections(
+                f"{index} dummy response",
+                [
+                    Subsection(
+                        "1", Chunk(content="markdown", document=document, headings=["headings"]), ""
+                    )
+                ],
+            )
+            # time.sleep(65)
+            asyncio.run(asyncio.sleep(100 - index * 10))
+        else:
+            result = engine.on_message(question=question, chat_history=[])
+            final_result = simplify_citation_numbers(result)
 
-    logger.info("Processed question %i", index)
-    return result_table
+        result_table: dict[str, str | None] = {"answer": final_result.response}
+
+        for subsection in final_result.subsections:
+            citation_key = "citation_" + subsection.id
+            formatted_headings = (
+                " > ".join(subsection.text_headings) if subsection.text_headings else ""
+            )
+            result_table |= {
+                citation_key + "_name": subsection.chunk.document.name,
+                citation_key + "_headings": formatted_headings,
+                citation_key + "_source": subsection.chunk.document.source,
+                citation_key + "_text": subsection.text,
+            }
+
+        logger.info("Question %i processed with %d citations", index, len(final_result.subsections))
+        return result_table
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.exception("Error processing question %i: %s", index, e, stack_info=True)
+        return {"answer": f"Error processing question: {str(e)}"}
