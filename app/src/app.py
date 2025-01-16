@@ -9,8 +9,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost"],
-    allow_origin_regex=r"http://localhost:\d+|https://dev-social-benefits-navigator--nava-chatbot-.*\.web\.app",
+    allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"https://dev-social-benefits-navigator--nava-chatbot-.*\.web\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
