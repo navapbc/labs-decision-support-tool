@@ -263,11 +263,13 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
         await cl.Message(
             content="File processed, results attached.",
             elements=[cl.File(name=result_file_name, path=result_file_path)],
+            metadata={"result_file_path": result_file_path},
         ).send()
 
-    except ValueError as err:
+    except Exception as err:
         await cl.Message(
             author="backend",
             metadata={"error_class": err.__class__.__name__, "error": str(err)},
-            content=f"{err.__class__.__name__}: {err}",
+            content=f"batch_process: {err.__class__.__name__}: {err}",
         ).send()
+        logger.exception("batch_process error", stack_info=True)
