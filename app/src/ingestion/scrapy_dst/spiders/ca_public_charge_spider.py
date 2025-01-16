@@ -43,12 +43,8 @@ class CaPublicChargeSpider(CrawlSpider):
 
     def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
         extractions = {"url": response.url}
-        if len(response.css("h4::text").getall()) == 1:
-            title = response.css("h4.title::text").get()
-            extractions["title"] = title.strip()
-        else:
-            titles = ";".join(response.css("h4.title::text").getall())
-            extractions["title"] = titles
+        title = response.css("title::text").get().split("| Keep Your Benefits", 1)[0]
+        extractions["title"] = title.strip()
         base_url = response.url
 
         # remove icon text
