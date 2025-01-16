@@ -15,8 +15,3 @@ from src.app_config import app_config
 bind = app_config.host + ':' + str(app_config.port)
 workers = 1
 threads = 4
-
-# Increase timeout to handle long-running requests
-timeout = 300  # 5 minutes
-graceful_timeout = 300  # 5 minutes
-keepalive = 5
