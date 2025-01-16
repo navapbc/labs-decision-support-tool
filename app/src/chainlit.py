@@ -180,6 +180,30 @@ def extract_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
             logger.warning("Unexpected message type: %s: %r", message.type, message.content)
     return raw_chat_history
 
+async def send_test_message(msg):
+    await Message(content=msg).send()
+
+import time
+def my_sync_function():
+    # Your synchronous code goes here
+    cl.run_sync(send_test_message("Start sleeping"))
+    for i in range(10):
+        time.sleep(30)
+        logger.info(f"Sleeping {i}")
+        cl.run_sync(send_test_message(f"Sleeping {i}"))
+    cl.run_sync(send_test_message("Done sleeping"))
+    return 0
+
+async_function = cl.make_async(my_sync_function)
+
+async def my_async_function():
+    await Message(content="Async Start sleeping").send()
+    for i in range(10):
+        time.sleep(30)
+        logger.info(f"Sleeping {i}")
+        await Message(content=f"Sleeping {i}").send()
+    await Message(content="Done sleeping").send()
+    return 0
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
@@ -201,7 +225,22 @@ async def on_message(message: cl.Message) -> None:
         ).send()
 
         if files:
-            asyncio.create_task(_batch_proccessing(files[0]))
+            # https://docs.chainlit.io/guides/sync-async#long-running-synchronous-tasks
+            # await _batch_proccessing(files[0]) # Does not work
+
+            # await async_function()  # Works
+
+            # await my_async_function()  # Does not work
+
+            # Does not work
+            def sync_async_function():
+                cl.run_sync(my_async_function())
+            async_sync_async_function = cl.make_async(sync_async_function)
+            await async_sync_async_function()
+
+            await Message(content="Test Batch processing complete!").send()
+            logger.info("Batch processing complete!")
+
         return
 
     try:
@@ -291,8 +330,9 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
                     logger.info(status_msg)
                     # progress_msg.content = status_msg
                     # await progress_msg.update()
+                    await cl.Message(content=status_msg).send()
 
-                result_file_path = await batch_process(
+                result_file_path = batch_process(
                     file.path,
                     engine,
                     progress_callback=update_progress,

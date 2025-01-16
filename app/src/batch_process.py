@@ -85,10 +85,26 @@ async def batch_process(
         return result_file.name
 
 
+import time
 def _process_question(question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
     logger.debug("Processing question: %r", question)
-    result = engine.on_message(question=question, chat_history=[])
-    final_result = simplify_citation_numbers(result)
+    if True:
+        from src.citations import ResponseWithSubsections
+        from src.db.models.document import Chunk, Document, Subsection
+
+        document = Document(name="dummy document", source="dummy source")
+        final_result = ResponseWithSubsections(
+            "dummy response",
+            [
+                Subsection(
+                    "1", Chunk(content="markdown", document=document, headings=["headings"]), ""
+                )
+            ],
+        )
+        time.sleep(15)
+    else:
+        result = engine.on_message(question=question, chat_history=[])
+        final_result = simplify_citation_numbers(result)
 
     result_table: dict[str, str | None] = {"answer": final_result.response}
 
