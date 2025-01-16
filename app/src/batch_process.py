@@ -34,14 +34,12 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
             future_to_url = {executor.submit(_process_question, i, q, engine): q for i, q in enumerate(questions)}
 
             loop = asyncio.get_running_loop()
-            # blocking_call(processed_data, future_to_url)
-            await loop.run_in_executor(executor, blocking_call, processed_data, future_to_url)
-        logger.info("Got %i results", len(processed_data))
 
-        # Update rows with processed data while preserving original order
-        for row, data in zip(rows, processed_data, strict=True):
-            row.update(data)    # ROOT CAUSE?: Blocking call
-        logger.info("Updated results: %r", rows[0].keys())
+            # await loop.run_in_executor(executor, blocking_call, processed_data, future_to_url)
+            # logger.info("Got %i results", len(processed_data))
+
+            processed_data = await loop.run_in_executor(executor, blocking_call2, rows, future_to_url)
+            logger.info("Updated results: %r", rows[0].keys())
 
         # Update fieldnames to include new columns
         all_fieldnames_dict = {
@@ -58,6 +56,14 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
     result_file.close()
 
     return result_file.name
+
+def blocking_call2(rows, future_to_url):
+    processed_data = [f.result() for f, url in future_to_url.items()]
+    # Update rows with processed data while preserving original order
+    for row, data in zip(rows, processed_data, strict=True):
+        row.update(data)    # ROOT CAUSE?: Blocking call
+    return processed_data
+
 
 def blocking_call(processed_data, future_to_url):
     for future in concurrent.futures.as_completed(future_to_url): # This blocks as well!
@@ -88,7 +94,7 @@ def _process_question(index: int, question: str, engine: ChatEngineInterface) ->
             ],
         )
         # time.sleep(65)
-        asyncio.run(asyncio.sleep(65))
+        asyncio.run(asyncio.sleep(95))
     else:
         result = engine.on_message(question=question, chat_history=[])
         final_result = simplify_citation_numbers(result)

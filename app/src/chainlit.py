@@ -196,7 +196,8 @@ async def on_message(message: cl.Message) -> None:
         ).send()
 
         if files:
-            asyncio.create_task(_batch_proccessing(files[0]))
+            # await so that the step UI shows that BP is in progress
+            await asyncio.create_task(_batch_proccessing(files[0]))
         return
 
     try:
