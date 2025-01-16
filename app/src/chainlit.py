@@ -198,7 +198,14 @@ async_function = cl.make_async(my_sync_function)
 async def my_async_function():
     await Message(content="Async Start sleeping").send()
     for i in range(10):
-        time.sleep(30)
+        """
+        When you have a blocking call inside an asyncio.create_task, it can potentially block the entire event loop, defeating the purpose of using asyncio. Here's how to handle it:
+        1. Using asyncio.to_thread: This method allows you to run blocking code in a separate thread, preventing it from blocking the event loop.
+
+        Also https://stackoverflow.com/a/69925002/23458508
+        and https://stackoverflow.com/questions/71541276/how-to-run-a-blocking-code-independently-from-asyncio-loop
+        """
+        await asyncio.sleep(30)
         logger.info(f"Sleeping {i}")
         await Message(content=f"Sleeping {i}").send()
     await Message(content="Done sleeping").send()
@@ -239,9 +246,9 @@ async def on_message(message: cl.Message) -> None:
 
             # await async_function()  # Works
 
-            # await my_async_function()  # Does not work
+            # await my_async_function()  # Works
 
-            # Does not work
+            # Works
             # def sync_async_function():
             #     cl.run_sync(my_async_function())
             # async_sync_async_function = cl.make_async(sync_async_function)
@@ -251,10 +258,9 @@ async def on_message(message: cl.Message) -> None:
 
             # await asyncio.sleep(130)  # Works!  websocket pings are periodically sent while this is sleeping
 
-            # await asyncio.create_task(my_async_function())  # Does not work! websocket pings are not sent! Why not?
-            # This blocks any browser interaction until the task is complete
+            # await asyncio.create_task(my_async_function())  # Works
 
-            await async_step_tool()
+            # await async_step_tool() # Works
 
             await Message(content="Test Batch processing complete!").send()
             logger.info("Batch processing complete!")
