@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import pprint
 from typing import Any
@@ -196,7 +195,8 @@ async def on_message(message: cl.Message) -> None:
         ).send()
 
         if files:
-            asyncio.create_task(_batch_proccessing(files[0]))
+            # await so that the step UI shows that BP is in progress
+            await _batch_proccessing(files[0])
         return
 
     try:
@@ -247,6 +247,7 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
     }
 
 
+@cl.step(name="batch processing", type="tool")
 async def _batch_proccessing(file: AskFileResponse) -> None:
     await cl.Message(
         author="backend",
@@ -263,11 +264,13 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
         await cl.Message(
             content="File processed, results attached.",
             elements=[cl.File(name=result_file_name, path=result_file_path)],
+            metadata={"result_file_path": result_file_path},
         ).send()
 
-    except ValueError as err:
+    except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
             author="backend",
             metadata={"error_class": err.__class__.__name__, "error": str(err)},
-            content=f"{err.__class__.__name__}: {err}",
+            content=f"batch_process: {err.__class__.__name__}: {err}",
         ).send()
+        logger.exception("batch_process error", stack_info=True)
