@@ -1,4 +1,3 @@
-import asyncio
 import csv
 import logging
 import tempfile
@@ -48,6 +47,7 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
 
     result_file = tempfile.NamedTemporaryFile(delete=False, mode="w", newline="", encoding="utf-8")
     logger.info("Writing results to file %r", result_file.name)
+
     writer = csv.DictWriter(result_file, fieldnames=all_fieldnames)
     writer.writeheader()
     writer.writerows(rows)
