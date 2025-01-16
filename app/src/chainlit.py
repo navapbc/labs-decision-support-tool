@@ -192,7 +192,6 @@ def my_sync_function():
         logger.info(f"Sleeping {i}")
         cl.run_sync(send_test_message(f"Sleeping {i}"))
     cl.run_sync(send_test_message("Done sleeping"))
-    return 0
 
 async_function = cl.make_async(my_sync_function)
 
@@ -204,6 +203,16 @@ async def my_async_function():
         await Message(content=f"Sleeping {i}").send()
     await Message(content="Done sleeping").send()
     return 0
+
+@cl.step(type="tool")
+async def async_step_tool() -> None:
+    await Message(content="Async Start sleeping").send()
+    for i in range(10):
+        await asyncio.sleep(30)
+        logger.info(f"Sleeping {i}")
+        await Message(content=f"Sleeping {i}").send()
+    await Message(content="Done sleeping").send()
+
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
@@ -233,10 +242,19 @@ async def on_message(message: cl.Message) -> None:
             # await my_async_function()  # Does not work
 
             # Does not work
-            def sync_async_function():
-                cl.run_sync(my_async_function())
-            async_sync_async_function = cl.make_async(sync_async_function)
-            await async_sync_async_function()
+            # def sync_async_function():
+            #     cl.run_sync(my_async_function())
+            # async_sync_async_function = cl.make_async(sync_async_function)
+            # await async_sync_async_function()
+
+            # time.sleep(130) # Does not work
+
+            # await asyncio.sleep(130)  # Works!  websocket pings are periodically sent while this is sleeping
+
+            # await asyncio.create_task(my_async_function())  # Does not work! websocket pings are not sent! Why not?
+            # This blocks any browser interaction until the task is complete
+
+            await async_step_tool()
 
             await Message(content="Test Batch processing complete!").send()
             logger.info("Batch processing complete!")
