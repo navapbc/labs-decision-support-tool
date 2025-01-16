@@ -196,7 +196,7 @@ async def on_message(message: cl.Message) -> None:
         ).send()
 
         if files:
-            asyncio.create_task(_batch_proccessing(files[0]))
+            await asyncio.create_task(_batch_proccessing(files[0]))
         return
 
     try:

@@ -25,7 +25,8 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
 
         # Update rows with processed data while preserving original order
         for row, data in zip(rows, processed_data, strict=True):
-            row.update(data)
+            row.update(await data)
+        logger.info("Updated results: %r", rows[0].keys())
 
         # Update fieldnames to include new columns
         all_fieldnames_dict = {
@@ -43,7 +44,9 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
 
     return result_file.name
 
-def _process_question(index: int, question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
+import asyncio
+async def _process_question(index: int, question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
+    # FIXME: catch and handle exceptions
     logger.info("Processing question %i: %s...", index, question[:50])
     if True:
         from src.citations import ResponseWithSubsections
@@ -58,7 +61,8 @@ def _process_question(index: int, question: str, engine: ChatEngineInterface) ->
                 )
             ],
         )
-        time.sleep(65)
+        # time.sleep(65)
+        await asyncio.sleep(65)
     else:
         result = engine.on_message(question=question, chat_history=[])
         final_result = simplify_citation_numbers(result)
