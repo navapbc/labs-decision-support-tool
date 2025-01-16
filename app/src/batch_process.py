@@ -1,5 +1,6 @@
-import logging
+import asyncio
 import csv
+import logging
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,9 +29,16 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
             ]
             logger.info("Submitted %i questions for processing", len(futures))
 
+            def update_rows() -> None:
+                logger.info("Waiting for results...")
+                # Update rows with processed data while preserving original order
+                for row, f in zip(rows, futures, strict=True):
+                    row.update(f.result())  # f.result() is a blocking call
+                logger.info("Updated %i rows", len(rows))
+
             # Waiting for results is blocking so run_in_executor
             # https://docs.python.org/3/library/asyncio-eventloop.html#executing-code-in-thread-or-process-pools
-            await asyncio.get_running_loop().run_in_executor(executor, update_rows, rows, futures)
+            await asyncio.get_running_loop().run_in_executor(executor, update_rows)
 
         # Update fieldnames to include new columns
         all_row_fieldnames = list(reader.fieldnames) + [key for p in rows for key in p.keys()]
@@ -48,40 +56,13 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
     return result_file.name
 
 
-def update_rows(rows, futures):
-    logger.info("Waiting for results...")
-    # Update rows with processed data while preserving original order
-    for row, f in zip(rows, futures, strict=True):
-        row.update(f.result())  # f.result() is a blocking call
-    logger.info("Updated %i rows", len(rows))
-
-
-import asyncio
-
-
 def _process_question(
     index: int, question: str, engine: ChatEngineInterface
 ) -> dict[str, str | None]:
     try:
         logger.info("Processing question %i: %s...", index, question[:50])
-        if True:
-            from src.citations import ResponseWithSubsections
-            from src.db.models.document import Chunk, Document, Subsection
-
-            document = Document(name="dummy document", source="dummy source")
-            final_result = ResponseWithSubsections(
-                f"{index} dummy response",
-                [
-                    Subsection(
-                        "1", Chunk(content="markdown", document=document, headings=["headings"]), ""
-                    )
-                ],
-            )
-            # time.sleep(65)
-            asyncio.run(asyncio.sleep(100 - index * 10))
-        else:
-            result = engine.on_message(question=question, chat_history=[])
-            final_result = simplify_citation_numbers(result)
+        result = engine.on_message(question=question, chat_history=[])
+        final_result = simplify_citation_numbers(result)
 
         result_table: dict[str, str | None] = {"answer": final_result.response}
 

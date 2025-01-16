@@ -39,7 +39,7 @@ async def test_batch_process_invalid(invalid_csv, engine):
 
 @pytest.mark.asyncio
 async def test_batch_process(monkeypatch, sample_csv, engine):
-    def mock__process_question(question, engine):
+    def mock__process_question(index, question, engine):
         if question == "What is AI?":
             return {"answer": "Answer to What is AI?", "field_2": "value_2"}
         return {"answer": "Answer to Second question", "field_3": "value_3"}
@@ -66,7 +66,7 @@ def test_process_question(monkeypatch, engine):
     )
 
     monkeypatch.setattr(engine, "on_message", lambda question, chat_history: mock_result)
-    assert _process_question("What is AI?", engine) == {
+    assert _process_question(1, "What is AI?", engine) == {
         "answer": "Answer to question.(citation-1)",
         "citation_1_name": mock_result.subsections[0].chunk.document.name,
         "citation_1_headings": " > ".join(mock_result.subsections[0].text_headings),

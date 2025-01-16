@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import pprint
 from typing import Any
@@ -246,6 +245,7 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
         ],
         "raw_response": result.response,
     }
+
 
 @cl.step(name="batch processing", type="tool")
 async def _batch_proccessing(file: AskFileResponse) -> None:
