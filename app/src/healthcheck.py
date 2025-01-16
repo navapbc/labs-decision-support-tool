@@ -53,15 +53,14 @@ async def health(request: Request) -> HealthCheck:
     Returns:
         HealthCheck
     """
-    logger.info(request.headers)
-
     git_sha = os.environ.get("IMAGE_TAG", "")
     build_date = os.environ.get("BUILD_DATE", "")
     service_name = os.environ.get("ENVIRONMENT", "")
 
     hostname = f"{platform.node()} {socket.gethostname()}"
 
-    logger.info(f"Healthy {git_sha} built at {build_date}: {service_name} {hostname}")
+    # Reduce verbosity in logs
+    logger.debug(f"Healthy {git_sha} built at {build_date}: {service_name} {hostname}")
     return HealthCheck(
         build_date=build_date,
         git_sha=git_sha,
