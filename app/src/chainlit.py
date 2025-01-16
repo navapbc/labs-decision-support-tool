@@ -246,6 +246,14 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
         "raw_response": result.response,
     }
 
+@cl.step(type="tool")
+async def async_step_tool() -> None:
+    await cl.Message(content="Async Start sleeping").send()
+    for i in range(3):
+        await asyncio.sleep(65)
+        logger.info(f"Sleeping {i}")
+        await cl.Message(content=f"Sleeping {i}").send()
+    await cl.Message(content="Done sleeping").send()
 
 async def _batch_proccessing(file: AskFileResponse) -> None:
     await cl.Message(
@@ -255,7 +263,10 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
 
     try:
         engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
-        result_file_path = await batch_process(file.path, engine)
+
+        # result_file_path = await batch_process(file.path, engine)
+        await async_step_tool()
+        result_file_path = "/tmp/tmpjan8_yq2"
 
         # E.g., "abcd.csv" to "abcd_results.csv"
         result_file_name = file.name.removesuffix(".csv") + "_results.csv"
