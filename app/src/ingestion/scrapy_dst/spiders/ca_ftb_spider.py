@@ -17,7 +17,6 @@ class CaFranchiseTaxBoardSpider(scrapy.Spider):
 
     def parse(self, response: HtmlResponse) -> dict[str, str]:
         self.logger.info("Parsing %s", response.url)
-        extractions = {"url": response.url}
 
         nav_links = response.css("nav.local-nav a")
         for link in nav_links:
@@ -26,13 +25,21 @@ class CaFranchiseTaxBoardSpider(scrapy.Spider):
                 continue
 
             assert link.attrib["href"]
-            self.logger.info("Found nav link: %s", link.attrib["href"])
-            response.follow(link, callback=self.parse_childpage)
             self.logger.info("Found nav link: %s", link)
+            yield response.follow(link, callback=self.parse_childpage)
 
-        return extractions
+        body = response.css("div#body-content")
+        # Drop the navigation sidebar so that we only get the main content
+        body.css("aside").drop()
 
-    def parse_childpage(self, response):
+        markdown = to_markdown(body.get(), response.url)
+        extractions = {
+            "url": response.url,
+            "markdown": markdown,
+        }
+        yield extractions
+
+    def parse_childpage(self, response) -> dict[str, str]:
         self.logger.info("Parsing %s", response.url)
         extractions = {"url": response.url}
         return extractions
