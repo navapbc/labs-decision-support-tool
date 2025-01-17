@@ -1,5 +1,3 @@
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
 from src import chat_engine
@@ -32,22 +30,6 @@ def invalid_csv(tmp_path):
     return str(csv_path)
 
 
-@pytest.fixture
-def mock_chainlit_message(monkeypatch):
-    mock_message = MagicMock()
-    mock_message.send = AsyncMock()
-    mock_message.update = AsyncMock()
-    mock_message.remove = AsyncMock()
-
-    class MockMessage:
-        def __init__(self, content):
-            self.content = content
-            for attr, value in mock_message.__dict__.items():
-                setattr(self, attr, value)
-
-    monkeypatch.setattr("chainlit.Message", MockMessage)
-
-
 @pytest.mark.asyncio
 async def test_batch_process_invalid(invalid_csv, engine):
     engine = chat_engine.create_engine("ca-edd-web")
@@ -56,8 +38,8 @@ async def test_batch_process_invalid(invalid_csv, engine):
 
 
 @pytest.mark.asyncio
-async def test_batch_process(monkeypatch, sample_csv, engine, mock_chainlit_message):
-    def mock__process_question(question, engine):
+async def test_batch_process(monkeypatch, sample_csv, engine):
+    def mock__process_question(index, question, engine):
         if question == "What is AI?":
             return {"answer": "Answer to What is AI?", "field_2": "value_2"}
         return {"answer": "Answer to Second question", "field_3": "value_3"}
@@ -84,7 +66,7 @@ def test_process_question(monkeypatch, engine):
     )
 
     monkeypatch.setattr(engine, "on_message", lambda question, chat_history: mock_result)
-    assert _process_question("What is AI?", engine) == {
+    assert _process_question(1, "What is AI?", engine) == {
         "answer": "Answer to question.(citation-1)",
         "citation_1_name": mock_result.subsections[0].chunk.document.name,
         "citation_1_headings": " > ".join(mock_result.subsections[0].text_headings),

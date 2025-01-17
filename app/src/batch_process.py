@@ -1,9 +1,8 @@
 import asyncio
 import csv
-import gc
 import logging
 import tempfile
-from typing import Awaitable, Callable, Optional
+from concurrent.futures import ThreadPoolExecutor
 
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
@@ -11,98 +10,77 @@ from src.citations import simplify_citation_numbers
 logger = logging.getLogger(__name__)
 
 
-async def batch_process(
-    file_path: str,
-    engine: ChatEngineInterface,
-    progress_callback: Optional[Callable[[int, int], Awaitable[None]]] = None,
-) -> str:
-    """
-    Process a batch of questions from a CSV file.
-
-    Args:
-        file_path: Path to input CSV file
-        engine: Chat engine instance to use
-        progress_callback: Optional callback for progress updates
-
-    Returns:
-        Path to results file
-    """
-    logger.info("Starting batch processing of file: %r", file_path)
-
+async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
     with open(file_path, mode="r", newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
 
         if not reader.fieldnames or "question" not in reader.fieldnames:
-            logger.error("Invalid CSV format: missing 'question' column in %r", file_path)
             raise ValueError("CSV file must contain a 'question' column.")
 
-        rows = list(reader)
+        rows = list(reader)  # Convert reader to list to preserve order
         questions = [row["question"] for row in rows]
-        total_questions = len(questions)
-        logger.info("Found %d questions to process", total_questions)
 
-        processed_data = []
+        # Follow example usage https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor-example
+        with ThreadPoolExecutor() as executor:
+            # Process questions in parallel while preserving order
+            futures = [
+                executor.submit(_process_question, i, q, engine)
+                for i, q in enumerate(questions, start=1)
+            ]
+            logger.info("Submitted %i questions for processing", len(futures))
 
-        # Process in smaller batches to manage memory
-        BATCH_SIZE = 10
-        for i, q in enumerate(questions, 1):
-            logger.info("Processing question %d/%d", i, total_questions)
+            def update_rows() -> None:
+                logger.info("Waiting for results...")
+                # Update rows with processed data while preserving original order
+                for row, f in zip(rows, futures, strict=True):
+                    row.update(f.result())  # f.result() is a blocking call
+                logger.info("Updated %i rows", len(rows))
 
-            if progress_callback:
-                await progress_callback(i, total_questions)
+            # Waiting for results is blocking so run_in_executor
+            # https://docs.python.org/3/library/asyncio-eventloop.html#executing-code-in-thread-or-process-pools
+            await asyncio.get_running_loop().run_in_executor(executor, update_rows)
 
-            processed_data.append(_process_question(q, engine))
+        # Update fieldnames to include new columns
+        all_row_fieldnames = list(reader.fieldnames) + [key for p in rows for key in p.keys()]
+        # Use dict.keys() to get an ordered set of fieldnames
+        all_fieldnames = list({f: None for f in all_row_fieldnames}.keys())
+        logger.info("all_fieldnames: %r", all_fieldnames)
 
-            # Clear memory after each batch
-            if i % BATCH_SIZE == 0:
-                # Add small delay to prevent overwhelming the system
-                await asyncio.sleep(0.1)
-                # Force garbage collection to free memory
-                gc.collect()
+    result_file = tempfile.NamedTemporaryFile(delete=False, mode="w", newline="", encoding="utf-8")
+    logger.info("Writing results to file %r", result_file.name)
 
-        # Update rows with processed data
-        for row, data in zip(rows, processed_data, strict=True):
-            row.update(data)
+    writer = csv.DictWriter(result_file, fieldnames=all_fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    result_file.close()
 
-        # Prepare output file
-        all_fieldnames = list(
-            {
-                f: None
-                for f in list(reader.fieldnames) + [key for p in processed_data for key in p.keys()]
-            }.keys()
-        )
-
-        result_file = tempfile.NamedTemporaryFile(
-            delete=False, mode="w", newline="", encoding="utf-8", suffix=".csv"
-        )
-
-        writer = csv.DictWriter(result_file, fieldnames=all_fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-        result_file.close()
-
-        logger.info("Batch processing complete. Results written to: %r", result_file.name)
-        return result_file.name
+    return result_file.name
 
 
-def _process_question(question: str, engine: ChatEngineInterface) -> dict[str, str | None]:
-    logger.debug("Processing question: %r", question)
-    result = engine.on_message(question=question, chat_history=[])
-    final_result = simplify_citation_numbers(result)
+def _process_question(
+    index: int, question: str, engine: ChatEngineInterface
+) -> dict[str, str | None]:
+    try:
+        logger.info("Processing question %i: %s...", index, question[:50])
+        result = engine.on_message(question=question, chat_history=[])
+        final_result = simplify_citation_numbers(result)
 
-    result_table: dict[str, str | None] = {"answer": final_result.response}
+        result_table: dict[str, str | None] = {"answer": final_result.response}
 
-    for subsection in final_result.subsections:
-        citation_key = "citation_" + subsection.id
-        formatted_headings = (
-            " > ".join(subsection.text_headings) if subsection.text_headings else ""
-        )
-        result_table |= {
-            citation_key + "_name": subsection.chunk.document.name,
-            citation_key + "_headings": formatted_headings,
-            citation_key + "_source": subsection.chunk.document.source,
-            citation_key + "_text": subsection.text,
-        }
+        for subsection in final_result.subsections:
+            citation_key = "citation_" + subsection.id
+            formatted_headings = (
+                " > ".join(subsection.text_headings) if subsection.text_headings else ""
+            )
+            result_table |= {
+                citation_key + "_name": subsection.chunk.document.name,
+                citation_key + "_headings": formatted_headings,
+                citation_key + "_source": subsection.chunk.document.source,
+                citation_key + "_text": subsection.text,
+            }
 
-    logger.debug("Question processed with %d citations", len(final_result.subsections))
-    return result_table
+        logger.info("Question %i processed with %d citations", index, len(final_result.subsections))
+        return result_table
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.exception("Error processing question %i: %s", index, e, stack_info=True)
+        return {"answer": f"Error processing question: {str(e)}"}

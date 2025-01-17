@@ -109,10 +109,10 @@ def split_into_subsections(
     # Given a list of chunks, split them into a flat list of subsections to be used as citations
     subsections = [subsection for chunk in chunks for subsection in chunk_splitter(chunk, factory)]
     logger.info(
-        "Split %d chunks into %d subsections:\n%s",
+        "Split %d chunks into %d subsections",
         len(chunks),
         len(subsections),
-        "\n".join([f"{c.id}: {c.chunk.id}, {c.chunk.document.name}" for c in subsections]),
+        # "\n".join([f"{c.id}: {c.chunk.id}, {c.chunk.document.name}" for c in subsections]),
     )
     return subsections
 
