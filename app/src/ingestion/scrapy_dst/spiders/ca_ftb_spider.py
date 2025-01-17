@@ -1,5 +1,5 @@
 import re
-from typing import Optional
+from typing import Iterator, Optional
 
 import html2text
 import scrapy
@@ -15,7 +15,7 @@ class CaFranchiseTaxBoardSpider(scrapy.Spider):
     # This is used to substitute the base URL in the cache storage
     common_url_prefix = "https://www.ftb.ca.gov/file/"
 
-    def parse(self, response: HtmlResponse) -> dict[str, str]:
+    def parse(self, response: HtmlResponse) -> Iterator[scrapy.Request | dict[str, str]]:
         self.logger.info("Parsing %s", response.url)
 
         nav_links = response.css("nav.local-nav a")
@@ -28,6 +28,18 @@ class CaFranchiseTaxBoardSpider(scrapy.Spider):
             self.logger.info("Found nav link: %s", link)
             yield response.follow(link, callback=self.parse_childpage)
 
+        yield self.parse_childpage(response)
+
+    def parse_childpage(self, response: HtmlResponse) -> dict[str, str]:
+        self.logger.info("Parsing %s", response.url)
+
+        if (h1_count := len(response.css("h1").getall())) > 1:
+            self.logger.warning("Found %i h1 elements for %r", h1_count, response.url)
+            raise ValueError("Multiple h1 elements found")
+
+        title = to_markdown(response.css("h1").get().strip()).removeprefix("# ")
+        assert title
+
         body = response.css("div#body-content")
         # Drop the navigation sidebar so that we only get the main content
         body.css("aside").drop()
@@ -37,11 +49,6 @@ class CaFranchiseTaxBoardSpider(scrapy.Spider):
             "url": response.url,
             "markdown": markdown,
         }
-        yield extractions
-
-    def parse_childpage(self, response) -> dict[str, str]:
-        self.logger.info("Parsing %s", response.url)
-        extractions = {"url": response.url}
         return extractions
 
 
