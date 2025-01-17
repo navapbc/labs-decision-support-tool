@@ -43,7 +43,7 @@ class CaPublicChargeSpider(CrawlSpider):
 
     def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
         extractions = {"url": response.url}
-        title = response.css("title::text").get().split("| Keep Your Benefits", 1)[0]
+        title = response.css("title::text").get().removesuffix("| Keep Your Benefits")
         extractions["title"] = title.strip()
         base_url = response.url
 
