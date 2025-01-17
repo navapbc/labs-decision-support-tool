@@ -82,7 +82,7 @@ class CaPublicChargeSpider(CrawlSpider):
         return markdown.strip()
 
     def parse_main_primary(self, base_url: str, main_primary: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(base_url, main_primary.get())
+        markdown = self.to_markdown(base_url, main_primary.get()).replace("\r", "").strip()
         return {"main_primary": markdown}
 
     def parse_main_content(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
@@ -98,4 +98,4 @@ class CaPublicChargeSpider(CrawlSpider):
             for middle_detail in middler_details:
                 markdown += "\n" + self.to_markdown(base_url, middle_detail)
 
-        return {"main_content": markdown}
+        return {"main_content": markdown.replace("\r", "").strip()}
