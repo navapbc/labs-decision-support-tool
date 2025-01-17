@@ -287,3 +287,10 @@ scrape-irs-web:
 
 ingest-irs-web: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-irs-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
+
+
+scrape-wic:
+	$(PY_RUN_CMD) scrape-wic
+
+ingest-wic: check-ingest-arguments
+	$(PY_RUN_CMD) ingest-wic "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
