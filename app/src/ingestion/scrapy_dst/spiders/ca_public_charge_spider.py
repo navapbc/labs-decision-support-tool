@@ -43,12 +43,8 @@ class CaPublicChargeSpider(CrawlSpider):
 
     def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
         extractions = {"url": response.url}
-        if len(response.css("h4::text").getall()) == 1:
-            title = response.css("h4.title::text").get()
-            extractions["title"] = title.strip()
-        else:
-            titles = ";".join(response.css("h4.title::text").getall())
-            extractions["title"] = titles
+        title = response.css("title::text").get().removesuffix("| Keep Your Benefits")
+        extractions["title"] = title.strip()
         base_url = response.url
 
         # remove icon text
@@ -86,7 +82,7 @@ class CaPublicChargeSpider(CrawlSpider):
         return markdown.strip()
 
     def parse_main_primary(self, base_url: str, main_primary: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(base_url, main_primary.get())
+        markdown = self.to_markdown(base_url, main_primary.get()).replace("\r", "").strip()
         return {"main_primary": markdown}
 
     def parse_main_content(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
@@ -102,4 +98,4 @@ class CaPublicChargeSpider(CrawlSpider):
             for middle_detail in middler_details:
                 markdown += "\n" + self.to_markdown(base_url, middle_detail)
 
-        return {"main_content": markdown}
+        return {"main_content": markdown.replace("\r", "").strip()}

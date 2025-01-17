@@ -316,11 +316,15 @@ def chunk_tree(input_tree: Tree, config: ChunkingConfig) -> list[ProtoChunk]:
     unchunked_ids = input_data_ids - chunked_data_ids
     assert not unchunked_ids, f"Expected {unchunked_ids} to be chunked"
 
-    # Identify which chunk each node is in
+    # Identify which chunk each node is in, ignoring the Document root node
     data_id_to_chunk_id = {id: pc.id for pc in config.chunks for id in pc.data_ids}
     logger.debug(
         "Node-to-chunk mapping: %s",
-        {id: data_id_to_chunk_id[id] for id in [n.data_id for n in input_tree.iterator()]},
+        {
+            n.data_id: data_id_to_chunk_id[n.data_id]
+            for n in input_tree.iterator()
+            if n.data_id != doc_node.data_id
+        },
     )
     return config.chunks
 
