@@ -256,7 +256,7 @@ ingest-ca-public-charge: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-ca-public-charge "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
 
 scrape-edd-web:
-	$(PY_RUN_CMD) scrape-edd-web
+	$(PY_RUN_CMD) scrapy-runner edd
 
 ingest-edd-web: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-edd-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
