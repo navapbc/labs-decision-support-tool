@@ -250,13 +250,13 @@ endif
 
 
 scrape-ca-public-charge:
-	$(PY_RUN_CMD) scrape-ca-public-charge
+	$(PY_RUN_CMD) scrapy-runner ca_public_charge
 
 ingest-ca-public-charge: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-ca-public-charge "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
 
 scrape-edd-web:
-	$(PY_RUN_CMD) scrape-edd-web
+	$(PY_RUN_CMD) scrapy-runner edd
 
 ingest-edd-web: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-edd-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
@@ -274,16 +274,18 @@ scrape-la-county-policy:
 	cd src/ingestion/la_policy/scrape; uv run --no-project scrape_la_policy_nav_bar.py
 
 	# Now that we have the expanded nav bar, scrape all the links in the nav bar
-	# Either should work:
-	# DEBUG_SCRAPINGS=true uv run --no-project scrape_la_policy.py &> out.log
-	$(PY_RUN_CMD) scrape-la-policy 2>&1 | tee out.log
+	$(PY_RUN_CMD) scrapy-runner la_policy 2>&1 | tee out.log
 
 ingest-la-county-policy: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-la-policy "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
 
 
 scrape-irs-web:
-	$(PY_RUN_CMD) scrape-irs-web
+	$(PY_RUN_CMD) scrapy-runner irs
 
 ingest-irs-web: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-irs-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
+
+
+scrape-ca-ftb:
+	$(PY_RUN_CMD) scrapy-runner ca_ftb

@@ -6,8 +6,6 @@ from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders.crawl import CrawlSpider, Rule
 
-AccordionSections = dict[str, list[str]]
-
 
 class IrsSpider(CrawlSpider):
     # This name is used on the commandline: scrapy crawl edd_spider
@@ -43,7 +41,7 @@ class IrsSpider(CrawlSpider):
         ),
     )
 
-    def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
+    def parse_page(self, response: HtmlResponse) -> dict[str, str]:
         self.logger.info("Parsing %s", response.url)
         extractions = {"url": response.url}
 
