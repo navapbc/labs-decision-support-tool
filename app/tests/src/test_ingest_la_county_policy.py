@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
-from src.ingest_la_county_policy import _ingest_la_county_policy
+from src.ingest_runner import generalized_ingest
 
 
 @pytest.fixture
@@ -94,7 +94,7 @@ def test_ingestion(caplog, app_config, db_session, la_county_policy_local_file):
 
     with TemporaryDirectory(suffix="la_policy_md") as md_base_dir:
         with caplog.at_level(logging.WARNING):
-            _ingest_la_county_policy(
+            generalized_ingest(
                 db_session,
                 la_county_policy_local_file,
                 doc_attribs,
@@ -106,7 +106,7 @@ def test_ingestion(caplog, app_config, db_session, la_county_policy_local_file):
 
         # Re-ingesting the same data should not add any new documents
         with caplog.at_level(logging.INFO):
-            _ingest_la_county_policy(
+            generalized_ingest(
                 db_session,
                 la_county_policy_local_file,
                 doc_attribs,

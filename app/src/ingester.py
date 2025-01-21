@@ -89,6 +89,7 @@ def ingest_json(
     doc_attribs: dict[str, str],
     md_base_dir: str,
     common_base_url: str,
+    *,
     skip_db: bool = False,
     resume: bool = False,
     prep_json_item: Optional[Callable[[dict[str, str]], None]] = None,

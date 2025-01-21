@@ -93,6 +93,7 @@ def _ingest_content_hub(
     db_session: db.Session,
     html_file_dir: str,
     doc_attribs: dict[str, str],
+    *,
     md_base_dir: str = "imagine_la_md",
     skip_db: bool = False,
 ) -> None:

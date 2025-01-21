@@ -5,10 +5,10 @@ from tempfile import TemporaryDirectory
 import pytest
 from sqlalchemy import delete, select
 
-from src import ingest_edd_web
+from src import ingester
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
-from src.ingest_edd_web import _ingest_edd_web
+from src.ingest_runner import generalized_ingest
 
 
 @pytest.fixture
@@ -95,7 +95,7 @@ def edd_web_s3_file(mock_s3_bucket_resource, sample_cards):
 
 
 doc_attribs = {
-    "dataset": "edd_web",
+    "dataset": "CA EDD",
     "program": "employment",
     "region": "California",
 }
@@ -105,7 +105,7 @@ doc_attribs = {
 def test__ingest_edd(
     caplog, app_config, db_session, edd_web_local_file, edd_web_s3_file, file_location
 ):
-    ingest_edd_web.USE_MARKDOWN_TREE = False
+    ingester.USE_MARKDOWN_TREE = False
     # Force a short max_seq_length to test chunking
     app_config_for_test.sentence_transformer.max_seq_length = 47
 
@@ -113,9 +113,9 @@ def test__ingest_edd(
 
     with TemporaryDirectory(suffix="edd_md") as md_base_dir, caplog.at_level(logging.WARNING):
         if file_location == "local":
-            _ingest_edd_web(db_session, edd_web_local_file, doc_attribs, md_base_dir=md_base_dir)
+            generalized_ingest(db_session, edd_web_local_file, doc_attribs, md_base_dir=md_base_dir)
         else:
-            _ingest_edd_web(db_session, edd_web_s3_file, doc_attribs, md_base_dir=md_base_dir)
+            generalized_ingest(db_session, edd_web_s3_file, doc_attribs, md_base_dir=md_base_dir)
 
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 4
@@ -219,7 +219,7 @@ def test__ingest_edd(
 
 
 def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local_file):
-    ingest_edd_web.USE_MARKDOWN_TREE = True
+    ingester.USE_MARKDOWN_TREE = True
     # Force a short max_seq_length to test chunking
     app_config_for_test.sentence_transformer.max_seq_length = 47
 
@@ -227,7 +227,7 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
 
     with TemporaryDirectory(suffix="edd_md") as md_base_dir:
         with caplog.at_level(logging.WARNING):
-            _ingest_edd_web(
+            generalized_ingest(
                 db_session, edd_web_local_file, doc_attribs, md_base_dir=md_base_dir, resume=True
             )
 
@@ -235,7 +235,7 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
 
         # Re-ingesting the same data should not add any new documents
         with caplog.at_level(logging.INFO):
-            _ingest_edd_web(
+            generalized_ingest(
                 db_session, edd_web_local_file, doc_attribs, md_base_dir=md_base_dir, resume=True
             )
 

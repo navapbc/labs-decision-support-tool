@@ -1,3 +1,4 @@
+import argparse
 import logging
 import re
 import sys
@@ -5,7 +6,7 @@ from typing import Callable, NamedTuple, Optional
 
 from src.adapters import db
 from src.ingester import ingest_json
-from src.util.ingest_utils import ChunkingConfig, DefaultChunkingConfig, process_and_ingest_sys_args
+from src.util.ingest_utils import ChunkingConfig, DefaultChunkingConfig, start_ingestion
 
 logger = logging.getLogger(__name__)
 
@@ -102,45 +103,68 @@ def ca_public_charge_config(
     )
 
 
-CONFIGS = {
-    "CA EDD": edd_web_config("CA EDD", "unemployment insurance", "California"),
-    "DPSS Policy": la_county_policy_config("DPSS Policy", "mixed", "California:LA County"),
-    "IRS": IngestConfig("IRS", "tax credit", "US", "https://www.irs.gov/", "irs_web_md"),
-    "Keep Your Benefits": ca_public_charge_config("Keep Your Benefits", "mixed", "California"),
-}
+def get_ingester_config(dataset_id: str) -> IngestConfig:
+    match dataset_id:
+        case "CA EDD":
+            return edd_web_config(dataset_id, "unemployment insurance", "California")
+        case "DPSS Policy":
+            return la_county_policy_config(dataset_id, "mixed", "California:LA County")
+        case "IRS":
+            return IngestConfig(
+                dataset_id, "tax credit", "US", "https://www.irs.gov/", "irs_web_md"
+            )
+        case "Keep Your Benefits":
+            return ca_public_charge_config(dataset_id, "mixed", "California")
+        case _:
+            raise ValueError(f"Unknown dataset_id: {dataset_id}")
+
+
+# Print INFO messages since this is often run from the terminal during local development
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
+def generalized_ingest(
+    db_session: db.Session,
+    json_filepath: str,
+    doc_attribs: dict[str, str],
+    *,
+    md_base_dir: Optional[str] = None,
+    skip_db: bool = False,
+    resume: bool = False,
+) -> None:
+    config = get_ingester_config(doc_attribs["dataset"])
+    ingest_json(
+        db_session,
+        json_filepath,
+        doc_attribs,
+        md_base_dir or config.md_base_dir,
+        config.common_base_url,
+        skip_db=skip_db,
+        resume=resume,
+        prep_json_item=config.prep_json_item,
+        chunking_config=config.chunking_config,
+    )
 
 
 def main() -> None:  # pragma: no cover
-    config = CONFIGS[sys.argv[1]]
-    assert sys.argv[1] == config.dataset_id
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dataset_id")
+    parser.add_argument("file_path")
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--skip_db", action="store_true")
+    args = parser.parse_args(sys.argv[1:])
 
-    argv = [
-        sys.argv[0],
-        config.dataset_id,
-        config.benefit_program,
-        config.benefit_region,
-        *sys.argv[2:],
-    ]
-
-    def _ingest(
-        db_session: db.Session,
-        json_filepath: str,
-        doc_attribs: dict[str, str],
-        _md_base_dir: str = "md_base_dir",
-        skip_db: bool = False,
-        resume: bool = False,
-    ) -> None:
-
-        ingest_json(
-            db_session,
-            json_filepath,
-            doc_attribs,
-            config.md_base_dir,
-            config.common_base_url,
-            skip_db,
-            resume,
-            config.prep_json_item,
-            config.chunking_config,
-        )
-
-    process_and_ingest_sys_args(argv, logger, _ingest)
+    config = get_ingester_config(sys.argv[1])
+    doc_attribs = {
+        "dataset": config.dataset_id,
+        "program": config.benefit_program,
+        "region": config.benefit_region,
+    }
+    start_ingestion(
+        logger,
+        generalized_ingest,
+        args.file_path,
+        doc_attribs,
+        skip_db=args.skip_db,
+        resume=args.resume,
+    )
