@@ -4,7 +4,7 @@ import sys
 from typing import Callable, NamedTuple, Optional
 
 from src.adapters import db
-from src.ingest_edd_web import ingest_json
+from src.ingester import ingest_json
 from src.util.ingest_utils import ChunkingConfig, DefaultChunkingConfig, process_and_ingest_sys_args
 
 logger = logging.getLogger(__name__)

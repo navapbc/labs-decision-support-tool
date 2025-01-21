@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import re
-import sys
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
@@ -22,7 +21,6 @@ from src.util.ingest_utils import (
     deconstruct_table,
     document_exists,
     load_or_save_doc_markdown,
-    process_and_ingest_sys_args,
     reconstruct_list,
     reconstruct_table,
     tokenize,
@@ -83,55 +81,6 @@ class HeadingBasedSplit(Split):
             logger.warning("Text too long! %i tokens: %s", self.token_count, self.text_to_encode)
             return True
         return False
-
-
-def _ingest_edd_web(
-    db_session: db.Session,
-    json_filepath: str,
-    doc_attribs: dict[str, str],
-    md_base_dir: str = "edd_md",
-    skip_db: bool = False,
-    resume: bool = False,
-) -> None:
-    def prep_json_item(item: dict[str, str]) -> None:
-        markdown = item.get("main_content", item.get("main_primary", None))
-        assert markdown, f"Item {item['url']} has no main_content or main_primary"
-        item["markdown"] = _fix_input_markdown(markdown)
-
-    common_base_url = "https://edd.ca.gov/en/"
-    ingest_json(
-        db_session,
-        json_filepath,
-        doc_attribs,
-        md_base_dir,
-        common_base_url,
-        skip_db,
-        resume,
-        prep_json_item,
-    )
-
-
-def _fix_input_markdown(markdown: str) -> str:
-    # Fix ellipsis text that causes markdown parsing errors
-    # '. . .' is parsed as sublists on the same line
-    # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
-    markdown = markdown.replace(". . .", "...")
-
-    # Nested sublist '* + California's New Application' created without parent list
-    # in https://edd.ca.gov/en/about_edd/eddnext
-    markdown = markdown.replace("* + ", "    + ")
-
-    # Blank sublist '* ###" in https://edd.ca.gov/en/unemployment/Employer_Information/
-    # Tab labels are parsed into list items with headings; remove them
-    markdown = re.sub(r"^\s*\* #+", "", markdown, flags=re.MULTILINE)
-
-    # Blank sublist '* +" in https://edd.ca.gov/en/unemployment/Employer_Information/
-    # Empty sublist '4. * ' in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
-    # Remove empty nested sublists
-    markdown = re.sub(
-        r"^\s*(\w+\.|\*|\+|\-) (\w+\.|\*|\+|\-)\s*$", "", markdown, flags=re.MULTILINE
-    )
-    return markdown
 
 
 def ingest_json(
@@ -460,7 +409,3 @@ def _split_large_text_block(
 
 
 # endregion
-
-
-def main() -> None:
-    process_and_ingest_sys_args(sys.argv, logger, _ingest_edd_web)
