@@ -1,4 +1,5 @@
 import logging
+from tempfile import TemporaryDirectory
 
 import pytest
 from smart_open import open as smart_open
@@ -42,18 +43,21 @@ Accordion 21 Body
 
 Accordion 22 Body"""
 
-    with caplog.at_level(logging.INFO):
-        config = IngestConfig(
-            "Imagine LA",
-            "mixed",
-            "California",
-            "https://socialbenefitsnavigator25.web.app/contenthub/",
-            "imagine_la_md",
-        )
-        if file_location == "local":
-            _ingest_content_hub(db_session, "/app/tests/docs/imagine_la/", config)
-        else:
-            _ingest_content_hub(db_session, s3_html, config)
+    with TemporaryDirectory(suffix="imagine_la_md") as md_base_dir:
+        with caplog.at_level(logging.INFO):
+            config = IngestConfig(
+                "Imagine LA",
+                "mixed",
+                "California",
+                "https://socialbenefitsnavigator25.web.app/contenthub/",
+                "imagine_la_md",
+            )
+            if file_location == "local":
+                _ingest_content_hub(
+                    db_session, "/app/tests/docs/imagine_la/", config, md_base_dir=md_base_dir
+                )
+            else:
+                _ingest_content_hub(db_session, s3_html, config, md_base_dir=md_base_dir)
 
         assert any(text.startswith("Processing file: ") for text in caplog.messages)
 

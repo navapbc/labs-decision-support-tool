@@ -65,6 +65,7 @@ def process_and_ingest_sys_args(
     argv: list[str],
     logger: Logger,
     ingestion_call: Callable,
+    default_config: IngestConfig,
 ) -> None:
     """Method that reads sys args and passes them into ingestion call"""
     logger.info("Running with args: %r", argv)
@@ -92,13 +93,6 @@ def process_and_ingest_sys_args(
             )
         logger.info("Skipping reading or writing to the DB.")
 
-    default_config = IngestConfig(
-        "Imagine LA",
-        "mixed",
-        "California",
-        "https://socialbenefitsnavigator25.web.app/contenthub/",
-        "imagine_la_md",
-    )
     ingest_config = IngestConfig(
         args.dataset_id,
         args.benefit_program,

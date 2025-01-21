@@ -40,20 +40,32 @@ def test__drop_existing_dataset(db_session, enable_factory_create):
     assert db_session.execute(select(Document)).one()[0].dataset == docs[1].dataset
 
 
+default_config = IngestConfig(
+    "Imagine LA",
+    "mixed",
+    "California",
+    "https://socialbenefitsnavigator25.web.app/contenthub/",
+    "imagine_la_md",
+)
+
+
 def test_process_and_ingest_sys_args_requires_four_args(caplog):
     logger = logging.getLogger(__name__)
     ingest = Mock()
 
     with pytest.raises(SystemExit):
         with caplog.at_level(logging.WARNING):
-            process_and_ingest_sys_args(["ingest-policy-pdfs"], logger, ingest)
+            process_and_ingest_sys_args(["ingest-policy-pdfs"], logger, ingest, default_config)
             assert "the following arguments are required:" in caplog.text
             assert not ingest.called
 
     with pytest.raises(SystemExit):
         with caplog.at_level(logging.WARNING):
             process_and_ingest_sys_args(
-                ["ingest-policy-pdfs", "with", "too", "many", "args", "passed"], logger, ingest
+                ["ingest-policy-pdfs", "with", "too", "many", "args", "passed"],
+                logger,
+                ingest,
+                default_config,
             )
             assert "the following arguments are required:" in caplog.text
             assert not ingest.called
@@ -74,6 +86,7 @@ def test_process_and_ingest_sys_args_calls_ingest(caplog):
             ],
             logger,
             ingest,
+            default_config,
         )
         assert "Finished ingesting" in caplog.text
 
@@ -107,6 +120,7 @@ def test_process_and_ingest_sys_args_drops_existing_dataset(
             ],
             logger,
             ingest,
+            default_config,
         )
         assert "Dropped existing dataset" not in caplog.text
         assert db_session.execute(select(Document).where(Document.dataset == "other dataset")).one()
@@ -124,6 +138,7 @@ def test_process_and_ingest_sys_args_drops_existing_dataset(
             ],
             logger,
             ingest,
+            default_config,
         )
         assert "Dropped existing dataset" in caplog.text
         assert (
@@ -151,6 +166,7 @@ def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_c
             ],
             logger,
             ingest,
+            default_config,
         )
 
     # Use an unmocked function so that the resume parameter is detectable by process_and_ingest_sys_args()
@@ -172,6 +188,7 @@ def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_c
             ],
             logger,
             ingest_with_resume,
+            default_config,
         )
         assert "Enabled resuming from previous run" in caplog.text
         assert "Ingesting with resume: True" in caplog.text

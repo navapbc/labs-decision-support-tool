@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Sequence
+from typing import Optional, Sequence
 
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md
@@ -93,6 +93,7 @@ def _ingest_content_hub(
     config: IngestConfig,
     *,
     skip_db: bool = False,
+    md_base_dir: Optional[str] = None,
 ) -> None:
     file_list = sorted(get_files(html_file_dir))
 
@@ -110,7 +111,7 @@ def _ingest_content_hub(
 
         logger.info("Processing file: %s", file_path)
         result = _parse_html(
-            config.md_base_dir, config.common_base_url, file_path, config.doc_attribs
+            md_base_dir or config.md_base_dir, config.common_base_url, file_path, config.doc_attribs
         )
         all_chunks.append(result)
 
@@ -124,4 +125,11 @@ def _ingest_content_hub(
 
 
 def main() -> None:
-    process_and_ingest_sys_args(sys.argv, logger, _ingest_content_hub)
+    default_config = IngestConfig(
+        "Imagine LA",
+        "mixed",
+        "California",
+        "https://socialbenefitsnavigator25.web.app/contenthub/",
+        "imagine_la_md",
+    )
+    process_and_ingest_sys_args(sys.argv, logger, _ingest_content_hub, default_config)
