@@ -11,8 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
-    with open(file_path, mode="r", newline="", encoding="utf-8") as csvfile:
+    logger.info("Opening file: %s", file_path)
+
+    # Using utf-8-sig to handle CSV files with BOM characters from Excel
+    with open(file_path, mode="r", newline="", encoding="utf-8-sig") as csvfile:
         reader = csv.DictReader(csvfile)
+
+        # Clean up fieldnames to remove any BOM characters
+        if reader.fieldnames:
+            reader.fieldnames = [f.strip("\ufeff") for f in reader.fieldnames]
 
         if not reader.fieldnames or "question" not in reader.fieldnames:
             raise ValueError("CSV file must contain a 'question' column.")
