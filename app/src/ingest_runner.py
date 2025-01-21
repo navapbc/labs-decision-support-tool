@@ -1,6 +1,6 @@
 import logging
-import sys
 import re
+import sys
 from typing import Callable, NamedTuple, Optional
 
 from src.adapters import db
