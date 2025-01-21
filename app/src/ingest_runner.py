@@ -2,23 +2,13 @@ import argparse
 import logging
 import re
 import sys
-from typing import Callable, NamedTuple, Optional
+from typing import Optional
 
 from src.adapters import db
 from src.ingester import ingest_json
-from src.util.ingest_utils import ChunkingConfig, DefaultChunkingConfig, start_ingestion
+from src.util.ingest_utils import DefaultChunkingConfig, IngestConfig, start_ingestion
 
 logger = logging.getLogger(__name__)
-
-
-class IngestConfig(NamedTuple):
-    dataset_id: str
-    benefit_program: str
-    benefit_region: str
-    common_base_url: str
-    md_base_dir: str
-    prep_json_item: Optional[Callable[[dict[str, str]], None]] = None
-    chunking_config: Optional[ChunkingConfig] = None
 
 
 def edd_web_config(dataset_id: str, benefit_program: str, benefit_region: str) -> IngestConfig:
@@ -136,13 +126,10 @@ def generalized_ingest(
     ingest_json(
         db_session,
         json_filepath,
-        doc_attribs,
-        md_base_dir or config.md_base_dir,
-        config.common_base_url,
+        config,
         skip_db=skip_db,
         resume=resume,
-        prep_json_item=config.prep_json_item,
-        chunking_config=config.chunking_config,
+        md_base_dir=md_base_dir,
     )
 
 
@@ -155,16 +142,11 @@ def main() -> None:  # pragma: no cover
     args = parser.parse_args(sys.argv[1:])
 
     config = get_ingester_config(sys.argv[1])
-    doc_attribs = {
-        "dataset": config.dataset_id,
-        "program": config.benefit_program,
-        "region": config.benefit_region,
-    }
     start_ingestion(
         logger,
         generalized_ingest,
         args.file_path,
-        doc_attribs,
+        config,
         skip_db=args.skip_db,
         resume=args.resume,
     )

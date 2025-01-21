@@ -13,6 +13,7 @@ from src.ingestion.markdown_chunking import ChunkingConfig, chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.file_util import get_files
 from src.util.ingest_utils import (
+    IngestConfig,
     add_embeddings,
     create_file_path,
     load_or_save_doc_markdown,
@@ -23,9 +24,6 @@ from src.util.ingest_utils import (
 from src.util.string_utils import remove_links
 
 logger = logging.getLogger(__name__)
-
-
-CONTENT_HUB_URL = "https://socialbenefitsnavigator25.web.app/contenthub/"
 
 
 class ImagineLaChunkingConfig(ChunkingConfig):
@@ -46,7 +44,7 @@ def _parse_html(
 
     doc_attribs["name"] = soup.find("h2").text.strip()
     # Get filename and strip ".html" to get the source URL
-    doc_attribs["source"] = CONTENT_HUB_URL + file_path.split("/")[-1][:-5]
+    doc_attribs["source"] = common_base_url + file_path.split("/")[-1][:-5]
     document = Document(**doc_attribs)
 
     # Extract accordions
@@ -92,9 +90,8 @@ def _parse_html(
 def _ingest_content_hub(
     db_session: db.Session,
     html_file_dir: str,
-    doc_attribs: dict[str, str],
+    config: IngestConfig,
     *,
-    md_base_dir: str = "imagine_la_md",
     skip_db: bool = False,
 ) -> None:
     file_list = sorted(get_files(html_file_dir))
@@ -103,9 +100,8 @@ def _ingest_content_hub(
         "Processing HTML files in %s using %s with %s",
         html_file_dir,
         app_config.embedding_model,
-        doc_attribs,
+        config.doc_attribs,
     )
-    common_base_url = "https://socialbenefitsnavigator25.web.app/contenthub/"
 
     all_chunks: list[tuple[Document, Sequence[Chunk], Sequence[str]]] = []
     for file_path in file_list:
@@ -113,7 +109,9 @@ def _ingest_content_hub(
             continue
 
         logger.info("Processing file: %s", file_path)
-        result = _parse_html(md_base_dir, common_base_url, file_path, doc_attribs)
+        result = _parse_html(
+            config.md_base_dir, config.common_base_url, file_path, config.doc_attribs
+        )
         all_chunks.append(result)
 
     if skip_db:

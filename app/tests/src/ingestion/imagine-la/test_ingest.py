@@ -6,6 +6,7 @@ from sqlalchemy import delete, select
 
 from src.db.models.document import Chunk, Document
 from src.ingestion.imagine_la.ingest import _ingest_content_hub
+from src.util.ingest_utils import IngestConfig
 
 
 @pytest.fixture
@@ -20,12 +21,6 @@ def s3_html(mock_s3_bucket_resource):
 @pytest.mark.parametrize("file_location", ["local", "s3"])
 def test__ingest_content_hub(caplog, app_config, db_session, s3_html, file_location):
     db_session.execute(delete(Document))
-
-    doc_attribs = {
-        "dataset": "test_dataset",
-        "program": "test_benefit_program",
-        "region": "test_region",
-    }
 
     doc_1_content = """# Document 1
 
@@ -48,10 +43,17 @@ Accordion 21 Body
 Accordion 22 Body"""
 
     with caplog.at_level(logging.INFO):
+        config = IngestConfig(
+            "Imagine LA",
+            "mixed",
+            "California",
+            "https://socialbenefitsnavigator25.web.app/contenthub/",
+            "imagine_la_md",
+        )
         if file_location == "local":
-            _ingest_content_hub(db_session, "/app/tests/docs/imagine_la/", doc_attribs)
+            _ingest_content_hub(db_session, "/app/tests/docs/imagine_la/", config)
         else:
-            _ingest_content_hub(db_session, s3_html, doc_attribs)
+            _ingest_content_hub(db_session, s3_html, config)
 
         assert any(text.startswith("Processing file: ") for text in caplog.messages)
 

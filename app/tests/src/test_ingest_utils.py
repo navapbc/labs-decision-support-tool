@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import tempfile
-from unittest.mock import ANY, Mock
+from unittest.mock import Mock
 
 import pytest
 from smart_open import open
@@ -10,6 +10,7 @@ from sqlalchemy import delete, select
 
 from src.db.models.document import Document
 from src.util.ingest_utils import (
+    IngestConfig,
     _drop_existing_dataset,
     _ensure_blank_line_suffix,
     add_embeddings,
@@ -75,16 +76,15 @@ def test_process_and_ingest_sys_args_calls_ingest(caplog):
             ingest,
         )
         assert "Finished ingesting" in caplog.text
-        ingest.assert_called_with(
-            ANY,
-            "/some/folder",
-            {
-                "dataset": "bridges-eligibility-manual",
-                "program": "SNAP",
-                "region": "Michigan",
-            },
-            skip_db=False,
-        )
+
+        call_args = ingest.call_args
+        assert call_args[0][1] == "/some/folder"
+        ingest_config = call_args[0][2]
+        assert isinstance(ingest_config, IngestConfig)
+        assert ingest_config.dataset_id == "bridges-eligibility-manual"
+        assert ingest_config.benefit_program == "SNAP"
+        assert ingest_config.benefit_region == "Michigan"
+        assert call_args[1] == {"skip_db": False}
 
 
 def test_process_and_ingest_sys_args_drops_existing_dataset(

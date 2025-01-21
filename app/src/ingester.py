@@ -3,7 +3,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Optional, Sequence
 
 from smart_open import open as smart_open
 
@@ -15,6 +15,7 @@ from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
     ChunkingConfig,
     DefaultChunkingConfig,
+    IngestConfig,
     add_embeddings,
     create_file_path,
     deconstruct_list,
@@ -86,26 +87,26 @@ class HeadingBasedSplit(Split):
 def ingest_json(
     db_session: db.Session,
     json_filepath: str,
-    doc_attribs: dict[str, str],
-    md_base_dir: str,
-    common_base_url: str,
+    config: IngestConfig,
     *,
     skip_db: bool = False,
     resume: bool = False,
-    prep_json_item: Optional[Callable[[dict[str, str]], None]] = None,
-    chunking_config: Optional[ChunkingConfig] = None,
+    md_base_dir: Optional[str] = None,
 ) -> None:
-    json_items = load_json_items(db_session, json_filepath, doc_attribs, skip_db, resume)
+    json_items = load_json_items(db_session, json_filepath, config.doc_attribs, skip_db, resume)
 
-    if prep_json_item:
+    if config.prep_json_item:
         for item in json_items:
-            prep_json_item(item)
+            config.prep_json_item(item)
 
-    if not chunking_config:
-        chunking_config = DefaultChunkingConfig()
+    chunking_config = config.chunking_config or DefaultChunkingConfig()
     # First, chunk all json_items into splits (fast) to debug any issues quickly
     all_splits = _chunk_into_splits_from_json(
-        md_base_dir, json_items, doc_attribs, common_base_url, chunking_config
+        md_base_dir or config.md_base_dir,
+        json_items,
+        config.doc_attribs,
+        config.common_base_url,
+        chunking_config,
     )
 
     if skip_db:
