@@ -106,6 +106,9 @@ stop:
 
 check: format-check lint test
 
+app-shell:
+	docker compose run -ti -e PY_RUN_APPROACH=local --name $(APP_NAME)-shell --rm $(APP_NAME) /bin/bash
+
 ##################################################
 # DB & migrations
 ##################################################

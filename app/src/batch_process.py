@@ -6,45 +6,49 @@ from concurrent.futures import ThreadPoolExecutor
 
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
+from src.util.file_util import convert_to_utf8
 
 logger = logging.getLogger(__name__)
 
 
 async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
-    with open(file_path, mode="r", newline="", encoding="utf-8") as csvfile:
-        reader = csv.DictReader(csvfile)
 
-        if not reader.fieldnames or "question" not in reader.fieldnames:
-            raise ValueError("CSV file must contain a 'question' column.")
+    # Convert file contents to clean UTF-8
+    content = convert_to_utf8(file_path)
 
-        rows = list(reader)  # Convert reader to list to preserve order
-        questions = [row["question"] for row in rows]
+    reader = csv.DictReader(content.splitlines())
 
-        # Follow example usage https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor-example
-        with ThreadPoolExecutor() as executor:
-            # Process questions in parallel while preserving order
-            futures = [
-                executor.submit(_process_question, i, q, engine)
-                for i, q in enumerate(questions, start=1)
-            ]
-            logger.info("Submitted %i questions for processing", len(futures))
+    if not reader.fieldnames or "question" not in reader.fieldnames:
+        raise ValueError("CSV file must contain a 'question' column.")
 
-            def update_rows() -> None:
-                logger.info("Waiting for results...")
-                # Update rows with processed data while preserving original order
-                for row, f in zip(rows, futures, strict=True):
-                    row.update(f.result())  # f.result() is a blocking call
-                logger.info("Updated %i rows", len(rows))
+    rows = list(reader)  # Convert reader to list to preserve order
+    questions = [row["question"] for row in rows]
 
-            # Waiting for results is blocking so run_in_executor
-            # https://docs.python.org/3/library/asyncio-eventloop.html#executing-code-in-thread-or-process-pools
-            await asyncio.get_running_loop().run_in_executor(executor, update_rows)
+    # Follow example usage https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor-example
+    with ThreadPoolExecutor() as executor:
+        # Process questions in parallel while preserving order
+        futures = [
+            executor.submit(_process_question, i, q, engine)
+            for i, q in enumerate(questions, start=1)
+        ]
+        logger.info("Submitted %i questions for processing", len(futures))
 
-        # Update fieldnames to include new columns
-        all_row_fieldnames = list(reader.fieldnames) + [key for p in rows for key in p.keys()]
-        # Use dict.keys() to get an ordered set of fieldnames
-        all_fieldnames = list({f: None for f in all_row_fieldnames}.keys())
-        logger.info("all_fieldnames: %r", all_fieldnames)
+        def update_rows() -> None:
+            logger.info("Waiting for results...")
+            # Update rows with processed data while preserving original order
+            for row, f in zip(rows, futures, strict=True):
+                row.update(f.result())  # f.result() is a blocking call
+            logger.info("Updated %i rows", len(rows))
+
+        # Waiting for results is blocking so run_in_executor
+        # https://docs.python.org/3/library/asyncio-eventloop.html#executing-code-in-thread-or-process-pools
+        await asyncio.get_running_loop().run_in_executor(executor, update_rows)
+
+    # Update fieldnames to include new columns
+    all_row_fieldnames = list(reader.fieldnames) + [key for p in rows for key in p.keys()]
+    # Use dict.keys() to get an ordered set of fieldnames
+    all_fieldnames = list({f: None for f in all_row_fieldnames}.keys())
+    logger.info("all_fieldnames: %r", all_fieldnames)
 
     result_file = tempfile.NamedTemporaryFile(delete=False, mode="w", newline="", encoding="utf-8")
     logger.info("Writing results to file %r", result_file.name)

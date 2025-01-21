@@ -6,6 +6,18 @@ from urllib.parse import urlparse
 import boto3
 import botocore
 
+
+def convert_to_utf8(file_path: str) -> str:
+    """Convert file contents to UTF-8 without BOM characters from Excel. Return content as a UTF-8 string"""
+    # Ref: https://stackoverflow.com/questions/8898294/convert-utf-8-with-bom-to-utf-8-with-no-bom-in-python/8898439#8898439
+    try:
+        with open(file_path, "r", encoding="utf-8-sig", newline="") as fp:
+            return fp.read()
+    except UnicodeDecodeError:
+        with open(file_path, "r", encoding="utf-8", newline="") as fp:
+            return fp.read()
+
+
 ##################################
 # Path parsing utils
 ##################################
