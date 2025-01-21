@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
-    logger.info("Opening file: %s", file_path)
 
     # Using utf-8-sig to handle CSV files with BOM characters from Excel
     with open(file_path, mode="r", newline="", encoding="utf-8-sig") as csvfile:
