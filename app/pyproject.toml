@@ -77,6 +77,7 @@ ingest-la-policy = "src.ingest_la_county_policy:main"
 ingest-irs-web = "src.ingest_irs_web:main"
 
 scrapy-runner = "src.ingestion.scrapy_runner:main"
+ingest-runner = "src.ingest_runner:main"
 
 [tool.black]
 line-length = 100

@@ -283,9 +283,13 @@ ingest-la-county-policy: check-ingest-arguments
 scrape-irs-web:
 	$(PY_RUN_CMD) scrapy-runner irs
 
-ingest-irs-web: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-irs-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
+# Usage make ingest-irs-web FILEPATH=src/ingestion/irs_web_scrapings.json
+ingest-irs-web: #check-ingest-arguments
+	# $(PY_RUN_CMD) ingest-irs-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
+	$(PY_RUN_CMD) ingest-runner irs "$(FILEPATH)" $(INGEST_ARGS)
 
 
 scrape-ca-ftb:
 	$(PY_RUN_CMD) scrapy-runner ca_ftb
+ingest-ca-ftb: check-ingest-arguments
+	$(PY_RUN_CMD) ingest-ca-ftb "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)

@@ -142,13 +142,14 @@ def ingest_json(
     common_base_url: str,
     skip_db: bool = False,
     resume: bool = False,
-    prep_json_item: Callable[[dict[str, str]], None] = lambda x: None,
+    prep_json_item: Optional[Callable[[dict[str, str]], None]] = None,
     chunking_config: Optional[ChunkingConfig] = None,
 ) -> None:
     json_items = load_json_items(db_session, json_filepath, doc_attribs, skip_db, resume)
 
-    for item in json_items:
-        prep_json_item(item)
+    if prep_json_item:
+        for item in json_items:
+            prep_json_item(item)
 
     if not chunking_config:
         chunking_config = DefaultChunkingConfig()

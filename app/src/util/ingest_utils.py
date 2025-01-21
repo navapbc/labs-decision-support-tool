@@ -48,6 +48,7 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
 
     # Print INFO messages since this is often run from the terminal during local development
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logger.info("Running with args: %r", argv)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset_id")
