@@ -92,15 +92,16 @@ def test_get_file_name():
 
 
 @pytest.mark.parametrize(
-    "path,expected",
+    "expected",
     [
-        ("/tmp/test", ["file1.txt", "file2.txt"]),  # Local path
-        ("s3://bucket/prefix", ["s3://bucket/prefix/file1.txt"]),  # S3 path
+        ["file1.txt", "file2.txt"],  # Local path test files
+        ["s3://bucket/prefix/file1.txt"],  # S3 path test files
     ],
 )
-def test_get_files(path, expected, tmp_path):
+def test_get_files(expected, tmp_path):
     """Test getting files from both local and S3 paths"""
-    if is_s3_path(path):
+    if "s3://" in expected[0]:  # Test S3 path
+        path = "s3://bucket/prefix"
         # Mock S3 resource and bucket
         mock_obj = MagicMock()
         mock_obj.key = "prefix/file1.txt"
@@ -112,12 +113,12 @@ def test_get_files(path, expected, tmp_path):
             files = get_files(path)
             assert sorted(files) == sorted(expected)
             mock_bucket.objects.filter.assert_called_once_with(Prefix="prefix")
-    else:
-        # Create local test files
+    else:  # Test local path
+        # Create local test files in pytest-provided temp directory
         for filename in expected:
             (tmp_path / filename).touch()
-        path = str(tmp_path)
-        files = get_files(path)
+
+        files = get_files(str(tmp_path))
         files = [os.path.basename(f) for f in files]
         assert sorted(files) == sorted(expected)
 
