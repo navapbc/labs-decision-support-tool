@@ -1,5 +1,5 @@
 import re
-from typing import Iterator, Optional
+from typing import Optional
 
 import html2text
 import scrapy
