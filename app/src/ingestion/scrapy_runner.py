@@ -59,24 +59,12 @@ def run(spider_name: str, output_json_filename: str, debug: bool = False) -> Non
         postprocess_json(output_json_filename)
 
 
-DATASETS = {
-    "edd": {},
-    "la_policy": {},
-    "irs": {
-        "spider": "irs_web_spider",
-    },
-    "ca_public_charge": {},
-    "ca_ftb": {},
-}
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset")
     parser.add_argument("--debug", action="store_true")
 
     args = parser.parse_args(sys.argv[1:])
-    ds = DATASETS[args.dataset]
-    spider_id = ds.get("spider", f"{args.dataset}_spider")
-    json_output = ds.get("output", f"{spider_id.removesuffix("spider")}scrapings.json")
+    spider_id = f"{args.dataset}_spider"
+    json_output = f"{spider_id.removesuffix("spider")}scrapings.json"
     run(spider_id, json_output, debug=args.debug)
