@@ -268,10 +268,7 @@ scrape-la-county-policy:
 
 
 scrapy-runner:
-ifndef SPIDER
-	$(error SPIDER (prefix for the spider name) is undefined)
-endif
-	$(PY_RUN_CMD) scrapy-runner "$(SPIDER)"
+	$(PY_RUN_CMD) scrapy-runner $(args)
 
 ingest-runner:
 ifndef DATASET_ID
