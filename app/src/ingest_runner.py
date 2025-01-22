@@ -96,7 +96,7 @@ def ca_public_charge_config(
 def get_ingester_config(dataset_id: str) -> IngestConfig:
     match dataset_id:
         case "CA EDD":
-            return edd_web_config(dataset_id, "unemployment insurance", "California")
+            return edd_web_config(dataset_id, "employment", "California")
         case "DPSS Policy":
             return la_county_policy_config(dataset_id, "mixed", "California:LA County")
         case "IRS":
@@ -116,13 +116,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 def generalized_ingest(
     db_session: db.Session,
     json_filepath: str,
-    doc_attribs: dict[str, str],
+    config: IngestConfig,
     *,
     md_base_dir: Optional[str] = None,
     skip_db: bool = False,
     resume: bool = False,
 ) -> None:
-    config = get_ingester_config(doc_attribs["dataset"])
     ingest_json(
         db_session,
         json_filepath,

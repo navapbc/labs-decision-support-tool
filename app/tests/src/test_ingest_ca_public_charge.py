@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
-from src.ingest_runner import generalized_ingest
+from src.ingest_runner import generalized_ingest, get_ingester_config
 
 
 @pytest.fixture
@@ -80,24 +80,18 @@ def ca_public_charge_local_file(tmp_path, sample_markdown):
     return str(file_path)
 
 
-doc_attribs = {
-    "dataset": "Keep Your Benefits",
-    "program": "mixed",
-    "region": "California",
-}
-
-
 def test_ingestion(caplog, app_config, db_session, ca_public_charge_local_file):
     app_config_for_test.sentence_transformer.max_seq_length = 75
 
     db_session.execute(delete(Document))
 
     with TemporaryDirectory(suffix="ca_public_charge_md") as md_base_dir:
+        config = get_ingester_config("Keep Your Benefits")
         with caplog.at_level(logging.WARNING):
             generalized_ingest(
                 db_session,
                 ca_public_charge_local_file,
-                doc_attribs,
+                config,
                 md_base_dir=md_base_dir,
                 resume=True,
             )
@@ -109,7 +103,7 @@ def test_ingestion(caplog, app_config, db_session, ca_public_charge_local_file):
             generalized_ingest(
                 db_session,
                 ca_public_charge_local_file,
-                doc_attribs,
+                config,
                 md_base_dir=md_base_dir,
                 resume=True,
             )

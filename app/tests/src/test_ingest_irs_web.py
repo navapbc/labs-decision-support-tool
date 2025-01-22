@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
-from src.ingest_runner import generalized_ingest
+from src.ingest_runner import generalized_ingest, get_ingester_config
 
 
 @pytest.fixture
@@ -54,13 +54,6 @@ def irs_web_local_file(tmp_path, sample_markdown):
     return str(file_path)
 
 
-doc_attribs = {
-    "dataset": "IRS",
-    "program": "tax credit",
-    "region": "US",
-}
-
-
 def test_ingestion(caplog, app_config, db_session, irs_web_local_file):
     # Force a short max_seq_length to test chunking
     app_config_for_test.sentence_transformer.max_seq_length = 47
@@ -68,11 +61,12 @@ def test_ingestion(caplog, app_config, db_session, irs_web_local_file):
     db_session.execute(delete(Document))
 
     with TemporaryDirectory(suffix="irs_web_md") as md_base_dir:
+        config = get_ingester_config("IRS")
         with caplog.at_level(logging.WARNING):
             generalized_ingest(
                 db_session,
                 irs_web_local_file,
-                doc_attribs,
+                config,
                 md_base_dir=md_base_dir,
                 resume=True,
             )
@@ -84,7 +78,7 @@ def test_ingestion(caplog, app_config, db_session, irs_web_local_file):
             generalized_ingest(
                 db_session,
                 irs_web_local_file,
-                doc_attribs,
+                config,
                 md_base_dir=md_base_dir,
                 resume=True,
             )
