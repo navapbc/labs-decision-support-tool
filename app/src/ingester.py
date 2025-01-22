@@ -2,9 +2,8 @@ import json
 import logging
 import os
 import re
-import sys
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Optional, Sequence
 
 from smart_open import open as smart_open
 
@@ -16,13 +15,13 @@ from src.ingestion.markdown_tree import create_markdown_tree
 from src.util.ingest_utils import (
     ChunkingConfig,
     DefaultChunkingConfig,
+    IngestConfig,
     add_embeddings,
     create_file_path,
     deconstruct_list,
     deconstruct_table,
     document_exists,
     load_or_save_doc_markdown,
-    process_and_ingest_sys_args,
     reconstruct_list,
     reconstruct_table,
     tokenize,
@@ -85,76 +84,29 @@ class HeadingBasedSplit(Split):
         return False
 
 
-def _ingest_edd_web(
-    db_session: db.Session,
-    json_filepath: str,
-    doc_attribs: dict[str, str],
-    md_base_dir: str = "edd_md",
-    skip_db: bool = False,
-    resume: bool = False,
-) -> None:
-    def prep_json_item(item: dict[str, str]) -> None:
-        markdown = item.get("main_content", item.get("main_primary", None))
-        assert markdown, f"Item {item['url']} has no main_content or main_primary"
-        item["markdown"] = _fix_input_markdown(markdown)
-
-    common_base_url = "https://edd.ca.gov/en/"
-    ingest_json(
-        db_session,
-        json_filepath,
-        doc_attribs,
-        md_base_dir,
-        common_base_url,
-        skip_db,
-        resume,
-        prep_json_item,
-    )
-
-
-def _fix_input_markdown(markdown: str) -> str:
-    # Fix ellipsis text that causes markdown parsing errors
-    # '. . .' is parsed as sublists on the same line
-    # in https://edd.ca.gov/en/uibdg/total_and_partial_unemployment_tpu_5/
-    markdown = markdown.replace(". . .", "...")
-
-    # Nested sublist '* + California's New Application' created without parent list
-    # in https://edd.ca.gov/en/about_edd/eddnext
-    markdown = markdown.replace("* + ", "    + ")
-
-    # Blank sublist '* ###" in https://edd.ca.gov/en/unemployment/Employer_Information/
-    # Tab labels are parsed into list items with headings; remove them
-    markdown = re.sub(r"^\s*\* #+", "", markdown, flags=re.MULTILINE)
-
-    # Blank sublist '* +" in https://edd.ca.gov/en/unemployment/Employer_Information/
-    # Empty sublist '4. * ' in https://edd.ca.gov/en/about_edd/your-benefit-payment-options/
-    # Remove empty nested sublists
-    markdown = re.sub(
-        r"^\s*(\w+\.|\*|\+|\-) (\w+\.|\*|\+|\-)\s*$", "", markdown, flags=re.MULTILINE
-    )
-    return markdown
-
-
 def ingest_json(
     db_session: db.Session,
     json_filepath: str,
-    doc_attribs: dict[str, str],
-    md_base_dir: str,
-    common_base_url: str,
+    config: IngestConfig,
+    *,
     skip_db: bool = False,
     resume: bool = False,
-    prep_json_item: Callable[[dict[str, str]], None] = lambda x: None,
-    chunking_config: Optional[ChunkingConfig] = None,
+    md_base_dir: Optional[str] = None,
 ) -> None:
-    json_items = load_json_items(db_session, json_filepath, doc_attribs, skip_db, resume)
+    json_items = load_json_items(db_session, json_filepath, config.doc_attribs, skip_db, resume)
 
-    for item in json_items:
-        prep_json_item(item)
+    if config.prep_json_item:
+        for item in json_items:
+            config.prep_json_item(item)
 
-    if not chunking_config:
-        chunking_config = DefaultChunkingConfig()
+    chunking_config = config.chunking_config or DefaultChunkingConfig()
     # First, chunk all json_items into splits (fast) to debug any issues quickly
     all_splits = _chunk_into_splits_from_json(
-        md_base_dir, json_items, doc_attribs, common_base_url, chunking_config
+        md_base_dir or config.md_base_dir,
+        json_items,
+        config.doc_attribs,
+        config.common_base_url,
+        chunking_config,
     )
 
     if skip_db:
@@ -459,7 +411,3 @@ def _split_large_text_block(
 
 
 # endregion
-
-
-def main() -> None:
-    process_and_ingest_sys_args(sys.argv, logger, _ingest_edd_web)

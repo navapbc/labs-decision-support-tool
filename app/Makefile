@@ -255,14 +255,8 @@ endif
 scrape-ca-public-charge:
 	$(PY_RUN_CMD) scrapy-runner ca_public_charge
 
-ingest-ca-public-charge: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-ca-public-charge "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
-
 scrape-edd-web:
 	$(PY_RUN_CMD) scrapy-runner edd
-
-ingest-edd-web: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-edd-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
 
 
 scrape-imagine-la:
@@ -279,16 +273,17 @@ scrape-la-county-policy:
 	# Now that we have the expanded nav bar, scrape all the links in the nav bar
 	$(PY_RUN_CMD) scrapy-runner la_policy 2>&1 | tee out.log
 
-ingest-la-county-policy: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-la-policy "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
-
-
 scrape-irs-web:
 	$(PY_RUN_CMD) scrapy-runner irs
 
-ingest-irs-web: check-ingest-arguments
-	$(PY_RUN_CMD) ingest-irs-web "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(INGEST_ARGS)
-
-
 scrape-ca-ftb:
 	$(PY_RUN_CMD) scrapy-runner ca_ftb
+
+ingest-runner:
+ifndef DATASET_ID
+	$(error DATASET_ID is undefined)
+endif
+ifndef FILEPATH
+	$(error FILEPATH is undefined)
+endif
+	$(PY_RUN_CMD) ingest-runner "$(DATASET_ID)" "$(FILEPATH)" $(INGEST_ARGS)

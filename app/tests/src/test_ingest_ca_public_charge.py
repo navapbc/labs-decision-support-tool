@@ -7,7 +7,8 @@ from sqlalchemy import delete, select
 
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
-from src.ingest_ca_public_charge import _ingest_ca_public_charge
+from src.ingest_runner import get_ingester_config
+from src.ingester import ingest_json
 
 
 @pytest.fixture
@@ -80,24 +81,18 @@ def ca_public_charge_local_file(tmp_path, sample_markdown):
     return str(file_path)
 
 
-doc_attribs = {
-    "dataset": "Keep Your Benefits",
-    "program": "mixed",
-    "region": "California",
-}
-
-
 def test_ingestion(caplog, app_config, db_session, ca_public_charge_local_file):
     app_config_for_test.sentence_transformer.max_seq_length = 75
 
     db_session.execute(delete(Document))
 
     with TemporaryDirectory(suffix="ca_public_charge_md") as md_base_dir:
+        config = get_ingester_config("Keep Your Benefits")
         with caplog.at_level(logging.WARNING):
-            _ingest_ca_public_charge(
+            ingest_json(
                 db_session,
                 ca_public_charge_local_file,
-                doc_attribs,
+                config,
                 md_base_dir=md_base_dir,
                 resume=True,
             )
@@ -106,10 +101,10 @@ def test_ingestion(caplog, app_config, db_session, ca_public_charge_local_file):
 
         # Re-ingesting the same data should not add any new documents
         with caplog.at_level(logging.INFO):
-            _ingest_ca_public_charge(
+            ingest_json(
                 db_session,
                 ca_public_charge_local_file,
-                doc_attribs,
+                config,
                 md_base_dir=md_base_dir,
                 resume=True,
             )

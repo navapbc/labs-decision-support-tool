@@ -6,7 +6,7 @@ import os
 import re
 from logging import Logger
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Callable, NamedTuple, Optional, Sequence
 
 from smart_open import open as smart_open
 from sqlalchemy import and_, delete, select
@@ -43,11 +43,32 @@ def document_exists(db_session: db.Session, url: str, doc_attribs: dict[str, str
     return False
 
 
-def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call: Callable) -> None:
-    """Method that reads sys args and passes them into ingestion call"""
+class IngestConfig(NamedTuple):
+    dataset_id: str
+    benefit_program: str
+    benefit_region: str
+    common_base_url: str
+    md_base_dir: str
+    prep_json_item: Optional[Callable[[dict[str, str]], None]] = None
+    chunking_config: Optional[ChunkingConfig] = None
 
-    # Print INFO messages since this is often run from the terminal during local development
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    @property
+    def doc_attribs(self) -> dict[str, str]:
+        return {
+            "dataset": self.dataset_id,
+            "program": self.benefit_program,
+            "region": self.benefit_region,
+        }
+
+
+def process_and_ingest_sys_args(
+    argv: list[str],
+    logger: Logger,
+    ingestion_call: Callable,
+    default_config: IngestConfig,
+) -> None:
+    """Method that reads sys args and passes them into ingestion call"""
+    logger.info("Running with args: %r", argv)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset_id")
@@ -72,27 +93,45 @@ def process_and_ingest_sys_args(argv: list[str], logger: Logger, ingestion_call:
             )
         logger.info("Skipping reading or writing to the DB.")
 
-    doc_attribs = {
-        "dataset": args.dataset_id,
-        "program": args.benefit_program,
-        "region": args.benefit_region,
-    }
-    logger.info("Ingesting from %s: %r", args.file_path, doc_attribs)
+    ingest_config = IngestConfig(
+        args.dataset_id,
+        args.benefit_program,
+        args.benefit_region,
+        default_config.common_base_url,
+        default_config.md_base_dir,
+    )
 
+    start_ingestion(
+        logger,
+        ingestion_call,
+        args.file_path,
+        ingest_config,
+        skip_db=args.skip_db,
+        resume=args.resume,
+    )
+
+
+def start_ingestion(
+    logger: Logger,
+    ingestion_call: Callable,
+    file_path: str,
+    config: IngestConfig,
+    *,
+    skip_db: bool = False,
+    resume: bool = False,
+) -> None:
+    logger.info("Ingesting from %s: %r", file_path, config.doc_attribs)
     with app_config.db_session() as db_session:
-        if args.resume:
-            ingestion_call(
-                db_session, args.file_path, doc_attribs, skip_db=args.skip_db, resume=args.resume
-            )
+        if resume:
+            ingestion_call(db_session, file_path, config, skip_db=skip_db, resume=resume)
         else:
-            if not args.skip_db:
-                dropped = _drop_existing_dataset(db_session, args.dataset_id)
+            if not skip_db:
+                dropped = _drop_existing_dataset(db_session, config.dataset_id)
                 if dropped:
-                    logger.warning("Dropped existing dataset %s", args.dataset_id)
+                    logger.warning("Dropped existing dataset %s", config.dataset_id)
                 db_session.commit()
-            ingestion_call(db_session, args.file_path, doc_attribs, skip_db=args.skip_db)
+            ingestion_call(db_session, file_path, config, skip_db=skip_db)
         db_session.commit()
-
     logger.info("Finished ingesting")
 
 
