@@ -10,7 +10,10 @@ class CaFranchiseTaxBoardSpider(scrapy.Spider):
     # This name is used on the commandline: scrapy crawl edd_spider
     name = "ca_ftb_spider"
     allowed_domains = ["www.ftb.ca.gov"]
-    start_urls = ["https://www.ftb.ca.gov/file/personal/credits/index.html"]
+    start_urls = [
+        "https://www.ftb.ca.gov/file/personal/credits/index.html",
+        "https://www.ftb.ca.gov/about-ftb/newsroom/caleitc/eligibility-and-credit-information.html",
+    ]
 
     # This is used to substitute the base URL in the cache storage
     common_url_prefix = "https://www.ftb.ca.gov/file/"
@@ -18,15 +21,17 @@ class CaFranchiseTaxBoardSpider(scrapy.Spider):
     def parse(self, response: HtmlResponse) -> Iterator[scrapy.Request | dict[str, str]]:
         self.logger.info("Parsing %s", response.url)
 
-        nav_links = response.css("nav.local-nav a")
-        for link in nav_links:
-            if "class" in link.attrib and link.attrib["class"] == "uplevel":
-                # Skip the uplevel/back link that goes to the parent page
-                continue
+        # Only for the "Credit" page, follow the child pages
+        if response.url == "https://www.ftb.ca.gov/file/personal/credits/index.html":
+            nav_links = response.css("nav.local-nav a")
+            for link in nav_links:
+                if "class" in link.attrib and link.attrib["class"] == "uplevel":
+                    # Skip the uplevel/back link that goes to the parent page
+                    continue
 
-            assert link.attrib["href"]
-            self.logger.info("Found nav link: %s", link)
-            yield response.follow(link, callback=self.parse_childpage)
+                assert link.attrib["href"]
+                self.logger.info("Found nav link: %s", link)
+                yield response.follow(link, callback=self.parse_childpage)
 
         yield self.parse_childpage(response)
 
@@ -45,8 +50,10 @@ class CaFranchiseTaxBoardSpider(scrapy.Spider):
         body.css("aside").drop()
 
         markdown = to_markdown(body.get(), response.url)
+        assert markdown
         extractions = {
             "url": response.url,
+            "title": title,
             "markdown": markdown,
         }
         return extractions

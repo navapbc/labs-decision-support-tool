@@ -103,6 +103,10 @@ def get_ingester_config(dataset_id: str) -> IngestConfig:
             )
         case "Keep Your Benefits":
             return ca_public_charge_config(dataset_id, "mixed", "California")
+        case "CA FTB":
+            return IngestConfig(
+                dataset_id, "tax credit", "California", "https://www.ftb.ca.gov/", "ca_ftb_md"
+            )
         case _:
             raise ValueError(f"Unknown dataset_id: {dataset_id}")
 
