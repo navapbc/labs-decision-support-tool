@@ -8,7 +8,8 @@ from sqlalchemy import delete, select
 from src import ingester
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
-from src.ingest_runner import generalized_ingest, get_ingester_config
+from src.ingest_runner import get_ingester_config
+from src.ingester import ingest_json
 
 
 @pytest.fixture
@@ -107,9 +108,9 @@ def test__ingest_edd(
     with TemporaryDirectory(suffix="edd_md") as md_base_dir, caplog.at_level(logging.WARNING):
         config = get_ingester_config("CA EDD")
         if file_location == "local":
-            generalized_ingest(db_session, edd_web_local_file, config, md_base_dir=md_base_dir)
+            ingest_json(db_session, edd_web_local_file, config, md_base_dir=md_base_dir)
         else:
-            generalized_ingest(db_session, edd_web_s3_file, config, md_base_dir=md_base_dir)
+            ingest_json(db_session, edd_web_s3_file, config, md_base_dir=md_base_dir)
 
     documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
     assert len(documents) == 4
@@ -222,7 +223,7 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
     with TemporaryDirectory(suffix="edd_md") as md_base_dir:
         config = get_ingester_config("CA EDD")
         with caplog.at_level(logging.WARNING):
-            generalized_ingest(
+            ingest_json(
                 db_session, edd_web_local_file, config, md_base_dir=md_base_dir, resume=True
             )
 
@@ -230,7 +231,7 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
 
         # Re-ingesting the same data should not add any new documents
         with caplog.at_level(logging.INFO):
-            generalized_ingest(
+            ingest_json(
                 db_session, edd_web_local_file, config, md_base_dir=md_base_dir, resume=True
             )
 

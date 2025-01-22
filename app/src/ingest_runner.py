@@ -2,9 +2,7 @@ import argparse
 import logging
 import re
 import sys
-from typing import Optional
 
-from src.adapters import db
 from src.ingester import ingest_json
 from src.util.ingest_utils import DefaultChunkingConfig, IngestConfig, start_ingestion
 
@@ -113,25 +111,6 @@ def get_ingester_config(dataset_id: str) -> IngestConfig:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def generalized_ingest(
-    db_session: db.Session,
-    json_filepath: str,
-    config: IngestConfig,
-    *,
-    md_base_dir: Optional[str] = None,
-    skip_db: bool = False,
-    resume: bool = False,
-) -> None:
-    ingest_json(
-        db_session,
-        json_filepath,
-        config,
-        skip_db=skip_db,
-        resume=resume,
-        md_base_dir=md_base_dir,
-    )
-
-
 def main() -> None:  # pragma: no cover
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset_id")
@@ -143,7 +122,7 @@ def main() -> None:  # pragma: no cover
     config = get_ingester_config(sys.argv[1])
     start_ingestion(
         logger,
-        generalized_ingest,
+        ingest_json,
         args.file_path,
         config,
         skip_db=args.skip_db,
