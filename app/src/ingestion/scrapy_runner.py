@@ -67,6 +67,7 @@ DATASETS = {
     },
     "ca_public_charge": {},
     "ca_ftb": {},
+    "ca_wic": {},
 }
 
 
