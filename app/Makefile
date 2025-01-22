@@ -107,7 +107,7 @@ stop:
 check: format-check lint test
 
 app-shell:
-	docker compose run -ti -e PY_RUN_APPROACH=local --name $(APP_NAME)-shell --rm $(APP_NAME) /bin/bash
+	docker compose run -ti -e PY_RUN_APPROACH=local --name $(APP_NAME)-shell --rm $(APP_NAME) /bin/bash --rcfile .apprc
 
 ##################################################
 # DB & migrations
@@ -252,13 +252,6 @@ ifndef FILEPATH
 endif
 
 
-scrape-ca-public-charge:
-	$(PY_RUN_CMD) scrapy-runner ca_public_charge
-
-scrape-edd-web:
-	$(PY_RUN_CMD) scrapy-runner edd
-
-
 scrape-imagine-la:
 	cd src/ingestion/imagine_la/scrape; uv run --no-project scrape_content_hub.py https://socialbenefitsnavigator25.web.app/contenthub $(CONTENTHUB_PASSWORD)
 
@@ -273,11 +266,9 @@ scrape-la-county-policy:
 	# Now that we have the expanded nav bar, scrape all the links in the nav bar
 	$(PY_RUN_CMD) scrapy-runner la_policy 2>&1 | tee out.log
 
-scrape-irs-web:
-	$(PY_RUN_CMD) scrapy-runner irs
 
-scrape-ca-ftb:
-	$(PY_RUN_CMD) scrapy-runner ca_ftb
+scrapy-runner:
+	$(PY_RUN_CMD) scrapy-runner $(args)
 
 ingest-runner:
 ifndef DATASET_ID

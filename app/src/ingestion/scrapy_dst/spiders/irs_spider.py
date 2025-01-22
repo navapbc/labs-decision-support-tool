@@ -9,7 +9,7 @@ from scrapy.spiders.crawl import CrawlSpider, Rule
 
 class IrsSpider(CrawlSpider):
     # This name is used on the commandline: scrapy crawl edd_spider
-    name = "irs_web_spider"
+    name = "irs_spider"
     allowed_domains = ["irs.gov"]
     start_urls = ["https://www.irs.gov/credits-deductions/family-dependents-and-students-credits"]
 

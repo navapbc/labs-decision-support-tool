@@ -5,6 +5,7 @@ import os
 import sys
 from pprint import pprint
 
+from scrapy import spiderloader
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
 
@@ -49,35 +50,31 @@ def postprocess_json(input_filename: str) -> None:
             logger.info("Formatted JSON saved to %s-pretty.json", input_filename)
 
 
-def run(spider_name: str, output_json_filename: str, debug: bool = False) -> None:
+def list_spiders() -> list[str]:
+    settings = get_project_settings()
+    spider_loader = spiderloader.SpiderLoader.from_settings(settings)
+    return spider_loader.list()
+
+
+def main() -> None:
     # Scrapy expects the scrapy.cfg file to be in the current working directory
     if "src" in os.listdir():
         os.chdir("src/ingestion")
 
-    run_spider(spider_name, output_json_filename)
-    if debug:
-        postprocess_json(output_json_filename)
+    if len(sys.argv) == 1:
+        spiders = list_spiders()
+        datasets = [spider.removesuffix("_spider") for spider in spiders]
+        print(f"Available datasets: {datasets}")
+        return
 
-
-DATASETS = {
-    "edd": {},
-    "la_policy": {},
-    "irs": {
-        "spider": "irs_web_spider",
-    },
-    "ca_public_charge": {},
-    "ca_ftb": {},
-    "ca_wic": {},
-}
-
-
-def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset")
     parser.add_argument("--debug", action="store_true")
 
     args = parser.parse_args(sys.argv[1:])
-    ds = DATASETS[args.dataset]
-    spider_id = ds.get("spider", f"{args.dataset}_spider")
-    json_output = ds.get("output", f"{spider_id.removesuffix("spider")}scrapings.json")
-    run(spider_id, json_output, debug=args.debug)
+    spider_id = f"{args.dataset}_spider"
+    json_output = f"{spider_id.removesuffix("spider")}scrapings.json"
+
+    run_spider(spider_id, json_output)
+    if args.debug:
+        postprocess_json(json_output)
