@@ -271,10 +271,4 @@ scrapy-runner:
 	$(PY_RUN_CMD) scrapy-runner $(args)
 
 ingest-runner:
-ifndef DATASET_ID
-	$(error DATASET_ID is undefined)
-endif
-ifndef FILEPATH
-	$(error FILEPATH is undefined)
-endif
-	$(PY_RUN_CMD) ingest-runner "$(DATASET_ID)" "$(FILEPATH)" $(INGEST_ARGS)
+	$(PY_RUN_CMD) ingest-runner $(args)

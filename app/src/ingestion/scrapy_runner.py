@@ -61,15 +61,17 @@ def main() -> None:
     if "src" in os.listdir():
         os.chdir("src/ingestion")
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dataset")
+    parser.add_argument("--debug", action="store_true")
+
     if len(sys.argv) == 1:
+        parser.print_help()
+        print("")
         spiders = list_spiders()
         datasets = [spider.removesuffix("_spider") for spider in spiders]
         print(f"Available datasets: {datasets}")
         return
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("dataset")
-    parser.add_argument("--debug", action="store_true")
 
     args = parser.parse_args(sys.argv[1:])
     spider_id = f"{args.dataset}_spider"

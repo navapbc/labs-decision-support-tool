@@ -44,18 +44,22 @@ def document_exists(db_session: db.Session, url: str, doc_attribs: dict[str, str
 
 
 class IngestConfig(NamedTuple):
-    dataset_id: str
+    dataset_label: str
     benefit_program: str
     benefit_region: str
     common_base_url: str
-    md_base_dir: str
+    scraper_dataset: str
     prep_json_item: Optional[Callable[[dict[str, str]], None]] = None
     chunking_config: Optional[ChunkingConfig] = None
 
     @property
+    def md_base_dir(self) -> str:
+        return f"{self.scraper_dataset}_md"
+
+    @property
     def doc_attribs(self) -> dict[str, str]:
         return {
-            "dataset": self.dataset_id,
+            "dataset": self.dataset_label,
             "program": self.benefit_program,
             "region": self.benefit_region,
         }
@@ -126,9 +130,9 @@ def start_ingestion(
             ingestion_call(db_session, file_path, config, skip_db=skip_db, resume=resume)
         else:
             if not skip_db:
-                dropped = _drop_existing_dataset(db_session, config.dataset_id)
+                dropped = _drop_existing_dataset(db_session, config.dataset_label)
                 if dropped:
-                    logger.warning("Dropped existing dataset %s", config.dataset_id)
+                    logger.warning("Dropped existing dataset %s", config.dataset_label)
                 db_session.commit()
             ingestion_call(db_session, file_path, config, skip_db=skip_db)
         db_session.commit()

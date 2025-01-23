@@ -87,7 +87,7 @@ def test_ingestion(caplog, app_config, db_session, la_county_policy_local_file):
     db_session.execute(delete(Document))
 
     with TemporaryDirectory(suffix="la_policy_md") as md_base_dir:
-        config = get_ingester_config("DPSS Policy")
+        config = get_ingester_config("la_policy")
         with caplog.at_level(logging.WARNING):
             ingest_json(
                 db_session,

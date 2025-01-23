@@ -94,7 +94,7 @@ def test_process_and_ingest_sys_args_calls_ingest(caplog):
         assert call_args[0][1] == "/some/folder"
         ingest_config = call_args[0][2]
         assert isinstance(ingest_config, IngestConfig)
-        assert ingest_config.dataset_id == "bridges-eligibility-manual"
+        assert ingest_config.dataset_label == "bridges-eligibility-manual"
         assert ingest_config.benefit_program == "SNAP"
         assert ingest_config.benefit_region == "Michigan"
         assert call_args[1] == {"skip_db": False}

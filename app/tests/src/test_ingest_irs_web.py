@@ -62,7 +62,7 @@ def test_ingestion(caplog, app_config, db_session, irs_web_local_file):
     db_session.execute(delete(Document))
 
     with TemporaryDirectory(suffix="irs_web_md") as md_base_dir:
-        config = get_ingester_config("IRS")
+        config = get_ingester_config("irs")
         with caplog.at_level(logging.WARNING):
             ingest_json(
                 db_session,

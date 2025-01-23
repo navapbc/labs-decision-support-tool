@@ -87,7 +87,7 @@ def test_ingestion(caplog, app_config, db_session, ca_public_charge_local_file):
     db_session.execute(delete(Document))
 
     with TemporaryDirectory(suffix="ca_public_charge_md") as md_base_dir:
-        config = get_ingester_config("Keep Your Benefits")
+        config = get_ingester_config("ca_public_charge")
         with caplog.at_level(logging.WARNING):
             ingest_json(
                 db_session,
