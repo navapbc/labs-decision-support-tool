@@ -267,8 +267,8 @@ scrape-la-county-policy:
 	$(PY_RUN_CMD) scrapy-runner la_policy 2>&1 | tee out.log
 
 
-scrapy-runner:
+scrapy-runner: ## Scrape website using a Scrapy spider: `make scrapy-runner args="dataset"`
 	$(PY_RUN_CMD) scrapy-runner $(args)
 
-ingest-runner:
+ingest-runner: ## Ingest scrapings into DB: `make ingest-runner args="dataset"`
 	$(PY_RUN_CMD) ingest-runner $(args)
