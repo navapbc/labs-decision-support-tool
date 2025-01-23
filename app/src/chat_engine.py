@@ -179,6 +179,13 @@ class ImagineLaEngine(BaseEngine):
     chunks_shown_min_score: float = -1
     chunks_shown_max_num: int = 8
 
+    user_settings = [
+        "llm",
+        "retrieval_k",
+        "retrieval_k_min_score",
+        "system_prompt",
+    ]
+
     engine_id: str = "imagine-la"
     name: str = "Imagine LA Chat Engine"
     datasets = ["CA EDD", "Imagine LA", "DPSS Policy", "IRS", "Keep Your Benefits", "CA FTB", "WIC"]
