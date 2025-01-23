@@ -106,7 +106,7 @@ def test__ingest_edd(
     db_session.execute(delete(Document))
 
     with TemporaryDirectory(suffix="edd_md") as md_base_dir, caplog.at_level(logging.WARNING):
-        config = get_ingester_config("CA EDD")
+        config = get_ingester_config("edd")
         if file_location == "local":
             ingest_json(db_session, edd_web_local_file, config, md_base_dir=md_base_dir)
         else:
@@ -221,7 +221,7 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
     db_session.execute(delete(Document))
 
     with TemporaryDirectory(suffix="edd_md") as md_base_dir:
-        config = get_ingester_config("CA EDD")
+        config = get_ingester_config("edd")
         with caplog.at_level(logging.WARNING):
             ingest_json(
                 db_session, edd_web_local_file, config, md_base_dir=md_base_dir, resume=True
