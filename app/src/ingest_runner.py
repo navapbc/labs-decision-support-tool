@@ -9,7 +9,7 @@ from src.util.ingest_utils import DefaultChunkingConfig, IngestConfig, start_ing
 logger = logging.getLogger(__name__)
 
 
-def edd_web_config(
+def edd_config(
     dataset_label: str, benefit_program: str, benefit_region: str, scraper_dataset: str
 ) -> IngestConfig:
     def _fix_input_markdown(markdown: str) -> str:
@@ -49,7 +49,7 @@ def edd_web_config(
     )
 
 
-def la_county_policy_config(
+def la_policy_config(
     dataset_label: str, benefit_program: str, benefit_region: str, scraper_dataset: str
 ) -> IngestConfig:
     chunking_config = DefaultChunkingConfig()
@@ -108,13 +108,11 @@ def get_ingester_config(scraper_dataset: str) -> IngestConfig:
                 "WIC", "wic", "California", "https://www.phfewic.org/en/", scraper_dataset
             )
         case "edd":
-            return edd_web_config("CA EDD", "employment", "California", scraper_dataset)
+            return edd_config("CA EDD", "employment", "California", scraper_dataset)
         case "irs":
             return IngestConfig("IRS", "tax credit", "US", "https://www.irs.gov/", scraper_dataset)
         case "la_policy":
-            return la_county_policy_config(
-                "DPSS Policy", "mixed", "California:LA County", scraper_dataset
-            )
+            return la_policy_config("DPSS Policy", "mixed", "California:LA County", scraper_dataset)
         case _:
             raise ValueError(
                 f"Unknown dataset: {scraper_dataset!r}.  Run `make scrapy-runner` to see available datasets"
