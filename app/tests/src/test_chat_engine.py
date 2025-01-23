@@ -30,4 +30,5 @@ def test_create_engine_Imagine_LA():
         "IRS",
         "Keep Your Benefits",
         "CA FTB",
+        "WIC",
     ]

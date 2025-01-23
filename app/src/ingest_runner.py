@@ -107,6 +107,10 @@ def get_ingester_config(dataset_id: str) -> IngestConfig:
             return IngestConfig(
                 dataset_id, "tax credit", "California", "https://www.ftb.ca.gov/", "ca_ftb_md"
             )
+        case "WIC":
+            return IngestConfig(
+                dataset_id, "wic", "California", "https://www.phfewic.org/en/", "ca_wic_md"
+            )
         case _:
             raise ValueError(f"Unknown dataset_id: {dataset_id}")
 
