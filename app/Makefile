@@ -87,7 +87,7 @@ setup-local:
 build:
 	docker compose build
 
-start:
+start: ## Start all docker-compose containers
 	docker compose up --detach
 
 start-debug:
@@ -101,13 +101,13 @@ init: build init-db
 clean-volumes: ## Remove project docker volumes (which includes the DB state)
 	docker compose down --volumes
 
-stop:
+stop: ## Start all docker-compose containers
 	docker compose down
 
-check: format-check lint test
+check: format-check lint test ## Run all checks and tests
 
-app-shell:
-	docker compose run -ti -e PY_RUN_APPROACH=local --name $(APP_NAME)-shell --rm $(APP_NAME) /bin/bash --rcfile .apprc
+app-shell: ## Start a shell in a container to quickly run frequent make commands
+	docker compose run -ti -e PY_RUN_APPROACH=local --name $(APP_NAME)-shell --rm $(APP_NAME) /bin/bash --rcfile .app-shell.bashrc
 
 ##################################################
 # DB & migrations
@@ -121,7 +121,7 @@ app-shell:
 # ready to accept connections so we add a brief wait script
 init-db: start-db db-migrate
 
-start-db:
+start-db: ## Start only the database container
 	docker compose up --detach main-db
 	./bin/wait-for-local-db.sh
 
