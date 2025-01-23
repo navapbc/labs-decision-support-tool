@@ -124,7 +124,7 @@ def start_ingestion(
     skip_db: bool = False,
     resume: bool = False,
 ) -> None:
-    logger.info("Ingesting from %s: %r", file_path, config.doc_attribs)
+    logger.info("Ingesting from %r: %r", file_path, config.doc_attribs)
     with app_config.db_session() as db_session:
         if resume:
             ingestion_call(db_session, file_path, config, skip_db=skip_db, resume=resume)
@@ -136,7 +136,7 @@ def start_ingestion(
                 db_session.commit()
             ingestion_call(db_session, file_path, config, skip_db=skip_db)
         db_session.commit()
-    logger.info("Finished ingesting")
+    logger.info("Finished ingesting %r (%s)", config.dataset_label, config.scraper_dataset)
 
 
 def tokenize(text: str) -> list[str]:
