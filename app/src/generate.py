@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 # Reminder: If your changes are chat-engine-specific, then update the specific `chat_engine.system_prompt`.
 PROMPT = """Provide answers in plain language using http://plainlanguage.gov guidelines.
 Write at the average American reading level.
-Use bullet points to structure info. Don’t use numbered lists.
-If the user asks for a list of programs or requirements, list them all, don’t abbreviate the list. For example “List housing programs available to youth” or “What are the requirements for students to qualify for CalFresh?”
+Use bullet points to structure info. Don't use numbered lists.
+If the user asks for a list of programs or requirements, list them all, don't abbreviate the list. For example "List housing programs available to youth" or "What are the requirements for students to qualify for CalFresh?"
 Keep your answers as similar to your knowledge text as you can.
 Respond in the language the user used in their prompt
 
