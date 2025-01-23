@@ -9,7 +9,9 @@ from src.util.ingest_utils import DefaultChunkingConfig, IngestConfig, start_ing
 logger = logging.getLogger(__name__)
 
 
-def edd_web_config(dataset_label: str, benefit_program: str, benefit_region: str, scraper_dataset: str) -> IngestConfig:
+def edd_web_config(
+    dataset_label: str, benefit_program: str, benefit_region: str, scraper_dataset: str
+) -> IngestConfig:
     def _fix_input_markdown(markdown: str) -> str:
         # Fix ellipsis text that causes markdown parsing errors
         # '. . .' is parsed as sublists on the same line
@@ -98,7 +100,9 @@ def get_ingester_config(scraper_dataset: str) -> IngestConfig:
                 "CA FTB", "tax credit", "California", "https://www.ftb.ca.gov/", scraper_dataset
             )
         case "ca_public_charge":
-            return ca_public_charge_config("Keep Your Benefits", "mixed", "California", scraper_dataset)
+            return ca_public_charge_config(
+                "Keep Your Benefits", "mixed", "California", scraper_dataset
+            )
         case "ca_wic":
             return IngestConfig(
                 "WIC", "wic", "California", "https://www.phfewic.org/en/", scraper_dataset
@@ -106,13 +110,15 @@ def get_ingester_config(scraper_dataset: str) -> IngestConfig:
         case "edd":
             return edd_web_config("CA EDD", "employment", "California", scraper_dataset)
         case "irs":
-            return IngestConfig(
-                "IRS", "tax credit", "US", "https://www.irs.gov/", scraper_dataset
-            )
+            return IngestConfig("IRS", "tax credit", "US", "https://www.irs.gov/", scraper_dataset)
         case "la_policy":
-            return la_county_policy_config("DPSS Policy", "mixed", "California:LA County", scraper_dataset)
+            return la_county_policy_config(
+                "DPSS Policy", "mixed", "California:LA County", scraper_dataset
+            )
         case _:
-            raise ValueError(f"Unknown dataset: {scraper_dataset!r}.  Run `make scrapy-runner` to see available datasets")
+            raise ValueError(
+                f"Unknown dataset: {scraper_dataset!r}.  Run `make scrapy-runner` to see available datasets"
+            )
 
 
 # Print INFO messages since this is often run from the terminal during local development
