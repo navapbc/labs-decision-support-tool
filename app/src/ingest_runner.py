@@ -107,6 +107,10 @@ def get_ingester_config(scraper_dataset: str) -> IngestConfig:
             return IngestConfig(
                 "WIC", "wic", "California", "https://www.phfewic.org/en/", scraper_dataset
             )
+        case "covered_ca":
+            return IngestConfig(
+                "Covered California", "insurance", "California", "https://www.coveredca.com/", scraper_dataset
+            )
         case "edd":
             return edd_config("CA EDD", "employment", "California", scraper_dataset)
         case "irs":
