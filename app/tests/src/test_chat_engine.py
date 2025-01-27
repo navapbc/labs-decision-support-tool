@@ -31,4 +31,5 @@ def test_create_engine_Imagine_LA():
         "Keep Your Benefits",
         "CA FTB",
         "WIC",
+        "Covered California",
     ]
