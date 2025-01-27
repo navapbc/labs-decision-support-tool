@@ -188,7 +188,16 @@ class ImagineLaEngine(BaseEngine):
 
     engine_id: str = "imagine-la"
     name: str = "Imagine LA Chat Engine"
-    datasets = ["CA EDD", "Imagine LA", "DPSS Policy", "IRS", "Keep Your Benefits", "CA FTB", "WIC"]
+    datasets = [
+        "CA EDD",
+        "Imagine LA",
+        "DPSS Policy",
+        "IRS",
+        "Keep Your Benefits",
+        "CA FTB",
+        "WIC",
+        "Covered California",
+    ]
 
     system_prompt = f"""Overall intent
 You're supporting users of the Benefit Navigator tool, which is an online tool, "one-stop shop," for case managers, individuals, and families to help them understand, access, and navigate the complex public benefits and tax credit landscape in the Los Angeles region.
