@@ -8,7 +8,6 @@ from scrapy.selector import Selector
 
 
 class CoveredCaliforniaSpider(scrapy.Spider):
-    # This name is used on the commandline: scrapy crawl edd_spider
     name = "covered_ca_spider"
     allowed_domains = ["www.coveredca.com"]
     start_urls = [
@@ -47,7 +46,6 @@ class CoveredCaliforniaSpider(scrapy.Spider):
                     yield extractions
         else:
             body = response.css("div.gtm-content")
-            # h2content = primary.xpath("//h2/following-sibling::*[count(following-sibling::h2)=1]")
             topic = None
             for item in body.css("h2, a"):
                 if item.root.tag == "h2":
