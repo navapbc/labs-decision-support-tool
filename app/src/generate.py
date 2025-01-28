@@ -83,7 +83,6 @@ def completion_args(llm: str) -> dict[str, Any]:
 
 
 class MessageAttributes(BaseModel):
-    original_language: str
     is_in_english: bool
     message_in_english: str
     needs_context: bool
