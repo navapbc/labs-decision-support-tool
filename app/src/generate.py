@@ -10,31 +10,6 @@ from src.app_config import app_config
 
 logger = logging.getLogger(__name__)
 
-# Reminder: If your changes are chat-engine-specific, then update the specific `chat_engine.system_prompt`.
-PROMPT = """Provide answers in plain language using http://plainlanguage.gov guidelines.
-Write at the average American reading level.
-Use bullet points to structure info. Don't use numbered lists.
-If the user asks for a list of programs or requirements, list them all, don't abbreviate the list. For example "List housing programs available to youth" or "What are the requirements for students to qualify for CalFresh?"
-Keep your answers as similar to your knowledge text as you can.
-Respond in the language the user used in their prompt
-
-Citations
-When referencing the context, do not quote directly. Use the provided citation numbers (e.g., (citation-1)) to indicate when you are drawing from the context. To cite multiple sources at once, you can append citations like so: (citation-1) (citation-2), etc. For example: 'This is a sentence that draws on information from the context.(citation-1)'
-
-Example Answer:
-If the client lost their job at no fault, they may be eligible for unemployment insurance benefits. For example: They may qualify if they were laid off due to lack of work.(citation-1) (citation-2) They might be eligible if their hours were significantly reduced.(citation-3)
-"""
-
-ANALYZE_MESSAGE_PROMPT = """
-Analyze the user's message to determine how to respond.
-Reply with a JSON dictionary.
-Set original_language to the language of the user's message.
-If the user's message is in English, set is_in_english to true.
-Otherwise, set is_in_english to false and set message_in_english to a translation of the query into English.
-If the question would be easier to answer with additional policy or program context (such as policy documentation), set needs_context to True.
-Otherwise, set needs_context to false.
-"""
-
 
 def get_models() -> dict[str, str]:
     """
@@ -114,13 +89,13 @@ class MessageAttributes(BaseModel):
     needs_context: bool
 
 
-def analyze_message(llm: str, message: str) -> MessageAttributes:
+def analyze_message(llm: str, system_prompt: str, message: str) -> MessageAttributes:
     response = (
         completion(
             model=llm,
             messages=[
                 {
-                    "content": ANALYZE_MESSAGE_PROMPT,
+                    "content": system_prompt,
                     "role": "system",
                 },
                 {

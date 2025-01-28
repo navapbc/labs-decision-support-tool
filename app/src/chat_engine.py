@@ -10,11 +10,36 @@ from src.citations import (
 )
 from src.db.models.document import ChunkWithScore, Subsection
 from src.format import FormattingConfig
-from src.generate import PROMPT, ChatHistory, MessageAttributes, analyze_message, generate
+from src.generate import ChatHistory, MessageAttributes, analyze_message, generate
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
 
 logger = logging.getLogger(__name__)
+
+# Reminder: If your changes are chat-engine-specific, then update the specific `chat_engine.system_prompt`.
+PROMPT = """Provide answers in plain language using http://plainlanguage.gov guidelines.
+Write at the average American reading level.
+Use bullet points to structure info. Don't use numbered lists.
+If the user asks for a list of programs or requirements, list them all, don't abbreviate the list. For example "List housing programs available to youth" or "What are the requirements for students to qualify for CalFresh?"
+Keep your answers as similar to your knowledge text as you can.
+Respond in the language the user used in their prompt
+
+Citations
+When referencing the context, do not quote directly. Use the provided citation numbers (e.g., (citation-1)) to indicate when you are drawing from the context. To cite multiple sources at once, you can append citations like so: (citation-1) (citation-2), etc. For example: 'This is a sentence that draws on information from the context.(citation-1)'
+
+Example Answer:
+If the client lost their job at no fault, they may be eligible for unemployment insurance benefits. For example: They may qualify if they were laid off due to lack of work.(citation-1) (citation-2) They might be eligible if their hours were significantly reduced.(citation-3)
+"""
+
+ANALYZE_MESSAGE_PROMPT = """
+Analyze the user's message to determine how to respond.
+Reply with a JSON dictionary.
+Set original_language to the language of the user's message.
+If the user's message is in English, set is_in_english to true.
+Otherwise, set is_in_english to false and set message_in_english to a translation of the query into English.
+If the question would be easier to answer with additional policy or program context (such as policy documentation), set needs_context to True.
+Otherwise, set needs_context to false.
+"""
 
 
 class OnMessageResult(ResponseWithSubsections):
@@ -41,7 +66,8 @@ class ChatEngineInterface(ABC):
     chunks_shown_max_num: int = 5
     chunks_shown_min_score: float = 0.65
 
-    system_prompt: str = PROMPT
+    system_prompt_1: str = ANALYZE_MESSAGE_PROMPT  # FIXME
+    system_prompt_2: str = PROMPT
 
     # List of engine-specific configuration settings that can be set by the user.
     # The string elements must match the attribute names for the configuration setting.
@@ -90,13 +116,14 @@ class BaseEngine(ChatEngineInterface):
         "retrieval_k_min_score",
         "chunks_shown_max_num",
         "chunks_shown_min_score",
-        "system_prompt",
+        "system_prompt_1",
+        "system_prompt_2",
     ]
 
     formatting_config = FormattingConfig()
 
     def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
-        attributes = analyze_message(self.llm, question)
+        attributes = analyze_message(self.llm, self.system_prompt_1, question)
 
         if attributes.needs_context:
             return self._build_response_with_context(question, attributes, chat_history)
@@ -111,13 +138,13 @@ class BaseEngine(ChatEngineInterface):
     ) -> OnMessageResult:
         response = generate(
             self.llm,
-            self.system_prompt,
+            self.system_prompt_2,
             question,
             None,
             chat_history,
         )
 
-        return OnMessageResult(response, self.system_prompt)
+        return OnMessageResult(response, self.system_prompt_2)
 
     def _build_response_with_context(
         self,
@@ -143,13 +170,13 @@ class BaseEngine(ChatEngineInterface):
 
         response = generate(
             self.llm,
-            self.system_prompt,
+            self.system_prompt_2,
             question,
             context_text,
             chat_history,
         )
 
-        return OnMessageResult(response, self.system_prompt, chunks_with_scores, subsections)
+        return OnMessageResult(response, self.system_prompt_2, chunks_with_scores, subsections)
 
 
 class CaEddWebEngine(BaseEngine):
@@ -183,7 +210,8 @@ class ImagineLaEngine(BaseEngine):
         "llm",
         "retrieval_k",
         "retrieval_k_min_score",
-        "system_prompt",
+        "system_prompt_1",
+        "system_prompt_2",
     ]
 
     engine_id: str = "imagine-la"
@@ -199,7 +227,10 @@ class ImagineLaEngine(BaseEngine):
         "Covered California",
     ]
 
-    system_prompt = f"""Overall intent
+    system_prompt_1 = f"""
+{ANALYZE_MESSAGE_PROMPT}"""
+
+    system_prompt_2 = f"""Overall intent
 You're supporting users of the Benefit Navigator tool, which is an online tool, "one-stop shop," for case managers, individuals, and families to help them understand, access, and navigate the complex public benefits and tax credit landscape in the Los Angeles region.
 
 Step 1: Detect In and out of scope programs

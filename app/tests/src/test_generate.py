@@ -2,8 +2,9 @@ import os
 
 import ollama
 
+from src.chat_engine import PROMPT
 from src.citations import create_prompt_context, split_into_subsections
-from src.generate import PROMPT, generate, get_models
+from src.generate import generate, get_models
 from tests.mock import mock_completion
 
 

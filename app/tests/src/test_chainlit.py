@@ -2,9 +2,8 @@ from unittest.mock import MagicMock
 
 from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata, extract_raw_chat_history
-from src.chat_engine import OnMessageResult
+from src.chat_engine import PROMPT, OnMessageResult
 from src.db.models.document import Subsection
-from src.generate import PROMPT
 
 
 def test_url_query_values(monkeypatch):
