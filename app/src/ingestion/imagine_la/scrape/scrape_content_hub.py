@@ -48,6 +48,8 @@ if not password_field:
     quit()
 password_field.fill(password)
 password_field.press("Enter")
+page.wait_for_load_state("networkidle")
+print("Logged in")
 
 # Wait for the page to load by ensuring an element (e.g., an <h2> tag) is present
 page.wait_for_selector("h2", timeout=10_000)
@@ -63,16 +65,20 @@ for index in range(learn_more_buttons.count()):
     accordions = page.locator(".chakra-accordion__button")
     for accordion_index in range(accordions.count()):
         accordions.nth(accordion_index).click()
+    page.wait_for_load_state("networkidle")
 
     with page.expect_navigation() as navigation:
         learn_more_buttons.nth(index).click()
+        page.wait_for_load_state("networkidle")
 
+    page.wait_for_selector("h2", timeout=10_000)
     page_path = page.url.removeprefix(root_url_prefix)
     print(f"Scraped page: {page_path}")
 
     content_hub_pages[page_path] = page.content()
 
     page.go_back()
+    page.wait_for_load_state("networkidle")
 
 # Write the files to the `pages` directory
 os.makedirs("pages", exist_ok=True)
