@@ -83,9 +83,18 @@ def completion_args(llm: str) -> dict[str, Any]:
 
 
 class MessageAttributes(BaseModel):
-    is_in_english: bool
-    message_in_english: str
+    "'Message' refers to the user's message/question"
     needs_context: bool
+    # The user's message/question translated by the LLM so that RAG retrieval is in English
+    translated_message: str
+
+
+class ImagineLAMessageAttributes(MessageAttributes):
+    # FIXME
+    # needs_context: bool
+    # translated_message: str
+    canned_response: str
+    alert_message: str
 
 
 def analyze_message(llm: str, system_prompt: str, message: str) -> MessageAttributes:
@@ -102,7 +111,7 @@ def analyze_message(llm: str, system_prompt: str, message: str) -> MessageAttrib
                     "role": "user",
                 },
             ],
-            response_format=MessageAttributes,
+            response_format=ImagineLAMessageAttributes,
             temperature=app_config.temperature,
             **completion_args(llm),
         )
@@ -113,4 +122,4 @@ def analyze_message(llm: str, system_prompt: str, message: str) -> MessageAttrib
     logger.info("Analyzed message: %s", response)
 
     response_as_json = json.loads(response)
-    return MessageAttributes.model_validate(response_as_json)
+    return ImagineLAMessageAttributes.model_validate(response_as_json)
