@@ -21,7 +21,6 @@ from src.util.ingest_utils import (
     save_json,
     tokenize,
 )
-from src.util.string_utils import remove_links
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +37,7 @@ def _parse_html(
     md_base_dir: str, common_base_url: str, file_path: str, doc_attribs: dict[str, str]
 ) -> tuple[Document, Sequence[Chunk], Sequence[str]]:
 
+    logger.info("Reading %r", file_path)
     with open(file_path, "r") as file:
         file_contents = file.read()
     soup = BeautifulSoup(file_contents, "html.parser")
@@ -75,10 +75,12 @@ def _parse_html(
     tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)
     tree_chunks = chunk_tree(tree, ImagineLaChunkingConfig())
     chunks = [
-        Chunk(content=chunk.markdown, document=document, headings=chunk.headings)
+        Chunk(
+            content=chunk.markdown, document=document, headings=chunk.headings, tokens=chunk.length
+        )
         for chunk in tree_chunks
     ]
-    chunk_texts_to_encode = [remove_links(chunk.markdown) for chunk in tree_chunks]
+    chunk_texts_to_encode = [t_chunk.embedding_str for t_chunk in tree_chunks]
 
     chunks_file_path = f"{file_path}.chunks.json"
     logger.info("  Saving chunks to %r", chunks_file_path)
@@ -119,17 +121,21 @@ def _ingest_content_hub(
         logger.info("Skip saving to DB")
     else:
         for document, chunks, chunk_texts_to_encode in all_chunks:
+            logger.info("Adding embeddings for %r", document.source)
             add_embeddings(chunks, chunk_texts_to_encode)
             db_session.add(document)
             db_session.add_all(chunks)
 
 
 def main() -> None:
+    # Print INFO messages since this is often run from the terminal during local development
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
     default_config = IngestConfig(
         "Imagine LA",
         "mixed",
         "California",
         "https://socialbenefitsnavigator25.web.app/contenthub/",
-        "imagine_la_md",
+        "imagine_la",
     )
     process_and_ingest_sys_args(sys.argv, logger, _ingest_content_hub, default_config)

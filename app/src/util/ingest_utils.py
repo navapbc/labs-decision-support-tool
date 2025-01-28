@@ -102,7 +102,7 @@ def process_and_ingest_sys_args(
         args.benefit_program,
         args.benefit_region,
         default_config.common_base_url,
-        default_config.md_base_dir,
+        default_config.scraper_dataset,
     )
 
     start_ingestion(
@@ -175,10 +175,11 @@ def add_embeddings(
 
     for chunk, embedding, text in zip(chunks, embeddings, to_encode, strict=True):
         chunk.mpnet_embedding = embedding
+        token_len = len(tokenize(text))
         if not chunk.tokens:
-            chunk.tokens = len(tokenize(text))
+            chunk.tokens = token_len
         else:
-            assert chunk.tokens == len(tokenize(text))
+            assert chunk.tokens == token_len, f"Token count mismatch: {chunk.tokens} != {token_len}"
         assert (
             chunk.tokens <= embedding_model.max_seq_length
         ), f"Text too long for embedding model: {chunk.tokens} tokens: {len(chunk.content)} chars: {chunk.content[:80]}...{chunk.content[-50:]}"
