@@ -304,7 +304,7 @@ with household income over 200% of the Federal Poverty Level (FPL); or the house
 where it has been disqualified because of an intentional program violation, or some other specific compliance requirement; \
 or there is a disputed claim for benefits paid in the past. \
 Read more on: https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit"
-"""
+"""  # nosec
 
     system_prompt_2 = f"""You're supporting users of the Benefit Navigator tool, which is an online tool, "one-stop shop," for case managers, individuals, and \
 families to help them understand, access, and navigate the complex public benefits and tax credit landscape in the Los Angeles region.
