@@ -122,7 +122,7 @@ class BaseEngine(ChatEngineInterface):
     formatting_config = FormattingConfig()
 
     def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
-        attributes = analyze_message(self.llm, self.system_prompt_1, question)
+        attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
 
         if attributes.needs_context:
             return self._build_response_with_context(question, attributes, chat_history)
@@ -193,6 +193,12 @@ If you can't find information about the user's prompt in your context, don't ans
 If a prompt is about an EDD program, but you can't tell which one, detect and clarify program ambiguity. Ask: "The EDD administers several programs such as State Disability Insurance (SDI), Paid Family Leave (PFL), and Unemployment Insurance (UI). I'm not sure which benefit program your prompt is about; could you let me know?"
 
 {PROMPT}"""
+
+
+
+class ImagineLAMessageAttributes(MessageAttributes):
+    canned_response: str
+    alert_message: str
 
 
 class ImagineLaEngine(BaseEngine):
@@ -314,3 +320,14 @@ If the user's question is about the Coronavirus pandemic, don't reference corona
 Only respond to the user's question if there is relevant information in the provided context. Otherwise, respond with "I don't know".
 
 {PROMPT}"""
+
+    def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
+        attributes = analyze_message(self.llm, self.system_prompt_1, question, response_format=ImagineLAMessageAttributes)
+
+        if attributes.canned_response:
+            return OnMessageResult(attributes.canned_response, self.system_prompt_1)
+
+        if attributes.needs_context:
+            return self._build_response_with_context(question, attributes, chat_history)
+
+        return self._build_response(question, attributes, chat_history)
