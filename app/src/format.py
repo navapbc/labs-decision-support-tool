@@ -9,6 +9,7 @@ import markdown
 
 from src.citations import CITATION_PATTERN, remap_citation_ids
 from src.db.models.document import Chunk, Document, Subsection
+from src.generate import MessageAttributesT
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +46,43 @@ def to_html(text: str) -> str:
     return markdown.markdown(corrected_text)
 
 
-def build_accordions(
-    subsections: Sequence[Subsection], raw_response: str, config: FormattingConfig
+def format_response(
+    subsections: Sequence[Subsection],
+    raw_response: str,
+    config: FormattingConfig,
+    attributes: MessageAttributesT,
 ) -> str:
-    global _accordion_id
-
     remapped_citations = remap_citation_ids(subsections, raw_response)
+    citations_html, map_of_accordion_ids = _create_accordion_html(config, remapped_citations)
 
-    citations_html = ""
+    html_response = []
+    if alert_msg := getattr(attributes, "alert_message", None):
+        html_response.append(
+            f"<div class='alert' style='padding:10px; border: 2px black solid;'>{to_html(alert_msg)}</div>"
+        )
+
+    # This heading is important to prevent Chainlit from embedding citations_html
+    # as the next part of a list in html_response
+    html_response.append(
+        to_html(_add_citation_links(raw_response, remapped_citations, config, map_of_accordion_ids))
+    )
+
+    if citations_html:
+        return (
+            "<div>"
+            + "\n".join(html_response)
+            + "</div><h3>Source(s)</h3><div>"
+            + citations_html
+            + "</div>"
+        )
+    return "<div>" + "\n".join(html_response) + "</div>"
+
+
+def _create_accordion_html(
+    config: FormattingConfig, remapped_citations: dict[str, Subsection]
+) -> tuple[str, dict]:
+    global _accordion_id
+    html = ""
     map_of_accordion_ids = {}
     for document, cited_subsections in _group_by_document(remapped_citations).items():
         _accordion_id += 1
@@ -62,7 +92,7 @@ def build_accordions(
 
         for citation_number in citation_numbers:
             map_of_accordion_ids[citation_number] = _accordion_id
-        citations_html += f"""
+        html += f"""
         <div class="usa-accordion" id=accordion-{_accordion_id}>
             <h4 class="usa-accordion__heading">
                 <button
@@ -78,20 +108,7 @@ def build_accordions(
             </div>
         </div>"""
 
-    # This heading is important to prevent Chainlit from embedding citations_html
-    # as the next part of a list in response_with_citations
-    response_with_citations = to_html(
-        _add_citation_links(raw_response, remapped_citations, config, map_of_accordion_ids)
-    )
-    if citations_html:
-        return (
-            "<div>"
-            + response_with_citations
-            + "</div><h3>Source(s)</h3><div>"
-            + citations_html
-            + "</div>"
-        )
-    return "<div>" + response_with_citations + "</div>"
+    return html, map_of_accordion_ids
 
 
 def _group_by_document(

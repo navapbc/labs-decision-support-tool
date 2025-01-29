@@ -167,10 +167,13 @@ def remap_citation_ids(subsections: Sequence[Subsection], response: str) -> dict
             citations[citation_id] = factory.create_citation(
                 citation.chunk, citation.text, citation.text_headings
             )
-    logger.info(
-        "Remapped citations:\n  %s",
-        "\n  ".join([f"{id} -> {c.id}, {c.chunk.document.name}" for id, c in citations.items()]),
-    )
+    if citations:
+        logger.info(
+            "Remapped citations:\n  %s",
+            "\n  ".join(
+                [f"{id} -> {c.id}, {c.chunk.document.name}" for id, c in citations.items()]
+            ),
+        )
     return citations
 
 

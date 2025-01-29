@@ -10,7 +10,13 @@ from src.citations import (
 )
 from src.db.models.document import ChunkWithScore, Subsection
 from src.format import FormattingConfig
-from src.generate import ChatHistory, MessageAttributes, analyze_message, generate
+from src.generate import (
+    ChatHistory,
+    MessageAttributes,
+    MessageAttributesT,
+    analyze_message,
+    generate,
+)
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
 
@@ -22,7 +28,8 @@ ANALYZE_MESSAGE_PROMPT = """Analyze the user's message to respond with a JSON di
 If the user's message is not in English, set translated_message to be an English translation of the user's message. \
 Otherwise, set translated_message to be an empty string.
 
-If the question would be easier to answer with additional policy or program context (such as policy documentation), set needs_context to True. \
+If the question would be easier to answer with additional policy or program context (such as policy documentation), \
+set needs_context to True and canned_response to empty string. \
 Otherwise, set needs_context to False.
 """
 
@@ -46,11 +53,14 @@ class OnMessageResult(ResponseWithSubsections):
         self,
         response: str,
         system_prompt: str,
+        attributes: MessageAttributesT,
+        *,
         chunks_with_scores: Sequence[ChunkWithScore] | None = None,
         subsections: Sequence[Subsection] | None = None,
     ):
         super().__init__(response, subsections if subsections is not None else [])
         self.system_prompt = system_prompt
+        self.attributes = attributes
         self.chunks_with_scores = chunks_with_scores if chunks_with_scores is not None else []
 
 
@@ -132,7 +142,7 @@ class BaseEngine(ChatEngineInterface):
     def _build_response(
         self,
         question: str,
-        attributes: MessageAttributes,
+        attributes: MessageAttributesT,
         chat_history: Optional[ChatHistory] = None,
     ) -> OnMessageResult:
         response = generate(
@@ -143,12 +153,12 @@ class BaseEngine(ChatEngineInterface):
             chat_history,
         )
 
-        return OnMessageResult(response, self.system_prompt_2)
+        return OnMessageResult(response, self.system_prompt_2, attributes)
 
     def _build_response_with_context(
         self,
         question: str,
-        attributes: MessageAttributes,
+        attributes: MessageAttributesT,
         chat_history: Optional[ChatHistory] = None,
     ) -> OnMessageResult:
         question_for_retrieval = attributes.translated_message or question
@@ -173,7 +183,13 @@ class BaseEngine(ChatEngineInterface):
             chat_history,
         )
 
-        return OnMessageResult(response, self.system_prompt_2, chunks_with_scores, subsections)
+        return OnMessageResult(
+            response,
+            self.system_prompt_2,
+            attributes,
+            chunks_with_scores=chunks_with_scores,
+            subsections=subsections,
+        )
 
 
 class CaEddWebEngine(BaseEngine):
@@ -195,8 +211,8 @@ If a prompt is about an EDD program, but you can't tell which one, detect and cl
 {PROMPT}"""
 
 
-
-class ImagineLAMessageAttributes(MessageAttributes):
+class ImagineLA_MessageAttributes(MessageAttributes):
+    benefit_program: str
     canned_response: str
     alert_message: str
 
@@ -251,6 +267,14 @@ In-Home Supportive Services, and EDD programs, including unemployment (UI), stat
 
 If the user asks what programs you support or what information you have, set canned_response to text that describes the categories from the list above with a few program examples for each.
 
+Set benefit_program to the specific program the user's question is about. Otherwise, set benefit_program to an empty string and set canned_response to \
+"Sorry, I don't have info about that topic. See the [Benefits Information Hub](https://socialbenefitsnavigator25.web.app/contenthub) \
+for the topics I cover."
+
+If the user asks about a related benefit program but it's unclear which one, then set canned_response to \
+"I'm not sure which benefit program your prompt is about; could you clarify? \
+If you don't know what benefit program might be helpful, describe what you need so that I can make a recommendation."
+
 Referral links:
 - ID cards: https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/
 - Passports: https://travel.state.gov/content/travel/en/passports/need-passport/apply-in-person.html
@@ -271,45 +295,38 @@ Referral links:
 - LA County Hospitals and Clinics: https://dhs.lacounty.gov/find-a-clinic-or-hospital/
 - LGBTQ resources: https://dpss.lacounty.gov/en/rights/rights/sogie.html
 
-If the user asks about any of the referral links topics, set canned_response to "I don't have information about that topic, but you can find more at [link provided]", \
+If the user's question is not about a supported benefit program and the user asks about any of the referral links topics, set canned_response to "I don't have information about that topic, but you can find more at [link provided]", \
 where [link provided] is one or more of the above referral links.
 
-If the user asks about a topic not covered by the supported programs or referral links, set canned_response to \
-"Sorry, I don't have info about that topic. See the Benefits Information Hub (provide clickable link to https://socialbenefitsnavigator25.web.app/contenthub) \
-for the topics I cover."
-
-If the user asks about a covered benefit program but it's unclear which one, then set canned_response to \
-"I'm not sure which benefit program your prompt is about; could you clarify? \
-If you don't know what benefit program might be helpful, describe what you need so that I can make a recommendation."
-
-If the user asked about any of the following topics with a policy update, set alert_message to one or more of the following text:
+If the user asked about any of the following topics with a policy update, set canned_response to empty string and \
+set alert_message to one or more of the following text:
 
 Policy update topic: Benefits application website
-"YourBenefitsNow(YBN) no longer exists. Instead people use https://benefitscal.com/ to apply for and manage \
+"YourBenefitsNow(YBN) no longer exists. Instead people use [benefitscal.com](https://benefitscal.com/) to apply for and manage \
 CalWorks, CalFresh, General Relief and Medi-Cal applications and documents. People can also apply for Medi-Cal and health insurance at coveredca.com."
 
 Policy update topic: Medicaid for immigrants
 "Since January 1, 2024, a new law in California will allow adults ages 26 through 49 to qualify for full-scope Medi-Cal, \
 regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, will still apply. \
-Read more https://www.coveredca.com/learning-center/information-for-immigrants/."
+[Read more](https://www.coveredca.com/learning-center/information-for-immigrants/)."
 
 Policy update topic: Medicaid asset limits
 "As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. \
-Read more on https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx"
+[Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)"
 
 Policy update topic: CalFresh work requirements (ABAWDs, time limits)
 "California has a statewide waiver through October 31, 2025. This means no ABAWDs living in California \
 will have to meet the work requirement to keep receiving CalFresh benefits. \
 ABAWDs who have lost their CalFresh benefits may reapply and continue to receive CalFresh if otherwise eligible. \
-Read more https://www.cdss.ca.gov/inforesources/calfresh/abawd"
+[Read more](https://www.cdss.ca.gov/inforesources/calfresh/abawd)"
 
 Policy update topic: Calfresh asset limits/resource limits
-"California has dramatically modified its rules for "categorical eligibility" in the CalFresh program, such that asset limits have all but been removed. \
+"California has dramatically modified its rules for 'categorical eligibility' in the CalFresh program, such that asset limits have all but been removed. \
 The only exceptions would be if either the household includes one or more members who are aged or disabled, \
 with household income over 200% of the Federal Poverty Level (FPL); or the household fits within a narrow group of cases \
 where it has been disqualified because of an intentional program violation, or some other specific compliance requirement; \
 or there is a disputed claim for benefits paid in the past. \
-Read more on: https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit"
+[Read more](https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit)"
 """  # nosec
 
     system_prompt_2 = f"""You're supporting users of the Benefit Navigator tool, which is an online tool, "one-stop shop," for case managers, individuals, and \
@@ -322,10 +339,15 @@ Only respond to the user's question if there is relevant information in the prov
 {PROMPT}"""
 
     def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
-        attributes = analyze_message(self.llm, self.system_prompt_1, question, response_format=ImagineLAMessageAttributes)
+        attributes = analyze_message(
+            self.llm, self.system_prompt_1, question, response_format=ImagineLA_MessageAttributes
+        )
+
+        if attributes.alert_message:
+            attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
 
         if attributes.canned_response:
-            return OnMessageResult(attributes.canned_response, self.system_prompt_1)
+            return OnMessageResult(attributes.canned_response, self.system_prompt_1, attributes)
 
         if attributes.needs_context:
             return self._build_response_with_context(question, attributes, chat_history)

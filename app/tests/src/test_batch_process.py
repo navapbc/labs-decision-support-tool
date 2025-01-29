@@ -4,6 +4,7 @@ from src import chat_engine
 from src.batch_process import _process_question, batch_process
 from src.chat_engine import OnMessageResult
 from src.db.models.document import Subsection
+from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory
 
 
@@ -61,6 +62,7 @@ def test_process_question(monkeypatch, engine):
     mock_result = OnMessageResult(
         response="Answer to question.(citation-1)",
         subsections=[Subsection("citation-1", chunk, subsection_text)],
+        attributes=MessageAttributes(needs_context=True, translated_message=""),
         chunks_with_scores=[],
         system_prompt="",
     )

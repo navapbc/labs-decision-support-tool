@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, TypeVar, Generic
+from typing import Any, TypeVar
 
 from litellm import completion
 from pydantic import BaseModel
