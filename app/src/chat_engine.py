@@ -86,7 +86,9 @@ class ChatEngineInterface(ABC):
         super().__init__()
 
     @abstractmethod
-    def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
+    def on_message(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> OnMessageResult:
         pass
 
 
@@ -131,7 +133,9 @@ class BaseEngine(ChatEngineInterface):
 
     formatting_config = FormattingConfig()
 
-    def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
+    def on_message(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> OnMessageResult:
         attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
 
         if attributes.needs_context:
@@ -299,7 +303,7 @@ Referral links:
 - LGBTQ resources: https://dpss.lacounty.gov/en/rights/rights/sogie.html
 
 If the user's question is related to any of the following policy updates listed below, set canned_response to empty string and \
-set alert_message to one or more of the following text based on the user's question: 
+set alert_message to one or more of the following text based on the user's question:
 - Benefits application website: "YourBenefitsNow(YBN) no longer exists. Instead people use [benefitscal.com](https://benefitscal.com/) to apply for and manage \
 CalWorks, CalFresh, General Relief and Medi-Cal applications and documents. People can also apply for Medi-Cal and health insurance at coveredca.com."
 - Medicaid for immigrants: "Since January 1, 2024, a new law in California will allow adults ages 26 through 49 to qualify for full-scope Medi-Cal, \
@@ -331,7 +335,9 @@ Only respond to the user's question if there is relevant information in the prov
 
 {PROMPT}"""
 
-    def on_message(self, question: str, chat_history: Optional[ChatHistory]) -> OnMessageResult:
+    def on_message(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> OnMessageResult:
         attributes = analyze_message(
             self.llm, self.system_prompt_1, question, response_format=ImagineLA_MessageAttributes
         )
