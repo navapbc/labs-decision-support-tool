@@ -89,7 +89,7 @@ class MessageAttributes(BaseModel):
     translated_message: str
 
 
-MessageAttributesT = TypeVar("MessageAttributesT", bound="MessageAttributes")
+MessageAttributesT = TypeVar("MessageAttributesT", bound=MessageAttributes)
 
 
 def analyze_message(

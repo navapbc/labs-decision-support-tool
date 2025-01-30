@@ -246,34 +246,42 @@ class ImagineLaEngine(BaseEngine):
         "Covered California",
     ]
 
-    system_prompt_1 = f"""{ANALYZE_MESSAGE_PROMPT}
-Set canned_response according to the instructions below. The canned_response text should be in the same language as the user's question.
-Set alert_message to the policy update message if the user's question is related to any policy update described below. Otherwise, set alert_message to an empty string.
+    system_prompt_1 = """Analyze the user's message to respond with a JSON dictionary populated with the following fields and default values:
+- canned_response: empty string
+- alert_message: empty string
+- needs_context: True
+- translated_message: empty string
 
-Supported benefit programs and tax credits:
-CalWorks (including childcare), \
-CalFresh (SNAP or Food stamps), Medi-Cal (Medicaid), ACA (Covered California), General Relief, CARE, FERA, LADWP EZ-Save, LifeLine, WIC, \
-Earned Income Tax Credit (EITC), California Earned Income Tax Credit (CalEITC), Child Tax Credit (CTC) and Additional Child Tax Credit, \
-Young Child Tax Credit, California Child and Dependent Care Tax Credit, Child and Dependent Care Tax Credit (CDCTC), California Renter's Credit, \
-California Foster Youth Tax Credit, Supplemental Security Income (SSI), Social Security Disability Insurance (SSDI), SDI (State Disability Insurance), \
-CalWORKS Homeless Assistance (HA): Permanent HA Arrerages, CalWORKS WtW Housing Assistance: Emergency Assistance to Prevent Eviction (EAPE), \
-Crisis/Bridge Housing, CalWORKS Homeless Assistance (HA): Temporary HA, CALWORKS Homeless Assistance (HA): Expanded Temporary HA, \
-CalWORKS WtW Housing Assistance: Temporary Homeless Assistance Program (THAP) + 14, CalWORKS Homeless Assistance (HA): Permanent HA, \
-CalWORKS Homeless Assistance (HA): Permanent HA, CalWORKS WtW Housing Assistance: Moving Assistance (MA), \
-CalWORKS WtW Housing Assistance: 4 Month Rental Assistance, General Relief (GR) Rental Assistance, General Relief (GR) Move-In Assistance, \
-Access Centers, Outreach Services, Family Solutions Center, Veterans Benefits (VA), Cash Assistance Program for Immigrants (CAPI) \
-Public Charge, \
-In-Home Supportive Services, and EDD programs, including unemployment (UI), state disability insurance (SDI), and paid family leave (PFL).
+The canned_response string should be in the same language as the user's question. \
+If canned_response is set to a non-empty string, leave the other JSON fields as their default values.
 
-If the user asks what programs you support or what information you have, set canned_response to text that describes the categories from the list above with a few program examples for each.
+Supported benefit programs are:
+- CalWORKS (including childcare), CalFresh, Medi-Cal (Medicaid), ACA (Covered California),
+- CalWORKS Homeless Assistance (HA) for Permanent HA, Permanent HA Arrerages, Expanded Temporary HA,
+- CalWORKS WtW Housing Assistance: Emergency Assistance to Prevent Eviction (EAPE),
+- CalWORKS WtW Housing Assistance: Temporary Homeless Assistance Program (THAP or Temporary HA) + 14, CalWORKS Homeless Assistance (HA): Permanent HA,
+- CalWORKS WtW Housing Assistance: Moving Assistance (MA),
+- CalWORKS WtW Housing Assistance: 4 Month Rental Assistance, General Relief (GR) Rental Assistance, General Relief (GR) Move-In Assistance,
+- Crisis/Bridge Housing, General Relief, CARE, FERA, LADWP EZ-Save, LifeLine, WIC,
+- Earned Income Tax Credit (EITC), California Earned Income Tax Credit (CalEITC), Child Tax Credit (CTC) and Additional Child Tax Credit, Young Child Tax Credit,
+- California Child and Dependent Care Tax Credit, Child and Dependent Care Tax Credit (CDCTC), California Renter's Credit, California Foster Youth Tax Credit,
+- Supplemental Security Income (SSI), Social Security Disability Insurance (SSDI), SDI (State Disability Insurance),
+- Access Centers, Outreach Services, Family Solutions Center, Veterans Benefits (VA), Cash Assistance Program for Immigrants (CAPI)
+- Public Charge, In-Home Supportive Services, and EDD programs
+- unemployment insurance (UI), state disability insurance (SDI), paid family leave (PFL)
 
-Set benefit_program to the specific program the user's question is about. Otherwise, set benefit_program to an empty string and set canned_response to \
-"Sorry, I don't have info about that topic. See the [Benefits Information Hub](https://socialbenefitsnavigator25.web.app/contenthub) \
-for the topics I cover."
+If the user asks what programs are supported or what information is available, \
+set canned_response to text that gives examples and describes categories for the supported benefit programs.
 
-If the user asks about a related benefit program but it's unclear which one, then set canned_response to \
-"I'm not sure which benefit program your prompt is about; could you clarify? \
-If you don't know what benefit program might be helpful, describe what you need so that I can make a recommendation."
+If it's unclear which supported benefit program the user's talking about, then set canned_response to \
+"I'm not sure which benefit program your question is about. Please specify the program or describe what you need so that I can make a recommendation? \
+You question may be about [insert possible relevant supported benefit programs]."
+
+If the user's question is not about a supported benefit program, set canned_response to one of the following based on the condition:
+Condition 1: If the user's question is about a referral link below, set canned_response to \
+"I don't have information about that topic, but you can find more at [link provided]", \
+where [link provided] is one or more of the referral links below.
+Condition 2: Otherwise set canned_response to "Sorry, I don't have info about that topic. See the [Benefits Information Hub](https://socialbenefitsnavigator25.web.app/contenthub) for the topics I cover."
 
 Referral links:
 - ID cards: https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/
@@ -295,39 +303,29 @@ Referral links:
 - LA County Hospitals and Clinics: https://dhs.lacounty.gov/find-a-clinic-or-hospital/
 - LGBTQ resources: https://dpss.lacounty.gov/en/rights/rights/sogie.html
 
-If the user's question is not about a supported benefit program and the user asks about any of the referral links topics, set canned_response to "I don't have information about that topic, but you can find more at [link provided]", \
-where [link provided] is one or more of the above referral links.
-
-If the user asked about any of the following topics with a policy update, set canned_response to empty string and \
-set alert_message to one or more of the following text:
-
-Policy update topic: Benefits application website
-"YourBenefitsNow(YBN) no longer exists. Instead people use [benefitscal.com](https://benefitscal.com/) to apply for and manage \
+If the user's question is related to any of the following policy updates listed below, set canned_response to empty string and \
+set alert_message to one or more of the following text based on the user's question: 
+- Benefits application website: "YourBenefitsNow(YBN) no longer exists. Instead people use [benefitscal.com](https://benefitscal.com/) to apply for and manage \
 CalWorks, CalFresh, General Relief and Medi-Cal applications and documents. People can also apply for Medi-Cal and health insurance at coveredca.com."
-
-Policy update topic: Medicaid for immigrants
-"Since January 1, 2024, a new law in California will allow adults ages 26 through 49 to qualify for full-scope Medi-Cal, \
+- Medicaid for immigrants: "Since January 1, 2024, a new law in California will allow adults ages 26 through 49 to qualify for full-scope Medi-Cal, \
 regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, will still apply. \
 [Read more](https://www.coveredca.com/learning-center/information-for-immigrants/)."
-
-Policy update topic: Medicaid asset limits
-"As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. \
+- Medicaid asset limits: "As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. \
 [Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)"
-
-Policy update topic: CalFresh work requirements (ABAWDs, time limits)
-"California has a statewide waiver through October 31, 2025. This means no ABAWDs living in California \
+- CalFresh work requirements (ABAWDs, time limits): "California has a statewide waiver through October 31, 2025. This means no ABAWDs living in California \
 will have to meet the work requirement to keep receiving CalFresh benefits. \
 ABAWDs who have lost their CalFresh benefits may reapply and continue to receive CalFresh if otherwise eligible. \
 [Read more](https://www.cdss.ca.gov/inforesources/calfresh/abawd)"
-
-Policy update topic: Calfresh asset limits/resource limits
-"California has dramatically modified its rules for 'categorical eligibility' in the CalFresh program, such that asset limits have all but been removed. \
+- Calfresh asset limits/resource limits: "California has dramatically modified its rules for 'categorical eligibility' in the CalFresh program, such that asset limits have all but been removed. \
 The only exceptions would be if either the household includes one or more members who are aged or disabled, \
 with household income over 200% of the Federal Poverty Level (FPL); or the household fits within a narrow group of cases \
-where it has been disqualified because of an intentional program violation, or some other specific compliance requirement; \
-or there is a disputed claim for benefits paid in the past. \
+where it has been disqualified because of an intentional program violation, or some other specific compliance requirement; or there is a disputed claim for benefits paid in the past. \
 [Read more](https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit)"
-"""  # nosec
+
+If the user's question is to translate text, set needs_context to False.
+
+If the user's question is not in English, set translated_message to be an English translation of the user's message.
+"""
 
     system_prompt_2 = f"""You're supporting users of the Benefit Navigator tool, which is an online tool, "one-stop shop," for case managers, individuals, and \
 families to help them understand, access, and navigate the complex public benefits and tax credit landscape in the Los Angeles region.
