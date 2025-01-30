@@ -212,7 +212,6 @@ If a prompt is about an EDD program, but you can't tell which one, detect and cl
 
 
 class ImagineLA_MessageAttributes(MessageAttributes):
-    benefit_program: str
     canned_response: str
     alert_message: str
 
@@ -272,10 +271,6 @@ Supported benefit programs are:
 
 If the user asks what programs are supported or what information is available, \
 set canned_response to text that gives examples and describes categories for the supported benefit programs.
-
-If it's unclear which supported benefit program the user's talking about, then set canned_response to \
-"I'm not sure which benefit program your question is about. Please specify the program or describe what you need so that I can make a recommendation? \
-You question may be about [insert possible relevant supported benefit programs]."
 
 If the user's question is not about a supported benefit program, set canned_response to one of the following based on the condition:
 Condition 1: If the user's question is about a referral link below, set canned_response to \
