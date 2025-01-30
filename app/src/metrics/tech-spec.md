@@ -1,4 +1,4 @@
-# QA Evaluation Pipeline Technical Specification
+# Tech Spec: Automating QA evaluation pipeline for DST chat
 
 ## Current Need
 
@@ -28,7 +28,7 @@ Our primary need is to establish traceability of our retrieval system's performa
 - Dataset version tracking
 
 ### Full Feature Set
-- Automated triggers on system changes, including software releases, new source ingestion and re-ingestion.
+- Automated triggers on system changes, including software releases, new source ingestion and re-ingestion
 - Complete evaluation history in database
 - Performance regression alerts
 - Analytics/visualization
@@ -164,8 +164,7 @@ Metrics Computation:
   - Retrieval time statistics
 - Outputs metrics to log file in JSON format
 
-#### 3. Automation
-- Weekly Evaluation Runs (eg run every Monday at 2 AM PST)
+#### 3. Automations
 - Generate new QA pairs from latest content
 - Triggers to consider if we would like to use webhooks:
   - On new ingested data batches
@@ -181,6 +180,12 @@ Simple Python scripts to:
 - Basic error analysis (which types of questions fail)
 
 ### Log File Structure and Usage
+
+The log files serve several key purposes in the evaluation runs:
+- Each evaluation run creates a new dated directory
+- Batch metadata captures system state and configuration
+- Results file stores individual QA pair outcomes
+- Metrics file provides run summary and analysis
 
 #### Directory Structure
 ```
@@ -279,15 +284,27 @@ Each line is a JSON object representing one evaluation:
 }
 ```
 
-#### MVP Log File Usage
+#### File Relationships and Workflow
+1. `batch_${UUID}.json` is created first when evaluation starts
+   - Captures configuration and system state
+   - UUID links this run's files together
+   - Acts as manifest for the evaluation run
 
-The log files serve several key purposes in th evaluation runs:
+2. `results_${UUID}.jsonl` grows during evaluation
+   - Each line added as questions are processed
+   - References batch_id from batch file
+   - Streaming format (JSONL) allows real-time monitoring
 
-- Each evaluation run creates a new dated directory
-- Batch metadata captures system state and configuration
-- Results file stores individual QA pair outcomes
-- Metrics file provides run summary and analysis
+3. `metrics_${UUID}.json` generated after completion
+   - Summarizes results from the JSONL file
+   - Uses same batch_id for correlation
+   - Final output for quick performance review
 
+This structure enables:
+- Real-time monitoring via results file
+- Quick lookups via metrics summary
+- Full debugging via correlation of all three files
+- Easy filtering by date (directory) or run (UUID)
 
 ## Implementation Phases
 
@@ -305,13 +322,11 @@ The log files serve several key purposes in th evaluation runs:
 - Migration of existing evaluation data
 - Weekly automated evaluation runs
 - Filter and analyze results by date, dataset, or metrics
-- Basic trend analysis scripts
 
 ### Iteration 3 (Sprint 5+): Advanced Features
 - Automated triggers for evaluation runs
 - Performance monitoring dashboards
 - Regression detection and alerts
-- Advanced analytics tools
 
 ## Success Metrics
 - Complete history of evaluation runs
