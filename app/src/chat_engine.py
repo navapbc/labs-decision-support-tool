@@ -258,13 +258,12 @@ class ImagineLaEngine(BaseEngine):
 The canned_response string should be in the same language as the user's question. \
 If canned_response is set to a non-empty string, leave the other JSON fields as their default values.
 
-Supported benefit programs are:
-- CalWORKS (including childcare), CalFresh, Medi-Cal (Medicaid), ACA (Covered California),
+In-scope benefit programs are:
+- CalWORKS (including childcare)
 - CalWORKS Homeless Assistance (HA) for Permanent HA, Permanent HA Arrerages, Expanded Temporary HA,
-- CalWORKS WtW Housing Assistance: Emergency Assistance to Prevent Eviction (EAPE),
-- CalWORKS WtW Housing Assistance: Temporary Homeless Assistance Program (THAP or Temporary HA) + 14, CalWORKS Homeless Assistance (HA): Permanent HA,
-- CalWORKS WtW Housing Assistance: Moving Assistance (MA),
-- CalWORKS WtW Housing Assistance: 4 Month Rental Assistance, General Relief (GR) Rental Assistance, General Relief (GR) Move-In Assistance,
+- CalWORKS WtW Housing Assistance, including Emergency Assistance to Prevent Eviction (EAPE), Temporary Homeless Assistance Program (THAP or Temporary HA) + 14, CalWORKS Homeless Assistance (HA): Permanent HA,
+Moving Assistance (MA), 4 Month Rental Assistance, General Relief (GR) Rental Assistance, General Relief (GR) Move-In Assistance,
+- CalFresh, Medi-Cal (Medicaid), ACA (Covered California)
 - Crisis/Bridge Housing, General Relief, CARE, FERA, LADWP EZ-Save, LifeLine, WIC,
 - Earned Income Tax Credit (EITC), California Earned Income Tax Credit (CalEITC), Child Tax Credit (CTC) and Additional Child Tax Credit, Young Child Tax Credit,
 - California Child and Dependent Care Tax Credit, Child and Dependent Care Tax Credit (CDCTC), California Renter's Credit, California Foster Youth Tax Credit,
@@ -273,14 +272,13 @@ Supported benefit programs are:
 - Public Charge, In-Home Supportive Services, and EDD programs
 - unemployment insurance (UI), state disability insurance (SDI), paid family leave (PFL)
 
-If the user asks what programs are supported or what information is available, \
-set canned_response to text that gives examples and describes categories for the supported benefit programs.
+If the user asks what programs or what information is available, \
+set canned_response to text that gives examples and describes categories for the in-scope benefit programs.
 
-If the user's question is not about a supported benefit program, set canned_response to one of the following based on the condition:
-Condition 1: If the user's question is about a referral link below, set canned_response to \
-"I don't have information about that topic, but you can find more at [link provided]", \
-where [link provided] is one or more of the referral links below.
-Condition 2: Otherwise set canned_response to "Sorry, I don't have info about that topic. See the [Benefits Information Hub](https://socialbenefitsnavigator25.web.app/contenthub) for the topics I cover."
+If the user's question is not about one of the in-scope benefit programs, set canned_response to \
+"Sorry, I don't have info about that topic. \
+See the [Benefits Information Hub](https://socialbenefitsnavigator25.web.app/contenthub) for the topics I cover.". \
+If the user's question is about a referral link below, append the link to canned_response like so: "Or try [referral link]".
 
 Referral links:
 - ID cards: https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/
