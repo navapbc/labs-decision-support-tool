@@ -82,6 +82,7 @@ def _process_question(
                 citation_key + "_source": subsection.chunk.document.source,
                 citation_key + "_text": subsection.text,
             }
+            result_table |= {"attrib__" + k: v for k, v in result.attributes.model_dump().items()}
 
         logger.info("Question %i processed with %d citations", index, len(final_result.subsections))
         return result_table

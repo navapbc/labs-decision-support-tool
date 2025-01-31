@@ -74,4 +74,6 @@ def test_process_question(monkeypatch, engine):
         "citation_1_headings": " > ".join(mock_result.subsections[0].text_headings),
         "citation_1_source": mock_result.subsections[0].chunk.document.source,
         "citation_1_text": subsection_text,
+        "attrib__needs_context": True,
+        "attrib__translated_message": "",
     }
