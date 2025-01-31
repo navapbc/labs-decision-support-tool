@@ -217,6 +217,7 @@ class Citation(BaseModel):
 
 class QueryResponse(BaseModel):
     response_text: str
+    alert_message: Optional[str] = None
     citations: list[Citation]
 
     # Populated after instantiation based on LiteralAI message ID
@@ -295,6 +296,10 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
+# Temporarily True until API client handles alert_message field
+INCLUDE_ALERT_IN_RESPONSE = True
+
+
 async def run_query(
     engine: ChatEngineInterface, question: str, chat_history: Optional[ChatHistory] = None
 ) -> QueryResponse:
@@ -304,7 +309,16 @@ async def run_query(
 
     final_result = simplify_citation_numbers(result)
     citations = [Citation.from_subsection(subsection) for subsection in final_result.subsections]
-    return QueryResponse(response_text=final_result.response, citations=citations)
+
+    alert_msg = getattr(result, "alert_message", None)
+    if alert_msg:
+        alert_msg = f"**Policy update**: {alert_msg}\n\nThe rest of this answer may be outdated."
+
+    if INCLUDE_ALERT_IN_RESPONSE and alert_msg:
+        response_msg = f"{alert_msg}\n\n{final_result.response}"
+    else:
+        response_msg = final_result.response
+    return QueryResponse(response_text=response_msg, alert_message=alert_msg, citations=citations)
 
 
 # endregion
