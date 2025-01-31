@@ -143,9 +143,15 @@ _WIDGET_FACTORIES = {
         max=1,
         step=0.25,
     ),
-    "system_prompt": lambda initial_value: TextInput(
-        id="system_prompt",
-        label="System prompt",
+    "system_prompt_1": lambda initial_value: TextInput(
+        id="system_prompt_1",
+        label="System prompt 1",
+        initial=initial_value,
+        multiline=True,
+    ),
+    "system_prompt_2": lambda initial_value: TextInput(
+        id="system_prompt_2",
+        label="System prompt 2",
         initial=initial_value,
         multiline=True,
     ),
