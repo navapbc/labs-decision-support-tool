@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, TypeVar
 
 from litellm import completion
 from pydantic import BaseModel
@@ -89,15 +89,12 @@ class MessageAttributes(BaseModel):
     translated_message: str
 
 
-class ImagineLAMessageAttributes(MessageAttributes):
-    # FIXME
-    # needs_context: bool
-    # translated_message: str
-    canned_response: str
-    alert_message: str
+MessageAttributesT = TypeVar("MessageAttributesT", bound=MessageAttributes)
 
 
-def analyze_message(llm: str, system_prompt: str, message: str) -> MessageAttributes:
+def analyze_message(
+    llm: str, system_prompt: str, message: str, response_format: type[MessageAttributesT]
+) -> MessageAttributesT:
     response = (
         completion(
             model=llm,
@@ -111,7 +108,7 @@ def analyze_message(llm: str, system_prompt: str, message: str) -> MessageAttrib
                     "role": "user",
                 },
             ],
-            response_format=ImagineLAMessageAttributes,
+            response_format=response_format,
             temperature=app_config.temperature,
             **completion_args(llm),
         )
@@ -122,4 +119,4 @@ def analyze_message(llm: str, system_prompt: str, message: str) -> MessageAttrib
     logger.info("Analyzed message: %s", response)
 
     response_as_json = json.loads(response)
-    return ImagineLAMessageAttributes.model_validate(response_as_json)
+    return response_format.model_validate(response_as_json)

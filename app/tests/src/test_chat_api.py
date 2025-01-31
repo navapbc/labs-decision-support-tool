@@ -20,6 +20,7 @@ from src.chat_api import (
 )
 from src.chat_engine import OnMessageResult
 from src.citations import CitationFactory, split_into_subsections
+from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory
 
 
@@ -158,7 +159,11 @@ async def test_run_query__1_citation(subsections):
     class MockChatEngine:
         def on_message(self, question, chat_history):
             return OnMessageResult(
-                "Response from LLM (citation-2)", "Some system prompt", [], subsections
+                "Response from LLM (citation-2)",
+                "Some system prompt",
+                MessageAttributes(needs_context=True, translated_message=""),
+                chunks_with_scores=[],
+                subsections=subsections,
             )
 
     query_response = await run_query(MockChatEngine(), "My question")
@@ -172,7 +177,11 @@ async def test_run_query__2_citations(subsections):
     class MockChatEngine:
         def on_message(self, question, chat_history):
             return OnMessageResult(
-                "Response from LLM (citation-2)(citation-3)", "Some system prompt", [], subsections
+                "Response from LLM (citation-2)(citation-3)",
+                "Some system prompt",
+                MessageAttributes(needs_context=True, translated_message=""),
+                chunks_with_scores=[],
+                subsections=subsections,
             )
 
     query_response = await run_query(MockChatEngine(), "My question")
@@ -187,7 +196,11 @@ async def test_run_query__unknown_citation(subsections, caplog):
     class MockChatEngine:
         def on_message(self, question, chat_history):
             return OnMessageResult(
-                "Response from LLM (citation-2)(citation-44)", "Some system prompt", [], subsections
+                "Response from LLM (citation-2)(citation-44)",
+                "Some system prompt",
+                MessageAttributes(needs_context=True, translated_message=""),
+                chunks_with_scores=[],
+                subsections=subsections,
             )
 
     with caplog.at_level(logging.ERROR):

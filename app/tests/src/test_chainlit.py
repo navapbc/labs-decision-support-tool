@@ -4,6 +4,7 @@ from src import chainlit, chat_engine
 from src.chainlit import _get_retrieval_metadata, extract_raw_chat_history
 from src.chat_engine import PROMPT, OnMessageResult
 from src.db.models.document import Subsection
+from src.generate import MessageAttributes
 
 
 def test_url_query_values(monkeypatch):
@@ -27,7 +28,13 @@ def test__get_retrieval_metadata(chunks_with_scores):
     system_prompt = "Some system prompt"
     chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
     subsections = [Subsection(chunk.id, chunk, chunk.content) for chunk in chunks]
-    result = OnMessageResult("Some response", system_prompt, chunks_with_scores, subsections)
+    result = OnMessageResult(
+        "Some response",
+        system_prompt,
+        MessageAttributes(needs_context=True, translated_message=""),
+        chunks_with_scores=chunks_with_scores,
+        subsections=subsections,
+    )
 
     metadata = _get_retrieval_metadata(result)
     assert metadata["system_prompt"] == system_prompt

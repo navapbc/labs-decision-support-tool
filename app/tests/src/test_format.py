@@ -1,7 +1,8 @@
 import re
 
 from src.citations import CitationFactory, split_into_subsections
-from src.format import FormattingConfig, _get_breadcrumb_html, build_accordions, reify_citations
+from src.format import FormattingConfig, _get_breadcrumb_html, format_response, reify_citations
+from src.generate import MessageAttributes
 from src.retrieve import retrieve_with_scores
 from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_retrieve import _create_chunks
@@ -67,27 +68,30 @@ def test__get_breadcrumb_html():
     assert _get_breadcrumb_html(headings, "Doc name") == "<div><b>Heading 2</b></div>"
 
 
-def test_build_accordions(chunks_with_scores):
+def test_format_response(chunks_with_scores):
     subsections = to_subsections(chunks_with_scores)
 
     config = FormattingConfig()
+    msg_attribs = MessageAttributes(needs_context=True, translated_message="")
     # Test empty response
-    assert build_accordions(subsections, "", config) == "<div></div>"
+    assert format_response(subsections, "", config, msg_attribs) == "<div></div>"
 
     # Test non-existent citation
     assert (
-        build_accordions([], "Non-existent citation: (citation-0)", config)
+        format_response([], "Non-existent citation: (citation-0)", config, msg_attribs)
         == "<div><p>Non-existent citation: </p></div>"
     )
 
     # Test markdown list formatting
     assert (
-        build_accordions([], "List intro sentence: \n- item 1\n- item 2", config)
+        format_response([], "List intro sentence: \n- item 1\n- item 2", config, msg_attribs)
         == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
     )
 
     # Test real citations
-    html = build_accordions(subsections, "Some real citations: (citation-1) (citation-2)", config)
+    html = format_response(
+        subsections, "Some real citations: (citation-1) (citation-2)", config, msg_attribs
+    )
     assert len(_unique_accordion_ids(html)) == 2
     assert "Source(s)" in html
     assert "usa-accordion__button" in html

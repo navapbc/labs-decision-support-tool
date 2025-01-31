@@ -12,7 +12,7 @@ from src import chat_engine
 from src.app_config import app_config
 from src.batch_process import batch_process
 from src.chat_engine import ChatEngineInterface, OnMessageResult
-from src.format import build_accordions
+from src.format import format_response
 from src.generate import ChatHistory, get_models
 from src.login import require_login
 
@@ -208,10 +208,11 @@ async def on_message(message: cl.Message) -> None:
     try:
         result = await asyncify(lambda: engine.on_message(message.content, chat_history))()
         logger.info("Raw response: %s", result.response)
-        msg_content = build_accordions(
+        msg_content = format_response(
             subsections=result.subsections,
             raw_response=result.response,
             config=engine.formatting_config,
+            attributes=result.attributes,
         )
 
         await cl.Message(
