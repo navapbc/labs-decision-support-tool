@@ -18,7 +18,7 @@ from src.chat_api import (
     router,
     run_query,
 )
-from src.chat_engine import OnMessageResult
+from src.chat_engine import ImagineLA_MessageAttributes, OnMessageResult
 from src.citations import CitationFactory, split_into_subsections
 from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory
@@ -179,13 +179,25 @@ async def test_run_query__2_citations(subsections):
             return OnMessageResult(
                 "Response from LLM (citation-2)(citation-3)",
                 "Some system prompt",
-                MessageAttributes(needs_context=True, translated_message=""),
+                ImagineLA_MessageAttributes(
+                    needs_context=True,
+                    translated_message="",
+                    canned_response="",
+                    alert_message="Some alert message.",
+                ),
                 chunks_with_scores=[],
                 subsections=subsections,
             )
 
     query_response = await run_query(MockChatEngine(), "My question")
-    assert query_response.response_text == "Response from LLM (citation-1)(citation-2)"
+    assert (
+        query_response.alert_message
+        == "**Policy update**: Some alert message.\n\nThe rest of this answer may be outdated."
+    )
+    assert (
+        query_response.response_text
+        == f"{query_response.alert_message}\n\nResponse from LLM (citation-1)(citation-2)"
+    )
     assert len(query_response.citations) == 2
     assert query_response.citations[0].citation_id == "citation-1"
     assert query_response.citations[1].citation_id == "citation-2"

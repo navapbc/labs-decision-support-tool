@@ -310,7 +310,7 @@ async def run_query(
     final_result = simplify_citation_numbers(result)
     citations = [Citation.from_subsection(subsection) for subsection in final_result.subsections]
 
-    alert_msg = getattr(result, "alert_message", None)
+    alert_msg = getattr(result.attributes, "alert_message", None)
     if alert_msg:
         alert_msg = f"**Policy update**: {alert_msg}\n\nThe rest of this answer may be outdated."
 
