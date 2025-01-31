@@ -4,6 +4,7 @@ from src import chat_engine
 from src.batch_process import _process_question, batch_process
 from src.chat_engine import ImagineLA_MessageAttributes, OnMessageResult
 from src.db.models.document import Subsection
+from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory
 
 
