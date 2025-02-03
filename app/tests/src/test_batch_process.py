@@ -2,9 +2,8 @@ import pytest
 
 from src import chat_engine
 from src.batch_process import _process_question, batch_process
-from src.chat_engine import OnMessageResult
+from src.chat_engine import ImagineLA_MessageAttributes, OnMessageResult
 from src.db.models.document import Subsection
-from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory
 
 
@@ -62,7 +61,12 @@ def test_process_question(monkeypatch, engine):
     mock_result = OnMessageResult(
         response="Answer to question.(citation-1)",
         subsections=[Subsection("citation-1", chunk, subsection_text)],
-        attributes=MessageAttributes(needs_context=True, translated_message=""),
+        attributes=ImagineLA_MessageAttributes(
+            needs_context=True,
+            translated_message="",
+            canned_response="",
+            alert_message="Some alert message.",
+        ),
         chunks_with_scores=[],
         system_prompt="",
     )
@@ -74,4 +78,8 @@ def test_process_question(monkeypatch, engine):
         "citation_1_headings": " > ".join(mock_result.subsections[0].text_headings),
         "citation_1_source": mock_result.subsections[0].chunk.document.source,
         "citation_1_text": subsection_text,
+        "attrib__needs_context": True,
+        "attrib__translated_message": "",
+        "attrib__alert_message": "Some alert message.",
+        "attrib__canned_response": "",
     }
