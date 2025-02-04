@@ -87,7 +87,8 @@ def _split_section(
     base_headings = chunk.headings or []
     headings = None
     subsections: list[Subsection] = []
-    for node in hs_node.children:
+    node = hs_node.first_child()
+    while node:
         if node.data_type == "HeadingSection":
             subsections += _split_section(node, chunk, factory)
         elif node.data_type == "Heading":
@@ -95,9 +96,23 @@ def _split_section(
         elif node.has_token() and node.is_block_token():
             headings = headings or (base_headings + get_parent_headings_raw(node))
             markdown = node.render().strip()
-            subsections.append(factory.create_citation(chunk, markdown, headings))
+
+            if (
+                node.data_type == "Paragraph"
+                and (next_node := node.next_sibling())
+                and next_node.data_type == "List"
+            ):
+                intro_sentence = markdown
+                markdown = next_node.render().strip()
+                subsections.append(
+                    factory.create_citation(chunk, intro_sentence + "\n" + markdown, headings)
+                )
+                node.next_sibling().remove()
+            else:
+                subsections.append(factory.create_citation(chunk, markdown, headings))
         else:
             raise NotImplementedError(f"Unexpected: {node.id_string()}")
+        node = node.next_sibling()
     return subsections
 
 
