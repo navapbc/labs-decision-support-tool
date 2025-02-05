@@ -5,7 +5,6 @@ from tempfile import TemporaryDirectory
 import pytest
 from sqlalchemy import delete, select
 
-from src import ingester
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
 from src.ingest_runner import get_ingester_config
