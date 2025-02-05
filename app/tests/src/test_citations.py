@@ -9,7 +9,7 @@ from src.citations import (
     split_into_subsections,
     tree_based_chunk_splitter,
 )
-from src.db.models.document import Subsection
+from src.db.models.document import Chunk, Subsection
 from tests.src.db.models.factories import ChunkFactory
 
 
@@ -160,3 +160,26 @@ def test_replace_citation_ids():
         replace_citation_ids("Remapped. (citation-4)(citation-3)", remapped_citations)
         == "Remapped. (citation-1)(citation-2)"
     )
+
+
+def test_intro_sentence_for_list():
+    my_chunk_text = """When someone applies for a Green Card through a family petition, the immigration officials can deny the application for different reasons. One reason is if the government thinks the person is likely to depend too much on public benefits in the future. This is called the Public Charge Rule.
+
+The immigration officer will consider the immigrant's:
+
+* Health
+* Age
+* Income/resources
+* Education and skills
+* Family size and potential sponsor
+* Receiving the two kinds of public benefits listed below
+
+The officer weighs all these factors. They consider positive factors, like a job or skills or support from a sponsor. They consider negative factors, like low income or health problems. If an immigrant receives a counted benefit, officials will look at how recently and for how long. They do *not* consider benefits received for family members. They can deny the application if they think the person will depend too much on public benefits in the future.
+"""
+    my_chunk = Chunk(content=my_chunk_text, headings=["Public Charge Rule"])
+    subsections = split_into_subsections([my_chunk], factory=CitationFactory())
+
+    assert subsections[0].text.startswith("When someone applies for a Green Card")
+    assert subsections[1].text.startswith("The immigration officer will consider")
+    assert "* Health" in subsections[1].text
+    assert subsections[2].text.startswith("The officer weighs all these factors.")
