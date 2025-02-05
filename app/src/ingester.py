@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -18,15 +17,11 @@ from src.util.ingest_utils import (
     IngestConfig,
     add_embeddings,
     create_file_path,
-    deconstruct_list,
-    deconstruct_table,
     document_exists,
     load_or_save_doc_markdown,
-    reconstruct_list,
-    reconstruct_table,
     tokenize,
 )
-from src.util.string_utils import remove_links, split_markdown_by_heading
+from src.util.string_utils import remove_links
 
 logger = logging.getLogger(__name__)
 
@@ -220,14 +215,8 @@ def _chunk_into_splits_from_json(
     return result
 
 
-USE_MARKDOWN_TREE = True
-
-
 def _chunk_page(document: Document, chunking_config: ChunkingConfig) -> Sequence[Split]:
-    if USE_MARKDOWN_TREE:
-        return _create_splits_using_markdown_tree(document, chunking_config)
-    else:
-        return _create_splits_using_headings(document)
+    return _create_splits_using_markdown_tree(document, chunking_config)
 
 
 def _create_splits_using_markdown_tree(
@@ -278,136 +267,6 @@ def _save_splits_to_files(file_path: str, uri: str, splits: Sequence[Split]) -> 
             file.write(split.text)
             file.write("\n====================================\n")
         file.write("\n\n")
-
-
-# endregion
-# region Splitting Markdown by Headings
-
-
-def _create_splits_using_headings(document: Document) -> Sequence[Split]:
-    splits = []
-    assert document.content
-    for headings, text in split_markdown_by_heading(f"# {document.name}\n\n" + document.content):
-        # Start a new split for each heading
-        section_splits = _split_heading_section(headings, text)
-        splits.extend(section_splits)
-    return splits
-
-
-# MarkdownHeaderTextSplitter splits text by "\n" then calls aggregate_lines_to_chunks() to reaggregate
-# paragraphs using "  \n", so "\n\n" is replaced by "  \n"
-MarkdownHeaderTextSplitter_DELIMITER = "  \n"
-
-
-def _split_heading_section(headings: Sequence[str], text: str) -> list[HeadingBasedSplit]:
-    # Add headings to the context_str; other context can also be added
-    context_str = "\n".join(headings)
-    logger.debug("New heading: %s", headings)
-
-    # Keep intro sentence/paragraph together with the subsequent list or table by
-    # replacing the MarkdownHeaderTextSplitter_DELIMITER with "\n\n" so that they are not split
-    text = re.sub(
-        rf"{MarkdownHeaderTextSplitter_DELIMITER}^( *[\-\*\+] )",
-        r"\n\n\1",
-        text,
-        flags=re.MULTILINE,
-    )
-    text = re.sub(
-        rf"{MarkdownHeaderTextSplitter_DELIMITER}^(\| )", r"\n\n\1", text, flags=re.MULTILINE
-    )
-    # Ensure a list and subsequent table are being split; https://edd.ca.gov/en/payroll_taxes/Due_Dates_Calendar/
-    text = re.sub(
-        r"^( *[\-\*\+] .*\n)\n^(\| )",
-        rf"\1{MarkdownHeaderTextSplitter_DELIMITER}\2",
-        text,
-        flags=re.MULTILINE,
-    )
-
-    splits: list[HeadingBasedSplit] = []
-    # Split content by MarkdownHeaderTextSplitter_DELIMITER, then gather into the largest chunks
-    # that tokenize to less than the max_seq_length
-    paragraphs = text.split(MarkdownHeaderTextSplitter_DELIMITER)
-    # Start new split with the first paragraph
-    _create_splits(headings, context_str, splits, paragraphs)
-
-    if len(splits) == 1:
-        logger.debug("Section fits in 1 chunk: %s", headings[-1])
-    else:
-        logger.info("Split %i has %i tokens", len(splits), splits[-1].token_count)
-        logger.info("Partitioned section into %i splits", len(splits))
-        logger.debug("\n".join([f"[Split {i}]: {s.text_to_encode}" for i, s in enumerate(splits)]))
-    return splits
-
-
-def _create_splits(
-    headings: Sequence[str],
-    context_str: str,
-    splits: list[HeadingBasedSplit],
-    paragraphs: Sequence[str],
-    delimiter: str = "\n\n",
-) -> None:
-    splits.append(HeadingBasedSplit(headings, paragraphs[0], context_str))
-    logger.debug("Paragraph0: %r", paragraphs[0])
-    for paragraph in paragraphs[1:]:
-        logger.debug("Paragraph: %r", paragraph)
-        _split_large_text_block(headings, context_str, splits)
-
-        if not paragraph:
-            continue
-        if splits[-1].add_if_within_limit(paragraph, delimiter):
-            logger.debug("adding to Split %i => %i tokens", len(splits), splits[-1].token_count)
-        else:
-            logger.info("Split %i has %i tokens", len(splits), splits[-1].token_count)
-            # Start new split since longer_split will exceed max_seq_length
-            splits.append(HeadingBasedSplit(headings, paragraph, context_str))
-    _split_large_text_block(headings, context_str, splits)
-
-    for split in splits:
-        assert (
-            not split.exceeds_limit()
-        ), f"token_count: {split.token_count} > {app_config.sentence_transformer.max_seq_length}"
-
-
-def _split_large_text_block(
-    headings: Sequence[str], context_str: str, splits: list[HeadingBasedSplit]
-) -> None:
-    split = splits[-1]
-    context_token_count = len(tokenize(f"{context_str}\n\n"))
-    token_limit = app_config.sentence_transformer.max_seq_length - context_token_count
-    if split.exceeds_limit():
-        # Try to detect list items in the text_block
-        intro_sentence, list_items = deconstruct_list(split.text)
-        if list_items:
-            splits.pop()
-            logger.info(
-                "Split text_block into %i list items with intro: %r",
-                len(list_items),
-                intro_sentence,
-            )
-            chunk_texts = reconstruct_list(token_limit, intro_sentence, list_items)
-            _create_splits(headings, context_str, splits, chunk_texts)
-        elif "| --- |" in split.text:
-            table_intro_sentence, table_header, table_items = deconstruct_table(split.text)
-            splits.pop()
-            logger.info(
-                "Split text_block into %i table items with intro: %r",
-                len(table_items),
-                table_intro_sentence,
-            )
-            chunk_texts = reconstruct_table(
-                token_limit, table_intro_sentence, table_header, table_items
-            )
-            _create_splits(headings, context_str, splits, chunk_texts)
-        elif split.text.count("\n") > 2:
-            # Split text_block into smaller text_blocks
-            chunk_texts = split.text.split("\n")
-            splits.pop()
-            logger.info("Split text_block into %i smaller text_blocks", len(chunk_texts))
-            _create_splits(headings, context_str, splits, chunk_texts, delimiter="\n")
-        else:
-            raise ValueError(
-                f"Cannot split long ({split.token_count} tokens) text_block: {split.text}"
-            )
 
 
 # endregion

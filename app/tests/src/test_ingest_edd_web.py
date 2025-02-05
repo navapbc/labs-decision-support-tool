@@ -5,7 +5,6 @@ from tempfile import TemporaryDirectory
 import pytest
 from sqlalchemy import delete, select
 
-from src import ingester
 from src.app_config import app_config as app_config_for_test
 from src.db.models.document import Document
 from src.ingest_runner import get_ingester_config
@@ -95,126 +94,7 @@ def edd_web_s3_file(mock_s3_bucket_resource, sample_cards):
     return "s3://test_bucket/edd_scrapings.json"
 
 
-@pytest.mark.parametrize("file_location", ["local", "s3"])
-def test__ingest_edd(
-    caplog, app_config, db_session, edd_web_local_file, edd_web_s3_file, file_location
-):
-    ingester.USE_MARKDOWN_TREE = False
-    # Force a short max_seq_length to test chunking
-    app_config_for_test.sentence_transformer.max_seq_length = 47
-
-    db_session.execute(delete(Document))
-
-    with TemporaryDirectory(suffix="edd_md") as md_base_dir, caplog.at_level(logging.WARNING):
-        config = get_ingester_config("edd")
-        if file_location == "local":
-            ingest_json(db_session, edd_web_local_file, config, md_base_dir=md_base_dir)
-        else:
-            ingest_json(db_session, edd_web_s3_file, config, md_base_dir=md_base_dir)
-
-    documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
-    assert len(documents) == 4
-
-    assert (
-        "Skipping duplicate URL: https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
-        in caplog.messages[0]
-    )
-
-    assert documents[0].name == "Nonindustrial Disability Insurance FAQs"
-    assert documents[0].source == "https://edd.ca.gov/en/disability/nonindustrial/faqs/"
-    assert documents[1].name == "Options to File for Disability Insurance Benefits"
-    assert (
-        documents[1].source == "https://edd.ca.gov/en/disability/options_to_file_for_di_benefits/"
-    )
-    assert documents[2].name == "State Unemployment Tax Act Dumping"
-    assert documents[2].source == "https://edd.ca.gov/en/payroll_taxes/suta_dumping/"
-    assert documents[3].name == "The Northern Job Fairs and Workshops"
-    assert documents[3].source == "https://edd.ca.gov/en/jobs_and_training/northern_region/"
-
-    assert len(documents[0].chunks) == 3
-    assert (
-        documents[0].chunks[0].content
-        == "Get answers to FAQs about Nonindustrial Disability Insurance (NDI) and Nonindustrial Disability Insurance-Family Care Leave (NDI-FCL)."
-    )
-    assert documents[0].chunks[0].headings == [
-        "Nonindustrial Disability Insurance FAQs",
-        "Nonindustrial Disability Insurance",
-    ]
-
-    assert len(documents[1].chunks) == 1
-    assert (
-        documents[1].chunks[0].content
-        == "Disability Insurance (DI) provides short-term, partial wage replacement ...\n\nIf you think you are eligible to [file a claim](/en/disability/apply/), review ..."
-    )
-    assert documents[1].chunks[0].headings == ["Options to File for Disability Insurance Benefits"]
-
-    # Document[2] has a list
-    assert len(documents[2].chunks) == 4
-    assert (
-        documents[2].chunks[0].content
-        == "Employers, employees, and taxpayers make up the difference in higher taxes, lost jobs, lost profits, lower wages, and higher costs for goods and services."
-    )
-    assert documents[2].chunks[0].headings == [
-        "State Unemployment Tax Act Dumping",
-        "",
-        "SUTA Dumping Hurts Everyone",
-    ]
-
-    assert documents[2].chunks[1].content == (
-        "SUTA dumping:\n\n"
-        "* Costs the UI trust fund millions of dollars each year.\n"
-        "* Adversely affects tax rates for all employers.\n"
-        "* Creates inequity for compliant employers.\n"
-        "* Eliminates the incentive for employers to avoid layoffs.\n"
-    )
-    assert documents[2].chunks[1].headings == [
-        "State Unemployment Tax Act Dumping",
-        "",
-        "SUTA Dumping Hurts Everyone",
-    ]
-
-    assert documents[2].chunks[2].content == (
-        "SUTA dumping:\n\n" "* Compromises the integrity of the UI system."
-    )
-    assert documents[2].chunks[2].headings == [
-        "State Unemployment Tax Act Dumping",
-        "",
-        "SUTA Dumping Hurts Everyone",
-    ]
-
-    assert documents[2].chunks[3].content == (
-        "These schemes are meant to unlawfully lower an employer\u2019s UI tax rate. Employers should know about these schemes and their potential legal ramifications."
-    )
-    assert documents[2].chunks[3].headings == [
-        "State Unemployment Tax Act Dumping",
-        "",
-        "SUTA Dumping Schemes",
-    ]
-
-    # Document[3] has a table
-    assert len(documents[3].chunks) == 2
-    assert documents[3].chunks[0].content == (
-        "**Career Center Orientation**\n\n"
-        "| Location | Date/Time | Other Information |\n"
-        "| --- | --- | --- |\n"
-        "| Virtual | Friday | This workshop will ... |\n"
-        "| Virtual | Friday | This workshop is for ... |\n"
-    )
-    assert documents[3].chunks[1].content == (
-        "**Career Center Orientation**\n\n"
-        "| Location | Date/Time | Other Information |\n"
-        "| --- | --- | --- |\n"
-        "| Virtual | Friday | Staff will conduct ... |"
-    )
-    for chunk in documents[3].chunks:
-        assert chunk.headings == [
-            "The Northern Job Fairs and Workshops",
-            "Scheduled Events",
-        ]
-
-
 def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local_file):
-    ingester.USE_MARKDOWN_TREE = True
     # Force a short max_seq_length to test chunking
     app_config_for_test.sentence_transformer.max_seq_length = 47
 

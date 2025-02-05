@@ -12,13 +12,8 @@ from src.db.models.document import Document
 from src.util.ingest_utils import (
     IngestConfig,
     _drop_existing_dataset,
-    _ensure_blank_line_suffix,
     add_embeddings,
-    deconstruct_list,
-    deconstruct_table,
     process_and_ingest_sys_args,
-    reconstruct_list,
-    reconstruct_table,
     save_json,
     tokenize,
 )
@@ -213,81 +208,6 @@ def test__add_embeddings_with_texts_to_encode(app_config):
     for chunk, text in zip(chunks, texts_to_encode, strict=True):
         assert chunk.tokens == len(tokenize(text))
         assert chunk.mpnet_embedding == embedding_model.encode(text)
-
-
-TEST_LIST_MARKDOWN = (
-    "Following are list items:\n"
-    "    - This is a sentence.\n"
-    "    - This is another sentence.\n"
-    "    - This is a third sentence."
-)
-
-
-# Use app_config fixture to provide sentence_transformer
-def test_deconstruct_and_reconstruct_list(app_config):
-    intro_sentence = "Following are list items:\n"
-    deconstructed_list_items = [
-        "    - This is a sentence.\n",
-        "    - This is another sentence.\n",
-        "    - This is a third sentence.",
-    ]
-
-    assert deconstruct_list(TEST_LIST_MARKDOWN) == (intro_sentence, deconstructed_list_items)
-
-    context_size = len(tokenize(intro_sentence))
-    assert reconstruct_list(context_size + 10, intro_sentence, deconstructed_list_items) == [
-        (
-            "Following are list items:\n\n"
-            "    - This is a sentence.\n"
-            "    - This is another sentence.\n"
-        ),
-        (
-            "Following are list items:\n\n"  #
-            "    - This is a third sentence."
-        ),
-    ]
-
-
-# Use app_config fixture to provide sentence_transformer
-def test_deconstruct_and_reconstruct_table(app_config):
-    table_markdown = (
-        "Following is a table:\n"
-        "| Header 1 | Header 2 |\n"
-        "| --- | --- |\n"
-        "| Row 1, col 1 | Row 1, col 2 |\n"
-        "| Row 2, col 1 | Row 2, col 2 |\n"
-    )
-
-    intro_sentence = "Following is a table:\n"
-    table_header = "| Header 1 | Header 2 |\n| --- | --- |\n"
-    table_rows = [
-        "| Row 1, col 1 | Row 1, col 2 |\n",
-        "| Row 2, col 1 | Row 2, col 2 |\n",
-    ]
-
-    assert deconstruct_table(table_markdown) == (intro_sentence, table_header, table_rows)
-
-    context_size = len(tokenize(intro_sentence + table_header))
-    assert reconstruct_table(context_size + 20, intro_sentence, table_header, table_rows) == [
-        (
-            "Following is a table:\n\n"
-            "| Header 1 | Header 2 |\n"
-            "| --- | --- |\n"
-            "| Row 1, col 1 | Row 1, col 2 |\n"
-        ),
-        (
-            "Following is a table:\n\n"
-            "| Header 1 | Header 2 |\n"
-            "| --- | --- |\n"
-            "| Row 2, col 1 | Row 2, col 2 |\n"
-        ),
-    ]
-
-
-def test__ensure_blank_line_suffix():
-    assert _ensure_blank_line_suffix("This is a sentence.") == "This is a sentence.\n\n"
-    assert _ensure_blank_line_suffix("This is a sentence.\n") == "This is a sentence.\n\n"
-    assert _ensure_blank_line_suffix("This is a sentence.\n\n") == "This is a sentence.\n\n"
 
 
 @pytest.mark.parametrize("file_location", ["local", "s3"])
