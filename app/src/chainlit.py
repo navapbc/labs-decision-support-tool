@@ -251,6 +251,7 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
             for citations in result.subsections
         ],
         "raw_response": result.response,
+        "attributes": result.attributes.model_dump(),
     }
 
 
