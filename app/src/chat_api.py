@@ -242,8 +242,9 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 async def query(request: QueryRequest) -> QueryResponse:
     user_session_id = request.user_id if request.user_id else request.session_id
     session = await _get_user_session(user_session_id)
+    one_line_question = request.message.strip().splitlines()[0] or "API:/query"
     with (
-        literalai().thread(name="API:/query", participant_id=session.literalai_user_id),
+        literalai().thread(name=one_line_question, participant_id=session.literalai_user_id),
         app_config.db_session() as db_session,
         db_session.begin(),  # session is auto-committed or rolled back upon exception
     ):
