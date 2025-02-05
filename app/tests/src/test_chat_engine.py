@@ -42,6 +42,7 @@ def test_on_message_Imagine_LA_canned_response(monkeypatch):
         lambda *_, **_kw: ImagineLA_MessageAttributes(
             needs_context=True,
             translated_message="",
+            benefit_program="",
             canned_response="This is a canned response",
             alert_message="",
         ),
@@ -50,6 +51,7 @@ def test_on_message_Imagine_LA_canned_response(monkeypatch):
     engine = chat_engine.create_engine("imagine-la")
     result = engine.on_message("What is AI?")
     assert result.response == "This is a canned response"
+    assert not result.attributes.benefit_program
     assert not result.attributes.alert_message
 
 
@@ -60,6 +62,7 @@ def test_on_message_Imagine_LA_alert_message(monkeypatch):
         lambda *_, **_kw: ImagineLA_MessageAttributes(
             needs_context=True,
             translated_message="",
+            benefit_program="CalFresh",
             canned_response="",
             alert_message="Some alert message",
         ),
@@ -70,6 +73,7 @@ def test_on_message_Imagine_LA_alert_message(monkeypatch):
     engine = chat_engine.create_engine("imagine-la")
     result = engine.on_message("What is AI?")
     assert result.response == "This is a generated response"
+    assert result.attributes.benefit_program == "CalFresh"
     assert result.attributes.alert_message.startswith("**Policy update**: ")
     assert result.attributes.alert_message.endswith("\n\nThe rest of this answer may be outdated.")
 
@@ -81,6 +85,7 @@ def test_on_message_Imagine_LA_needs_context_False(monkeypatch):
         lambda *_, **_kw: ImagineLA_MessageAttributes(
             needs_context=False,
             translated_message="",
+            benefit_program="CalFresh",
             canned_response="",
             alert_message="Some alert message",
         ),
@@ -92,5 +97,6 @@ def test_on_message_Imagine_LA_needs_context_False(monkeypatch):
     assert result.response == "This is a generated response"
     assert not result.chunks_with_scores
     assert not result.subsections
+    assert result.attributes.benefit_program == "CalFresh"
     assert result.attributes.alert_message.startswith("**Policy update**: ")
     assert result.attributes.alert_message.endswith("\n\nThe rest of this answer may be outdated.")

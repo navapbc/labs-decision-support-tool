@@ -64,6 +64,7 @@ def test_process_question(monkeypatch, engine):
         attributes=ImagineLA_MessageAttributes(
             needs_context=True,
             translated_message="",
+            benefit_program="CalFresh",
             canned_response="",
             alert_message="Some alert message.",
         ),
@@ -80,6 +81,7 @@ def test_process_question(monkeypatch, engine):
         "citation_1_text": subsection_text,
         "attrib__needs_context": True,
         "attrib__translated_message": "",
+        "attrib__benefit_program": "CalFresh",
         "attrib__alert_message": "Some alert message.",
         "attrib__canned_response": "",
     }

@@ -182,6 +182,7 @@ async def test_run_query__2_citations(subsections):
                 ImagineLA_MessageAttributes(
                     needs_context=True,
                     translated_message="",
+                    benefit_program="CalFresh",
                     canned_response="",
                     alert_message="Some alert message.",
                 ),
