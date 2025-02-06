@@ -189,11 +189,20 @@ def _chunk_into_splits_from_json(
         urls_processed.add(url)
 
         assert "title" in item, f"Item {url} has no title"
-        assert "markdown" in item, f"Item {url} has no markdown content"
-        document = Document(name=item["title"], content=item["markdown"], source=url, **doc_attribs)
 
         file_path = create_file_path(md_base_dir, common_base_url, url)
-        load_or_save_doc_markdown(file_path, document)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        if "md_file" in item:
+            # Load the markdown content from the file
+            logger.info("  Loading markdown from file: %r", item["md_file"])
+            content = Path(item["md_file"]).read_text(encoding="utf-8")
+        else:
+            assert "markdown" in item, f"Item {url} has no markdown content"
+            # Load the markdown from a file if it exists (in case of manual modifications)
+            # or save item["markdown"] content to a file
+            content = load_or_save_doc_markdown(file_path, item["markdown"])
+
+        document = Document(name=item["title"], content=content, source=url, **doc_attribs)
 
         chunks_file_path = f"{file_path}.splits.json"
         if os.path.exists(chunks_file_path):

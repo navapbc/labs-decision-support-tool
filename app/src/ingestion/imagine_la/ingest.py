@@ -65,11 +65,10 @@ def _parse_html(
     content = f"# {document.name}\n\n"
     for heading, body in accordion_data.items():
         content += f"## {heading}\n\n{md(body)}\n\n"
-    document.content = content
 
     assert document.source
     file_path = create_file_path(md_base_dir, common_base_url, document.source)
-    load_or_save_doc_markdown(file_path, document)
+    document.content = load_or_save_doc_markdown(file_path, content)
 
     # Convert markdown to chunks
     tree = create_markdown_tree(content, doc_name=document.name, doc_source=document.source)

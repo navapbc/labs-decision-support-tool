@@ -255,6 +255,7 @@ class ImagineLaEngine(BaseEngine):
         "CA FTB",
         "WIC",
         "Covered California",
+        "SSA",
     ]
 
     system_prompt_1 = """Analyze the user's message to respond with a JSON dictionary populated with the following fields and default values:
