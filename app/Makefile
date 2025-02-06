@@ -128,6 +128,28 @@ start-db: ## Start only the database container
 ## Destroy current DB, setup new one
 db-recreate: clean-volumes init-db
 
+## Basic DB checks
+db-psql: ## Connect to PostgreSQL with psql
+	docker compose exec main-db psql -U app -d app
+
+db-tables: ## List all tables in the database
+	docker compose exec main-db psql -U app -d app -c '\dt'
+
+db-count-documents: ## Count rows in documents table
+	docker compose exec main-db psql -U app -d app -c 'SELECT COUNT(*) FROM document;'
+
+db-groupby-dataset-count: ## Count rows in documents table
+	docker compose exec main-db psql -U app -d app -c 'SELECT dataset, COUNT(DISTINCT id) FROM document GROUP BY dataset;'
+
+db-view-documents: ## View contents of document table
+	docker compose exec main-db psql -U app -d app -c 'SELECT id, dataset, name, content FROM document LIMIT 1;'
+
+db-view-documents-full: ## View all columns from document table
+	docker compose exec main-db psql -U app -d app -c 'SELECT * FROM document LIMIT 1;'
+
+db-view-chunks: ## View contents of document table
+	docker compose exec main-db psql -U app -d app -c 'SELECT id, document_id, page_number, headings, num_splits, split_index, tokens, created_at FROM chunk LIMIT 1;'
+
 #########################
 # DB Migrations
 #########################
@@ -272,3 +294,27 @@ scrapy-runner: ## Scrape website using a Scrapy spider: `make scrapy-runner args
 
 ingest-runner: ## Ingest scrapings into DB: `make ingest-runner args="dataset"`
 	$(PY_RUN_CMD) ingest-runner $(args)
+
+# Add to the .PHONY section at the top
+.PHONY: run-evaluation
+
+# Add the evaluation target
+run-evaluation: ## Run precision-recall evaluation with configurable parameters
+	docker compose run --rm main-app poetry run python -m src.metrics.cli \
+		$(if $(dataset),--dataset=$(dataset),) \
+		$(if $(k),--k=$(k),) \
+		$(if $(questions_file),--questions-file=$(questions_file),) \
+		$(if $(sampling),--sampling=$(sampling),) \
+		$(if $(embedding_model),--embedding-model=$(embedding_model),) \
+		$(if $(environment),--environment=$(environment),) \
+		$(if $(min_score),--min-score=$(min_score),)
+
+# Add help text for the parameters
+# run-evaluation parameters:
+#   dataset         Dataset to evaluate (imagine_la, la_policy, or all)
+#   k              Comma-separated list of k values (default: 5,10,25)
+#   questions_file  Path to questions CSV file
+#   sampling       Fraction of questions to sample (e.g., 0.1)
+#   embedding_model OpenAI embedding model to use
+#   environment    Environment name (development/production)
+#   min_score      Minimum similarity score for retrieval (default: -1.0)
