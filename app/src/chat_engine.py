@@ -75,6 +75,9 @@ class ChatEngineInterface(ABC):
     chunks_shown_max_num: int = 5
     chunks_shown_min_score: float = 0.65
 
+    # Whether to show message-assessment attributes resulting from system_prompt_1 in the UI
+    show_msg_attributes: bool = False
+
     system_prompt_1: str = ANALYZE_MESSAGE_PROMPT
     system_prompt_2: str = PROMPT
 
@@ -125,6 +128,7 @@ class BaseEngine(ChatEngineInterface):
         "llm",
         "retrieval_k",
         "retrieval_k_min_score",
+        "show_msg_attributes",
         "chunks_shown_max_num",
         "chunks_shown_min_score",
         "system_prompt_1",
@@ -216,6 +220,7 @@ If a prompt is about an EDD program, but you can't tell which one, detect and cl
 
 
 class ImagineLA_MessageAttributes(MessageAttributes):
+    benefit_program: str
     canned_response: str
     alert_message: str
 
@@ -228,10 +233,13 @@ class ImagineLaEngine(BaseEngine):
     chunks_shown_min_score: float = -1
     chunks_shown_max_num: int = 8
 
+    show_msg_attributes: bool = False
+
     user_settings = [
         "llm",
         "retrieval_k",
         "retrieval_k_min_score",
+        "show_msg_attributes",
         "system_prompt_1",
         "system_prompt_2",
     ]
@@ -274,6 +282,8 @@ Moving Assistance (MA), 4 Month Rental Assistance, General Relief (GR) Rental As
 
 If the user asks what programs or what information is available, \
 set canned_response to text that gives examples and describes categories for the in-scope benefit programs.
+
+Set benefit_program to the name of the in-scope benefit program that the user's question is about.
 
 If the user's question is not about one of the in-scope benefit programs, set canned_response to \
 "Sorry, I don't have info about that topic. \

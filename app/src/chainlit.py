@@ -6,14 +6,14 @@ from urllib.parse import parse_qs, urlparse
 from asyncer import asyncify
 
 import chainlit as cl
-from chainlit.input_widget import InputWidget, Select, Slider, TextInput
+from chainlit.input_widget import InputWidget, Select, Slider, Switch, TextInput
 from chainlit.types import AskFileResponse
 from src import chat_engine
 from src.app_config import app_config
 from src.batch_process import batch_process
 from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.format import format_response
-from src.generate import ChatHistory, get_models
+from src.generate import ChatHistory, MessageAttributesT, get_models
 from src.login import require_login
 
 logger = logging.getLogger(__name__)
@@ -155,6 +155,11 @@ _WIDGET_FACTORIES = {
         initial=initial_value,
         multiline=True,
     ),
+    "show_msg_attributes": lambda initial_value: Switch(
+        id="show_msg_attributes",
+        label="Show message-assessment attributes",
+        initial=False,
+    ),
 }
 
 
@@ -219,6 +224,9 @@ async def on_message(message: cl.Message) -> None:
             content=msg_content,
             metadata=_get_retrieval_metadata(result),
         ).send()
+
+        if engine.show_msg_attributes:
+            await _msg_attributes(result.attributes)
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
             author="backend",
@@ -253,6 +261,13 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
         "raw_response": result.response,
         "attributes": result.attributes.model_dump(),
     }
+
+
+async def _msg_attributes(attributes: MessageAttributesT) -> None:
+    json_dump = pprint.pformat(attributes.model_dump(), indent=4)
+    await cl.Message(
+        content=f"```\n{json_dump}\n```",
+    ).send()
 
 
 @cl.step(name="batch processing", type="tool")
