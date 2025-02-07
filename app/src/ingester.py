@@ -6,8 +6,6 @@ from typing import Optional, Sequence
 
 from smart_open import open as smart_open
 
-# from smart_open import parse_uri
-
 from src.adapters import db
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
@@ -199,8 +197,6 @@ def _chunk_into_splits_from_json(
         if "md_file" in item:
             # Load the markdown content from the file
             json_base_dir = os.path.dirname(json_filepath)
-            # if parse_uri(json_filepath).scheme == "file":
-            #     json_base_dir=str(Path(json_base_dir).resolve())
             extra_md_file_path = os.path.join(json_base_dir, item["md_file"])
             logger.info("  Loading markdown from file: %r", extra_md_file_path)
             with smart_open(extra_md_file_path, "r", encoding="utf-8") as md_file:
