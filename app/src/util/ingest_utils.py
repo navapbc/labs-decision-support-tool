@@ -200,7 +200,7 @@ def load_or_save_doc_markdown(file_path: str, content: str) -> str:
     md_file_path = f"{file_path}.md"
     if os.path.exists(md_file_path):
         # Load the markdown content from the file in case it's been manually edited
-        logger.info("  Loading markdown from file: %r", md_file_path)
+        logger.info("  Loading markdown from file instead: %r", md_file_path)
         content = Path(md_file_path).read_text(encoding="utf-8")
     else:
         logger.info("  Saving markdown to %r", md_file_path)
