@@ -7,7 +7,6 @@ from typing import Optional, Sequence
 from smart_open import open as smart_open
 
 from src.adapters import db
-from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.markdown_chunking import chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
@@ -60,25 +59,6 @@ class Split:
         return split
 
 
-class HeadingBasedSplit(Split):
-
-    def add_if_within_limit(self, paragraph: str, delimiter: str = "\n\n") -> bool:
-        new_text_to_encode = f"{self.text_to_encode}{delimiter}{remove_links(paragraph)}"
-        token_count = len(tokenize(new_text_to_encode))
-        if token_count <= app_config.sentence_transformer.max_seq_length:
-            self.text += f"{delimiter}{paragraph}"
-            self.text_to_encode = new_text_to_encode
-            self.token_count = token_count
-            return True
-        return False
-
-    def exceeds_limit(self) -> bool:
-        if self.token_count > app_config.sentence_transformer.max_seq_length:
-            logger.warning("Text too long! %i tokens: %s", self.token_count, self.text_to_encode)
-            return True
-        return False
-
-
 def ingest_json(
     db_session: db.Session,
     json_filepath: str,
@@ -97,6 +77,7 @@ def ingest_json(
     chunking_config = config.chunking_config or DefaultChunkingConfig()
     # First, chunk all json_items into splits (fast) to debug any issues quickly
     all_splits = _chunk_into_splits_from_json(
+        json_filepath,
         md_base_dir or config.md_base_dir,
         json_items,
         config.doc_attribs,
@@ -169,6 +150,7 @@ def save_to_db(
 
 
 def _chunk_into_splits_from_json(
+    json_filepath: str,
     md_base_dir: str,
     json_items: Sequence[dict[str, str]],
     doc_attribs: dict[str, str],
@@ -189,11 +171,23 @@ def _chunk_into_splits_from_json(
         urls_processed.add(url)
 
         assert "title" in item, f"Item {url} has no title"
-        assert "markdown" in item, f"Item {url} has no markdown content"
-        document = Document(name=item["title"], content=item["markdown"], source=url, **doc_attribs)
 
         file_path = create_file_path(md_base_dir, common_base_url, url)
-        load_or_save_doc_markdown(file_path, document)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        if "md_file" in item:
+            # Load the markdown content from the file
+            json_base_dir = os.path.dirname(json_filepath)
+            extra_md_file_path = os.path.join(json_base_dir, item["md_file"])
+            logger.info("  Loading markdown from file: %r", extra_md_file_path)
+            with smart_open(extra_md_file_path, "r", encoding="utf-8") as md_file:
+                content = md_file.read()
+        else:
+            assert "markdown" in item, f"Item {url} has no markdown content"
+            # Load the markdown from a file if it exists (in case of manual modifications)
+            # or save item["markdown"] content to a file
+            content = load_or_save_doc_markdown(file_path, item["markdown"])
+
+        document = Document(name=item["title"], content=content, source=url, **doc_attribs)
 
         chunks_file_path = f"{file_path}.splits.json"
         if os.path.exists(chunks_file_path):
@@ -231,7 +225,7 @@ def _create_splits_using_markdown_tree(
         tree_chunks = chunk_tree(tree, chunking_config)
 
         # For debugging, save the tree to a file
-        if os.path.exists("DEBUG_TREE"):
+        if os.path.exists("DEBUG_TREE"):  # pragma: no cover
             assert document.source
             tree_file_path = f"{document.source.rsplit('/', 1)[-1]}.tree"
             Path(tree_file_path).write_text(tree.format(), encoding="utf-8")

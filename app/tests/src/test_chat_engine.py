@@ -32,6 +32,7 @@ def test_create_engine_Imagine_LA():
         "CA FTB",
         "WIC",
         "Covered California",
+        "SSA",
     ]
 
 

@@ -196,18 +196,18 @@ def create_file_path(base_dir: str, common_base_url: str, source_url: str) -> st
     return file_path
 
 
-def load_or_save_doc_markdown(file_path: str, document: Document) -> str:
+def load_or_save_doc_markdown(file_path: str, content: str) -> str:
     md_file_path = f"{file_path}.md"
     if os.path.exists(md_file_path):
         # Load the markdown content from the file in case it's been manually edited
-        logger.info("  Loading markdown from file: %r", md_file_path)
-        document.content = Path(md_file_path).read_text(encoding="utf-8")
+        logger.info("  Loading markdown from file instead: %r", md_file_path)
+        content = Path(md_file_path).read_text(encoding="utf-8")
     else:
         logger.info("  Saving markdown to %r", md_file_path)
-        assert document.content
+        assert content
         os.makedirs(os.path.dirname(md_file_path), exist_ok=True)
-        Path(md_file_path).write_text(document.content, encoding="utf-8")
-    return file_path
+        Path(md_file_path).write_text(content, encoding="utf-8")
+    return content
 
 
 def save_json(file_path: str, chunks: list[Chunk]) -> None:
