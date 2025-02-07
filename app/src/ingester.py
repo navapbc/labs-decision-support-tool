@@ -7,7 +7,6 @@ from typing import Optional, Sequence
 from smart_open import open as smart_open
 
 from src.adapters import db
-from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.markdown_chunking import chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
@@ -58,25 +57,6 @@ class Split:
         split.chunk_id = split_dict.get("chunk_id", "")
         split.data_ids = split_dict.get("data_ids", "")
         return split
-
-
-class HeadingBasedSplit(Split):
-
-    def add_if_within_limit(self, paragraph: str, delimiter: str = "\n\n") -> bool:
-        new_text_to_encode = f"{self.text_to_encode}{delimiter}{remove_links(paragraph)}"
-        token_count = len(tokenize(new_text_to_encode))
-        if token_count <= app_config.sentence_transformer.max_seq_length:
-            self.text += f"{delimiter}{paragraph}"
-            self.text_to_encode = new_text_to_encode
-            self.token_count = token_count
-            return True
-        return False
-
-    def exceeds_limit(self) -> bool:
-        if self.token_count > app_config.sentence_transformer.max_seq_length:
-            logger.warning("Text too long! %i tokens: %s", self.token_count, self.text_to_encode)
-            return True
-        return False
 
 
 def ingest_json(
@@ -245,7 +225,7 @@ def _create_splits_using_markdown_tree(
         tree_chunks = chunk_tree(tree, chunking_config)
 
         # For debugging, save the tree to a file
-        if os.path.exists("DEBUG_TREE"):
+        if os.path.exists("DEBUG_TREE"):  # pragma: no cover
             assert document.source
             tree_file_path = f"{document.source.rsplit('/', 1)[-1]}.tree"
             Path(tree_file_path).write_text(tree.format(), encoding="utf-8")
