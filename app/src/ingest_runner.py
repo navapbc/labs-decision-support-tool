@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import os
 import re
 import sys
 from pathlib import Path
@@ -95,7 +96,7 @@ def ca_public_charge_config(
     )
 
 
-def get_ingester_config(scraper_dataset: str) -> IngestConfig:
+def get_ingester_config(scraper_dataset: str) -> IngestConfig:  # pragma: no cover
     match scraper_dataset:
         case "ca_ftb":
             return IngestConfig(
@@ -154,11 +155,12 @@ def conditionally_consolidate_json_files(json_files: list[str], outfile_prefix: 
         return json_files[0]
 
     output_file = f"{outfile_prefix}_combined_scrapings.json"
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     merge_json_files(json_files, output_file)
     return output_file
 
 
-def main() -> None:  # pragma: no cover
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset", help="scraper dataset id from `make scrapy-runner`")
     parser.add_argument("--json_input", help="path to the JSON file to ingest", action="append")
@@ -168,7 +170,8 @@ def main() -> None:  # pragma: no cover
 
     config = get_ingester_config(args.dataset)
 
-    json_input = conditionally_consolidate_json_files(args.json_input, config.scraper_dataset)
+    output_file_prefix = os.path.join(config.md_base_dir, config.scraper_dataset)
+    json_input = conditionally_consolidate_json_files(args.json_input, output_file_prefix)
 
     start_ingestion(
         logger,
