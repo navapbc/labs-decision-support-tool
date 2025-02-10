@@ -101,6 +101,7 @@ def load_json_items(
 ) -> Sequence[dict[str, str]]:
     with smart_open(json_filepath, "r", encoding="utf-8") as json_file:
         json_items = json.load(json_file)
+    logger.info("Loaded %d items from %r", len(json_items), json_filepath)
 
     def verbose_document_exists(item: dict[str, str]) -> bool:
         if skip_db:

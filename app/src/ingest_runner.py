@@ -1,7 +1,9 @@
 import argparse
+import json
 import logging
 import re
 import sys
+from pathlib import Path
 
 from src.ingester import ingest_json
 from src.util.ingest_utils import DefaultChunkingConfig, IngestConfig, start_ingestion
@@ -135,19 +137,43 @@ def get_ingester_config(scraper_dataset: str) -> IngestConfig:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
+def merge_json_files(json_files: list[str], output_file: str) -> None:
+    merged = []
+    for json_file in json_files:
+        json_items = json.loads(Path(json_file).read_text(encoding="utf-8"))
+        logger.info("Loaded %d items from %r", len(json_items), json_file)
+        merged.extend(json_items)
+    logger.info("Merged %d files into %d items in %r", len(json_files), len(merged), output_file)
+    Path(output_file).write_text(json.dumps(merged, indent=2), encoding="utf-8")
+
+
+def conditionally_consolidate_json_files(json_files: list[str], outfile_prefix: str) -> str:
+    if not json_files:
+        return ""
+    if len(json_files) == 1:
+        return json_files[0]
+
+    output_file = f"{outfile_prefix}_combined_scrapings.json"
+    merge_json_files(json_files, output_file)
+    return output_file
+
+
 def main() -> None:  # pragma: no cover
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset", help="scraper dataset id from `make scrapy-runner`")
-    parser.add_argument("--json_input", help="path to the JSON file to ingest")
+    parser.add_argument("--json_input", help="path to the JSON file to ingest", action="append")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip_db", action="store_true")
     args = parser.parse_args(sys.argv[1:])
 
     config = get_ingester_config(args.dataset)
+
+    json_input = conditionally_consolidate_json_files(args.json_input, config.scraper_dataset)
+
     start_ingestion(
         logger,
         ingest_json,
-        args.json_input or f"src/ingestion/{config.scraper_dataset}_scrapings.json",
+        json_input or f"src/ingestion/{config.scraper_dataset}_scrapings.json",
         config,
         skip_db=args.skip_db,
         resume=args.resume,
