@@ -49,7 +49,7 @@ Accordion 22 Body"""
                 "Imagine LA",
                 "mixed",
                 "California",
-                "https://socialbenefitsnavigator25.web.app/contenthub/",
+                "https://benefitnavigator.web.app/contenthub/",
                 "imagine_la_md",
             )
             if file_location == "local":
@@ -64,11 +64,11 @@ Accordion 22 Body"""
         documents = db_session.execute(select(Document).order_by(Document.name)).scalars().all()
         assert len(documents) == 2
         assert documents[0].name == "Document 1"
-        assert documents[0].source == "https://socialbenefitsnavigator25.web.app/contenthub/doc_1"
+        assert documents[0].source == "https://benefitnavigator.web.app/contenthub/doc_1"
         assert documents[0].content == doc_1_content + "\n\n"
 
         assert documents[1].name == "Document 2"
-        assert documents[1].source == "https://socialbenefitsnavigator25.web.app/contenthub/doc_2"
+        assert documents[1].source == "https://benefitnavigator.web.app/contenthub/doc_2"
         assert documents[1].content == doc_2_content + "\n\n"
 
         chunks = db_session.execute(select(Chunk).order_by(Chunk.content)).scalars().all()

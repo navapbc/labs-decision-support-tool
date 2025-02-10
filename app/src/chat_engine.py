@@ -299,7 +299,7 @@ set canned_response to a list that gives examples and describes categories for t
 Example prompts: "What do you know about?" "What info do you have?" "What can I ask you?" "What programs do you cover?" "What benefits do you cover?" "What topics do you know?"
 
 If the user's question is about a referral link below, set canned_response to: "I don't have info about that topic in my sources yet. \
-Learn more about [referral link title](referral link). See the [Benefits Information Hub](https://socialbenefitsnavigator25.web.app/contenthub) for the topics I have more information about."
+Learn more about [referral link title](referral link). See the [Benefits Information Hub](https://benefitnavigator.web.app/contenthub) for the topics I have more information about."
 
 Referral links:
 - ID cards: [https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/](https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/)
@@ -317,7 +317,7 @@ Referral links:
 - Transportation for people with disabilities: [https://accessla.org/](https://accessla.org/)
 - Food banks: [https://www.lafoodbank.org/find-food/pantry-locator/](https://www.lafoodbank.org/find-food/pantry-locator/)
 - Wildfire resources: [https://recovery.lacounty.gov/resources/](https://recovery.lacounty.gov/resources/)
-- Benefit Navigator screening: [https://socialbenefitsnavigator25.web.app/start](https://socialbenefitsnavigator25.web.app/start)
+- Benefit Navigator screening: [https://benefitnavigator.web.app/start](https://benefitnavigator.web.app/start)
 - LA County Hospitals and Clinics: [https://dhs.lacounty.gov/find-a-clinic-or-hospital/](https://dhs.lacounty.gov/find-a-clinic-or-hospital/)
 - LGBTQ resources: [https://dpss.lacounty.gov/en/rights/rights/sogie.html](https://dpss.lacounty.gov/en/rights/rights/sogie.html)
 

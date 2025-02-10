@@ -39,7 +39,7 @@ default_config = IngestConfig(
     "Imagine LA",
     "mixed",
     "California",
-    "https://socialbenefitsnavigator25.web.app/contenthub/",
+    "https://benefitnavigator.web.app/contenthub/",
     "imagine_la_md",
 )
 
