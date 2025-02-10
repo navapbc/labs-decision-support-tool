@@ -82,7 +82,7 @@ If you are enrolled in the Annual Leave Program (ALP), your employer will contin
 
 
 @pytest.fixture
-def edd_web_local_file(tmp_path, sample_cards):
+def local_file(tmp_path, sample_cards):
     file_path = tmp_path / "edd_scrapings.json"
     file_path.write_text(sample_cards)
     return str(file_path)
@@ -94,7 +94,7 @@ def edd_web_s3_file(mock_s3_bucket_resource, sample_cards):
     return "s3://test_bucket/edd_scrapings.json"
 
 
-def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local_file):
+def test__ingester__edd(caplog, app_config, db_session, local_file):
     # Force a short max_seq_length to test chunking
     app_config_for_test.sentence_transformer.max_seq_length = 47
 
@@ -103,17 +103,13 @@ def test__ingest_edd_using_md_tree(caplog, app_config, db_session, edd_web_local
     with TemporaryDirectory(suffix="edd_md") as md_base_dir:
         config = get_ingester_config("edd")
         with caplog.at_level(logging.WARNING):
-            ingest_json(
-                db_session, edd_web_local_file, config, md_base_dir=md_base_dir, resume=True
-            )
+            ingest_json(db_session, local_file, config, md_base_dir=md_base_dir, resume=True)
 
         check_database_contents(db_session, caplog)
 
         # Re-ingesting the same data should not add any new documents
         with caplog.at_level(logging.INFO):
-            ingest_json(
-                db_session, edd_web_local_file, config, md_base_dir=md_base_dir, resume=True
-            )
+            ingest_json(db_session, local_file, config, md_base_dir=md_base_dir, resume=True)
 
     skipped_logs = {
         msg for msg in caplog.messages if msg.startswith("Skipping -- document already exists")
