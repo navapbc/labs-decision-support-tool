@@ -38,6 +38,7 @@ class EddSpider(CrawlSpider):
                     "en/jobs_and_training/Information_Notices/wsin",
                     # Irrelevant pages
                     r"en/.*social-media-toolkit",
+                    r"en/.*Social-Media-Toolkit",
                 ),
                 allow_domains=allowed_domains,
                 deny_domains=(
