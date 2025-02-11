@@ -305,16 +305,14 @@ run-evaluation: ## Run precision-recall evaluation with configurable parameters
 		$(if $(k),--k=$(k),) \
 		$(if $(questions_file),--questions-file=$(questions_file),) \
 		$(if $(sampling),--sampling=$(sampling),) \
-		$(if $(embedding_model),--embedding-model=$(embedding_model),) \
-		$(if $(environment),--environment=$(environment),) \
-		$(if $(min_score),--min-score=$(min_score),)
+		$(if $(min_score),--min-score=$(min_score),) \
+		--commit=$(shell git rev-parse HEAD)
 
 # Add help text for the parameters
 # run-evaluation parameters:
 #   dataset         Dataset to evaluate (imagine_la, la_policy, or all)
 #   k              Comma-separated list of k values (default: 5,10,25)
 #   questions_file  Path to questions CSV file
-#   sampling       Fraction of questions to sample (e.g., 0.1)
-#   embedding_model OpenAI embedding model to use
-#   environment    Environment name (development/production)
+#   sampling       Fraction of questions to sample (e.g. 0.1)
 #   min_score      Minimum similarity score for retrieval (default: -1.0)
+#   commit         Git commit hash of the code being evaluated (auto-populated)
