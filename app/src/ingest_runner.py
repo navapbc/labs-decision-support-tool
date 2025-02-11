@@ -1,7 +1,10 @@
 import argparse
+import json
 import logging
+import os
 import re
 import sys
+from pathlib import Path
 
 from src.ingester import ingest_json
 from src.util.ingest_utils import DefaultChunkingConfig, IngestConfig, start_ingestion
@@ -93,7 +96,7 @@ def ca_public_charge_config(
     )
 
 
-def get_ingester_config(scraper_dataset: str) -> IngestConfig:
+def get_ingester_config(scraper_dataset: str) -> IngestConfig:  # pragma: no cover
     match scraper_dataset:
         case "ca_ftb":
             return IngestConfig(
@@ -135,19 +138,45 @@ def get_ingester_config(scraper_dataset: str) -> IngestConfig:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def main() -> None:  # pragma: no cover
+def merge_json_files(json_files: list[str], output_file: str) -> None:
+    merged = []
+    for json_file in json_files:
+        json_items = json.loads(Path(json_file).read_text(encoding="utf-8"))
+        logger.info("Loaded %d items from %r", len(json_items), json_file)
+        merged.extend(json_items)
+    logger.info("Merged %d files into %d items in %r", len(json_files), len(merged), output_file)
+    Path(output_file).write_text(json.dumps(merged, indent=2), encoding="utf-8")
+
+
+def conditionally_consolidate_json_files(json_files: list[str], outfile_prefix: str) -> str:
+    if not json_files:
+        return ""
+    if len(json_files) == 1:
+        return json_files[0]
+
+    output_file = f"{outfile_prefix}_combined_scrapings.json"
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    merge_json_files(json_files, output_file)
+    return output_file
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset", help="scraper dataset id from `make scrapy-runner`")
-    parser.add_argument("--json_input", help="path to the JSON file to ingest")
+    parser.add_argument("--json_input", help="path to the JSON file to ingest", action="append")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip_db", action="store_true")
     args = parser.parse_args(sys.argv[1:])
 
     config = get_ingester_config(args.dataset)
+
+    output_file_prefix = os.path.join(config.md_base_dir, config.scraper_dataset)
+    json_input = conditionally_consolidate_json_files(args.json_input, output_file_prefix)
+
     start_ingestion(
         logger,
         ingest_json,
-        args.json_input or f"src/ingestion/{config.scraper_dataset}_scrapings.json",
+        json_input or f"src/ingestion/{config.scraper_dataset}_scrapings.json",
         config,
         skip_db=args.skip_db,
         resume=args.resume,
