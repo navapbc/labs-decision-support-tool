@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any, Optional
 from ..models.metrics import BatchConfig, EvaluationResult, MetricsSummary
+from ..utils.jsonl_to_csv import convert_results_to_csv
 
 class EvaluationLogger:
     """Handles structured logging for evaluation runs."""
@@ -47,8 +48,13 @@ class EvaluationLogger:
     def finish_batch(self, metrics: MetricsSummary) -> None:
         """Finish the batch and write summary metrics."""
         if self.results_file:
+            results_path = self.results_file.name
             self.results_file.close()
             self.results_file = None
+            
+            # Convert results to CSV
+            csv_path = convert_results_to_csv(results_path)
+            print(f"Converted results to CSV: {os.path.abspath(csv_path)}")
         
         metrics_file = os.path.join(self.log_dir, f"metrics_{self.batch_id}.json")
         with open(metrics_file, 'w') as f:
