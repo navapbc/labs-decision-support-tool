@@ -134,7 +134,7 @@ def main() -> None:
         "Imagine LA",
         "mixed",
         "California",
-        "https://socialbenefitsnavigator25.web.app/contenthub/",
+        "https://benefitnavigator.web.app/contenthub/",
         "imagine_la",
     )
     process_and_ingest_sys_args(sys.argv, logger, _ingest_content_hub, default_config)

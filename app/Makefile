@@ -253,7 +253,7 @@ endif
 
 
 scrape-imagine-la:
-	cd src/ingestion/imagine_la/scrape; uv run --no-project scrape_content_hub.py https://socialbenefitsnavigator25.web.app/contenthub $(CONTENTHUB_PASSWORD)
+	cd src/ingestion/imagine_la/scrape; uv run --no-project scrape_content_hub.py https://benefitnavigator.web.app/contenthub $(CONTENTHUB_PASSWORD)
 
 ingest-imagine-la: check-ingest-arguments
 	$(PY_RUN_CMD) ingest-imagine-la "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)"
