@@ -7,7 +7,7 @@ from ..models.metrics import (
     EvaluationResult,
     MetricsSummary,
     DatasetMetrics,
-    ErrorAnalysis
+    IncorrectRetrievalsAnalysis
 )
 
 def compute_mrr(ranks: List[int]) -> float:
@@ -20,63 +20,60 @@ def compute_dataset_metrics(results: List[EvaluationResult]) -> DatasetMetrics:
     """Compute metrics for a specific dataset."""
     if not results:
         return DatasetMetrics(
-            precision_at_k=0.0,
             recall_at_k=0.0,
-            relevance=0.0,
-            sample_size=0
+            sample_size=0,
+            avg_score_incorrect=0.0
         )
     
     total = len(results)
     correct = sum(1 for r in results if r.correct_chunk_retrieved)
     
-    # Compute average relevance from top_k_scores
-    relevance = sum(
-        sum(r.top_k_scores) / len(r.top_k_scores)  # Average score per result
-        for r in results
-    ) / total
+    # Compute average score for incorrect retrievals
+    incorrect_results = [r for r in results if not r.correct_chunk_retrieved]
+    incorrect_scores = [max(r.top_k_scores) for r in incorrect_results if r.top_k_scores]
+    avg_score_incorrect = float(np.mean(incorrect_scores)) if incorrect_scores else 0.0
     
     return DatasetMetrics(
-        precision_at_k=correct / total,
-        recall_at_k=correct / total,  # Same as precision for single-answer case
-        relevance=relevance,
-        sample_size=total
+        recall_at_k=correct / total,
+        sample_size=total,
+        avg_score_incorrect=avg_score_incorrect
     )
 
-def compute_error_analysis(results: List[EvaluationResult]) -> ErrorAnalysis:
-    """Compute error analysis metrics."""
-    failed_results = [r for r in results if not r.correct_chunk_retrieved]
-    failed_count = len(failed_results)
+def compute_incorrect_analysis(results: List[EvaluationResult]) -> IncorrectRetrievalsAnalysis:
+    """Compute analysis of incorrect retrievals."""
+    incorrect_results = [r for r in results if not r.correct_chunk_retrieved]
+    incorrect_count = len(incorrect_results)
     
-    if failed_count == 0:
-        return ErrorAnalysis(
-            failed_retrievals=0,
-            avg_score_failed=0.0,
-            common_failure_datasets=[]
+    if incorrect_count == 0:
+        return IncorrectRetrievalsAnalysis(
+            incorrect_retrievals_count=0,
+            avg_score_incorrect=0.0,
+            datasets_with_incorrect_retrievals=[]
         )
     
-    # Compute average score of failed retrievals
-    failed_scores = []
-    for result in failed_results:
+    # Compute average score of incorrect retrievals
+    incorrect_scores = []
+    for result in incorrect_results:
         if result.top_k_scores:
-            failed_scores.append(max(result.top_k_scores))
+            incorrect_scores.append(max(result.top_k_scores))
     
-    avg_score = np.mean(failed_scores) if failed_scores else 0.0
+    avg_score = np.mean(incorrect_scores) if incorrect_scores else 0.0
     
-    # Find most common failure datasets
-    dataset_failures = defaultdict(int)
-    for result in failed_results:
-        dataset_failures[result.document_info.source] += 1
+    # Count incorrect retrievals per dataset and sort by frequency
+    dataset_counts = defaultdict(int)
+    for result in incorrect_results:
+        dataset_counts[result.document_info.source] += 1
     
-    # Sort by frequency and get top 3
-    common_datasets = sorted(
-        dataset_failures.items(),
+    # Sort datasets by number of incorrect retrievals (descending) and then by name
+    sorted_datasets = sorted(
+        dataset_counts.items(),
         key=lambda x: (-x[1], x[0])  # Sort by count desc, then name
-    )[:3]
+    )
     
-    return ErrorAnalysis(
-        failed_retrievals=failed_count,
-        avg_score_failed=float(avg_score),
-        common_failure_datasets=[d[0] for d in common_datasets]
+    return IncorrectRetrievalsAnalysis(
+        incorrect_retrievals_count=incorrect_count,
+        avg_score_incorrect=float(avg_score),
+        datasets_with_incorrect_retrievals=[dataset for dataset, _ in sorted_datasets]
     )
 
 def compute_metrics_summary(
@@ -97,7 +94,7 @@ def compute_metrics_summary(
     
     # Compute overall metrics
     overall = compute_dataset_metrics(results)
-    error_analysis = compute_error_analysis(results)
+    incorrect_analysis = compute_incorrect_analysis(results)
     
     # Get average retrieval time
     avg_time = np.mean([r.retrieval_time_ms for r in results])
@@ -106,12 +103,11 @@ def compute_metrics_summary(
         batch_id=batch_id,
         timestamp=results[0].timestamp if results else "",
         overall_metrics={
-            "precision_at_k": overall.precision_at_k,
             "recall_at_k": overall.recall_at_k,
             "mean_retrieval_time_ms": float(avg_time),
             "total_questions": len(results),
-            "successful_retrievals": len(results) - error_analysis.failed_retrievals
+            "successful_retrievals": len(results) - incorrect_analysis.incorrect_retrievals_count
         },
         dataset_metrics=dataset_metrics,
-        error_analysis=error_analysis
+        incorrect_analysis=incorrect_analysis
     )

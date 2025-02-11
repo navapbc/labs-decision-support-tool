@@ -1,7 +1,7 @@
 """Data models for metrics evaluation."""
 
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import datetime
 import uuid
 import json
@@ -14,12 +14,11 @@ class BatchConfig:
     dataset_filter: List[str]
     package_version: str
     git_commit: str
-    environment: str
-    retriever_config: Dict[str, any]
     batch_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary format."""
         return {
             "batch_id": self.batch_id,
             "timestamp": self.timestamp,
@@ -30,10 +29,8 @@ class BatchConfig:
             },
             "system_info": {
                 "package_version": self.package_version,
-                "git_commit": self.git_commit,
-                "environment": self.environment
-            },
-            "retriever_config": self.retriever_config
+                "git_commit": self.git_commit
+            }
         }
 
 @dataclass
@@ -95,17 +92,16 @@ class EvaluationResult:
 @dataclass
 class DatasetMetrics:
     """Metrics for a specific dataset."""
-    precision_at_k: float
-    recall_at_k: float
-    relevance: float  # Average semantic relevance of retrieved chunks
+    recall_at_k: float  # Whether the correct chunk was found in top k results
     sample_size: int
+    avg_score_incorrect: float  # Average similarity score for incorrect retrievals in this dataset
 
 @dataclass
-class ErrorAnalysis:
-    """Error analysis metrics."""
-    failed_retrievals: int
-    avg_score_failed: float
-    common_failure_datasets: List[str]
+class IncorrectRetrievalsAnalysis:
+    """Analysis of incorrect retrievals (where no correct chunk was found in top k)."""
+    incorrect_retrievals_count: int
+    avg_score_incorrect: float
+    datasets_with_incorrect_retrievals: List[str]
 
 @dataclass
 class MetricsSummary:
@@ -114,20 +110,22 @@ class MetricsSummary:
     timestamp: str
     overall_metrics: Dict[str, float]
     dataset_metrics: Dict[str, DatasetMetrics]
-    error_analysis: ErrorAnalysis
+    incorrect_analysis: IncorrectRetrievalsAnalysis
 
     def to_dict(self) -> Dict:
         return {
             "batch_id": self.batch_id,
             "timestamp": self.timestamp,
-            "overall_metrics": self.overall_metrics,
+            "overall_metrics": {
+                **self.overall_metrics,
+                "incorrect_retrievals_analysis": {
+                    "incorrect_retrievals_count": self.incorrect_analysis.incorrect_retrievals_count,
+                    "avg_score_incorrect": self.incorrect_analysis.avg_score_incorrect,
+                    "datasets_with_incorrect_retrievals": self.incorrect_analysis.datasets_with_incorrect_retrievals
+                }
+            },
             "dataset_metrics": {
                 dataset: asdict(metrics)
                 for dataset, metrics in self.dataset_metrics.items()
-            },
-            "error_analysis": {
-                "failed_retrievals": self.error_analysis.failed_retrievals,
-                "avg_score_failed": self.error_analysis.avg_score_failed,
-                "common_failure_datasets": self.error_analysis.common_failure_datasets
             }
         }

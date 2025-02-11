@@ -7,6 +7,7 @@ from collections import defaultdict
 import subprocess
 from ..models.metrics import BatchConfig
 from ..utils.timer import measure_time
+from src.app_config import app_config
 
 def get_git_commit() -> str:
     """Get current git commit hash."""
@@ -34,7 +35,7 @@ def get_package_version() -> str:
 def create_batch_config(
     k_value: int,
     dataset_filter: Optional[List[str]] = None,
-    environment: str = "development"
+    git_commit: Optional[str] = None
 ) -> BatchConfig:
     """Create a new batch configuration."""
     return BatchConfig(
@@ -42,14 +43,7 @@ def create_batch_config(
         num_samples=0,  # Will be updated when questions are loaded
         dataset_filter=dataset_filter or [],
         package_version=get_package_version(),
-        git_commit=get_git_commit(),
-        environment=environment,
-        retriever_config={
-            "model_name": "text-embedding-3-large",
-            "chunk_size": 500,
-            "overlap": 50,
-            "similarity_top_k": k_value
-        }
+        git_commit=git_commit or get_git_commit()
     )
 
 def stratified_sample(

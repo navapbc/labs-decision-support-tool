@@ -10,10 +10,6 @@ from ..models.metrics import (
     RetrievedChunk
 )
 from ..utils.timer import measure_time
-from ..utils.embedding import (
-    EmbeddingComputer,
-    compute_similarities
-)
 
 def process_retrieved_chunks(
     question: Dict[str, Any],
@@ -78,8 +74,7 @@ def process_retrieved_chunks(
 def batch_process_results(
     questions: List[Dict],
     retrieval_func: Any,
-    k: int,
-    embedding_computer: EmbeddingComputer
+    k: int
 ) -> List[EvaluationResult]:
     """Process multiple questions in batches.
     
@@ -87,7 +82,6 @@ def batch_process_results(
         questions: List of questions to process
         retrieval_func: Function to retrieve chunks for a question
         k: Number of chunks to retrieve
-        embedding_computer: EmbeddingComputer instance
     
     Returns:
         List of EvaluationResult objects

@@ -30,7 +30,7 @@ def main():
     parser.add_argument(
         "--questions-file",
         type=str,
-        default="notebooks/metrics/question_answer_pairs.csv",  # Path inside container
+        default="src/metrics/data/question_answer_pairs.csv",
         help="Path to questions CSV file"
     )
     parser.add_argument(
@@ -39,22 +39,15 @@ def main():
         help="Fraction of questions to sample (e.g. 0.1)"
     )
     parser.add_argument(
-        "--embedding-model",
-        type=str,
-        default="text-embedding-3-large",
-        help="OpenAI embedding model to use"
-    )
-    parser.add_argument(
-        "--environment",
-        type=str,
-        default="development",
-        help="Environment name (development/production)"
-    )
-    parser.add_argument(
         "--min-score",
         type=float,
         default=-1.0,
         help="Minimum similarity score for retrieval"
+    )
+    parser.add_argument(
+        "--commit",
+        type=str,
+        help="Git commit hash of the code being evaluated"
     )
     
     args = parser.parse_args()
@@ -78,9 +71,8 @@ def main():
             retrieval_func=retrieval_func,
             dataset_filter=dataset_filter,
             sample_fraction=args.sampling,
-            embedding_model=args.embedding_model,
-            environment=args.environment,
-            log_dir=log_dir
+            log_dir=log_dir,
+            commit=args.commit  # Pass commit hash to evaluation
         )
         
         # Print latest results
@@ -100,6 +92,8 @@ def main():
             print("=" * 50)
             print(f"Batch ID: {latest_results['batch_id']}")
             print(f"Timestamp: {latest_results['timestamp']}")
+            if "commit" in latest_results:
+                print(f"Commit: {latest_results['commit']}")
             print("\nOverall Metrics:")
             for metric, value in latest_results["overall_metrics"].items():
                 print(f"  {metric}: {value:.4f}")

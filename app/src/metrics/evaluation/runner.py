@@ -4,7 +4,6 @@ import os
 import csv
 from typing import List, Dict, Optional, Any
 from ..models.metrics import BatchConfig
-from ..utils.embedding import EmbeddingComputer
 from .batch import (
     create_batch_config,
     filter_questions,
@@ -20,27 +19,16 @@ class EvaluationRunner:
     def __init__(
         self,
         retrieval_func: Any,
-        embedding_model: str = "text-embedding-3-large",
-        batch_size: int = 100,
-        log_dir: str = "logs/evaluations",
-        environment: str = "development"
+        log_dir: str = "logs/evaluations"
     ):
         """Initialize the runner.
         
         Args:
-            retrieval_func: Function to retrieve chunks for questions
-            embedding_model: Name of embedding model to use
-            batch_size: Batch size for embedding computation
+            retrieval_func: Function to retrieve chunks for questions (uses model from app_config)
             log_dir: Directory for log files
-            environment: Environment name (development/production)
         """
         self.retrieval_func = retrieval_func
-        self.embedding_computer = EmbeddingComputer(
-            model=embedding_model,
-            batch_size=batch_size
-        )
         self.log_dir = log_dir
-        self.environment = environment
     
     def load_questions(self, file_path: str) -> List[Dict]:
         """Load questions from CSV file."""
@@ -59,7 +47,8 @@ class EvaluationRunner:
         questions_file: str,
         k_values: List[int],
         dataset_filter: Optional[List[str]] = None,
-        sample_fraction: Optional[float] = None
+        sample_fraction: Optional[float] = None,
+        commit: Optional[str] = None
     ) -> None:
         """Run evaluation for multiple k values.
         
@@ -68,6 +57,7 @@ class EvaluationRunner:
             k_values: List of k values to evaluate
             dataset_filter: Optional list of datasets to include
             sample_fraction: Optional fraction of questions to sample
+            commit: Git commit hash of code being evaluated
         """
         # Load and filter questions
         questions = self.load_questions(questions_file)
@@ -88,20 +78,21 @@ class EvaluationRunner:
         # Run evaluation for each k value
         for k in k_values:
             print(f"\nEvaluating k={k}")
-            self.run_evaluation_batch(questions, k, dataset_filter)
+            self.run_evaluation_batch(questions, k, dataset_filter, commit)
     
     def run_evaluation_batch(
         self,
         questions: List[Dict],
         k: int,
-        dataset_filter: Optional[List[str]] = None
+        dataset_filter: Optional[List[str]] = None,
+        commit: Optional[str] = None
     ) -> None:
         """Run evaluation for a single k value."""
         # Create batch config
         config = create_batch_config(
             k_value=k,
             dataset_filter=dataset_filter,
-            environment=self.environment
+            git_commit=commit
         )
         config.num_samples = len(questions)
         
@@ -116,8 +107,7 @@ class EvaluationRunner:
             results = batch_process_results(
                 questions,
                 self.retrieval_func,
-                k,
-                self.embedding_computer
+                k
             )
             
             # Log individual results
@@ -141,15 +131,12 @@ def run_evaluation(
     retrieval_func: Any,
     dataset_filter: Optional[List[str]] = None,
     sample_fraction: Optional[float] = None,
-    embedding_model: str = "text-embedding-3-large",
-    environment: str = "development",
-    log_dir: str = "logs/evaluations"
+    log_dir: str = "logs/evaluations",
+    commit: Optional[str] = None
 ) -> None:
     """Convenience function to run evaluation."""
     runner = EvaluationRunner(
         retrieval_func=retrieval_func,
-        embedding_model=embedding_model,
-        environment=environment,
         log_dir=log_dir
     )
     
@@ -157,5 +144,6 @@ def run_evaluation(
         questions_file=questions_file,
         k_values=k_values,
         dataset_filter=dataset_filter,
-        sample_fraction=sample_fraction
+        sample_fraction=sample_fraction,
+        commit=commit
     )
