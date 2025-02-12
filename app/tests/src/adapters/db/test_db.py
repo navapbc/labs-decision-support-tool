@@ -1,6 +1,7 @@
+import logging
+
 import pytest
 from sqlalchemy import text
-import logging
 
 import src.adapters.db as db
 
