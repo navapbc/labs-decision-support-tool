@@ -28,3 +28,6 @@ docker-compose.override.yml
 # Evaluation result logfiles and local data
 app/src/metrics/logs/
 app/src/metrics/data/
+
+# Local development files
+app/Makefile.local
