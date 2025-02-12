@@ -1,6 +1,49 @@
 """Tests for batch processing functions."""
 
-from src.metrics.evaluation.batch import create_batch_config, filter_questions, stratified_sample
+from unittest.mock import mock_open, patch
+
+from src.metrics.evaluation.batch import (
+    create_batch_config,
+    filter_questions,
+    get_git_commit,
+    get_package_version,
+    stratified_sample,
+)
+
+
+def test_get_git_commit():
+    """Test getting git commit hash."""
+    # Test successful case
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value.stdout = "abc123\n"
+        assert get_git_commit() == "abc123"
+        mock_run.assert_called_once_with(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    # Test failure case
+    with patch("subprocess.run", side_effect=Exception("git error")):
+        assert get_git_commit() == "unknown"
+
+
+def test_get_package_version():
+    """Test getting package version."""
+    # Test successful case
+    mock_toml = 'name = "app"\nversion = "1.0.0"\n'
+    with patch("builtins.open", mock_open(read_data=mock_toml)):
+        assert get_package_version() == "1.0.0"
+
+    # Test file not found case
+    with patch("builtins.open", side_effect=FileNotFoundError):
+        assert get_package_version() == "unknown"
+
+    # Test malformed file case
+    mock_toml_bad = 'name = "app"\nno_version_here\n'
+    with patch("builtins.open", mock_open(read_data=mock_toml_bad)):
+        assert get_package_version() == "unknown"
 
 
 def test_create_batch_config():
@@ -63,6 +106,20 @@ def test_stratified_sample():
     assert len([q for q in min_sample if q["dataset"] == "dataset1"]) >= 1
     assert len([q for q in min_sample if q["dataset"] == "dataset2"]) >= 1
 
+    # Test with random seed for reproducibility
+    sample1 = stratified_sample(questions, 0.5, random_seed=42)
+    sample2 = stratified_sample(questions, 0.5, random_seed=42)
+    assert [q["question"] for q in sample1] == [q["question"] for q in sample2]
+
+    # Test that random seed is properly reset
+    import random
+    random.seed(123)
+    val1 = random.random()
+    stratified_sample(questions, 0.5, random_seed=42)
+    random.seed(123)
+    val2 = random.random()
+    assert val1 == val2  # Random state should be restored
+
 
 def test_filter_questions():
     """Test question filtering by dataset."""
@@ -93,3 +150,8 @@ def test_filter_questions():
     filtered = filter_questions(questions, ["IMAGINE_LA"])
     assert len(filtered) == 1
     assert filtered[0]["question"] == "q1"
+
+    # Test with unknown dataset (should use original name)
+    filtered = filter_questions(questions, ["Other Dataset"])
+    assert len(filtered) == 1
+    assert filtered[0]["question"] == "q3"
