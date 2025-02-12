@@ -25,6 +25,13 @@ def create_retrieval_function(min_score: float) -> Callable[[str, int], Sequence
     return retrieval_func
 
 
+def format_metric_value(value: Any) -> str:
+    """Format a metric value for display."""
+    if isinstance(value, (float, int)):
+        return f"{value:.4f}"
+    return str(value)
+
+
 def main() -> None:
     """Run the CLI application."""
     parser = argparse.ArgumentParser(description="Run precision-recall evaluation")
@@ -95,21 +102,26 @@ def main() -> None:
                 print(f"Commit: {latest_results['commit']}")
             print("\nOverall Metrics:")
             for metric, value in latest_results["overall_metrics"].items():
-                print(f"  {metric}: {value:.4f}")
+                if metric != "incorrect_retrievals_analysis":
+                    print(f"  {metric}: {format_metric_value(value)}")
+
+            # Print incorrect retrievals analysis separately
+            if "incorrect_retrievals_analysis" in latest_results["overall_metrics"]:
+                analysis = latest_results["overall_metrics"]["incorrect_retrievals_analysis"]
+                print("\nIncorrect Retrievals Analysis:")
+                print(f"  Incorrect retrievals: {analysis['incorrect_retrievals_count']}")
+                print(
+                    f"  Average score for incorrect retrievals: {format_metric_value(analysis['avg_score_incorrect'])}"
+                )
+                print(
+                    f"  Datasets with incorrect retrievals: {', '.join(analysis['datasets_with_incorrect_retrievals'])}"
+                )
+
             print("\nDataset Metrics:")
             for dataset, metrics in latest_results["dataset_metrics"].items():
                 print(f"\n  {dataset}:")
-                print(f"    Recall@k: {metrics['recall_at_k']:.4f}")
+                print(f"    Recall@k: {format_metric_value(metrics['recall_at_k'])}")
                 print(f"    Sample size: {metrics['sample_size']}")
-            print("\nIncorrect Retrievals Analysis:")
-            analysis = latest_results["overall_metrics"]["incorrect_retrievals_analysis"]
-            print(f"  Incorrect retrievals: {analysis['incorrect_retrievals_count']}")
-            print(
-                f"  Average score for incorrect retrievals: {analysis['avg_score_incorrect']:.4f}"
-            )
-            print(
-                f"  Datasets with incorrect retrievals: {', '.join(analysis['datasets_with_incorrect_retrievals'])}"
-            )
     except Exception as e:
         print(f"Error running evaluation: {str(e)}")
         raise
