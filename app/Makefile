@@ -285,9 +285,10 @@ run-evaluation: ## Run precision-recall evaluation with configurable parameters
 
 # Add help text for the parameters
 # run-evaluation parameters:
-#   dataset         Dataset to evaluate (imagine_la, la_policy, or all)
+#   dataset         Filter questions from the CSV by matching this value against the 'dataset' column
+#                  (imagine_la, la_policy, or all)
 #   k              Comma-separated list of k values (default: 5,10,25)
-#   questions_file  Path to questions CSV file
+#   questions_file  Path to questions CSV file (default: src/metrics/data/question_answer_pairs.csv)
 #   sampling       Fraction of questions to sample (e.g. 0.1)
 #   min_score      Minimum similarity score for retrieval (default: -1.0)
 #   commit         Git commit hash of the code being evaluated (auto-populated)

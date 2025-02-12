@@ -42,6 +42,12 @@ metrics/
 
 ## Usage
 
+### Setup
+
+Before running evaluations, you'll need the questions CSV file:
+1. Download the questions file from [this Google Sheet](https://docs.google.com/spreadsheets/d/1KBFMyRUSohqA94ic6yAv3Ne22GwEBJHHYHM49rEKFsc/edit?usp=sharing)
+2. Save it as `question_answer_pairs.csv` in `app/src/metrics/data/`
+
 ### Command Line Interface
 
 The module provides a CLI for running evaluations:
@@ -51,9 +57,9 @@ make run-evaluation dataset=imagine_la k=5,10,25
 ```
 
 Arguments:
-- `dataset`: Dataset to evaluate (imagine_la, la_policy, or all)
+- `dataset`: Filter questions from the CSV by matching this value against the 'dataset' column (e.g., "imagine_la", "la_policy", or "all" to use all datasets)
 - `k`: Comma-separated list of k values (default: 5,10,25)
-- `questions_file`: Path to questions CSV file
+- `questions_file`: Path to questions CSV file (default: src/metrics/data/question_answer_pairs.csv)
 - `sampling`: Fraction of questions to sample (e.g., 0.1)
 - `min_score`: Minimum similarity score for retrieval (default: -1.0)
 - `commit`: Git commit hash of code being evaluated (auto-populated)
