@@ -58,6 +58,12 @@ Arguments:
 - `min_score`: Minimum similarity score for retrieval (default: -1.0)
 - `commit`: Git commit hash of code being evaluated (auto-populated)
 
+### Log Storage
+
+By default, evaluation logs and data are stored in:
+- `app/src/metrics/data/` - Contains the generated QA files used for evaluation
+- `app/src/metrics/logs/YYYY-MM-DD/` - Contains all evaluation run logs
+
 ### Log File Structure
 
 Each evaluation run creates four files in the logs directory:

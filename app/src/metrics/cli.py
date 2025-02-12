@@ -59,7 +59,8 @@ def main() -> None:
     # Set up dataset filter
     dataset_filter = None if args.dataset == "all" else [args.dataset]
 
-    # Set up log directory in src/metrics/logs
+    # Evaluation results stored in src/metrics/logs/YYYY-MM-DD/
+    # See README.md for details on log storage and structure
     log_dir = os.path.join("src", "metrics", "logs")
     os.makedirs(log_dir, exist_ok=True)
     print(f"Writing logs to: {os.path.abspath(log_dir)}")

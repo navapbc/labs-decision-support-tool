@@ -16,7 +16,9 @@ class EvaluationLogger:
         """Initialize the logger.
 
         Args:
-            log_dir: Directory for log files
+            log_dir: Directory for log files. Results will be stored in:
+                    {log_dir}/YYYY-MM-DD/
+                    See README.md for details.
         """
         # Create date-based subdirectory
         self.date_dir = os.path.join(log_dir, datetime.now().strftime("%Y-%m-%d"))
