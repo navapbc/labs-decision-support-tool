@@ -4,12 +4,12 @@ from datetime import datetime
 
 from src.metrics.models.metrics import (
     BatchConfig,
-    DocumentInfo,
-    RetrievedChunk,
-    EvaluationResult,
     DatasetMetrics,
+    DocumentInfo,
+    EvaluationResult,
     IncorrectRetrievalsAnalysis,
     MetricsSummary,
+    RetrievedChunk,
 )
 
 

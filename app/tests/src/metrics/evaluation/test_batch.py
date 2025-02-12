@@ -1,10 +1,6 @@
 """Tests for batch processing functions."""
 
-from src.metrics.evaluation.batch import (
-    create_batch_config,
-    stratified_sample,
-    filter_questions,
-)
+from src.metrics.evaluation.batch import create_batch_config, filter_questions, stratified_sample
 
 
 def test_create_batch_config():
