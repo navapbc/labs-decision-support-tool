@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from sqlalchemy import text
 
@@ -11,6 +13,7 @@ def test_db_connection(db_client):
 
 
 def test_check_db_connection(caplog, monkeypatch: pytest.MonkeyPatch):
+    caplog.set_level(logging.INFO)
     monkeypatch.setenv("DB_CHECK_CONNECTION_ON_INIT", "True")
     db.PostgresDBClient()
     assert "database connection is not using SSL" in caplog.messages

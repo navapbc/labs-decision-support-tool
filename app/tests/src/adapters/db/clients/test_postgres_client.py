@@ -34,7 +34,7 @@ def test_verify_ssl_not_in_use(caplog):
     verify_ssl(conn_info)
 
     assert caplog.messages == ["database connection is not using SSL"]
-    assert caplog.records[0].levelname == "WARNING"
+    assert caplog.records[0].levelname == "INFO"
 
 
 def test_get_connection_parameters(monkeypatch: pytest.MonkeyPatch):
