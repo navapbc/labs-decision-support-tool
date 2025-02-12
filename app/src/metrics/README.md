@@ -84,7 +84,7 @@ Each evaluation run creates four files in the logs directory:
     "dataset_filter": ["imagine_la"],
     "num_samples": 100
   },
-  "system_info": {
+  "software_info": {
     "package_version": "0.1.0",
     "git_commit": "abc123"
   }

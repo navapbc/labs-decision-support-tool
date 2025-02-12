@@ -28,7 +28,10 @@ class BatchConfig:
                 "num_samples": self.num_samples,
                 "dataset_filter": self.dataset_filter,
             },
-            "system_info": {"package_version": self.package_version, "git_commit": self.git_commit},
+            "software_info": {
+                "package_version": self.package_version,
+                "git_commit": self.git_commit,
+            },
         }
 
 

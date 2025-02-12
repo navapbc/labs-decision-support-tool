@@ -41,8 +41,8 @@ def test_batch_config_creation():
     assert config_dict["evaluation_config"]["k_value"] == 5
     assert config_dict["evaluation_config"]["num_samples"] == 100
     assert config_dict["evaluation_config"]["dataset_filter"] == ["dataset1", "dataset2"]
-    assert config_dict["system_info"]["package_version"] == "1.0.0"
-    assert config_dict["system_info"]["git_commit"] == "abc123"
+    assert config_dict["software_info"]["package_version"] == "1.0.0"
+    assert config_dict["software_info"]["git_commit"] == "abc123"
 
 
 def test_document_info():
