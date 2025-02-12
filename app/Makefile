@@ -281,8 +281,7 @@ run-evaluation: ## Run precision-recall evaluation with configurable parameters
 		$(if $(questions_file),--questions-file=$(questions_file),) \
 		$(if $(sampling),--sampling=$(sampling),) \
 		$(if $(min_score),--min-score=$(min_score),) \
-		$(if $(random_seed),--random-seed=$(random_seed),) \
-		--commit=$(shell git rev-parse HEAD)
+		$(if $(random_seed),--random-seed=$(random_seed),)
 
 # Add help text for the parameters
 # run-evaluation parameters:
@@ -293,4 +292,3 @@ run-evaluation: ## Run precision-recall evaluation with configurable parameters
 #   min_score      Minimum similarity score for retrieval (default: -1.0)
 #   sampling       Fraction of questions to sample (e.g. 0.1). Uses stratified sampling to maintain dataset proportions
 #   random_seed    Random seed for reproducible sampling (only used if sampling is specified)
-#   commit         Git commit hash of the code being evaluated (auto-populated)

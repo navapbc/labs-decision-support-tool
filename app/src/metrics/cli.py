@@ -57,7 +57,6 @@ def main() -> None:
         type=int,
         help="Random seed for reproducible sampling (only used if sampling is specified)",
     )
-    parser.add_argument("--commit", type=str, help="Git commit hash of the code being evaluated")
 
     args = parser.parse_args()
 
@@ -83,7 +82,6 @@ def main() -> None:
             sample_fraction=args.sampling,
             random_seed=args.random_seed,
             log_dir=log_dir,
-            commit=args.commit,  # Pass commit hash to evaluation
         )
 
         # Print latest results
@@ -105,8 +103,6 @@ def main() -> None:
             print("=" * 50)
             print(f"Batch ID: {latest_results['batch_id']}")
             print(f"Timestamp: {latest_results['timestamp']}")
-            if "commit" in latest_results:
-                print(f"Commit: {latest_results['commit']}")
             print("\nOverall Metrics:")
             for metric, value in latest_results["overall_metrics"].items():
                 if metric != "incorrect_retrievals_analysis":

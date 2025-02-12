@@ -43,7 +43,6 @@ class EvaluationRunner:
         min_score: Optional[float] = None,
         sample_fraction: Optional[float] = None,
         random_seed: Optional[int] = None,
-        commit: Optional[str] = None,
     ) -> None:
         """Run evaluation for multiple k values.
 
@@ -54,7 +53,6 @@ class EvaluationRunner:
             min_score: Optional minimum similarity score for retrieval
             sample_fraction: Optional fraction of questions to sample
             random_seed: Optional seed for reproducible sampling
-            commit: Git commit hash of code being evaluated
         """
         # Load and filter questions
         questions = self.load_questions(questions_file)
@@ -82,18 +80,17 @@ class EvaluationRunner:
         # Run evaluation for each k value
         for k in k_values:
             print(f"\nEvaluating k={k}")
-            self.run_evaluation_batch(questions, k, dataset_filter, commit)
+            self.run_evaluation_batch(questions, k, dataset_filter)
 
     def run_evaluation_batch(
         self,
         questions: List[Dict],
         k: int,
         dataset_filter: Optional[List[str]] = None,
-        commit: Optional[str] = None,
     ) -> None:
         """Run evaluation for a single k value."""
         # Create batch config
-        config = create_batch_config(k_value=k, dataset_filter=dataset_filter, git_commit=commit)
+        config = create_batch_config(k_value=k, dataset_filter=dataset_filter)
         config.num_samples = len(questions)
 
         # Initialize logger
@@ -131,7 +128,6 @@ def run_evaluation(
     sample_fraction: Optional[float] = None,
     random_seed: Optional[int] = None,
     log_dir: str = "logs/evaluations",
-    commit: Optional[str] = None,
 ) -> None:
     """Convenience function to run evaluation."""
     runner = EvaluationRunner(retrieval_func=retrieval_func, log_dir=log_dir)
@@ -143,5 +139,4 @@ def run_evaluation(
         min_score=min_score,
         sample_fraction=sample_fraction,
         random_seed=random_seed,
-        commit=commit,
     )

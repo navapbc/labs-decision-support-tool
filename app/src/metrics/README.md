@@ -63,7 +63,6 @@ Arguments:
 - `min_score`: Minimum similarity score for retrieval (default: -1.0)
 - `sampling`: Fraction of questions to sample (e.g., 0.1). Uses stratified sampling to maintain dataset proportions
 - `random_seed`: Random seed for reproducible sampling (only used if sampling is specified)
-- `commit`: Git commit hash of code being evaluated (auto-populated)
 
 ### Log Storage
 

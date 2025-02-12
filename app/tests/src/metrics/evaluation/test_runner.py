@@ -84,9 +84,7 @@ def test_run_evaluation_batch(mock_retrieval_func, mock_questions):
                     runner.run_evaluation_batch(mock_questions, k=5)
 
                     # Verify mocks were called correctly
-                    mock_create_config.assert_called_once_with(
-                        k_value=5, dataset_filter=None, git_commit=None
-                    )
+                    mock_create_config.assert_called_once_with(k_value=5, dataset_filter=None)
                     mock_logger_cls.assert_called_once_with(runner.log_dir)
                     mock_logger.start_batch.assert_called_once_with(mock_config)
                     mock_process.assert_called_once_with(mock_questions, mock_retrieval_func, 5)
@@ -177,8 +175,9 @@ def test_convenience_function(mock_retrieval_func):
             retrieval_func=mock_retrieval_func,
             dataset_filter=["dataset1"],
             sample_fraction=0.5,
+            min_score=None,
+            random_seed=None,
             log_dir="test_logs",
-            commit="abc123",
         )
 
         # Verify runner was created and called correctly
@@ -189,8 +188,7 @@ def test_convenience_function(mock_retrieval_func):
             questions_file="test.csv",
             k_values=[5],
             dataset_filter=["dataset1"],
-            sample_fraction=0.5,
             min_score=None,
+            sample_fraction=0.5,
             random_seed=None,
-            commit="abc123",
         )
