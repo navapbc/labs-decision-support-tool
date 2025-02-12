@@ -26,44 +26,42 @@ def explode_result_to_rows(result: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
     1:1 relationship between ground truth and retrieved chunks.
 
     Args:
-        result: A single result dictionary containing evaluation_result with
-               top_k_scores (list[float]) and retrieved_chunks (list[dict])
+        result: A single result dictionary containing retrieved_chunks (list[dict])
 
     Yields:
         Dict containing flattened result with one row per retrieved chunk/score pair
     """
     # Get the base result without the arrays we'll explode
     base_result = result.copy()
+    retrieved_chunks = base_result.pop("retrieved_chunks", [])
+
+    # Add evaluation result fields
     eval_result = base_result.pop("evaluation_result", {})
+    base_result.update(flatten_dict({"evaluation_result": eval_result}))
 
-    # Extract arrays we want to explode
-    top_k_scores = eval_result.pop("top_k_scores", [])
-    retrieved_chunks = eval_result.pop("retrieved_chunks", [])
+    # Get expected content hash and add to base result
+    expected_chunk = base_result.pop("expected_chunk", {})
+    expected_content_hash = expected_chunk.get("content_hash", "")
+    base_result["expected_content_hash"] = expected_content_hash
+    base_result.update(flatten_dict({"expected_chunk": expected_chunk}))
 
-    # Add remaining eval_result fields back to base_result
-    base_result["evaluation_result"] = eval_result
-    base_result = flatten_dict(base_result)
-
-    # If no chunks/scores, yield single flattened row
-    if not retrieved_chunks or not top_k_scores:
+    # If no chunks, yield single flattened row
+    if not retrieved_chunks:
         yield base_result
         return
 
-    # Create a row for each chunk/score pair
-    for idx, (chunk, score) in enumerate(zip(retrieved_chunks, top_k_scores, strict=True)):
+    # Create a row for each chunk
+    for idx, chunk in enumerate(retrieved_chunks, start=1):
         row = base_result.copy()
         row.update(
             {
-                "rank": idx + 1,
-                "similarity_score": float(score),  # Ensure score is float
-                # Add chunk fields directly to row
-                "retrieved_chunk_id": chunk.get("chunk_id", ""),
-                "retrieved_document_id": chunk.get("document_id", ""),
-                "retrieved_document_name": chunk.get("document_name", ""),
-                "retrieved_content": chunk.get("content", ""),
-                # Add a boolean flag for whether this chunk matches ground truth
-                "is_correct_chunk": chunk.get("chunk_id", "")
-                == result.get("expected_chunk_id", ""),
+                "rank": idx,
+                "similarity_score": float(chunk["score"]),
+                "retrieved_chunk_id": chunk["chunk_id"],
+                "retrieved_content": chunk["content"],
+                "retrieved_content_hash": chunk["content_hash"],
+                # Match on content hash like we do in evaluation
+                "is_correct_chunk": chunk["content_hash"] == expected_content_hash,
             }
         )
         yield row

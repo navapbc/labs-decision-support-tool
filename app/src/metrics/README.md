@@ -106,14 +106,14 @@ Each evaluation run creates four files in the logs directory:
   "evaluation_result": {
     "correct_chunk_retrieved": true,
     "rank_if_found": 1,
-    "top_k_scores": [0.92, 0.85, 0.76],
     "retrieval_time_ms": 150
   },
   "retrieved_chunks": [
     {
       "chunk_id": "123",
       "score": 0.92,
-      "content": "..."
+      "content": "...",
+      "content_hash": "abc..."
     }
   ]
 }
@@ -129,8 +129,26 @@ Note: The `qa_pair_id` is deterministic to question, answer, and dataset content
 
 3. `results_${UUID}.csv` - Flattened results for analysis:
 - One row per retrieved chunk
-- Includes original result ID, chunk details, and retrieval metrics
+- Includes original result ID, chunk details, retrieval metrics, and content hash
+- Each row contains rank, similarity score, and whether it matches the expected chunk
 - Easier to analyze in spreadsheet tools
+
+The CSV contains the following columns:
+- `qa_pair_id`: Unique identifier for the question-answer pair
+- `question`: The original question text
+- `rank`: Position of the chunk in retrieval results (1-based)
+- `similarity_score`: Retrieval similarity score for this chunk
+- `retrieved_chunk_id`: ID of the retrieved chunk
+- `retrieved_content`: Content of the retrieved chunk
+- `retrieved_content_hash`: Hash of the retrieved chunk content
+- `expected_chunk_content_hash`: Hash of the expected (ground truth) chunk content
+- `expected_chunk_name`: Name of the expected source document
+- `expected_chunk_source`: Source dataset of the expected chunk
+- `expected_chunk_id`: ID of the expected chunk
+- `is_correct_chunk`: Boolean indicating if this chunk matches the expected answer (based on content hash match)
+- `evaluation_result_correct_chunk_retrieved`: Whether any correct chunk was found in the results
+- `evaluation_result_rank_if_found`: Position of correct chunk if found (null if not found)
+- `evaluation_result_retrieval_time_ms`: Time taken to retrieve results in milliseconds
 
 4. `metrics_${UUID}.json` - Aggregated metrics:
 ```json

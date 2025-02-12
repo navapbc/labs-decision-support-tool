@@ -65,10 +65,12 @@ def test_retrieved_chunk():
         chunk_id="chunk123",
         score=0.85,
         content="test content",
+        content_hash="hash456",
     )
     assert chunk.chunk_id == "chunk123"
     assert chunk.score == 0.85
     assert chunk.content == "test content"
+    assert chunk.content_hash == "hash456"
 
 
 def test_evaluation_result():
@@ -83,6 +85,7 @@ def test_evaluation_result():
         chunk_id="chunk123",
         score=0.85,
         content="test content",
+        content_hash="hash456",
     )
     result = EvaluationResult(
         qa_pair_id="qa123",
@@ -91,7 +94,6 @@ def test_evaluation_result():
         expected_chunk=expected,
         correct_chunk_retrieved=True,
         rank_if_found=1,
-        top_k_scores=[0.85, 0.75],
         retrieval_time_ms=100.5,
         retrieved_chunks=[retrieved_chunk],
     )
@@ -103,7 +105,6 @@ def test_evaluation_result():
     assert result.expected_chunk == expected
     assert result.correct_chunk_retrieved is True
     assert result.rank_if_found == 1
-    assert result.top_k_scores == [0.85, 0.75]
     assert result.retrieval_time_ms == 100.5
     assert result.retrieved_chunks == [retrieved_chunk]
 
@@ -115,10 +116,10 @@ def test_evaluation_result():
     assert result_dict["expected_chunk"]["name"] == "test_doc"
     assert result_dict["evaluation_result"]["correct_chunk_retrieved"] is True
     assert result_dict["evaluation_result"]["rank_if_found"] == 1
-    assert result_dict["evaluation_result"]["top_k_scores"] == [0.85, 0.75]
     assert result_dict["evaluation_result"]["retrieval_time_ms"] == 100.5
     assert len(result_dict["retrieved_chunks"]) == 1
     assert result_dict["retrieved_chunks"][0]["chunk_id"] == "chunk123"
+    assert result_dict["retrieved_chunks"][0]["content_hash"] == "hash456"
 
 
 def test_dataset_metrics():

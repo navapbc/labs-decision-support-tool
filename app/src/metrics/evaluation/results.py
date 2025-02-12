@@ -57,16 +57,19 @@ def process_retrieved_chunks(
     # Process retrieved chunks
     processed_chunks = []
     content_hashes = []
-    scores = []
 
     for chunk in retrieved_chunks:
         content = chunk.chunk.content
         content_hash = md5(content.encode("utf-8"), usedforsecurity=False).hexdigest()
         content_hashes.append(content_hash)
-        scores.append(chunk.score)
 
         processed_chunks.append(
-            RetrievedChunk(chunk_id=str(chunk.chunk.id), score=chunk.score, content=content)
+            RetrievedChunk(
+                chunk_id=str(chunk.chunk.id),
+                score=chunk.score,
+                content=content,
+                content_hash=content_hash,
+            )
         )
 
     # Check if correct chunk was found
@@ -89,7 +92,6 @@ def process_retrieved_chunks(
         expected_chunk=doc_info,
         correct_chunk_retrieved=correct_chunk_retrieved,
         rank_if_found=rank_if_found,
-        top_k_scores=scores,
         retrieval_time_ms=retrieval_time_ms,
         retrieved_chunks=processed_chunks,
     )

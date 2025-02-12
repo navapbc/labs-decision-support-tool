@@ -25,11 +25,16 @@ def create_test_result(
         content_hash="hash456",
     )
 
-    retrieved_chunk = RetrievedChunk(
-        chunk_id="chunk123",
-        score=scores[0],
-        content="test content",
-    )
+    retrieved_chunks = []
+    for i, score in enumerate(scores):
+        retrieved_chunks.append(
+            RetrievedChunk(
+                chunk_id=f"chunk{i + 1}",
+                score=score,
+                content="test content",
+                content_hash="hash456" if i == 0 and correct else f"hash{i + 1}",
+            )
+        )
 
     return EvaluationResult(
         qa_pair_id="qa123",
@@ -38,9 +43,8 @@ def create_test_result(
         expected_chunk=expected,
         correct_chunk_retrieved=correct,
         rank_if_found=rank if correct else None,
-        top_k_scores=scores,
         retrieval_time_ms=100.5,
-        retrieved_chunks=[retrieved_chunk],
+        retrieved_chunks=retrieved_chunks,
     )
 
 

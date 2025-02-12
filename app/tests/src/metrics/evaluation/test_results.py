@@ -83,7 +83,6 @@ def test_process_retrieved_chunks_found(mock_question, mock_chunk):
         assert result.expected_answer == mock_question["answer"]
         assert result.correct_chunk_retrieved is True
         assert result.rank_if_found == 1
-        assert result.top_k_scores == [0.85]
         assert result.retrieval_time_ms == 100.5
 
         # Verify expected chunk
@@ -125,7 +124,8 @@ def test_process_retrieved_chunks_not_found(mock_question, mock_chunk):
     # Verify result
     assert result.correct_chunk_retrieved is False
     assert result.rank_if_found is None
-    assert result.top_k_scores == [0.85]
+    assert len(result.retrieved_chunks) == 1
+    assert result.retrieved_chunks[0].score == 0.85
 
 
 def test_process_retrieved_chunks_empty():
@@ -141,7 +141,7 @@ def test_process_retrieved_chunks_empty():
     # Verify result
     assert result.correct_chunk_retrieved is False
     assert result.rank_if_found is None
-    assert result.top_k_scores == []
+    assert len(result.retrieved_chunks) == 0
     assert result.expected_chunk.name == ""
     assert result.expected_chunk.source == ""
     assert result.expected_chunk.chunk_id == ""

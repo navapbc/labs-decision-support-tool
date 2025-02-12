@@ -52,6 +52,7 @@ class RetrievedChunk:
     chunk_id: str
     score: float
     content: str
+    content_hash: str  # Hash of chunk content for verification
 
 
 @dataclass
@@ -64,7 +65,6 @@ class EvaluationResult:
     expected_chunk: ExpectedChunk
     correct_chunk_retrieved: bool
     rank_if_found: Optional[int]
-    top_k_scores: List[float]
     retrieval_time_ms: float
     retrieved_chunks: List[RetrievedChunk]
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -83,11 +83,15 @@ class EvaluationResult:
             "evaluation_result": {
                 "correct_chunk_retrieved": self.correct_chunk_retrieved,
                 "rank_if_found": self.rank_if_found,
-                "top_k_scores": self.top_k_scores,
                 "retrieval_time_ms": self.retrieval_time_ms,
             },
             "retrieved_chunks": [
-                {"chunk_id": chunk.chunk_id, "score": chunk.score, "content": chunk.content}
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "score": chunk.score,
+                    "content": chunk.content,
+                    "content_hash": chunk.content_hash,
+                }
                 for chunk in self.retrieved_chunks
             ],
         }

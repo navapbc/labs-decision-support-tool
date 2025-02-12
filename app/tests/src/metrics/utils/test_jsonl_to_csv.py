@@ -61,33 +61,43 @@ def test_explode_result_to_rows():
         "qa_pair_id": "qa123",
         "question": "test?",
         "evaluation_result": {},
+        "expected_chunk": {"content_hash": "empty_hash"},
     }
     rows = list(explode_result_to_rows(empty_result))
     assert len(rows) == 1
     assert rows[0]["qa_pair_id"] == "qa123"
+    assert rows[0]["expected_content_hash"] == "empty_hash"
 
     # Test result with chunks and scores
     result = {
         "qa_pair_id": "qa123",
         "question": "test?",
         "expected_chunk_id": "chunk1",
-        "evaluation_result": {
-            "top_k_scores": [0.9, 0.8],
-            "retrieved_chunks": [
-                {
-                    "chunk_id": "chunk1",
-                    "document_id": "doc1",
-                    "document_name": "test_doc",
-                    "content": "content1",
-                },
-                {
-                    "chunk_id": "chunk2",
-                    "document_id": "doc2",
-                    "document_name": "test_doc",
-                    "content": "content2",
-                },
-            ],
+        "expected_chunk": {
+            "name": "test_doc",
+            "source": "test_dataset",
+            "chunk_id": "chunk1",
+            "content_hash": "hash1",
         },
+        "evaluation_result": {"correct_chunk_retrieved": True, "rank_if_found": 1},
+        "retrieved_chunks": [
+            {
+                "chunk_id": "chunk1",
+                "document_id": "doc1",
+                "document_name": "test_doc",
+                "content": "content1",
+                "content_hash": "hash1",
+                "score": 0.9,
+            },
+            {
+                "chunk_id": "chunk2",
+                "document_id": "doc2",
+                "document_name": "test_doc",
+                "content": "content2",
+                "content_hash": "hash2",
+                "score": 0.8,
+            },
+        ],
     }
 
     rows = list(explode_result_to_rows(result))
@@ -98,14 +108,22 @@ def test_explode_result_to_rows():
     assert rows[0]["rank"] == 1
     assert rows[0]["similarity_score"] == 0.9
     assert rows[0]["retrieved_chunk_id"] == "chunk1"
+    assert rows[0]["retrieved_content_hash"] == "hash1"
+    assert rows[0]["expected_content_hash"] == "hash1"
     assert rows[0]["is_correct_chunk"] is True
+    assert rows[0]["evaluation_result_correct_chunk_retrieved"] is True
+    assert rows[0]["evaluation_result_rank_if_found"] == 1
 
     # Check second row
     assert rows[1]["qa_pair_id"] == "qa123"
     assert rows[1]["rank"] == 2
     assert rows[1]["similarity_score"] == 0.8
     assert rows[1]["retrieved_chunk_id"] == "chunk2"
+    assert rows[1]["retrieved_content_hash"] == "hash2"
+    assert rows[1]["expected_content_hash"] == "hash1"
     assert rows[1]["is_correct_chunk"] is False
+    assert rows[1]["evaluation_result_correct_chunk_retrieved"] is True
+    assert rows[1]["evaluation_result_rank_if_found"] == 1
 
 
 @pytest.fixture
@@ -118,13 +136,14 @@ def temp_jsonl_file(tmp_path):
             "question": "test?",
             "expected_chunk_id": "chunk1",
             "evaluation_result": {
-                "top_k_scores": [0.9],
                 "retrieved_chunks": [
                     {
                         "chunk_id": "chunk1",
                         "document_id": "doc1",
                         "document_name": "test_doc",
                         "content": "content1",
+                        "content_hash": "hash1",
+                        "score": 0.9,
                     }
                 ],
             },
@@ -186,9 +205,21 @@ def temp_batch_dir(tmp_path):
             result = {
                 "qa_pair_id": f"qa{i}",
                 "question": "test?",
+                "expected_chunk": {
+                    "name": "test_doc",
+                    "source": "test_dataset",
+                    "chunk_id": "chunk1",
+                    "content_hash": f"hash{i}",
+                },
                 "evaluation_result": {
-                    "top_k_scores": [0.9],
-                    "retrieved_chunks": [{"chunk_id": "chunk1"}],
+                    "retrieved_chunks": [
+                        {
+                            "chunk_id": "chunk1",
+                            "content": "test content",
+                            "content_hash": f"hash{i}",
+                            "score": 0.9,
+                        }
+                    ],
                 },
             }
             f.write(json.dumps(result) + "\n")

@@ -51,6 +51,7 @@ def test_evaluation_result():
         chunk_id="chunk123",
         score=0.85,
         content="test content",
+        content_hash="hash456",
     )
     return EvaluationResult(
         qa_pair_id="qa123",
@@ -59,7 +60,6 @@ def test_evaluation_result():
         expected_chunk=expected,
         correct_chunk_retrieved=True,
         rank_if_found=1,
-        top_k_scores=[0.85, 0.75],
         retrieval_time_ms=100.5,
         retrieved_chunks=[retrieved_chunk],
     )

@@ -23,7 +23,11 @@ def compute_dataset_metrics(results: List[EvaluationResult]) -> DatasetMetrics:
 
     # Compute average score for incorrect retrievals
     incorrect_results = [r for r in results if not r.correct_chunk_retrieved]
-    incorrect_scores = [max(r.top_k_scores) for r in incorrect_results if r.top_k_scores]
+    incorrect_scores = [
+        max(chunk.score for chunk in r.retrieved_chunks)
+        for r in incorrect_results
+        if r.retrieved_chunks
+    ]
     avg_score_incorrect = float(np.mean(incorrect_scores)) if incorrect_scores else 0.0
 
     return DatasetMetrics(
@@ -46,8 +50,8 @@ def compute_incorrect_analysis(results: List[EvaluationResult]) -> IncorrectRetr
     # Compute average score of incorrect retrievals
     incorrect_scores = []
     for result in incorrect_results:
-        if result.top_k_scores:
-            incorrect_scores.append(max(result.top_k_scores))
+        if result.retrieved_chunks:
+            incorrect_scores.append(max(chunk.score for chunk in result.retrieved_chunks))
 
     avg_score = np.mean(incorrect_scores) if incorrect_scores else 0.0
 
