@@ -36,8 +36,8 @@ class BatchConfig:
 
 
 @dataclass
-class DocumentInfo:
-    """Information about a document containing a chunk."""
+class ExpectedChunk:
+    """Information about the expected/ground truth chunk containing the answer."""
 
     name: str
     source: str
@@ -61,7 +61,7 @@ class EvaluationResult:
     qa_pair_id: str
     question: str
     expected_answer: str
-    document_info: DocumentInfo
+    expected_chunk: ExpectedChunk
     correct_chunk_retrieved: bool
     rank_if_found: Optional[int]
     top_k_scores: List[float]
@@ -74,11 +74,11 @@ class EvaluationResult:
             "qa_pair_id": self.qa_pair_id,
             "question": self.question,
             "expected_answer": self.expected_answer,
-            "document_info": {
-                "name": self.document_info.name,
-                "source": self.document_info.source,
-                "chunk_id": self.document_info.chunk_id,
-                "content_hash": self.document_info.content_hash,
+            "expected_chunk": {
+                "name": self.expected_chunk.name,
+                "source": self.expected_chunk.source,
+                "chunk_id": self.expected_chunk.chunk_id,
+                "content_hash": self.expected_chunk.content_hash,
             },
             "evaluation_result": {
                 "correct_chunk_retrieved": self.correct_chunk_retrieved,

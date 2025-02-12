@@ -10,8 +10,8 @@ from src.metrics.evaluation.logging import EvaluationLogger
 from src.metrics.models.metrics import (
     BatchConfig,
     DatasetMetrics,
-    DocumentInfo,
     EvaluationResult,
+    ExpectedChunk,
     IncorrectRetrievalsAnalysis,
     MetricsSummary,
     RetrievedChunk,
@@ -41,7 +41,7 @@ def test_batch_config():
 @pytest.fixture
 def test_evaluation_result():
     """Create a test evaluation result."""
-    doc_info = DocumentInfo(
+    expected = ExpectedChunk(
         name="test_doc",
         source="test_dataset",
         chunk_id="chunk123",
@@ -56,7 +56,7 @@ def test_evaluation_result():
         qa_pair_id="qa123",
         question="test question?",
         expected_answer="test answer",
-        document_info=doc_info,
+        expected_chunk=expected,
         correct_chunk_retrieved=True,
         rank_if_found=1,
         top_k_scores=[0.85, 0.75],

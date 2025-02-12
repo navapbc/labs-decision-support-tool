@@ -5,8 +5,8 @@ from datetime import datetime
 from src.metrics.models.metrics import (
     BatchConfig,
     DatasetMetrics,
-    DocumentInfo,
     EvaluationResult,
+    ExpectedChunk,
     IncorrectRetrievalsAnalysis,
     MetricsSummary,
     RetrievedChunk,
@@ -45,18 +45,18 @@ def test_batch_config_creation():
     assert config_dict["software_info"]["git_commit"] == "abc123"
 
 
-def test_document_info():
-    """Test DocumentInfo creation."""
-    doc_info = DocumentInfo(
+def test_expected_chunk():
+    """Test ExpectedChunk creation."""
+    expected = ExpectedChunk(
         name="test_doc",
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
     )
-    assert doc_info.name == "test_doc"
-    assert doc_info.source == "test_dataset"
-    assert doc_info.chunk_id == "chunk123"
-    assert doc_info.content_hash == "hash456"
+    assert expected.name == "test_doc"
+    assert expected.source == "test_dataset"
+    assert expected.chunk_id == "chunk123"
+    assert expected.content_hash == "hash456"
 
 
 def test_retrieved_chunk():
@@ -73,7 +73,7 @@ def test_retrieved_chunk():
 
 def test_evaluation_result():
     """Test EvaluationResult creation and to_dict conversion."""
-    doc_info = DocumentInfo(
+    expected = ExpectedChunk(
         name="test_doc",
         source="test_dataset",
         chunk_id="chunk123",
@@ -88,7 +88,7 @@ def test_evaluation_result():
         qa_pair_id="qa123",
         question="test question?",
         expected_answer="test answer",
-        document_info=doc_info,
+        expected_chunk=expected,
         correct_chunk_retrieved=True,
         rank_if_found=1,
         top_k_scores=[0.85, 0.75],
@@ -100,7 +100,7 @@ def test_evaluation_result():
     assert result.qa_pair_id == "qa123"
     assert result.question == "test question?"
     assert result.expected_answer == "test answer"
-    assert result.document_info == doc_info
+    assert result.expected_chunk == expected
     assert result.correct_chunk_retrieved is True
     assert result.rank_if_found == 1
     assert result.top_k_scores == [0.85, 0.75]
@@ -112,7 +112,7 @@ def test_evaluation_result():
     assert result_dict["qa_pair_id"] == "qa123"
     assert result_dict["question"] == "test question?"
     assert result_dict["expected_answer"] == "test answer"
-    assert result_dict["document_info"]["name"] == "test_doc"
+    assert result_dict["expected_chunk"]["name"] == "test_doc"
     assert result_dict["evaluation_result"]["correct_chunk_retrieved"] is True
     assert result_dict["evaluation_result"]["rank_if_found"] == 1
     assert result_dict["evaluation_result"]["top_k_scores"] == [0.85, 0.75]

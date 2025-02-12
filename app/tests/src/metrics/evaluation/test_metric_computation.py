@@ -5,7 +5,7 @@ from src.metrics.evaluation.metric_computation import (
     compute_incorrect_analysis,
     compute_metrics_summary,
 )
-from src.metrics.models.metrics import DocumentInfo, EvaluationResult, RetrievedChunk
+from src.metrics.models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def create_test_result(
@@ -18,7 +18,7 @@ def create_test_result(
     if scores is None:
         scores = [0.85, 0.75]
 
-    doc_info = DocumentInfo(
+    expected = ExpectedChunk(
         name="test_doc",
         source=source,
         chunk_id="chunk123",
@@ -35,7 +35,7 @@ def create_test_result(
         qa_pair_id="qa123",
         question="test question?",
         expected_answer="test answer",
-        document_info=doc_info,
+        expected_chunk=expected,
         correct_chunk_retrieved=correct,
         rank_if_found=rank if correct else None,
         top_k_scores=scores,

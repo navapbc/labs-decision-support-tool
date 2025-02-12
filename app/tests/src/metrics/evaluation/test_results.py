@@ -9,7 +9,7 @@ from src.metrics.evaluation.results import (
     generate_qa_pair_id,
     process_retrieved_chunks,
 )
-from src.metrics.models.metrics import DocumentInfo, EvaluationResult, RetrievedChunk
+from src.metrics.models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def test_generate_qa_pair_id():
@@ -86,12 +86,12 @@ def test_process_retrieved_chunks_found(mock_question, mock_chunk):
         assert result.top_k_scores == [0.85]
         assert result.retrieval_time_ms == 100.5
 
-        # Verify document info
-        assert isinstance(result.document_info, DocumentInfo)
-        assert result.document_info.name == mock_question["document_name"]
-        assert result.document_info.source == mock_question["dataset"]
-        assert result.document_info.chunk_id == mock_question["chunk_id"]
-        assert result.document_info.content_hash == mock_question["content_hash"]
+        # Verify expected chunk
+        assert isinstance(result.expected_chunk, ExpectedChunk)
+        assert result.expected_chunk.name == mock_question["document_name"]
+        assert result.expected_chunk.source == mock_question["dataset"]
+        assert result.expected_chunk.chunk_id == mock_question["chunk_id"]
+        assert result.expected_chunk.content_hash == mock_question["content_hash"]
 
         # Verify retrieved chunks
         assert len(result.retrieved_chunks) == 1
@@ -142,10 +142,10 @@ def test_process_retrieved_chunks_empty():
     assert result.correct_chunk_retrieved is False
     assert result.rank_if_found is None
     assert result.top_k_scores == []
-    assert result.document_info.name == ""
-    assert result.document_info.source == ""
-    assert result.document_info.chunk_id == ""
-    assert result.document_info.content_hash == ""
+    assert result.expected_chunk.name == ""
+    assert result.expected_chunk.source == ""
+    assert result.expected_chunk.chunk_id == ""
+    assert result.expected_chunk.content_hash == ""
 
 
 def test_batch_process_results(mock_question, mock_chunk):

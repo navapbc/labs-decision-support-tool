@@ -97,7 +97,7 @@ Each evaluation run creates four files in the logs directory:
   "qa_pair_id": "uuid",
   "question": "What are the eligibility requirements?",
   "expected_answer": "...",
-  "document_info": {
+  "expected_chunk": {
     "name": "document.pdf",
     "source": "imagine_la",
     "chunk_id": "123",

@@ -54,7 +54,7 @@ def compute_incorrect_analysis(results: List[EvaluationResult]) -> IncorrectRetr
     # Count incorrect retrievals per dataset and sort by frequency
     dataset_counts: Dict[str, int] = defaultdict(int)
     for result in incorrect_results:
-        dataset_counts[result.document_info.source] += 1
+        dataset_counts[result.expected_chunk.source] += 1
 
     # Sort datasets by number of incorrect retrievals (descending) and then by name
     sorted_datasets = sorted(
@@ -73,7 +73,7 @@ def compute_metrics_summary(results: List[EvaluationResult], batch_id: str) -> M
     # Group results by dataset
     dataset_results = defaultdict(list)
     for result in results:
-        dataset_results[result.document_info.source].append(result)
+        dataset_results[result.expected_chunk.source].append(result)
 
     # Compute metrics per dataset
     dataset_metrics = {

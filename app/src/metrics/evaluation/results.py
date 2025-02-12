@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from src.app_config import app_config
 
-from ..models.metrics import DocumentInfo, EvaluationResult, RetrievedChunk
+from ..models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
 from ..utils.timer import measure_time
 
 
@@ -47,7 +47,7 @@ def process_retrieved_chunks(
         EvaluationResult object
     """
     # Extract document info
-    doc_info = DocumentInfo(
+    doc_info = ExpectedChunk(
         name=question.get("document_name", ""),
         source=question.get("dataset", ""),
         chunk_id=question.get("chunk_id", ""),
@@ -86,7 +86,7 @@ def process_retrieved_chunks(
         qa_pair_id=qa_pair_id,
         question=question["question"],
         expected_answer=question.get("answer", ""),
-        document_info=doc_info,
+        expected_chunk=doc_info,
         correct_chunk_retrieved=correct_chunk_retrieved,
         rank_if_found=rank_if_found,
         top_k_scores=scores,
