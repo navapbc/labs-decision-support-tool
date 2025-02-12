@@ -127,7 +127,7 @@ Note: The `qa_pair_id` is deterministic to question, answer, and dataset content
   - QA pair generation module is implemented
   - We move to multiple ground truths per question (in which case we may remove dataset from UUID)
 
-3. `results_${UUID}.csv` - Flattened results for analysis:
+3. `results_${UUID}.csv` - Flattened version of `results_${UUID}.jsonl` for analysis:
 - One row per retrieved chunk
 - Includes original result ID, chunk details, retrieval metrics, and content hash
 - Each row contains rank, similarity score, and whether it matches the expected chunk
@@ -150,7 +150,7 @@ The CSV contains the following columns:
 - `evaluation_result_rank_if_found`: Position of correct chunk if found (null if not found)
 - `evaluation_result_retrieval_time_ms`: Time taken to retrieve results in milliseconds
 
-4. `metrics_${UUID}.json` - Aggregated metrics:
+4. `metrics_${UUID}.json` - Aggregated metrics computed from data in `results_${UUID}.jsonl`:
 ```json
 {
   "batch_id": "uuid",
