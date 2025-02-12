@@ -20,7 +20,7 @@ def create_retrieval_function(min_score: float) -> Callable[[str, int], Sequence
     """Create retrieval function with configured min_score."""
 
     def retrieval_func(query: str, k: int) -> Sequence[Any]:
-        return retrieve_with_scores(query, k, min_score)
+        return retrieve_with_scores(query=query, retrieval_k=k, retrieval_k_min_score=min_score)
 
     return retrieval_func
 
@@ -57,6 +57,11 @@ def main() -> None:
         type=int,
         help="Random seed for reproducible sampling (only used if sampling is specified)",
     )
+    parser.add_argument(
+        "--commit",
+        type=str,
+        help="Git commit hash of the code being evaluated",
+    )
 
     args = parser.parse_args()
 
@@ -82,6 +87,7 @@ def main() -> None:
             sample_fraction=args.sampling,
             random_seed=args.random_seed,
             log_dir=log_dir,
+            commit=args.commit,
         )
 
         # Print latest results

@@ -11,7 +11,7 @@ def test_create_batch_config():
     assert config.num_samples == 0
     assert config.dataset_filter == []
     assert config.package_version is not None
-    assert config.git_commit is not None
+    assert config.git_commit is not None  # Should get from get_git_commit()
     assert config.batch_id is not None
     assert config.timestamp is not None
 
@@ -23,7 +23,14 @@ def test_create_batch_config():
     )
     assert config.k_value == 10
     assert config.dataset_filter == ["dataset1", "dataset2"]
-    assert config.git_commit == "test123"
+    assert config.git_commit == "test123"  # Should use provided commit hash
+    assert config.package_version is not None
+    assert config.batch_id is not None
+    assert config.timestamp is not None
+
+    # Test that git_commit is properly included in to_dict output
+    config_dict = config.to_dict()
+    assert config_dict["software_info"]["git_commit"] == "test123"
 
 
 def test_stratified_sample():

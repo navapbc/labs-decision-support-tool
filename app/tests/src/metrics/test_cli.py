@@ -54,7 +54,9 @@ def test_create_retrieval_function():
         results = retrieval_func("test query", 2)
 
         # Verify the mock was called with correct parameters
-        mock_retrieve.assert_called_once_with("test query", 2, min_score)
+        mock_retrieve.assert_called_once_with(
+            query="test query", retrieval_k=2, retrieval_k_min_score=min_score
+        )
         assert results == ["result1", "result2"]
 
 
