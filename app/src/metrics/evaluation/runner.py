@@ -40,7 +40,9 @@ class EvaluationRunner:
         questions_file: str,
         k_values: List[int],
         dataset_filter: Optional[List[str]] = None,
+        min_score: Optional[float] = None,
         sample_fraction: Optional[float] = None,
+        random_seed: Optional[int] = None,
         commit: Optional[str] = None,
     ) -> None:
         """Run evaluation for multiple k values.
@@ -49,7 +51,9 @@ class EvaluationRunner:
             questions_file: Path to questions CSV file
             k_values: List of k values to evaluate
             dataset_filter: Optional list of datasets to include
+            min_score: Optional minimum similarity score for retrieval
             sample_fraction: Optional fraction of questions to sample
+            random_seed: Optional seed for reproducible sampling
             commit: Git commit hash of code being evaluated
         """
         # Load and filter questions
@@ -62,7 +66,14 @@ class EvaluationRunner:
         # Apply sampling if specified
         if sample_fraction:
             print(f"Sampling {sample_fraction * 100}% of questions")
-            questions = stratified_sample(questions, sample_fraction)
+            if random_seed is not None:
+                print(f"Using random seed: {random_seed}")
+            questions = stratified_sample(
+                questions,
+                sample_fraction=sample_fraction,
+                min_per_dataset=1,
+                random_seed=random_seed,
+            )
             print(f"After sampling: {len(questions)} questions")
 
         if not questions:
@@ -116,7 +127,9 @@ def run_evaluation(
     k_values: List[int],
     retrieval_func: Any,
     dataset_filter: Optional[List[str]] = None,
+    min_score: Optional[float] = None,
     sample_fraction: Optional[float] = None,
+    random_seed: Optional[int] = None,
     log_dir: str = "logs/evaluations",
     commit: Optional[str] = None,
 ) -> None:
@@ -127,6 +140,8 @@ def run_evaluation(
         questions_file=questions_file,
         k_values=k_values,
         dataset_filter=dataset_filter,
+        min_score=min_score,
         sample_fraction=sample_fraction,
+        random_seed=random_seed,
         commit=commit,
     )

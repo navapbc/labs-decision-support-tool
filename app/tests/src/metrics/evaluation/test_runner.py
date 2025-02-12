@@ -126,7 +126,9 @@ def test_run_evaluation_with_sampling(mock_retrieval_func, mock_questions):
                 runner.run_evaluation(questions_file="test.csv", k_values=[5], sample_fraction=0.5)
 
                 # Verify sampled questions were passed to batch
-                mock_sample.assert_called_once_with(mock_questions, 0.5)
+                mock_sample.assert_called_once_with(
+                    mock_questions, sample_fraction=0.5, min_per_dataset=1, random_seed=None
+                )
                 call_args = mock_run_batch.call_args[0]
                 sampled_questions = call_args[0]
                 assert len(sampled_questions) == 1
@@ -188,5 +190,7 @@ def test_convenience_function(mock_retrieval_func):
             k_values=[5],
             dataset_filter=["dataset1"],
             sample_fraction=0.5,
+            min_score=None,
+            random_seed=None,
             commit="abc123",
         )

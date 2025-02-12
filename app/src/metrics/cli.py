@@ -48,9 +48,14 @@ def main() -> None:
         default="src/metrics/data/question_answer_pairs.csv",
         help="Path to questions CSV file",
     )
-    parser.add_argument("--sampling", type=float, help="Fraction of questions to sample (e.g. 0.1)")
     parser.add_argument(
         "--min-score", type=float, default=-1.0, help="Minimum similarity score for retrieval"
+    )
+    parser.add_argument("--sampling", type=float, help="Fraction of questions to sample (e.g. 0.1)")
+    parser.add_argument(
+        "--random-seed",
+        type=int,
+        help="Random seed for reproducible sampling (only used if sampling is specified)",
     )
     parser.add_argument("--commit", type=str, help="Git commit hash of the code being evaluated")
 
@@ -76,6 +81,7 @@ def main() -> None:
             retrieval_func=retrieval_func,
             dataset_filter=dataset_filter,
             sample_fraction=args.sampling,
+            random_seed=args.random_seed,
             log_dir=log_dir,
             commit=args.commit,  # Pass commit hash to evaluation
         )

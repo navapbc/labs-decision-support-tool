@@ -45,7 +45,10 @@ def create_batch_config(
 
 
 def stratified_sample(
-    questions: List[Dict], sample_fraction: float, min_per_dataset: int = 1
+    questions: List[Dict],
+    sample_fraction: float,
+    min_per_dataset: int = 1,
+    random_seed: Optional[int] = None,
 ) -> List[Dict]:
     """Take a stratified sample of questions based on dataset.
 
@@ -53,12 +56,19 @@ def stratified_sample(
         questions: List of questions to sample from
         sample_fraction: Fraction of questions to sample (0-1)
         min_per_dataset: Minimum number of questions per dataset
+        random_seed: Optional seed for random sampling to make runs reproducible
 
     Returns:
-        Sampled questions maintaining dataset proportions
+        Sampled questions maintaining dataset proportions. The sampling is stratified,
+        meaning it maintains the relative proportions of questions from each dataset
+        while ensuring at least min_per_dataset (default: 1) questions from each.
     """
     if sample_fraction >= 1.0:
         return questions
+
+    # Set random seed if provided
+    if random_seed is not None:
+        random.seed(random_seed)
 
     # Group questions by dataset
     dataset_groups = defaultdict(list)
@@ -73,6 +83,11 @@ def stratified_sample(
 
     # Shuffle the combined sample
     random.shuffle(sampled_questions)
+
+    # Reset random seed
+    if random_seed is not None:
+        random.seed()
+
     return sampled_questions
 
 
