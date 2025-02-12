@@ -119,6 +119,14 @@ Each evaluation run creates four files in the logs directory:
 }
 ```
 
+Note: The `qa_pair_id` is deterministic to question, answer, and dataset content. This ensures:
+- Same QA pair gets same ID across different eval runs
+- IDs change if question/answer content changes
+- IDs are unique across different datasets
+- Valid until:
+  - QA pair generation module is implemented
+  - We move to multiple ground truths per question (in which case we may remove dataset from UUID)
+
 3. `results_${UUID}.csv` - Flattened results for analysis:
 - One row per retrieved chunk
 - Includes original result ID, chunk details, and retrieval metrics

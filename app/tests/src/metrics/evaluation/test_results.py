@@ -4,8 +4,30 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.metrics.evaluation.results import batch_process_results, process_retrieved_chunks
+from src.metrics.evaluation.results import (
+    batch_process_results,
+    generate_qa_pair_id,
+    process_retrieved_chunks,
+)
 from src.metrics.models.metrics import DocumentInfo, EvaluationResult, RetrievedChunk
+
+
+def test_generate_qa_pair_id():
+    """Test UUID generation for QA pairs."""
+    # Test that same inputs generate same UUID
+    uuid1 = generate_qa_pair_id("test question?", "test answer", "test_dataset")
+    uuid2 = generate_qa_pair_id("test question?", "test answer", "test_dataset")
+    assert uuid1 == uuid2
+
+    # Test that different inputs generate different UUIDs
+    uuid3 = generate_qa_pair_id("different question?", "test answer", "test_dataset")
+    assert uuid1 != uuid3
+
+    uuid4 = generate_qa_pair_id("test question?", "different answer", "test_dataset")
+    assert uuid1 != uuid4
+
+    uuid5 = generate_qa_pair_id("test question?", "test answer", "different_dataset")
+    assert uuid1 != uuid5
 
 
 @pytest.fixture
@@ -20,6 +42,14 @@ def mock_question():
         "chunk_id": "chunk_123",
         "content_hash": "abc123",
     }
+
+
+@pytest.fixture
+def mock_question_no_id(mock_question):
+    """Create a mock question dictionary without an ID."""
+    question = mock_question.copy()
+    del question["id"]
+    return question
 
 
 @pytest.fixture
@@ -70,6 +100,19 @@ def test_process_retrieved_chunks_found(mock_question, mock_chunk):
         assert chunk.chunk_id == str(mock_chunk.chunk.id)
         assert chunk.score == mock_chunk.score
         assert chunk.content == mock_chunk.chunk.content
+
+
+def test_process_retrieved_chunks_no_id(mock_question_no_id, mock_chunk):
+    """Test processing retrieved chunks when no ID is provided."""
+    retrieved_chunks = [mock_chunk]
+
+    result = process_retrieved_chunks(mock_question_no_id, retrieved_chunks, 100.5)
+
+    # Verify a UUID was generated
+    assert result.qa_pair_id != ""
+    # Verify it's stable for same inputs
+    result2 = process_retrieved_chunks(mock_question_no_id, retrieved_chunks, 100.5)
+    assert result.qa_pair_id == result2.qa_pair_id
 
 
 def test_process_retrieved_chunks_not_found(mock_question, mock_chunk):

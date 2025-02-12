@@ -1,5 +1,6 @@
 """Results processing for evaluation runs."""
 
+import uuid
 from hashlib import md5
 from typing import Any, Dict, List
 
@@ -9,6 +10,27 @@ from src.app_config import app_config
 
 from ..models.metrics import DocumentInfo, EvaluationResult, RetrievedChunk
 from ..utils.timer import measure_time
+
+
+def generate_qa_pair_id(question: str, answer: str, dataset: str) -> str:
+    """Generate a stable UUID for a QA pair based on content.
+
+    The QA Pair UUID will be deterministic based on question, answer, and dataset.
+    So it will be consistent between runs but will change if the content changes.
+
+    Args:
+        question: The question text
+        answer: The expected answer text
+        dataset: The dataset identifier (e.g., "imagine_la")
+
+    Returns:
+        UUID string stable on QA and dataset content
+    """
+    # Combine all fields to create a stable hash
+    content = f"{dataset}||{question}||{answer}".encode("utf-8")
+    content_hash = md5(content, usedforsecurity=False).digest()
+    # Use the first 16 bytes of the hash to create a UUID
+    return str(uuid.UUID(bytes=content_hash[:16]))
 
 
 def process_retrieved_chunks(
@@ -55,8 +77,13 @@ def process_retrieved_chunks(
     if correct_chunk_retrieved:
         rank_if_found = content_hashes.index(doc_info.content_hash) + 1
 
+    # Generate a stable UUID for this QA pair if one isn't provided
+    qa_pair_id = question.get("id") or generate_qa_pair_id(
+        question=question["question"], answer=question.get("answer", ""), dataset=doc_info.source
+    )
+
     return EvaluationResult(
-        qa_pair_id=question.get("id", ""),
+        qa_pair_id=qa_pair_id,
         question=question["question"],
         expected_answer=question.get("answer", ""),
         document_info=doc_info,
