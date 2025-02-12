@@ -39,7 +39,7 @@ def process_retrieved_chunks(
 
     for chunk in retrieved_chunks:
         content = chunk.chunk.content
-        content_hash = md5(content.encode("utf-8")).hexdigest()
+        content_hash = md5(content.encode("utf-8"), usedforsecurity=False).hexdigest()
         content_hashes.append(content_hash)
         scores.append(chunk.score)
 
