@@ -113,6 +113,7 @@ def test_stratified_sample():
 
     # Test that random seed is properly reset
     import random
+
     random.seed(123)
     val1 = random.random()
     stratified_sample(questions, 0.5, random_seed=42)
