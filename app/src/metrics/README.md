@@ -48,6 +48,16 @@ Before running evaluations, you'll need the questions CSV file:
 1. Download the questions file from [this Google Sheet](https://docs.google.com/spreadsheets/d/1KBFMyRUSohqA94ic6yAv3Ne22GwEBJHHYHM49rEKFsc/edit?usp=sharing)
 2. Save it as `question_answer_pairs.csv` in `app/src/metrics/data/`
 
+### Input CSV Format
+
+The questions CSV file should have the following columns:
+- question: The question text
+- answer: Expected answer text
+- document_name: Name of source document
+- dataset: Dataset identifier (e.g., "Imagine LA")
+- chunk_id: ID of chunk containing answer
+- content_hash: Hash of chunk content for verification
+
 ### Command Line Interface
 
 The module provides a CLI for running evaluations:
@@ -77,8 +87,8 @@ Each evaluation run creates four files in the logs directory:
 1. `batch_${UUID}.json` - Run metadata and configuration:
 ```json
 {
-  "batch_id": "uuid",
-  "timestamp": "XXXZ",
+  "batch_id": "527703bd-97f1-4f51-959b-e0d8bed8cbab",
+  "timestamp": "2024-02-15T09:32:47.123456",
   "evaluation_config": {
     "k_value": 5,
     "dataset_filter": ["imagine_la"],
@@ -153,68 +163,41 @@ The CSV contains the following columns:
 4. `metrics_${UUID}.json` - Aggregated metrics computed from data in `results_${UUID}.jsonl`:
 ```json
 {
-  "batch_id": "uuid",
-  "timestamp": "XXXZ",
+  "batch_id": "527703bd-97f1-4f51-959b-e0d8bed8cbab",
+  "timestamp": "2024-02-15T09:32:48.234567",
   "overall_metrics": {
-    "recall_at_k": 0.90,
-    "mean_retrieval_time_ms": 145,
-    "total_questions": 100,
-    "successful_retrievals": 90,
+    "recall_at_k": 0.90,                      // Fraction of questions where correct chunk found in top k results
+    "mean_retrieval_time_ms": 145.0,          // Average retrieval time per question
+    "total_questions": 100,                   // Total number of questions evaluated
+    "successful_retrievals": 90,              // Questions where correct chunk was found
     "incorrect_retrievals_analysis": {
-      "incorrect_retrievals_count": 10,
-      "avg_score_incorrect": 0.45,
-      "datasets_with_incorrect_retrievals": ["dataset1", "dataset2"]
+      "incorrect_retrievals_count": 10,       // Number of failed retrievals
+      "avg_score_incorrect": 0.45,            // Mean similarity score of incorrect chunks
+      "datasets_with_incorrect_retrievals": ["dataset1", "dataset2"]  // Datasets with failures, sorted by frequency
     }
   },
   "dataset_metrics": {
-    "imagine_la": {
-      "recall_at_k": 0.90,
-      "sample_size": 100,
-      "avg_score_incorrect": 0.45
+    "Imagine LA": {                           // Note: Actual dataset name from CSV
+      "recall_at_k": 0.90,                    // Dataset-specific recall rate
+      "sample_size": 100,                     // Questions from this dataset
+      "avg_score_incorrect": 0.45             // Mean score of incorrect retrievals
     }
   }
 }
 ```
 
-### CSV Format
-
-The questions CSV file should have the following columns:
-- question: The question text
-- answer: Expected answer text
-- document_name: Name of source document
-- dataset: Dataset identifier (e.g., "Imagine LA")
-- chunk_id: ID of chunk containing answer
-- content_hash: Hash of chunk content for verification
-
 ### Metrics Explanation
 
-The system computes several metrics to evaluate retrieval performance:
+Key formulas and additional details:
 
-- **Recall@k**: Whether the correct chunk was found within the top k results
-- **Mean Retrieval Time**: Average time in milliseconds to retrieve results
+- **Recall@k**: Number of successful retrievals / total questions
 - **Incorrect Retrievals Analysis**:
-  - Count of incorrect retrievals
-  - Average similarity score of incorrect retrievals
-  - Datasets where incorrect retrievals occurred (sorted by frequency)
+  - `avg_score_incorrect = sum(similarity_scores_of_incorrect_chunks) / count(incorrect_chunks)`
+  - Helps identify if failures had misleadingly high confidence scores
 
 Metrics are computed both overall and per dataset, providing:
 - Total questions evaluated
 - Successful retrievals count
 - Sample size per dataset
 - Average score for incorrect retrievals
-
-## Example
-
-```python
-from src.metrics.evaluation.runner import run_evaluation
-from src.retrieve import retrieve_with_scores
-
-# Run evaluation
-run_evaluation(
-    questions_file="src/metrics/data/question_answer_pairs.csv",
-    k_values=[5, 10, 25],
-    retrieval_func=lambda q, k: retrieve_with_scores(q, k, min_score=-1.0),
-    dataset_filter=["imagine_la"],
-    sample_fraction=0.1
-)
 ``` 
