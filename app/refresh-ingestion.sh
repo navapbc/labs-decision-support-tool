@@ -92,6 +92,72 @@ scrape_and_ingest() {
     echo_stats "$DATASET_ID"
 }
 
+create_md_zip(){
+    local DATASET_ID="$1"
+    [ -d "${DATASET_ID}_md" ] || exit 29
+
+    # Collect stats before zipping
+    collect_stats "$DATASET_ID"
+
+    # Include stats.json in the zip along with other logs
+    zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log logs/"$DATASET_ID"*.json
+    mv -iv "${DATASET_ID}_md" "${DATASET_ID}-${TODAY}_md"
+}
+
+collect_stats(){
+    local DATASET_ID="$1"
+
+    local MARKDOWN_COUNT=$(find "${DATASET_ID}_md" -type f -iname '*.md' | wc -l)
+    local INGEST_STATS=$(grep -E "Running with args|DONE splitting|Finished ingesting" "logs/${DATASET_ID}-2ingest.log")
+    local SCRAPE_STATS=$(grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log")
+    local HTML_COUNT=0
+    if [ -d "src/ingestion/imagine_la/scrape/pages" ]; then
+        HTML_COUNT=$(ls src/ingestion/imagine_la/scrape/pages | wc -l)
+    fi
+
+    # Parse ingest stats
+    local PAGES_COUNT=$(echo "$INGEST_STATS" | grep "DONE splitting" | sed -E 's/.*splitting all ([0-9]+) webpages.*/\1/')
+    local CHUNKS_COUNT=$(echo "$INGEST_STATS" | grep "DONE splitting" | sed -E 's/.*total of ([0-9]+) chunks.*/\1/')
+    local INGEST_STATUS=$(echo "$INGEST_STATS" | grep -q "Finished ingesting" && echo "completed" || echo "failed")
+    
+    # Parse scrape stats into key-value pairs
+    local SCRAPE_PARSED=$(echo "$SCRAPE_STATS" | sed 's/{//g; s/}//g; s/'"'"'//g' | tr -d '\n' | sed 's/: /:/g' | tr ',' '\n' | while read -r line; do
+        key=$(echo "$line" | cut -d':' -f1 | tr -d ' ')
+        value=$(echo "$line" | cut -d':' -f2 | tr -d ' ')
+        if [ ! -z "$key" ]; then
+            echo "            \"$key\": $value,"
+        fi
+    done | sed '$ s/,$//')
+
+    # Save stats to JSON
+    cat > "logs/${DATASET_ID}-${TODAY}_stats_raw.json" << EOF
+{
+    "dataset_id": "$DATASET_ID",
+    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "stats": {
+        "markdown_files": $MARKDOWN_COUNT,
+        "html_files": $HTML_COUNT,
+        "ingest": {
+            "chunks_split": {
+                "pages": ${PAGES_COUNT:-0},
+                "chunks": ${CHUNKS_COUNT:-0}
+            },
+            "status": "$INGEST_STATUS"
+        },
+        "scrape": {
+$SCRAPE_PARSED
+        }
+    }
+}
+EOF
+
+    # Validate and pretty-print the JSON
+    if command -v jq >/dev/null 2>&1; then
+        jq '.' "logs/${DATASET_ID}-${TODAY}_stats_raw.json" > "logs/${DATASET_ID}-${TODAY}_stats.json" && \
+        rm -v "logs/${DATASET_ID}-${TODAY}_stats_raw.json"
+    fi
+}
+
 echo_stats(){
     local DATASET_ID="$1"
     grep -E "Running with args|DONE splitting|Finished ingesting" "logs/${DATASET_ID}-2ingest.log"
@@ -101,18 +167,11 @@ echo_stats(){
     echo "REMINDERS:"
     echo "1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
     echo "   $(ls -l "${DATASET_ID}_md.zip")"
-    echo "2. Upload ingester input files (e.g., *-scrapings.json) to S3:"
-    echo "   aws s3 sync ..."
+    echo "2. Upload ingester input files (e.g., *-scrapings.json) and stats to S3:"
+    echo "   aws s3 sync src/ingestion/${DATASET_ID}_scrapings*.json s3://decision-support-tool-app-dev/${DATASET_ID}"
+    echo "   aws s3 cp logs/${DATASET_ID}-${TODAY}_stats.json s3://decision-support-tool-app-dev/${DATASET_ID}/stats/${TODAY}_stats.json"
     echo "3. Run ingestion on deployed app:"
     echo "   ./bin/run-command app dev ..."
-}
-
-create_md_zip(){
-    local DATASET_ID="$1"
-    [ -d "${DATASET_ID}_md" ] || exit 29
-
-    zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log
-    mv -iv "${DATASET_ID}_md" "${DATASET_ID}-${TODAY}_md"
 }
 
 check_preconditions(){
