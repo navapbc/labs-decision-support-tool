@@ -78,24 +78,6 @@ def la_policy_config(
     )
 
 
-def ca_public_charge_config(
-    dataset_label: str, benefit_program: str, benefit_region: str, scraper_dataset: str
-) -> IngestConfig:
-    def prep_json_item(item: dict[str, str]) -> None:
-        markdown = item.get("main_content", item.get("main_primary", None))
-        assert markdown, f"Item {item['url']} has no main_content or main_primary"
-        item["markdown"] = markdown
-
-    return IngestConfig(
-        dataset_label,
-        benefit_program,
-        benefit_region,
-        "https://keepyourbenefits.org/en/ca/",
-        scraper_dataset,
-        prep_json_item,
-    )
-
-
 def get_ingester_config(scraper_dataset: str) -> IngestConfig:  # pragma: no cover
     match scraper_dataset:
         case "ca_ftb":
@@ -103,8 +85,12 @@ def get_ingester_config(scraper_dataset: str) -> IngestConfig:  # pragma: no cov
                 "CA FTB", "tax credit", "California", "https://www.ftb.ca.gov/", scraper_dataset
             )
         case "ca_public_charge":
-            return ca_public_charge_config(
-                "Keep Your Benefits", "mixed", "California", scraper_dataset
+            return IngestConfig(
+                "Keep Your Benefits",
+                "mixed",
+                "California",
+                "https://keepyourbenefits.org/en/ca/",
+                scraper_dataset,
             )
         case "ca_wic":
             return IngestConfig(

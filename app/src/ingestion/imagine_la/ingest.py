@@ -116,6 +116,12 @@ def _ingest_content_hub(
         )
         all_chunks.append(result)
 
+    logger.info(
+        "=== DONE splitting all %d webpages into a total of %d chunks",
+        len(all_chunks),
+        sum(len(chunks) for _, chunks, _ in all_chunks),
+    )
+
     if skip_db:
         logger.info("Skip saving to DB")
     else:

@@ -61,7 +61,7 @@ class LA_PolicyManualSpider(scrapy.Spider):
     common_url_prefix = "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster"
 
     # To scrape individual pages, update urls in start_requests() and run:
-    # cd app/src/ingestion; DEBUGGING=true DEBUG_SCRAPINGS=true python scrape_la_policy.py
+    # DEBUGGING=true poetry run scrapy-runner la_policy --debug
     DEBUGGING = os.environ.get("DEBUGGING", False)
 
     def start_requests(self) -> Iterable[scrapy.Request]:
@@ -85,10 +85,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_49_Sponsored_Noncitizen/63-503_49_Sponsored_Noncitizen.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/42-300_Time_Limit_Requirements/42-300_Time_Limit_Requirements.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-503_41_Self-Employment_Income/63-503_41_Self-Employment_Income.htm",
-                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm",
+                # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/GR/GR/44-220_Emergency_Aid/44-220_Emergency_Aid.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalFresh/CalFresh/63-300_Application_Process/63-300_Application_Process.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/CalWORKs/CalWORKs/44-211_561_Homeless_Case_Management_Program/44-211_561_Homeless_Case_Management_Program.htm",
                 # "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm",
+                "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Sneede_v_Kizer/Sneede_v_Kizer.htm",
             ]
             for url in urls:
                 yield scrapy.Request(url=url, callback=self.parse_page)
@@ -362,6 +363,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
         if len(cols) == 8:
             # Bottom of 63-900_Emergency_CalFresh_Assistance.htm is an extra table with 8 columns;
+            # just render it as a table
+            return to_markdown(row.get(), base_url)
+        if len(cols) == 4:
+            # Bottom of Medi-Cal/Sneede_v_Kizer/Sneede_v_Kizer.htm has a row with formula;
             # just render it as a table
             return to_markdown(row.get(), base_url)
 

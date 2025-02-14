@@ -42,6 +42,7 @@ class CaPublicChargeSpider(CrawlSpider):
     )
 
     def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
+        self.logger.info("Parsing %s", response.url)
         extractions = {"url": response.url}
         title = response.css("title::text").get().removesuffix("| Keep Your Benefits")
         extractions["title"] = title.strip()
@@ -50,7 +51,7 @@ class CaPublicChargeSpider(CrawlSpider):
         # remove icon text
         response.css("div.ic-icon").drop()
 
-        extractions |= self.parse_main_primary(base_url, response.css("div.module-full"))
+        # extractions |= self.parse_module_full(base_url, response.css("div.module-full"))
         extractions |= self.parse_main_content(base_url, response.css("div.GTM-1"))
 
         return extractions
@@ -79,11 +80,11 @@ class CaPublicChargeSpider(CrawlSpider):
         )
         # Replace non-absolute URLs with absolute URLs
         markdown = string_utils.resolve_urls(base_url, markdown)
-        return markdown.strip()
+        return markdown.replace("\r", "").strip()
 
-    def parse_main_primary(self, base_url: str, main_primary: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(base_url, main_primary.get()).replace("\r", "").strip()
-        return {"main_primary": markdown}
+    def parse_module_full(self, base_url: str, module_full: SelectorList) -> dict[str, str]:
+        markdown = self.to_markdown(base_url, module_full.get())
+        return {"module_full": markdown}
 
     def parse_main_content(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
         markdown = ""
@@ -98,4 +99,4 @@ class CaPublicChargeSpider(CrawlSpider):
             for middle_detail in middler_details:
                 markdown += "\n" + self.to_markdown(base_url, middle_detail)
 
-        return {"main_content": markdown.replace("\r", "").strip()}
+        return {"markdown": markdown}
