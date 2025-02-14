@@ -115,7 +115,7 @@ create_md_zip(){
     done | sed '$ s/,$//')
 
     # Save stats to JSON
-    cat > "logs/${DATASET_ID}-${TODAY}_stats.json" << EOF
+    cat > "logs/${DATASET_ID}-${TODAY}_stats_raw.json" << EOF
 {
     "dataset_id": "$DATASET_ID",
     "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
@@ -138,8 +138,8 @@ EOF
 
     # Validate and pretty-print the JSON
     if command -v jq >/dev/null 2>&1; then
-        jq '.' "logs/${DATASET_ID}-${TODAY}_stats.json" > "logs/${DATASET_ID}-${TODAY}_stats.json.tmp" && \
-        mv "logs/${DATASET_ID}-${TODAY}_stats.json.tmp" "logs/${DATASET_ID}-${TODAY}_stats.json"
+        jq '.' "logs/${DATASET_ID}-${TODAY}_stats_raw.json" > "logs/${DATASET_ID}-${TODAY}_stats.json" && \
+        rm "logs/${DATASET_ID}-${TODAY}_stats_raw.json"
     fi
 
     echo "-----------------------------------"
