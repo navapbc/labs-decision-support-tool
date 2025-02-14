@@ -128,7 +128,7 @@ check_preconditions(){
 }
 
 if [ -z "$1" ]; then
-    echo "Usage: '$0 <DATASET_ID>', where DATASET_ID is any of the following:"
+    echo "Usage: '$0 <DATASET_ID>', where <DATASET_ID> is any of the following:"
     echo -n "  imagine_la"
     grep "case" src/ingest_runner.py | tr '":' ' ' | while read CASE DATASET_ID COLON; do [ "$DATASET_ID" != "_" ] && echo -n ", $DATASET_ID"; done
     echo ""
