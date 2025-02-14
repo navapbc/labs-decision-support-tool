@@ -109,7 +109,7 @@ create_md_zip(){
         "markdown_files": $MARKDOWN_COUNT,
         "html_files": $HTML_COUNT,
         "ingest_log": $(echo "$INGEST_STATS" | jq -R -s -c 'split("\n")[:-1]'),
-        "scrape_log": $(echo "$SCRAPE_STATS" | jq -R -s -c 'split("\n")[:-1]')
+        "scrape_log": $(echo "$SCRAPE_STATS" | sed 's/{//g; s/}//g; s/'"'"'//g' | tr -d '\n' | sed 's/: /:/g' | jq -R -c 'split(", ")[:-1]')
     }
 }
 EOF
