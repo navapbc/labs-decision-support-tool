@@ -47,6 +47,9 @@ documents/
 
 # intermediate markdown files during ingestion
 /*_md/
+/logs/
+/*.zip
+ssa_scrapings.json
 
 # Files for `make app-shell`
 /.app-shell.bashrc_local

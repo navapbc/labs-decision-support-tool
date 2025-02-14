@@ -75,7 +75,7 @@ def main() -> None:
 
     args = parser.parse_args(sys.argv[1:])
     spider_id = f"{args.dataset}_spider"
-    json_output = f"{spider_id.removesuffix("spider")}scrapings.json"
+    json_output = f"{spider_id.removesuffix('spider')}scrapings.json"
 
     run_spider(spider_id, json_output)
     if args.debug:
