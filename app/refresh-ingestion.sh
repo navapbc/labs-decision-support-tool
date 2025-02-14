@@ -100,6 +100,20 @@ create_md_zip(){
         HTML_COUNT=$(ls src/ingestion/imagine_la/scrape/pages | wc -l)
     fi
 
+    # Parse ingest stats
+    local PAGES_COUNT=$(echo "$INGEST_STATS" | grep "DONE splitting" | sed -E 's/.*splitting all ([0-9]+) webpages.*/\1/')
+    local CHUNKS_COUNT=$(echo "$INGEST_STATS" | grep "DONE splitting" | sed -E 's/.*total of ([0-9]+) chunks.*/\1/')
+    local INGEST_STATUS=$(echo "$INGEST_STATS" | grep -q "Finished ingesting" && echo "completed" || echo "failed")
+    
+    # Parse scrape stats into key-value pairs
+    local SCRAPE_PARSED=$(echo "$SCRAPE_STATS" | sed 's/{//g; s/}//g; s/'"'"'//g' | tr -d '\n' | sed 's/: /:/g' | tr ',' '\n' | while read -r line; do
+        key=$(echo "$line" | cut -d':' -f1 | tr -d ' ')
+        value=$(echo "$line" | cut -d':' -f2 | tr -d ' ')
+        if [ ! -z "$key" ]; then
+            echo "            \"$key\": $value,"
+        fi
+    done | sed '$ s/,$//')
+
     # Save stats to JSON
     cat > "logs/${DATASET_ID}-${TODAY}_stats.json" << EOF
 {
@@ -108,11 +122,25 @@ create_md_zip(){
     "stats": {
         "markdown_files": $MARKDOWN_COUNT,
         "html_files": $HTML_COUNT,
-        "ingest_log": $(echo "$INGEST_STATS" | jq -R -s -c 'split("\n")[:-1]'),
-        "scrape_log": $(echo "$SCRAPE_STATS" | sed 's/{//g; s/}//g; s/'"'"'//g' | tr -d '\n' | sed 's/: /:/g' | jq -R -c 'split(", ")[:-1]')
+        "ingest": {
+            "chunks_split": {
+                "pages": ${PAGES_COUNT:-0},
+                "chunks": ${CHUNKS_COUNT:-0}
+            },
+            "status": "$INGEST_STATUS"
+        },
+        "scrape": {
+$SCRAPE_PARSED
+        }
     }
 }
 EOF
+
+    # Validate and pretty-print the JSON
+    if command -v jq >/dev/null 2>&1; then
+        jq '.' "logs/${DATASET_ID}-${TODAY}_stats.json" > "logs/${DATASET_ID}-${TODAY}_stats.json.tmp" && \
+        mv "logs/${DATASET_ID}-${TODAY}_stats.json.tmp" "logs/${DATASET_ID}-${TODAY}_stats.json"
+    fi
 
     echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
