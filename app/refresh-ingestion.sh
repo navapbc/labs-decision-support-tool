@@ -1,8 +1,5 @@
 #!/bin/bash
 
-mkdir -p logs
-export TODAY=$(date "+%Y-%m-%d")
-
 # This ingestion process is different the others
 ingest_imagine_la() {
     local DATASET_ID=imagine_la
@@ -35,7 +32,7 @@ ingest_imagine_la() {
 
     echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
-    ls -ald src/ingestion/imagine_la/scrape/pages
+    ls -ld src/ingestion/imagine_la/scrape/pages
     echo "HTML files scraped: "
     ls src/ingestion/imagine_la/scrape/pages | wc -l
     echo_stats "$DATASET_ID"
@@ -98,11 +95,16 @@ scrape_and_ingest() {
 echo_stats(){
     local DATASET_ID="$1"
     grep -E "Running with args|DONE splitting|Finished ingesting" "logs/${DATASET_ID}-2ingest.log"
-    ls -ald "${DATASET_ID}-${TODAY}_md"
-    ls -al "${DATASET_ID}-${TODAY}_md" | wc -l
-    ls -al "${DATASET_ID}_md.zip"
+    ls -ld "${DATASET_ID}-${TODAY}_md"
+    echo "Markdown file count: $(find "${DATASET_ID}-${TODAY}_md" -type f -iname '*.md' | wc -l)"
     echo "-----------------------------------"
-    echo "REMINDER: Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
+    echo "REMINDERS:"
+    echo "1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
+    echo "   $(ls -l "${DATASET_ID}_md.zip")"
+    echo "2. Upload ingester input files (e.g., *-scrapings.json) to S3:"
+    echo "   aws s3 sync ..."
+    echo "3. Run ingestion on deployed app:"
+    echo "   ./bin/run-command app dev ..."
 }
 
 create_md_zip(){
@@ -134,6 +136,9 @@ if [ -z "$1" ]; then
     echo ""
     exit 1
 fi
+
+mkdir -p logs
+export TODAY=$(date "+%Y-%m-%d")
 
 case "$1" in
     imagine_la)
