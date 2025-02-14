@@ -85,6 +85,11 @@ scrape_and_ingest() {
     fi
 
     create_md_zip "$DATASET_ID"
+
+    echo "-----------------------------------"
+    echo "=== Copy the following to Slack ==="
+    grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
+    echo_stats "$DATASET_ID"
 }
 
 create_md_zip(){
@@ -92,6 +97,16 @@ create_md_zip(){
     [ -d "${DATASET_ID}_md" ] || exit 29
 
     # Collect stats before zipping
+    collect_stats "$DATASET_ID"
+
+    # Include stats.json in the zip along with other logs
+    zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log logs/"$DATASET_ID"*.json
+    mv -iv "${DATASET_ID}_md" "${DATASET_ID}-${TODAY}_md"
+}
+
+collect_stats(){
+    local DATASET_ID="$1"
+
     local MARKDOWN_COUNT=$(find "${DATASET_ID}_md" -type f -iname '*.md' | wc -l)
     local INGEST_STATS=$(grep -E "Running with args|DONE splitting|Finished ingesting" "logs/${DATASET_ID}-2ingest.log")
     local SCRAPE_STATS=$(grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log")
@@ -141,16 +156,6 @@ EOF
         jq '.' "logs/${DATASET_ID}-${TODAY}_stats_raw.json" > "logs/${DATASET_ID}-${TODAY}_stats.json" && \
         rm -v "logs/${DATASET_ID}-${TODAY}_stats_raw.json"
     fi
-
-    # Include stats.json in the zip along with other logs
-    zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log logs/"$DATASET_ID"*.json
-    mv -iv "${DATASET_ID}_md" "${DATASET_ID}-${TODAY}_md"
-
-    echo "-----------------------------------"
-    echo "=== Copy the following to Slack ==="
-    grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
-    echo_stats "$DATASET_ID"
-
 }
 
 echo_stats(){
