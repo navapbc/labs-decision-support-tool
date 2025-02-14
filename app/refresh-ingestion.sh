@@ -138,7 +138,8 @@ EOF
 
     # Validate and pretty-print the JSON
     if command -v jq >/dev/null 2>&1; then
-        jq '.' "logs/${DATASET_ID}-${TODAY}_stats.json" > "logs/${DATASET_ID}-${TODAY}_stats.json"
+        jq '.' "logs/${DATASET_ID}-${TODAY}_stats.json" > "logs/${DATASET_ID}-${TODAY}_stats.json.tmp" && \
+        mv "logs/${DATASET_ID}-${TODAY}_stats.json.tmp" "logs/${DATASET_ID}-${TODAY}_stats.json"
     fi
 
     echo "-----------------------------------"
