@@ -29,6 +29,13 @@ ingest_imagine_la() {
     fi
 
     create_md_zip "$DATASET_ID"
+
+    echo "-----------------------------------"
+    echo "=== Copy the following to Slack ==="
+    ls -ld src/ingestion/imagine_la/scrape/pages
+    echo "HTML files scraped: "
+    ls src/ingestion/imagine_la/scrape/pages | wc -l
+    echo_stats "$DATASET_ID"
 }
 
 scrape_and_ingest() {
@@ -106,6 +113,11 @@ create_md_zip(){
     }
 }
 EOF
+
+    echo "-----------------------------------"
+    echo "=== Copy the following to Slack ==="
+    grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
+    echo_stats "$DATASET_ID"
 
     # Include stats.json in the zip along with other logs
     zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log logs/"$DATASET_ID"*.json
