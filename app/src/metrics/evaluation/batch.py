@@ -1,4 +1,7 @@
-"""Batch processing for evaluation runs."""
+"""
+Batch processing for evaluation runs.
+Not to be confused with batch_process.py (used via the API).
+"""
 
 import random
 import subprocess
