@@ -96,7 +96,7 @@ def main() -> None:
         for filename in os.listdir(log_dir):
             if filename.startswith("metrics_"):
                 filepath = os.path.join(log_dir, filename)
-                with open(filepath) as f:
+                with open(filepath, "r") as f:
                     metrics = json.load(f)
                     timestamp = metrics["timestamp"]
                     # Update latest if this is the first or a newer timestamp
