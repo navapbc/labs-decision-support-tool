@@ -163,7 +163,7 @@ echo_stats(){
     echo "1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
     echo "   $(ls -l "${DATASET_ID}_md.zip")"
     echo "2. Upload ingester input files (e.g., *-scrapings.json) and stats to S3:"
-    echo "   aws s3 sync src/ingestion s3://decision-support-tool-app-dev/${DATASET_ID}"
+    echo "   aws s3 sync src/ingestion/${DATASET_ID}_scrapings*.json s3://decision-support-tool-app-dev/${DATASET_ID}"
     echo "   aws s3 cp logs/${DATASET_ID}-${TODAY}_stats.json s3://decision-support-tool-app-dev/${DATASET_ID}/stats/${TODAY}_stats.json"
     echo "3. Run ingestion on deployed app:"
     echo "   ./bin/run-command app dev ..."
