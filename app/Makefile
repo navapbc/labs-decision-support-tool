@@ -273,7 +273,6 @@ scrapy-runner: ## Scrape website using a Scrapy spider: `make scrapy-runner args
 ingest-runner: ## Ingest scrapings into DB: `make ingest-runner args="dataset"`
 	$(PY_RUN_CMD) ingest-runner $(args)
 
-# Add the evaluation target
 run-evaluation: ## Run precision-recall evaluation with configurable parameters
 	$(PY_RUN_CMD) python -m src.metrics.cli \
 		$(if $(dataset),--dataset=$(dataset),) \

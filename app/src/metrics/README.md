@@ -10,36 +10,6 @@ The metrics module allows you to:
 3. Generate structured evaluation logs and CSV reports
 4. Track performance across different datasets
 
-## Directory Structure
-
-```
-metrics/
-├── __init__.py
-├── README.md
-├── cli.py
-├── evaluation/
-│   ├── __init__.py
-│   ├── batch.py
-│   ├── logging.py
-│   ├── metrics.py
-│   ├── results.py
-│   └── runner.py
-├── models/
-│   ├── __init__.py
-│   └── metrics.py
-├── utils/
-│   ├── __init__.py
-│   ├── timer.py
-│   └── jsonl_to_csv.py
-├── data/           # Directory for evaluation datasets
-└── logs/          # Directory for evaluation results
-    └── YYYY-MM-DD/
-        ├── batch_${UUID}.json
-        ├── results_${UUID}.jsonl
-        ├── results_${UUID}.csv
-        └── metrics_${UUID}.json
-```
-
 ## Usage
 
 ### Setup
