@@ -29,13 +29,6 @@ ingest_imagine_la() {
     fi
 
     create_md_zip "$DATASET_ID"
-
-    echo "-----------------------------------"
-    echo "=== Copy the following to Slack ==="
-    ls -ld src/ingestion/imagine_la/scrape/pages
-    echo "HTML files scraped: "
-    ls src/ingestion/imagine_la/scrape/pages | wc -l
-    echo_stats "$DATASET_ID"
 }
 
 scrape_and_ingest() {
@@ -85,11 +78,38 @@ scrape_and_ingest() {
     fi
 
     create_md_zip "$DATASET_ID"
+}
 
-    echo "-----------------------------------"
-    echo "=== Copy the following to Slack ==="
-    grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
-    echo_stats "$DATASET_ID"
+create_md_zip(){
+    local DATASET_ID="$1"
+    [ -d "${DATASET_ID}_md" ] || exit 29
+
+    # Collect stats before zipping
+    local MARKDOWN_COUNT=$(find "${DATASET_ID}_md" -type f -iname '*.md' | wc -l)
+    local INGEST_STATS=$(grep -E "Running with args|DONE splitting|Finished ingesting" "logs/${DATASET_ID}-2ingest.log")
+    local SCRAPE_STATS=$(grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log")
+    local HTML_COUNT=0
+    if [ -d "src/ingestion/imagine_la/scrape/pages" ]; then
+        HTML_COUNT=$(ls src/ingestion/imagine_la/scrape/pages | wc -l)
+    fi
+
+    # Save stats to JSON
+    cat > "logs/${DATASET_ID}-${TODAY}_stats.json" << EOF
+{
+    "dataset_id": "$DATASET_ID",
+    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "stats": {
+        "markdown_files": $MARKDOWN_COUNT,
+        "html_files": $HTML_COUNT,
+        "ingest_log": $(echo "$INGEST_STATS" | jq -R -s -c 'split("\n")[:-1]'),
+        "scrape_log": $(echo "$SCRAPE_STATS" | jq -R -s -c 'split("\n")[:-1]')
+    }
+}
+EOF
+
+    # Include stats.json in the zip along with other logs
+    zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log logs/"$DATASET_ID"*.json
+    mv -iv "${DATASET_ID}_md" "${DATASET_ID}-${TODAY}_md"
 }
 
 echo_stats(){
@@ -101,18 +121,11 @@ echo_stats(){
     echo "REMINDERS:"
     echo "1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
     echo "   $(ls -l "${DATASET_ID}_md.zip")"
-    echo "2. Upload ingester input files (e.g., *-scrapings.json) to S3:"
-    echo "   aws s3 sync ..."
+    echo "2. Upload ingester input files (e.g., *-scrapings.json) and stats to S3:"
+    echo "   aws s3 sync src/ingestion s3://decision-support-tool-app-dev/${DATASET_ID}"
+    echo "   aws s3 cp logs/${DATASET_ID}-${TODAY}_stats.json s3://decision-support-tool-app-dev/${DATASET_ID}/stats/${TODAY}_stats.json"
     echo "3. Run ingestion on deployed app:"
     echo "   ./bin/run-command app dev ..."
-}
-
-create_md_zip(){
-    local DATASET_ID="$1"
-    [ -d "${DATASET_ID}_md" ] || exit 29
-
-    zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log
-    mv -iv "${DATASET_ID}_md" "${DATASET_ID}-${TODAY}_md"
 }
 
 check_preconditions(){
