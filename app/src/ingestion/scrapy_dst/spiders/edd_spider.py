@@ -37,8 +37,7 @@ class EddSpider(CrawlSpider):
                     # Exclude WSINs (Workforce Services Information Notices)
                     "en/jobs_and_training/Information_Notices/wsin",
                     # Irrelevant pages
-                    r"en/.*social-media-toolkit",
-                    r"en/.*Social-Media-Toolkit",
+                    r"(?i)en/.*social-media-toolkit",
                 ),
                 allow_domains=allowed_domains,
                 deny_domains=(
