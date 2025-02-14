@@ -139,17 +139,18 @@ EOF
     # Validate and pretty-print the JSON
     if command -v jq >/dev/null 2>&1; then
         jq '.' "logs/${DATASET_ID}-${TODAY}_stats_raw.json" > "logs/${DATASET_ID}-${TODAY}_stats.json" && \
-        rm "logs/${DATASET_ID}-${TODAY}_stats_raw.json"
+        rm -v "logs/${DATASET_ID}-${TODAY}_stats_raw.json"
     fi
+
+    # Include stats.json in the zip along with other logs
+    zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log logs/"$DATASET_ID"*.json
+    mv -iv "${DATASET_ID}_md" "${DATASET_ID}-${TODAY}_md"
 
     echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
     grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
     echo_stats "$DATASET_ID"
 
-    # Include stats.json in the zip along with other logs
-    zip "${DATASET_ID}_md.zip" -r "${DATASET_ID}_md" logs/"$DATASET_ID"*.log logs/"$DATASET_ID"*.json
-    mv -iv "${DATASET_ID}_md" "${DATASET_ID}-${TODAY}_md"
 }
 
 echo_stats(){
