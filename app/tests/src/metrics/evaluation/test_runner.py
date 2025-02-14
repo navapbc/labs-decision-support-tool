@@ -147,6 +147,7 @@ def test_run_evaluation_batch_error_handling(mock_retrieval_func, mock_questions
     """Test error handling in evaluation batch."""
     runner = EvaluationRunner(mock_retrieval_func)
 
+    # Test general error in batch processing
     with patch("src.metrics.evaluation.runner.create_batch_config"):
         with patch("src.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls:
             mock_logger = MagicMock()
@@ -162,6 +163,14 @@ def test_run_evaluation_batch_error_handling(mock_retrieval_func, mock_questions
 
                 # Verify logger cleanup was called
                 mock_logger.__exit__.assert_called_once()
+
+    # Test RuntimeError from batch configuration
+    with patch(
+        "src.metrics.evaluation.runner.create_batch_config",
+        side_effect=RuntimeError("Failed to get git commit hash"),
+    ):
+        with pytest.raises(RuntimeError, match="Failed to initialize batch configuration"):
+            runner.run_evaluation_batch(mock_questions, k=5)
 
 
 def test_convenience_function(mock_retrieval_func):

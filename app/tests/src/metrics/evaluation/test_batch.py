@@ -26,7 +26,12 @@ def test_get_git_commit():
 
     # Test failure case
     with patch("subprocess.run", side_effect=Exception("git error")):
-        assert get_git_commit() == "unknown"
+        try:
+            get_git_commit()
+            raise AssertionError("Expected RuntimeError")
+        except RuntimeError as e:
+            assert "Failed to get git commit hash" in str(e)
+            assert "git error" in str(e)
 
 
 def test_get_package_version():
@@ -37,43 +42,55 @@ def test_get_package_version():
         assert get_package_version() == "1.0.0"
 
     # Test file not found case
-    with patch("builtins.open", side_effect=FileNotFoundError):
-        assert get_package_version() == "unknown"
+    with patch("builtins.open", side_effect=FileNotFoundError("No such file")):
+        try:
+            get_package_version()
+            raise AssertionError("Expected RuntimeError")
+        except RuntimeError as e:
+            assert "Failed to get package version" in str(e)
+            assert "No such file" in str(e)
 
     # Test malformed file case
     mock_toml_bad = 'name = "app"\nno_version_here\n'
     with patch("builtins.open", mock_open(read_data=mock_toml_bad)):
-        assert get_package_version() == "unknown"
+        try:
+            get_package_version()
+            raise AssertionError("Expected RuntimeError")
+        except RuntimeError as e:
+            assert "No version field found in pyproject.toml" in str(e)
 
 
 def test_create_batch_config():
     """Test batch configuration creation."""
-    # Test with minimal parameters
-    config = create_batch_config(k_value=5)
-    assert config.k_value == 5
-    assert config.num_samples == 0
-    assert config.dataset_filter == []
-    assert config.package_version is not None
-    assert config.git_commit is not None  # Should get from get_git_commit()
-    assert config.batch_id is not None
-    assert config.timestamp is not None
+    # Mock git commit and package version
+    with patch("src.metrics.evaluation.batch.get_git_commit", return_value="abc123"):
+        with patch("src.metrics.evaluation.batch.get_package_version", return_value="1.0.0"):
+            # Test with minimal parameters
+            config = create_batch_config(k_value=5)
+            assert config.k_value == 5
+            assert config.num_samples == 0
+            assert config.dataset_filter == []
+            assert config.package_version == "1.0.0"
+            assert config.git_commit == "abc123"
+            assert config.batch_id is not None
+            assert config.timestamp is not None
 
-    # Test with all parameters
-    config = create_batch_config(
-        k_value=10,
-        dataset_filter=["dataset1", "dataset2"],
-        git_commit="test123",
-    )
-    assert config.k_value == 10
-    assert config.dataset_filter == ["dataset1", "dataset2"]
-    assert config.git_commit == "test123"  # Should use provided commit hash
-    assert config.package_version is not None
-    assert config.batch_id is not None
-    assert config.timestamp is not None
+            # Test with all parameters
+            config = create_batch_config(
+                k_value=10,
+                dataset_filter=["dataset1", "dataset2"],
+                git_commit="test123",
+            )
+            assert config.k_value == 10
+            assert config.dataset_filter == ["dataset1", "dataset2"]
+            assert config.git_commit == "test123"  # Should use provided commit hash
+            assert config.package_version == "1.0.0"
+            assert config.batch_id is not None
+            assert config.timestamp is not None
 
-    # Test that git_commit is properly included in to_dict output
-    config_dict = config.to_dict()
-    assert config_dict["software_info"]["git_commit"] == "test123"
+            # Test that git_commit is properly included in to_dict output
+            config_dict = config.to_dict()
+            assert config_dict["software_info"]["git_commit"] == "test123"
 
 
 def test_stratified_sample():

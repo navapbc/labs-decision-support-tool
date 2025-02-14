@@ -12,26 +12,36 @@ from ..models.metrics import BatchConfig
 
 
 def get_git_commit() -> str:
-    """Get current git commit hash."""
+    """Get current git commit hash.
+
+    Raises:
+        RuntimeError: If unable to get git commit hash
+    """
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
         )
         return result.stdout.strip()
-    except Exception:
-        return "unknown"
+    except Exception as err:
+        raise RuntimeError(f"Failed to get git commit hash: {str(err)}") from err
 
 
 def get_package_version() -> str:
-    """Get current package version."""
+    """Get current package version.
+
+    Raises:
+        RuntimeError: If unable to read version from pyproject.toml
+    """
     try:
         with open("pyproject.toml", "r") as f:
             for line in f:
                 if line.startswith("version"):
                     return line.split("=")[1].strip().strip("\"'")
-    except Exception:
-        pass
-    return "unknown"
+            raise RuntimeError("No version field found in pyproject.toml")
+    except Exception as err:
+        raise RuntimeError(
+            f"Failed to get package version from pyproject.toml: {str(err)}"
+        ) from err
 
 
 def create_batch_config(
