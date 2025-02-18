@@ -272,3 +272,14 @@ scrapy-runner: ## Scrape website using a Scrapy spider: `make scrapy-runner args
 
 ingest-runner: ## Ingest scrapings into DB: `make ingest-runner args="dataset"`
 	$(PY_RUN_CMD) ingest-runner $(args)
+
+run-evaluation: ## Run precision-recall evaluation with configurable parameters
+	$(PY_RUN_CMD) python -m src.metrics.cli \
+		$(if $(dataset),--dataset=$(dataset),) \
+		$(if $(k),--k=$(k),) \
+		$(if $(questions_file),--questions-file=$(questions_file),) \
+		$(if $(sampling),--sampling=$(sampling),) \
+		$(if $(min_score),--min-score=$(min_score),) \
+		$(if $(random_seed),--random-seed=$(random_seed),) \
+		--commit=$(shell git rev-parse HEAD)
+
