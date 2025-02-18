@@ -2,6 +2,7 @@
 
 import json
 import os
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any, Optional, TextIO
 
@@ -35,7 +36,7 @@ class EvaluationLogger:
         # Write batch config
         config_file = os.path.join(self.log_dir, f"batch_{self.batch_id}.json")
         with open(config_file, "w") as f:
-            json.dump(config.to_dict(), f, indent=2)
+            json.dump(asdict(config), f, indent=2)
 
         # Open results file
         results_file = os.path.join(self.log_dir, f"results_{self.batch_id}.jsonl")
@@ -44,7 +45,7 @@ class EvaluationLogger:
     def log_result(self, result: EvaluationResult) -> None:
         """Log an individual evaluation result."""
         if self.results_file:
-            json.dump(result.to_dict(), self.results_file)
+            json.dump(asdict(result), self.results_file)
             self.results_file.write("\n")
             self.results_file.flush()
 
@@ -61,7 +62,7 @@ class EvaluationLogger:
 
         metrics_file = os.path.join(self.log_dir, f"metrics_{self.batch_id}.json")
         with open(metrics_file, "w") as f:
-            json.dump(metrics.to_dict(), f, indent=2)
+            json.dump(asdict(metrics), f, indent=2)
 
     def __enter__(self) -> "EvaluationLogger":
         """Enter context manager."""

@@ -5,44 +5,42 @@ from datetime import datetime
 from src.metrics.models.metrics import (
     BatchConfig,
     DatasetMetrics,
+    EvaluationConfig,
     EvaluationResult,
     ExpectedChunk,
     IncorrectRetrievalsAnalysis,
     MetricsSummary,
     RetrievedChunk,
+    SoftwareInfo,
 )
 
 
 def test_batch_config_creation():
-    """Test BatchConfig creation and to_dict conversion."""
-    config = BatchConfig(
+    """Test BatchConfig creation with nested config objects."""
+    eval_config = EvaluationConfig(
         k_value=5,
         num_samples=100,
         dataset_filter=["dataset1", "dataset2"],
+    )
+    software_info = SoftwareInfo(
         package_version="1.0.0",
         git_commit="abc123",
     )
+    config = BatchConfig(
+        evaluation_config=eval_config,
+        software_info=software_info,
+    )
 
     # Test that required fields are set
-    assert config.k_value == 5
-    assert config.num_samples == 100
-    assert config.dataset_filter == ["dataset1", "dataset2"]
-    assert config.package_version == "1.0.0"
-    assert config.git_commit == "abc123"
+    assert config.evaluation_config.k_value == 5
+    assert config.evaluation_config.num_samples == 100
+    assert config.evaluation_config.dataset_filter == ["dataset1", "dataset2"]
+    assert config.software_info.package_version == "1.0.0"
+    assert config.software_info.git_commit == "abc123"
 
     # Test that auto-generated fields are present
     assert config.batch_id is not None
     assert config.timestamp is not None
-
-    # Test to_dict conversion
-    config_dict = config.to_dict()
-    assert config_dict["batch_id"] == config.batch_id
-    assert config_dict["timestamp"] == config.timestamp
-    assert config_dict["evaluation_config"]["k_value"] == 5
-    assert config_dict["evaluation_config"]["num_samples"] == 100
-    assert config_dict["evaluation_config"]["dataset_filter"] == ["dataset1", "dataset2"]
-    assert config_dict["software_info"]["package_version"] == "1.0.0"
-    assert config_dict["software_info"]["git_commit"] == "abc123"
 
 
 def test_expected_chunk():
@@ -74,7 +72,7 @@ def test_retrieved_chunk():
 
 
 def test_evaluation_result():
-    """Test EvaluationResult creation and to_dict conversion."""
+    """Test EvaluationResult creation with all fields."""
     expected = ExpectedChunk(
         name="test_doc",
         source="test_dataset",
@@ -107,19 +105,7 @@ def test_evaluation_result():
     assert result.rank_if_found == 1
     assert result.retrieval_time_ms == 100.5
     assert result.retrieved_chunks == [retrieved_chunk]
-
-    # Test to_dict conversion
-    result_dict = result.to_dict()
-    assert result_dict["qa_pair_id"] == "qa123"
-    assert result_dict["question"] == "test question?"
-    assert result_dict["expected_answer"] == "test answer"
-    assert result_dict["expected_chunk"]["name"] == "test_doc"
-    assert result_dict["evaluation_result"]["correct_chunk_retrieved"] is True
-    assert result_dict["evaluation_result"]["rank_if_found"] == 1
-    assert result_dict["evaluation_result"]["retrieval_time_ms"] == 100.5
-    assert len(result_dict["retrieved_chunks"]) == 1
-    assert result_dict["retrieved_chunks"][0]["chunk_id"] == "chunk123"
-    assert result_dict["retrieved_chunks"][0]["content_hash"] == "hash456"
+    assert result.timestamp is not None
 
 
 def test_dataset_metrics():
@@ -147,7 +133,7 @@ def test_incorrect_retrievals_analysis():
 
 
 def test_metrics_summary():
-    """Test MetricsSummary creation and to_dict conversion."""
+    """Test MetricsSummary creation with all components."""
     dataset_metrics = {
         "dataset1": DatasetMetrics(recall_at_k=0.75, sample_size=50, avg_score_incorrect=0.45),
         "dataset2": DatasetMetrics(recall_at_k=0.80, sample_size=50, avg_score_incorrect=0.40),
@@ -170,13 +156,14 @@ def test_metrics_summary():
         incorrect_analysis=incorrect_analysis,
     )
 
-    # Test to_dict conversion
-    summary_dict = summary.to_dict()
-    assert summary_dict["batch_id"] == "batch123"
-    assert "timestamp" in summary_dict
-    assert summary_dict["overall_metrics"]["recall_at_k"] == 0.775
-    assert summary_dict["overall_metrics"]["mean_retrieval_time_ms"] == 100.5
-    assert summary_dict["overall_metrics"]["total_questions"] == 100
-    assert summary_dict["overall_metrics"]["successful_retrievals"] == 75
-    assert "incorrect_retrievals_analysis" in summary_dict["overall_metrics"]
-    assert len(summary_dict["dataset_metrics"]) == 2
+    # Test that all components are set correctly
+    assert summary.batch_id == "batch123"
+    assert summary.timestamp is not None
+    assert summary.overall_metrics["recall_at_k"] == 0.775
+    assert summary.overall_metrics["mean_retrieval_time_ms"] == 100.5
+    assert summary.overall_metrics["total_questions"] == 100
+    assert summary.overall_metrics["successful_retrievals"] == 75
+    assert len(summary.dataset_metrics) == 2
+    assert isinstance(summary.dataset_metrics["dataset1"], DatasetMetrics)
+    assert isinstance(summary.dataset_metrics["dataset2"], DatasetMetrics)
+    assert isinstance(summary.incorrect_analysis, IncorrectRetrievalsAnalysis)

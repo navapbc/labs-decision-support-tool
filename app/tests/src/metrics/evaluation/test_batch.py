@@ -67,30 +67,23 @@ def test_create_batch_config():
         with patch("src.metrics.evaluation.batch.get_package_version", return_value="1.0.0"):
             # Test with minimal parameters
             config = create_batch_config(k_value=5)
-            assert config.k_value == 5
-            assert config.num_samples == 0
-            assert config.dataset_filter == []
-            assert config.package_version == "1.0.0"
-            assert config.git_commit == "abc123"
+            assert config.evaluation_config.k_value == 5
+            assert config.evaluation_config.num_samples == 0
+            assert config.evaluation_config.dataset_filter == []
+            assert config.software_info.package_version == "1.0.0"
+            assert config.software_info.git_commit == "abc123"
             assert config.batch_id is not None
             assert config.timestamp is not None
 
             # Test with all parameters
             config = create_batch_config(
                 k_value=10,
-                dataset_filter=["dataset1", "dataset2"],
-                git_commit="test123",
+                dataset_filter=["dataset1"],
+                git_commit="def456",
             )
-            assert config.k_value == 10
-            assert config.dataset_filter == ["dataset1", "dataset2"]
-            assert config.git_commit == "test123"  # Should use provided commit hash
-            assert config.package_version == "1.0.0"
-            assert config.batch_id is not None
-            assert config.timestamp is not None
-
-            # Test that git_commit is properly included in to_dict output
-            config_dict = config.to_dict()
-            assert config_dict["software_info"]["git_commit"] == "test123"
+            assert config.evaluation_config.k_value == 10
+            assert config.evaluation_config.dataset_filter == ["dataset1"]
+            assert config.software_info.git_commit == "def456"
 
 
 def test_stratified_sample():

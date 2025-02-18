@@ -97,7 +97,7 @@ class EvaluationRunner:
             config = create_batch_config(
                 k_value=k, dataset_filter=dataset_filter, git_commit=commit
             )
-            config.num_samples = len(questions)
+            config.evaluation_config.num_samples = len(questions)
 
             # Initialize logger
             logger = EvaluationLogger(self.log_dir)

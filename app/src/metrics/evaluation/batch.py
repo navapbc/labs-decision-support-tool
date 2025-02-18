@@ -8,7 +8,7 @@ import subprocess
 from collections import defaultdict
 from typing import Dict, List, Optional
 
-from ..models.metrics import BatchConfig
+from ..models.metrics import BatchConfig, EvaluationConfig, SoftwareInfo
 
 
 def get_git_commit() -> str:
@@ -48,12 +48,18 @@ def create_batch_config(
     k_value: int, dataset_filter: Optional[List[str]] = None, git_commit: Optional[str] = None
 ) -> BatchConfig:
     """Create a new batch configuration."""
-    return BatchConfig(
+    eval_config = EvaluationConfig(
         k_value=k_value,
         num_samples=0,  # Will be updated when questions are loaded
         dataset_filter=dataset_filter or [],
+    )
+    software_info = SoftwareInfo(
         package_version=get_package_version(),
         git_commit=git_commit or get_git_commit(),
+    )
+    return BatchConfig(
+        evaluation_config=eval_config,
+        software_info=software_info,
     )
 
 

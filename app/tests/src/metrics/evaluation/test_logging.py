@@ -10,11 +10,13 @@ from src.metrics.evaluation.logging import EvaluationLogger
 from src.metrics.models.metrics import (
     BatchConfig,
     DatasetMetrics,
+    EvaluationConfig,
     EvaluationResult,
     ExpectedChunk,
     IncorrectRetrievalsAnalysis,
     MetricsSummary,
     RetrievedChunk,
+    SoftwareInfo,
 )
 
 
@@ -29,12 +31,18 @@ def temp_log_dir(tmp_path):
 @pytest.fixture
 def test_batch_config():
     """Create a test batch configuration."""
-    return BatchConfig(
+    eval_config = EvaluationConfig(
         k_value=5,
         num_samples=10,
         dataset_filter=["test_dataset"],
+    )
+    software_info = SoftwareInfo(
         package_version="1.0.0",
         git_commit="test123",
+    )
+    return BatchConfig(
+        evaluation_config=eval_config,
+        software_info=software_info,
     )
 
 
@@ -118,7 +126,25 @@ def test_start_batch(temp_log_dir, test_batch_config):
     with open(config_file) as f:
         config_data = json.load(f)
         assert config_data["batch_id"] == test_batch_config.batch_id
-        assert config_data["evaluation_config"]["k_value"] == test_batch_config.k_value
+        assert (
+            config_data["evaluation_config"]["k_value"]
+            == test_batch_config.evaluation_config.k_value
+        )
+        assert (
+            config_data["evaluation_config"]["num_samples"]
+            == test_batch_config.evaluation_config.num_samples
+        )
+        assert (
+            config_data["evaluation_config"]["dataset_filter"]
+            == test_batch_config.evaluation_config.dataset_filter
+        )
+        assert (
+            config_data["software_info"]["package_version"]
+            == test_batch_config.software_info.package_version
+        )
+        assert (
+            config_data["software_info"]["git_commit"] == test_batch_config.software_info.git_commit
+        )
 
     # Check that results file was created
     results_file = os.path.join(logger.log_dir, f"results_{logger.batch_id}.jsonl")

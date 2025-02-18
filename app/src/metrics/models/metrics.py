@@ -1,38 +1,36 @@
 """Data models for metrics evaluation."""
 
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
+
+
+@dataclass
+class EvaluationConfig:
+    """Configuration for evaluation parameters."""
+
+    k_value: int
+    num_samples: int
+    dataset_filter: List[str]
+
+
+@dataclass
+class SoftwareInfo:
+    """Software version and commit information."""
+
+    package_version: str
+    git_commit: str
 
 
 @dataclass
 class BatchConfig:
     """Configuration for an evaluation batch."""
 
-    k_value: int
-    num_samples: int
-    dataset_filter: List[str]
-    package_version: str
-    git_commit: str
+    evaluation_config: EvaluationConfig
+    software_info: SoftwareInfo
     batch_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary format."""
-        return {
-            "batch_id": self.batch_id,
-            "timestamp": self.timestamp,
-            "evaluation_config": {
-                "k_value": self.k_value,
-                "num_samples": self.num_samples,
-                "dataset_filter": self.dataset_filter,
-            },
-            "software_info": {
-                "package_version": self.package_version,
-                "git_commit": self.git_commit,
-            },
-        }
 
 
 @dataclass
@@ -69,33 +67,6 @@ class EvaluationResult:
     retrieved_chunks: List[RetrievedChunk]
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def to_dict(self) -> Dict:
-        return {
-            "qa_pair_id": self.qa_pair_id,
-            "question": self.question,
-            "expected_answer": self.expected_answer,
-            "expected_chunk": {
-                "name": self.expected_chunk.name,
-                "source": self.expected_chunk.source,
-                "chunk_id": self.expected_chunk.chunk_id,
-                "content_hash": self.expected_chunk.content_hash,
-            },
-            "evaluation_result": {
-                "correct_chunk_retrieved": self.correct_chunk_retrieved,
-                "rank_if_found": self.rank_if_found,
-                "retrieval_time_ms": self.retrieval_time_ms,
-            },
-            "retrieved_chunks": [
-                {
-                    "chunk_id": chunk.chunk_id,
-                    "score": chunk.score,
-                    "content": chunk.content,
-                    "content_hash": chunk.content_hash,
-                }
-                for chunk in self.retrieved_chunks
-            ],
-        }
-
 
 @dataclass
 class DatasetMetrics:
@@ -124,20 +95,3 @@ class MetricsSummary:
     overall_metrics: Dict[str, float]
     dataset_metrics: Dict[str, DatasetMetrics]
     incorrect_analysis: IncorrectRetrievalsAnalysis
-
-    def to_dict(self) -> Dict:
-        return {
-            "batch_id": self.batch_id,
-            "timestamp": self.timestamp,
-            "overall_metrics": {
-                **self.overall_metrics,
-                "incorrect_retrievals_analysis": {
-                    "incorrect_retrievals_count": self.incorrect_analysis.incorrect_retrievals_count,
-                    "avg_score_incorrect": self.incorrect_analysis.avg_score_incorrect,
-                    "datasets_with_incorrect_retrievals": self.incorrect_analysis.datasets_with_incorrect_retrievals,
-                },
-            },
-            "dataset_metrics": {
-                dataset: asdict(metrics) for dataset, metrics in self.dataset_metrics.items()
-            },
-        }
