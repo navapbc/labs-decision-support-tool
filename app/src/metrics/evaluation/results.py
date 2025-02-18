@@ -115,7 +115,7 @@ def batch_process_results(
     results = []
 
     # Process each question individually to avoid pgvector batch issues
-    with measure_time() as t:  # Use a different variable name
+    with measure_time() as timer:
         # Process in database session
         with app_config.db_session():
             for question in tqdm(questions, desc="Processing questions"):
@@ -123,7 +123,7 @@ def batch_process_results(
                 retrieved = retrieval_func(query, k)
 
                 # Process results
-                retrieval_time = t.elapsed_ms() / len(questions)  # Average time per question
+                retrieval_time = timer.elapsed_ms() / len(questions)  # Average time per question
                 result = process_retrieved_chunks(question, retrieved, retrieval_time)
                 results.append(result)
 
