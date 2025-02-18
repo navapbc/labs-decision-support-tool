@@ -47,7 +47,7 @@ def process_retrieved_chunks(
         EvaluationResult object
     """
     # Extract document info
-    doc_info = ExpectedChunk(
+    expected_chunk = ExpectedChunk(
         name=question.get("document_name", ""),
         source=question.get("dataset", ""),
         chunk_id=question.get("chunk_id", ""),
@@ -73,23 +73,25 @@ def process_retrieved_chunks(
         )
 
     # Check if correct chunk was found
-    correct_chunk_retrieved = doc_info.content_hash in content_hashes
+    correct_chunk_retrieved = expected_chunk.content_hash in content_hashes
 
     # Find rank if found
     rank_if_found = None
     if correct_chunk_retrieved:
-        rank_if_found = content_hashes.index(doc_info.content_hash) + 1
+        rank_if_found = content_hashes.index(expected_chunk.content_hash) + 1
 
     # Generate a stable UUID for this QA pair if one isn't provided
     qa_pair_id = question.get("id") or generate_qa_pair_id(
-        question=question["question"], answer=question.get("answer", ""), dataset=doc_info.source
+        question=question["question"],
+        answer=question.get("answer", ""),
+        dataset=expected_chunk.source,
     )
 
     return EvaluationResult(
         qa_pair_id=qa_pair_id,
         question=question["question"],
         expected_answer=question.get("answer", ""),
-        expected_chunk=doc_info,
+        expected_chunk=expected_chunk,
         correct_chunk_retrieved=correct_chunk_retrieved,
         rank_if_found=rank_if_found,
         retrieval_time_ms=retrieval_time_ms,
