@@ -157,19 +157,19 @@ def test_batch_process_results(mock_question, mock_chunk):
     def mock_retrieval_func(query: str, k: int):
         return [mock_chunk]
 
-    # Mock app_config.db_session context manager
-    with patch("src.metrics.evaluation.results.app_config") as mock_config:
+    # Mock app_config.db_session and measure_time context managers
+    with (
+        patch("src.metrics.evaluation.results.app_config") as mock_config,
+        patch("src.metrics.evaluation.results.measure_time") as mock_timer,
+    ):
         mock_config.db_session.return_value.__enter__.return_value = None
         mock_config.db_session.return_value.__exit__.return_value = None
+        mock_timer.return_value.__enter__.return_value.elapsed_ms.return_value = 100.5
 
-        # Mock measure_time context manager
-        with patch("src.metrics.evaluation.results.measure_time") as mock_timer:
-            mock_timer.return_value.__enter__.return_value.elapsed_ms.return_value = 100.5
+        results = batch_process_results(questions, mock_retrieval_func, k)
 
-            results = batch_process_results(questions, mock_retrieval_func, k)
-
-            # Verify results
-            assert len(results) == 1
-            assert isinstance(results[0], EvaluationResult)
-            assert results[0].question == mock_question["question"]
-            assert results[0].retrieval_time_ms == 100.5
+        # Verify results
+        assert len(results) == 1
+        assert isinstance(results[0], EvaluationResult)
+        assert results[0].question == mock_question["question"]
+        assert results[0].retrieval_time_ms == 100.5

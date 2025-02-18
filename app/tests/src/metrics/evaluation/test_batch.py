@@ -63,27 +63,29 @@ def test_get_package_version():
 def test_create_batch_config():
     """Test batch configuration creation."""
     # Mock git commit and package version
-    with patch("src.metrics.evaluation.batch.get_git_commit", return_value="abc123"):
-        with patch("src.metrics.evaluation.batch.get_package_version", return_value="1.0.0"):
-            # Test with minimal parameters
-            config = create_batch_config(k_value=5)
-            assert config.evaluation_config.k_value == 5
-            assert config.evaluation_config.num_samples == 0
-            assert config.evaluation_config.dataset_filter == []
-            assert config.software_info.package_version == "1.0.0"
-            assert config.software_info.git_commit == "abc123"
-            assert config.batch_id is not None
-            assert config.timestamp is not None
+    with (
+        patch("src.metrics.evaluation.batch.get_git_commit", return_value="abc123"),
+        patch("src.metrics.evaluation.batch.get_package_version", return_value="1.0.0"),
+    ):
+        # Test with minimal parameters
+        config = create_batch_config(k_value=5)
+        assert config.evaluation_config.k_value == 5
+        assert config.evaluation_config.num_samples == 0
+        assert config.evaluation_config.dataset_filter == []
+        assert config.software_info.package_version == "1.0.0"
+        assert config.software_info.git_commit == "abc123"
+        assert config.batch_id is not None
+        assert config.timestamp is not None
 
-            # Test with all parameters
-            config = create_batch_config(
-                k_value=10,
-                dataset_filter=["dataset1"],
-                git_commit="def456",
-            )
-            assert config.evaluation_config.k_value == 10
-            assert config.evaluation_config.dataset_filter == ["dataset1"]
-            assert config.software_info.git_commit == "def456"
+        # Test with all parameters
+        config = create_batch_config(
+            k_value=10,
+            dataset_filter=["dataset1"],
+            git_commit="def456",
+        )
+        assert config.evaluation_config.k_value == 10
+        assert config.evaluation_config.dataset_filter == ["dataset1"]
+        assert config.software_info.git_commit == "def456"
 
 
 def test_stratified_sample():

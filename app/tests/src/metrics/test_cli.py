@@ -80,20 +80,22 @@ def test_main_dataset_filter(args, expected_dataset_filter):
             commit="test_commit",
         )
 
-        with patch("src.metrics.cli.run_evaluation") as mock_run_eval:
-            with patch("src.metrics.cli.create_retrieval_function") as mock_create_retrieval:
-                with patch("os.makedirs"):
-                    with patch("os.path.join", return_value="test_path"):
-                        with patch("os.listdir", return_value=[]):
-                            # Run main function
-                            main()
+        with (
+            patch("src.metrics.cli.run_evaluation") as mock_run_eval,
+            patch("src.metrics.cli.create_retrieval_function") as mock_create_retrieval,
+            patch("os.makedirs"),
+            patch("os.path.join", return_value="test_path"),
+            patch("os.listdir", return_value=[]),
+        ):
+            # Run main function
+            main()
 
-                            # Verify run_evaluation was called with correct dataset_filter
-                            call_args = mock_run_eval.call_args[1]
-                            assert call_args["dataset_filter"] == expected_dataset_filter
+            # Verify run_evaluation was called with correct dataset_filter
+            call_args = mock_run_eval.call_args[1]
+            assert call_args["dataset_filter"] == expected_dataset_filter
 
-                            # Verify create_retrieval_function was called with correct min_score
-                            mock_create_retrieval.assert_called_once_with(-1.0)
+            # Verify create_retrieval_function was called with correct min_score
+            mock_create_retrieval.assert_called_once_with(-1.0)
 
 
 @pytest.mark.parametrize("k_value", ["5", "5,10,25"])
@@ -110,18 +112,20 @@ def test_main_k_values(k_value):
             commit="test_commit",
         )
 
-        with patch("src.metrics.cli.run_evaluation") as mock_run_eval:
-            with patch("src.metrics.cli.create_retrieval_function"):
-                with patch("os.makedirs"):
-                    with patch("os.path.join", return_value="test_path"):
-                        with patch("os.listdir", return_value=[]):
-                            # Run main function
-                            main()
+        with (
+            patch("src.metrics.cli.run_evaluation") as mock_run_eval,
+            patch("src.metrics.cli.create_retrieval_function"),
+            patch("os.makedirs"),
+            patch("os.path.join", return_value="test_path"),
+            patch("os.listdir", return_value=[]),
+        ):
+            # Run main function
+            main()
 
-                            # Verify run_evaluation was called with correct k_values
-                            call_args = mock_run_eval.call_args[1]
-                            expected_k_values = [int(k) for k in k_value.split(",")]
-                            assert call_args["k_values"] == expected_k_values
+            # Verify run_evaluation was called with correct k_values
+            call_args = mock_run_eval.call_args[1]
+            expected_k_values = [int(k) for k in k_value.split(",")]
+            assert call_args["k_values"] == expected_k_values
 
 
 def test_main_results_display():
@@ -151,19 +155,21 @@ def test_main_results_display():
             commit="test_commit",
         )
 
-        with patch("src.metrics.cli.run_evaluation"):
-            with patch("src.metrics.cli.create_retrieval_function"):
-                with patch("os.makedirs"):
-                    with patch("os.path.join", return_value="test_path"):
-                        with patch("os.listdir", return_value=["metrics_123.json"]):
-                            with patch("builtins.open", create=True) as mock_open:
-                                # Mock the file read operation to return proper JSON string
-                                mock_open.return_value.__enter__.return_value.read.return_value = (
-                                    json.dumps(mock_metrics)
-                                )
+        with (
+            patch("src.metrics.cli.run_evaluation"),
+            patch("src.metrics.cli.create_retrieval_function"),
+            patch("os.makedirs"),
+            patch("os.path.join", return_value="test_path"),
+            patch("os.listdir", return_value=["metrics_123.json"]),
+            patch("builtins.open", create=True) as mock_open,
+        ):
+            # Mock the file read operation to return proper JSON string
+            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
+                mock_metrics
+            )
 
-                                # Run main function
-                                main()
+            # Run main function
+            main()
 
-                                # Verify file was opened
-                                mock_open.assert_called()
+            # Verify file was opened
+            mock_open.assert_called()

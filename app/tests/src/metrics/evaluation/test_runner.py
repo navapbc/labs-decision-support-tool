@@ -68,30 +68,31 @@ def test_run_evaluation_batch(mock_retrieval_func, mock_questions):
     runner = EvaluationRunner(mock_retrieval_func)
 
     # Mock dependencies
-    with patch("src.metrics.evaluation.runner.create_batch_config") as mock_create_config:
-        with patch("src.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls:
-            with patch("src.metrics.evaluation.runner.batch_process_results") as mock_process:
-                with patch("src.metrics.evaluation.runner.compute_metrics_summary") as mock_compute:
-                    # Setup mocks
-                    mock_config = MagicMock()
-                    mock_create_config.return_value = mock_config
-                    mock_logger = MagicMock()
-                    mock_logger_cls.return_value = mock_logger
-                    mock_process.return_value = ["result1", "result2"]
-                    mock_compute.return_value = {"metric1": 0.5}
+    mock_config = MagicMock()
+    mock_logger = MagicMock()
 
-                    # Run batch
-                    runner.run_evaluation_batch(mock_questions, k=5)
+    with (
+        patch("src.metrics.evaluation.runner.create_batch_config") as mock_create_config,
+        patch("src.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls,
+        patch("src.metrics.evaluation.runner.batch_process_results") as mock_process,
+        patch("src.metrics.evaluation.runner.compute_metrics_summary") as mock_compute,
+    ):
+        # Setup mocks
+        mock_create_config.return_value = mock_config
+        mock_logger_cls.return_value = mock_logger
+        mock_process.return_value = ["result1", "result2"]
+        mock_compute.return_value = {"metric1": 0.5}
 
-                    # Verify mocks were called correctly
-                    mock_create_config.assert_called_once_with(
-                        k_value=5, dataset_filter=None, git_commit=None
-                    )
-                    mock_logger_cls.assert_called_once_with(runner.log_dir)
-                    mock_logger.start_batch.assert_called_once_with(mock_config)
-                    mock_process.assert_called_once_with(mock_questions, mock_retrieval_func, 5)
-                    mock_compute.assert_called_once()
-                    mock_logger.finish_batch.assert_called_once()
+        # Run batch
+        runner.run_evaluation_batch(mock_questions, k=5)
+
+        # Verify mocks were called correctly
+        mock_create_config.assert_called_once_with(k_value=5, dataset_filter=None, git_commit=None)
+        mock_logger_cls.assert_called_once_with(runner.log_dir)
+        mock_logger.start_batch.assert_called_once_with(mock_config)
+        mock_process.assert_called_once_with(mock_questions, mock_retrieval_func, 5)
+        mock_compute.assert_called_once()
+        mock_logger.finish_batch.assert_called_once()
 
 
 def test_run_evaluation_with_filtering(mock_retrieval_func, mock_questions):
@@ -116,22 +117,24 @@ def test_run_evaluation_with_sampling(mock_retrieval_func, mock_questions):
     """Test running evaluation with sampling."""
     runner = EvaluationRunner(mock_retrieval_func)
 
-    with patch.object(runner, "load_questions", return_value=mock_questions):
-        with patch.object(runner, "run_evaluation_batch") as mock_run_batch:
-            with patch("src.metrics.evaluation.runner.stratified_sample") as mock_sample:
-                # Setup mock sampler
-                mock_sample.return_value = [mock_questions[0]]
+    with (
+        patch.object(runner, "load_questions", return_value=mock_questions),
+        patch.object(runner, "run_evaluation_batch") as mock_run_batch,
+        patch("src.metrics.evaluation.runner.stratified_sample") as mock_sample,
+    ):
+        # Setup mock sampler
+        mock_sample.return_value = [mock_questions[0]]
 
-                # Run evaluation with sampling
-                runner.run_evaluation(questions_file="test.csv", k_values=[5], sample_fraction=0.5)
+        # Run evaluation with sampling
+        runner.run_evaluation(questions_file="test.csv", k_values=[5], sample_fraction=0.5)
 
-                # Verify sampled questions were passed to batch
-                mock_sample.assert_called_once_with(
-                    mock_questions, sample_fraction=0.5, min_per_dataset=1, random_seed=None
-                )
-                call_args = mock_run_batch.call_args[0]
-                sampled_questions = call_args[0]
-                assert len(sampled_questions) == 1
+        # Verify sampled questions were passed to batch
+        mock_sample.assert_called_once_with(
+            mock_questions, sample_fraction=0.5, min_per_dataset=1, random_seed=None
+        )
+        call_args = mock_run_batch.call_args[0]
+        sampled_questions = call_args[0]
+        assert len(sampled_questions) == 1
 
 
 def test_run_evaluation_no_questions(mock_retrieval_func):
@@ -148,21 +151,22 @@ def test_run_evaluation_batch_error_handling(mock_retrieval_func, mock_questions
     runner = EvaluationRunner(mock_retrieval_func)
 
     # Test general error in batch processing
-    with patch("src.metrics.evaluation.runner.create_batch_config"):
-        with patch("src.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls:
-            mock_logger = MagicMock()
-            mock_logger_cls.return_value = mock_logger
+    with (
+        patch("src.metrics.evaluation.runner.create_batch_config"),
+        patch("src.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls,
+        patch(
+            "src.metrics.evaluation.runner.batch_process_results",
+            side_effect=Exception("Test error"),
+        ),
+    ):
+        mock_logger = MagicMock()
+        mock_logger_cls.return_value = mock_logger
 
-            # Simulate an error in batch processing
-            with patch(
-                "src.metrics.evaluation.runner.batch_process_results",
-                side_effect=Exception("Test error"),
-            ):
-                with pytest.raises(Exception, match="Test error"):
-                    runner.run_evaluation_batch(mock_questions, k=5)
+        with pytest.raises(Exception, match="Test error"):
+            runner.run_evaluation_batch(mock_questions, k=5)
 
-                # Verify logger cleanup was called
-                mock_logger.__exit__.assert_called_once()
+        # Verify logger cleanup was called
+        mock_logger.__exit__.assert_called_once()
 
     # Test RuntimeError from batch configuration
     with patch(
