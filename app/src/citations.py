@@ -208,6 +208,23 @@ def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection
     return re.sub(CITATION_PATTERN, replace_citation, response)
 
 
+def move_citations_after_punctuation(response):
+    """
+    After the '(citation-N)' should be a newline to avoid associating the citation with the next sentence.
+    """
+
+    def move_citation(match: Match) -> str:
+        citation = match.group(1)
+        punctuation = match.group(2)
+        # import pdb; pdb.set_trace()
+        return f"{punctuation} {citation}\n"
+
+    # Include trailing any spaces and a newline
+    return re.sub(
+        r" *(\(citation-\d+\)) *([\.\?\!]) *\n?", move_citation, response, flags=re.MULTILINE
+    ).strip()
+
+
 @dataclass
 class ResponseWithSubsections:
     response: str
@@ -221,6 +238,7 @@ def simplify_citation_numbers(result: ResponseWithSubsections) -> ResponseWithSu
     The returned subsections only contain citations used in the response
     and are ordered consecutively starting from 1.
     """
-    remapped_citations = remap_citation_ids(result.subsections, result.response)
+    formatted_citations = move_citations_after_punctuation(result.response)
+    remapped_citations = remap_citation_ids(result.subsections, formatted_citations)
     remapped_response = replace_citation_ids(result.response, remapped_citations)
     return ResponseWithSubsections(remapped_response, tuple(remapped_citations.values()))

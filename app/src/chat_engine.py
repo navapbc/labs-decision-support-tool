@@ -373,15 +373,15 @@ For example "List housing programs available to youth" or "What are the requirem
 Provide citation numbers:
 - When referencing the context, do not quote directly. Use the provided citation numbers (e.g., (citation-1)) to indicate when \
 you are drawing from the context. To cite multiple sources at once, you can append citations like so: (citation-1) (citation-2), etc. \
-For example: 'This is a sentence that draws on information from the context.(citation-1)'
+For example: 'This is a sentence that draws on information from the context. (citation-1)'
 
 Example question:
 Can a client get Unemployment and disability at the same time?
 
 Example Answer:
-No, a client cannot receive Unemployment Insurance (UI) and State Disability Insurance (SDI) benefits at the same time. (citation-1). \
+No, a client cannot receive Unemployment Insurance (UI) and State Disability Insurance (SDI) benefits at the same time. (citation-1)
 They must choose the program that best fits their situation. If they don't know which program to apply for, \
-they can apply for both, and their eligibility for each will be reviewed (citation-2) (citation-3)."""
+they can apply for both, and their eligibility for each will be reviewed. (citation-2) (citation-3)"""
 
     def on_message(
         self, question: str, chat_history: Optional[ChatHistory] = None

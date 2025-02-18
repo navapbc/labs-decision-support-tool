@@ -7,7 +7,7 @@ from typing import Match, Sequence
 
 import markdown
 
-from src.citations import CITATION_PATTERN, remap_citation_ids
+from src.citations import CITATION_PATTERN, move_citations_after_punctuation, remap_citation_ids
 from src.db.models.document import Chunk, Document, Subsection
 from src.generate import MessageAttributesT
 
@@ -52,7 +52,8 @@ def format_response(
     config: FormattingConfig,
     attributes: MessageAttributesT,
 ) -> str:
-    remapped_citations = remap_citation_ids(subsections, raw_response)
+    formatted_response = move_citations_after_punctuation(raw_response)
+    remapped_citations = remap_citation_ids(subsections, formatted_response)
     citations_html, map_of_accordion_ids = _create_accordion_html(config, remapped_citations)
 
     html_response = []
@@ -174,21 +175,12 @@ def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> 
     return f"<div><b>{' → '.join(headings)}</b></div>"
 
 
-def reify_citations(
-    response: str,
-    subsections: Sequence[Subsection],
-    config: FormattingConfig,
-    map_of_accordion_ids: dict,
-) -> str:
-    remapped_citations = remap_citation_ids(subsections, response)
-    return _add_citation_links(response, remapped_citations, config, map_of_accordion_ids)
-
-
 _footnote_id = random.randint(0, 1000000)
 _footnote_index = 0
 
 
-# FIXME: Refactor to reduce code replication with replace_citation_ids()
+# FIXME: Refactor to reduce code replication with replace_citation_ids();
+#        perhaps use simplify_citation_numbers() like chat_api and batch_process
 def _add_citation_links(
     response: str,
     remapped_citations: dict[str, Subsection],

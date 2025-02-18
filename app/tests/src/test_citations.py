@@ -1,9 +1,12 @@
+from textwrap import dedent
+
 import pytest
 
 from src.citations import (
     CitationFactory,
     basic_chunk_splitter,
     create_prompt_context,
+    move_citations_after_punctuation,
     remap_citation_ids,
     replace_citation_ids,
     split_into_subsections,
@@ -183,3 +186,27 @@ The officer weighs all these factors. They consider positive factors, like a job
     assert subsections[1].text.startswith("The immigration officer will consider")
     assert "* Health" in subsections[1].text
     assert subsections[2].text.startswith("The officer weighs all these factors.")
+
+
+def test_move_citations_after_punctuation():
+    text = dedent(
+        """
+                     Some text (citation-1). Another sentence on same line with no space(citation-2)? Sentence 3 has the correct citation formatting. (citation-3)
+                     - Bullet is on a new line (citation-4)!
+                     Last sentence(citation-99)!
+
+                     New paragraph (citation-100).
+                  """
+    )
+    expected_text = dedent(
+        """
+                            Some text. (citation-1)
+                            Another sentence on same line with no space? (citation-2)
+                            Sentence 3 has the correct citation formatting. (citation-3)
+                            - Bullet is on a new line! (citation-4)
+                            Last sentence! (citation-99)
+
+                            New paragraph. (citation-100)
+                           """
+    ).strip()
+    assert move_citations_after_punctuation(text) == expected_text
