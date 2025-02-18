@@ -208,7 +208,7 @@ def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection
     return re.sub(CITATION_PATTERN, replace_citation, response)
 
 
-def move_citations_after_punctuation(response):
+def move_citations_after_punctuation(response: str) -> str:
     """
     After the '(citation-N)' should be a newline to avoid associating the citation with the next sentence.
     """
@@ -219,7 +219,7 @@ def move_citations_after_punctuation(response):
         # import pdb; pdb.set_trace()
         return f"{punctuation} {citation}\n"
 
-    # Include trailing any spaces and a newline
+    # Include any trailing spaces and a single newline so they can be replaced
     return re.sub(
         r" *(\(citation-\d+\)) *([\.\?\!]) *\n?", move_citation, response, flags=re.MULTILINE
     ).strip()
