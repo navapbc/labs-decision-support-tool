@@ -1,16 +1,16 @@
-# Tech Spec: Automating QA evaluation pipeline for DST chat
+# Tech Spec: Automating retrieval evaluation in the DST QA pipeline
 
 ## Current Need
 
-Our primary need is to establish traceability of our retrieval system's performance over time. Specifically:
+Our primary need is to establish automation and traceability of our retrieval system's performance over time. Specifically:
 
 ### Primary Need: Traceability
-- Current limitation: Performance results tracked manually are difficult to trace changes and correlate with system updates to the DST retrieval application and latest dataset ingestions.
+- Current limitation: Performance results from vectorstore retrieval tracked manually are difficult to trace changes and correlate with system updates to the DST retrieval application and latest dataset ingestions.
 - Impact: Cannot reliably determine if system changes improve or degrade performance
 - Core requirement: Systematic logging of evaluation runs with clear links to system configuration
 
 ### Secondary Needs
-- Automated evaluation pipeline to reduce manual effort
+- Automated retrieval evaluation pipeline to reduce manual effort
 - Performance comparison across system changes
 - Historical dataset version tracking
 
