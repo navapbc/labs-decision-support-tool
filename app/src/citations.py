@@ -209,15 +209,14 @@ def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection
 
 
 def move_citations_after_punctuation(response: str) -> str:
-    """
-    After the '(citation-N)' should be a newline to avoid associating the citation with the next sentence.
-    """
-
     def move_citation(match: Match) -> str:
         citations = match.group(1)
         # match.group(2) only has the last citation in match.group(1)
         # see https://stackoverflow.com/a/43866169/23458508
         punctuation = match.group(3)
+        # Since citations appear after a punctuation, if there's a subsequent sentence,
+        # then someone might associate `(citation-N)` with that subsequent sentence,
+        # so insert a new line after the citations.
         return f"{punctuation} {citations}\n"
 
     # Include any trailing spaces and a single newline so they can be replaced
