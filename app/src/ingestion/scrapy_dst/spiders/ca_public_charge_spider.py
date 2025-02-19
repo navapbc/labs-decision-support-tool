@@ -6,10 +6,6 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
 
-from src.util import string_utils  # noqa: E402
-
-AccordionSections = dict[str, list[str]]
-
 
 class CaPublicChargeSpider(CrawlSpider):
     # This name is used on the commandline: scrapy crawl ca_public_charge_spider
@@ -41,7 +37,7 @@ class CaPublicChargeSpider(CrawlSpider):
         ),
     )
 
-    def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
+    def parse_page(self, response: HtmlResponse) -> dict[str, str]:
         self.logger.info("Parsing %s", response.url)
         extractions = {"url": response.url}
         title = response.css("title::text").get().removesuffix("| Keep Your Benefits")
@@ -50,21 +46,19 @@ class CaPublicChargeSpider(CrawlSpider):
         # remove icon text
         response.css("div.ic-icon").drop()
 
-        # Resolve anchor URLs to absolute URL
-        # response.url cannot be reliably used as a prefix for relative URLs
-        for anchor in response.css("a"):
-            if "href" in anchor.attrib:
-                absolute_href=response.urljoin(anchor.attrib['href'])
-                anchor.root.attrib.update({'href':absolute_href})
-
-        # extractions |= self.parse_module_full(response.css("div.module-full"))
+        self.resolveAnchorHrefs(response)
         extractions |= self.parse_main_content(response.css("div.GTM-1"))
-        # if response.url == 'https://keepyourbenefits.org/en/ca/public-charge':
-        import pdb; pdb.set_trace()
-
-        print("\n".join(re.findall(r'\]\(.*\)', extractions['markdown'])))
-
         return extractions
+
+    def resolveAnchorHrefs(self, response: HtmlResponse) -> None:
+        """
+        Resolve anchor URLs to absolute URL
+        response.url cannot be reliably used as a prefix for relative URLs
+        """
+        href_anchors = [anchor for anchor in response.css("a") if "href" in anchor.attrib]
+        for anchor in href_anchors:
+            absolute_href = response.urljoin(anchor.attrib["href"])
+            anchor.root.attrib.update({"href": absolute_href})
 
     def to_markdown(self, html: str) -> str:
         # convert larger text to header
