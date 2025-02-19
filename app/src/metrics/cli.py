@@ -38,6 +38,8 @@ def main() -> None:
     parser.add_argument(
         "--dataset",
         type=str,
+        # TODO: We currently only support 'imagine_la' and 'la_policy' datasets.
+        # This will be expanded to include other datasets (ca_wic, edd, etc.) as we add more evaluation data.
         help="Comma-separated list of datasets to evaluate (e.g., imagine_la,la_policy or all)",
         required=True,
     )
