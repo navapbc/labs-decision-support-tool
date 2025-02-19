@@ -33,12 +33,24 @@ The questions CSV file should have the following columns:
 The `src.metrics.cli` module provides a CLI for running evaluations:
 
 ```bash
-make run-evaluation dataset=imagine_la k=5,10,25
+# Evaluate all datasets with default k values
+make run-evaluation
+
+# Evaluate a single dataset
+make run-evaluation dataset="imagine_la"
+
+# Evaluate multiple datasets with specific k values
+make run-evaluation dataset="imagine_la la_policy" k="5 10 25"
+
+# Evaluate all datasets with sampling
+make run-evaluation sampling=0.1
 ```
 
 Arguments:
-- `dataset`: Filter questions from the CSV by matching this value against the 'dataset' column (e.g., "imagine_la", "la_policy", or "all" to use all datasets)
-- `k`: Comma-separated list of k values (default: 5,10,25)
+- `dataset`: Optional. One or more datasets to evaluate (e.g., "imagine_la la_policy"). If not specified, evaluates all available datasets. Currently supports:
+  - `imagine_la`: Imagine LA dataset
+  - `la_policy`: LA County Policy dataset
+- `k`: One or more k values to evaluate (default: "5 10 25")
 - `questions_file`: Path to questions CSV file (default: src/metrics/data/question_answer_pairs.csv)
 - `min_score`: Minimum similarity score for retrieval (default: -1.0)
 - `sampling`: Fraction of questions to sample (e.g., 0.1) for each specified dataset (default: 1.0)

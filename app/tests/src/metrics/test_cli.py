@@ -64,7 +64,8 @@ def test_create_retrieval_function():
     "args,expected_dataset_filter",
     [
         (["--dataset", "imagine_la"], ["imagine_la"]),
-        (["--dataset", "all"], None),
+        (["--dataset", "imagine_la", "la_policy"], ["imagine_la", "la_policy"]),
+        ([], None),  # No dataset specified means all datasets
     ],
 )
 def test_main_dataset_filter(args, expected_dataset_filter):
@@ -72,8 +73,8 @@ def test_main_dataset_filter(args, expected_dataset_filter):
     with patch("argparse.ArgumentParser.parse_args") as mock_args:
         # Setup mock arguments
         mock_args.return_value = MagicMock(
-            dataset=args[1],
-            k="5,10",
+            dataset=args[1:] if len(args) > 1 else None,  # If no --dataset arg, return None
+            k=[5, 10],  # Now k is a list of integers
             questions_file="test_file.csv",
             sampling=None,
             min_score=-1.0,
@@ -98,14 +99,14 @@ def test_main_dataset_filter(args, expected_dataset_filter):
             mock_create_retrieval.assert_called_once_with(-1.0)
 
 
-@pytest.mark.parametrize("k_value", ["5", "5,10,25"])
-def test_main_k_values(k_value):
+@pytest.mark.parametrize("k_values", [[5], [5, 10, 25]])
+def test_main_k_values(k_values):
     """Test main function handles k values correctly."""
     with patch("argparse.ArgumentParser.parse_args") as mock_args:
         # Setup mock arguments
         mock_args.return_value = MagicMock(
-            dataset="all",
-            k=k_value,
+            dataset=["all"],
+            k=k_values,  # Now k is a list of integers
             questions_file="test_file.csv",
             sampling=None,
             min_score=-1.0,
@@ -124,8 +125,7 @@ def test_main_k_values(k_value):
 
             # Verify run_evaluation was called with correct k_values
             call_args = mock_run_eval.call_args[1]
-            expected_k_values = [int(k) for k in k_value.split(",")]
-            assert call_args["k_values"] == expected_k_values
+            assert call_args["k_values"] == k_values
 
 
 def test_main_results_display():
@@ -147,8 +147,8 @@ def test_main_results_display():
 
     with patch("argparse.ArgumentParser.parse_args") as mock_args:
         mock_args.return_value = MagicMock(
-            dataset="all",
-            k="5",
+            dataset=["all"],
+            k=[5],
             questions_file="test_file.csv",
             sampling=None,
             min_score=-1.0,

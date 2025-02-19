@@ -38,12 +38,20 @@ def main() -> None:
     parser.add_argument(
         "--dataset",
         type=str,
+        nargs="+",
         # TODO: We currently only support 'imagine_la' and 'la_policy' datasets.
         # This will be expanded to include other datasets (ca_wic, edd, etc.) as we add more evaluation data.
-        help="Comma-separated list of datasets to evaluate (e.g., imagine_la,la_policy or all)",
-        required=True,
+        help="One or more datasets to evaluate (e.g., imagine_la la_policy). If not specified, evaluates all datasets.",
+        required=False,
+        default=None,
     )
-    parser.add_argument("--k", type=str, default="5,10,25", help="Comma-separated list of k values")
+    parser.add_argument(
+        "--k",
+        type=int,
+        nargs="+",
+        default=[5, 10, 25],
+        help="One or more k values to evaluate (e.g., 5 10 25)",
+    )
     parser.add_argument(
         "--questions-file",
         type=str,
@@ -67,8 +75,8 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # Set up dataset filter
-    dataset_filter = None if args.dataset == "all" else args.dataset.split(",")
+    # Set up dataset filter - None means all datasets
+    dataset_filter = args.dataset
 
     # Evaluation results stored in src/metrics/logs/YYYY-MM-DD/
     # See README.md for details on log storage and structure
@@ -83,7 +91,7 @@ def main() -> None:
     try:
         run_evaluation(
             questions_file=args.questions_file,
-            k_values=parse_k_values(args.k),
+            k_values=args.k,
             retrieval_func=retrieval_func,
             dataset_filter=dataset_filter,
             sample_fraction=args.sampling,
