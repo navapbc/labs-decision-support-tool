@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.metrics.cli import create_retrieval_function, format_metric_value, main, parse_k_values
+from src.metrics.cli import create_retrieval_function, format_metric_value, main
 
 
 def test_format_metric_value():
@@ -26,19 +26,6 @@ def test_format_metric_value():
 
     # Test dict values
     assert format_metric_value({"key": "value"}) == "{'key': 'value'}"
-
-
-def test_parse_k_values():
-    """Test parsing of k values from string."""
-    # Test single value
-    assert parse_k_values("5") == [5]
-
-    # Test multiple values
-    assert parse_k_values("5,10,25") == [5, 10, 25]
-
-    # Test invalid input
-    with pytest.raises(ValueError):
-        parse_k_values("5,abc,25")
 
 
 def test_create_retrieval_function():
@@ -73,8 +60,8 @@ def test_main_dataset_filter(args, expected_dataset_filter):
     with patch("argparse.ArgumentParser.parse_args") as mock_args:
         # Setup mock arguments
         mock_args.return_value = MagicMock(
-            dataset=args[1:] if len(args) > 1 else None,  # If no --dataset arg, return None
-            k=[5, 10],  # Now k is a list of integers
+            dataset=args[1:] if len(args) > 1 else None,
+            k=[5, 10],
             questions_file="test_file.csv",
             sampling=None,
             min_score=-1.0,
@@ -106,7 +93,7 @@ def test_main_k_values(k_values):
         # Setup mock arguments
         mock_args.return_value = MagicMock(
             dataset=["all"],
-            k=k_values,  # Now k is a list of integers
+            k=k_values,
             questions_file="test_file.csv",
             sampling=None,
             min_score=-1.0,
@@ -147,7 +134,7 @@ def test_main_results_display():
 
     with patch("argparse.ArgumentParser.parse_args") as mock_args:
         mock_args.return_value = MagicMock(
-            dataset=["all"],
+            dataset=None,
             k=[5],
             questions_file="test_file.csv",
             sampling=None,

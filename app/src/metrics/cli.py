@@ -4,16 +4,11 @@
 import argparse
 import json
 import os
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from src.retrieve import retrieve_with_scores
 
 from .evaluation.runner import run_evaluation
-
-
-def parse_k_values(k_str: str) -> List[int]:
-    """Parse comma-separated k values."""
-    return [int(k) for k in k_str.split(",")]
 
 
 def create_retrieval_function(min_score: float) -> Callable[[str, int], Sequence[Any]]:
