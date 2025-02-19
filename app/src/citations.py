@@ -216,6 +216,7 @@ def move_citations_after_punctuation(response: str) -> str:
     def move_citation(match: Match) -> str:
         citations = match.group(1)
         # match.group(2) only has the last citation in match.group(1)
+        # see https://stackoverflow.com/a/43866169/23458508
         punctuation = match.group(3)
         return f"{punctuation} {citations}\n"
 
