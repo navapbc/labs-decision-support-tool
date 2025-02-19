@@ -46,7 +46,7 @@ Accordion 22 Body"""
     with TemporaryDirectory(suffix="imagine_la_md") as md_base_dir:
         with caplog.at_level(logging.INFO):
             config = IngestConfig(
-                "Imagine LA",
+                "Benefits Information Hub",
                 "mixed",
                 "California",
                 "https://benefitnavigator.web.app/contenthub/",

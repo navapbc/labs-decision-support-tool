@@ -137,7 +137,7 @@ def test_stratified_sample():
 def test_filter_questions():
     """Test question filtering by dataset."""
     questions = [
-        {"dataset": "Imagine LA", "question": "q1"},
+        {"dataset": "Benefits Information Hub", "question": "q1"},
         {"dataset": "LA County Policy", "question": "q2"},
         {"dataset": "Other Dataset", "question": "q3"},
     ]

@@ -137,7 +137,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     default_config = IngestConfig(
-        "Imagine LA",
+        "Benefits Information Hub",
         "mixed",
         "California",
         "https://benefitnavigator.web.app/contenthub/",
