@@ -36,7 +36,7 @@ def test__drop_existing_dataset(db_session, enable_factory_create):
 
 
 default_config = IngestConfig(
-    "Imagine LA",
+    "Benefits Information Hub",
     "mixed",
     "California",
     "https://benefitnavigator.web.app/contenthub/",

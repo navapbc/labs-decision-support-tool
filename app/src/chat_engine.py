@@ -245,10 +245,10 @@ class ImagineLaEngine(BaseEngine):
     ]
 
     engine_id: str = "imagine-la"
-    name: str = "Imagine LA Chat Engine"
+    name: str = "SBN Chat Engine"
     datasets = [
         "CA EDD",
-        "Imagine LA",
+        "Benefits Information Hub",
         "DPSS Policy",
         "IRS",
         "Keep Your Benefits",
