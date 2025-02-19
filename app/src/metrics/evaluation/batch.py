@@ -127,7 +127,7 @@ def filter_questions(
 
     # Map CLI dataset names to actual dataset names in CSV
     dataset_mapping = {
-        "imagine_la": "Imagine LA",
+        "imagine_la": "Benefits Information Hub",
         "la_policy": "LA County Policy",
     }
 

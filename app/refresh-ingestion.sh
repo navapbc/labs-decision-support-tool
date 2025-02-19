@@ -21,7 +21,7 @@ ingest_imagine_la() {
     [ -d "${DATASET_ID}_md" ] && mv -iv "$DATASET_ID"{,-orig}_md
 
     # Save markdown files and ingest into DB
-    make ingest-imagine-la DATASET_ID="Imagine LA" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California \
+    make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California \
         FILEPATH=src/ingestion/imagine_la/scrape/pages 2>&1 | tee logs/${DATASET_ID}-2ingest.log
     if [ $? -ne 0 ] || grep -E 'make:.*Error' "logs/${DATASET_ID}-2ingest.log"; then
         echo "ERROR: ingest-runner failed. Check logs/${DATASET_ID}-2ingest.log"
