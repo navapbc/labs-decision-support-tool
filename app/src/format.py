@@ -65,7 +65,11 @@ def format_response(
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a list in html_response
     html_response.append(
-        to_html(_add_citation_links(raw_response, remapped_citations, config, map_of_accordion_ids))
+        to_html(
+            _add_citation_links(
+                formatted_response, remapped_citations, config, map_of_accordion_ids
+            )
+        )
     )
 
     if citations_html:

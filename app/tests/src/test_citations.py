@@ -192,8 +192,9 @@ def test_move_citations_after_punctuation():
     text = dedent(
         """
                      Some text (citation-1). Another sentence on same line with no space(citation-2)? Sentence 3 has the correct citation formatting. (citation-3)
-                     - Bullet is on a new line (citation-4)!
-                     Last sentence(citation-99)!
+                     - Bullet 1 is on a new line (citation-4) (citation-5)!
+                     - Bullet 2 is on next line (citation-14) (citation-15).
+                     Last sentence(citation-6)!
 
                      New paragraph (citation-100).
                   """
@@ -203,8 +204,9 @@ def test_move_citations_after_punctuation():
                             Some text. (citation-1)
                             Another sentence on same line with no space? (citation-2)
                             Sentence 3 has the correct citation formatting. (citation-3)
-                            - Bullet is on a new line! (citation-4)
-                            Last sentence! (citation-99)
+                            - Bullet 1 is on a new line! (citation-4) (citation-5)
+                            - Bullet 2 is on next line. (citation-14) (citation-15)
+                            Last sentence! (citation-6)
 
                             New paragraph. (citation-100)
                            """

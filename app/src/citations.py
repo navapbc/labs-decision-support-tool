@@ -214,15 +214,13 @@ def move_citations_after_punctuation(response: str) -> str:
     """
 
     def move_citation(match: Match) -> str:
-        citation = match.group(1)
-        punctuation = match.group(2)
-        # import pdb; pdb.set_trace()
-        return f"{punctuation} {citation}\n"
+        citations = match.group(1)
+        # group(2) is the last citation in group(1)
+        punctuation = match.group(3)
+        return f"{punctuation} {citations}\n"
 
     # Include any trailing spaces and a single newline so they can be replaced
-    return re.sub(
-        r" *(\(citation-\d+\)) *([\.\?\!]) *\n?", move_citation, response, flags=re.MULTILINE
-    ).strip()
+    return re.sub(r" *(( *\(citation-\d+\))+) *([\.\?\!]) *\n?", move_citation, response).strip()
 
 
 @dataclass
@@ -238,7 +236,7 @@ def simplify_citation_numbers(result: ResponseWithSubsections) -> ResponseWithSu
     The returned subsections only contain citations used in the response
     and are ordered consecutively starting from 1.
     """
-    formatted_citations = move_citations_after_punctuation(result.response)
-    remapped_citations = remap_citation_ids(result.subsections, formatted_citations)
-    remapped_response = replace_citation_ids(result.response, remapped_citations)
+    formatted_response = move_citations_after_punctuation(result.response)
+    remapped_citations = remap_citation_ids(result.subsections, formatted_response)
+    remapped_response = replace_citation_ids(formatted_response, remapped_citations)
     return ResponseWithSubsections(remapped_response, tuple(remapped_citations.values()))
