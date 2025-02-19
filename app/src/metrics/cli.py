@@ -38,7 +38,7 @@ def main() -> None:
     parser.add_argument(
         "--dataset",
         type=str,
-        help="Dataset to evaluate (imagine_la, la_policy, or all)",
+        help="Comma-separated list of datasets to evaluate (e.g., imagine_la,la_policy or all)",
         required=True,
     )
     parser.add_argument("--k", type=str, default="5,10,25", help="Comma-separated list of k values")
@@ -66,7 +66,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Set up dataset filter
-    dataset_filter = None if args.dataset == "all" else [args.dataset]
+    dataset_filter = None if args.dataset == "all" else args.dataset.split(",")
 
     # Evaluation results stored in src/metrics/logs/YYYY-MM-DD/
     # See README.md for details on log storage and structure
