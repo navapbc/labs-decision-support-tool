@@ -272,14 +272,17 @@ def test_save_qa_pairs_permission_error(storage, sample_qa_pairs):
     """Test handling of permission error during save."""
     version_id = "test_version"
 
+    # Store original permissions
+    original_mode = storage.base_path.stat().st_mode
+
     # Make base directory read-only
     os.chmod(storage.base_path, 0o444)
     try:
         with pytest.raises(PermissionError):
             storage.save_qa_pairs(sample_qa_pairs, version_id)
     finally:
-        # Restore permissions for cleanup
-        os.chmod(storage.base_path, 0o777)
+        # Restore original permissions for cleanup
+        os.chmod(storage.base_path, original_mode)
 
 
 def test_save_qa_pairs_existing_version(storage, sample_qa_pairs):
