@@ -16,7 +16,7 @@ module "prod_config" {
   # https://conchchow.medium.com/aws-ecs-fargate-compute-capacity-planning-a5025cb40bd0
   service_cpu                    = 2048
   service_memory                 = 8192
-  service_desired_instance_count = 2
+  service_desired_instance_count = 1
 
   # Enables ECS Exec access for debugging or jump access.
   # Defaults to `false`. Uncomment the next line to enable.
