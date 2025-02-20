@@ -141,7 +141,12 @@ def main() -> None:
         try:
             # Get QA pairs version using same output_dir as generation
             storage = QAPairStorage(qa_pairs_dir)
-            version_id = args.qa_pairs_version or storage.get_latest_version()
+            try:
+                version_id = args.qa_pairs_version or storage.get_latest_version()
+            except ValueError as e:
+                print(f"Error running evaluation: {str(e)}")
+                raise
+
             version_dir = storage.get_version_path(version_id)
             qa_pairs_path = version_dir / "qa_pairs.csv"
 

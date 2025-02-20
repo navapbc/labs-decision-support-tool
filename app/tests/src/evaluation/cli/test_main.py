@@ -223,8 +223,42 @@ def test_main_generate_no_documents_error(mock_run_generation, parser):
 
 
 @patch("src.evaluation.cli.main.run_evaluation")
-def test_main_evaluate_error(mock_run_evaluation, parser):
+@patch("src.evaluation.cli.main.QAPairStorage")
+def test_main_evaluate_error(mock_storage_class, mock_run_evaluation, parser):
     """Test main function handles evaluation errors."""
+    # Setup mock storage to raise the error
+    mock_storage = MagicMock()
+    mock_storage.get_latest_version.side_effect = ValueError(
+        "No QA pairs found - run generation first"
+    )
+    mock_storage_class.return_value = mock_storage
+
+    mock_run_evaluation.side_effect = Exception("Test error")  # This won't be reached
+    mock_print = MagicMock()
+
+    with (
+        patch("sys.argv", ["cli.py", "evaluate"]),
+        patch("builtins.print", mock_print),
+    ):
+        with pytest.raises(ValueError, match="No QA pairs found - run generation first"):
+            main()
+
+        # Verify error message was printed
+        mock_print.assert_called_with(
+            "Error running evaluation: No QA pairs found - run generation first"
+        )
+
+
+@patch("src.evaluation.cli.main.run_evaluation")
+@patch("src.evaluation.cli.main.QAPairStorage")
+def test_main_evaluate_run_error(mock_storage_class, mock_run_evaluation, parser):
+    """Test main function handles run_evaluation errors."""
+    # Setup mock storage to work normally
+    mock_storage = MagicMock()
+    mock_storage.get_latest_version.return_value = "test_version"
+    mock_storage_class.return_value = mock_storage
+
+    # Setup run_evaluation to raise error
     mock_run_evaluation.side_effect = Exception("Test error")
     mock_print = MagicMock()
 
