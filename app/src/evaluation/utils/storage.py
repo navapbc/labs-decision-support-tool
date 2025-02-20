@@ -128,28 +128,26 @@ class QAPairStorage:
                 writer.writerow(row)
 
         # Update latest symlink with robust handling
-        latest_link = self.base_path / "latest"
         try:
-            # Create temp symlink with unique name
+            latest_link = self.base_path / "latest"
             temp_link = self.base_path / f"latest.{datetime.now().timestamp()}"
-            temp_link.symlink_to(version_dir, target_is_directory=True)
+            
+            try:
+                if temp_link.exists():
+                    temp_link.unlink()
+                temp_link.symlink_to(version_dir, target_is_directory=True)
 
-            # Atomic rename of temp symlink to latest
-            # This avoids race conditions between processes
-            temp_link.rename(latest_link)
-
-        except FileExistsError:
-            # If latest exists, verify it points to correct dir
-            if latest_link.exists():
-                try:
-                    if latest_link.resolve() != version_dir:
-                        latest_link.unlink()
-                        latest_link.symlink_to(version_dir, target_is_directory=True)
-                except (OSError, RuntimeError):
-                    # Handle edge cases (broken symlink, permission issues, etc)
-                    if latest_link.exists():
-                        latest_link.unlink()
-                    latest_link.symlink_to(version_dir, target_is_directory=True)
+                if latest_link.exists():
+                    latest_link.unlink()
+                temp_link.rename(latest_link)
+            except (OSError, RuntimeError):
+                # Ignore symlink errors - files are still saved
+                if temp_link.exists():
+                    temp_link.unlink()
+        except Exception:
+            # Catch any other errors during symlink handling
+            # The main functionality (saving files) should still work
+            pass
 
         return csv_path
 
@@ -162,12 +160,16 @@ class QAPairStorage:
         Raises:
             ValueError if no QA pairs found
         """
-        # First try to find latest version by timestamp
-        versions = sorted(
-            [d for d in self.base_path.iterdir() if d.is_dir() and d.name != "latest"],
-            key=lambda d: d.name,
-            reverse=True,
-        )
+        try:
+            # First try to find latest version by timestamp
+            versions = sorted(
+                [d for d in self.base_path.iterdir() if d.is_dir() and d.name != "latest"],
+                key=lambda d: d.name,
+                reverse=True,
+            )
+        except (OSError, PermissionError) as e:
+            raise ValueError("No QA pairs found - error accessing directory") from e
+
         if not versions:
             raise ValueError("No QA pairs found - run generation first")
 
@@ -193,10 +195,10 @@ class QAPairStorage:
             Path to version directory
 
         Raises:
-            ValueError if version not found
+            ValueError if version not found or not a directory
         """
         version_dir = self.base_path / version_id
-        if not version_dir.exists():
+        if not version_dir.exists() or not version_dir.is_dir():
             raise ValueError(f"Version {version_id} not found")
 
         return version_dir

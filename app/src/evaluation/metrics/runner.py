@@ -49,6 +49,12 @@ class EvaluationRunner:
         try:
             with open(file_path, mode="r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
+                # Verify required headers are present
+                required_headers = {"id", "question", "answer", "document_id", "dataset"}
+                if not reader.fieldnames or not required_headers.issubset(set(reader.fieldnames)):
+                    raise RuntimeError(
+                        f"Invalid CSV format. Required headers: {required_headers}. Found: {reader.fieldnames}"
+                    )
                 questions = list(reader)
                 print(f"Loaded {len(questions)} questions")
                 return questions
