@@ -9,7 +9,7 @@ from tqdm import tqdm
 from src.app_config import app_config
 from src.db.models.document import Chunk
 
-from ..models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
+from ..data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 from ..utils.timer import measure_time
 from ..utils.progress import ProgressTracker
 

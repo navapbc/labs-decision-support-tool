@@ -1,11 +1,14 @@
-"""Tests for JSONL to CSV conversion utility."""
+"""Tests for JSONL to CSV conversion utilities."""
 
 import json
 import os
+import tempfile
+from pathlib import Path
+from typing import List
 
 import pytest
 
-from src.metrics.utils.jsonl_to_csv import (
+from src.evaluation.utils.jsonl_to_csv import (
     convert_batch_results_to_csv,
     convert_results_to_csv,
     explode_result_to_rows,

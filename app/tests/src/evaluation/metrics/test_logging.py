@@ -6,8 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from src.evaluation.metrics.logging import EvaluationLogger
-from src.evaluation.models.metrics import (
+from src.evaluation.data_models import (
     BatchConfig,
     DatasetMetrics,
     EvaluationConfig,
@@ -19,6 +18,7 @@ from src.evaluation.models.metrics import (
     RetrievedChunk,
     SoftwareInfo,
 )
+from src.evaluation.metrics.logging import EvaluationLogger
 
 
 @pytest.fixture

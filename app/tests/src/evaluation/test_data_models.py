@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from src.metrics.models.metrics import (
+from src.evaluation.data_models import (
     BatchConfig,
     DatasetMetrics,
     EvaluationConfig,
@@ -12,6 +12,7 @@ from src.metrics.models.metrics import (
     MetricsSummary,
     RetrievedChunk,
     SoftwareInfo,
+    QAGenerationInfo,
 )
 
 
@@ -26,9 +27,17 @@ def test_batch_config_creation():
         package_version="1.0.0",
         git_commit="abc123",
     )
+    qa_generation_info = QAGenerationInfo(
+        version_id="v1",
+        timestamp=datetime.now().isoformat(),
+        llm_model="gpt-4o-mini",
+        total_pairs=100,
+        datasets=["dataset1", "dataset2"],
+    )
     config = BatchConfig(
         evaluation_config=eval_config,
         software_info=software_info,
+        qa_generation_info=qa_generation_info,
     )
 
     # Test that required fields are set
@@ -37,6 +46,8 @@ def test_batch_config_creation():
     assert config.evaluation_config.dataset_filter == ["dataset1", "dataset2"]
     assert config.software_info.package_version == "1.0.0"
     assert config.software_info.git_commit == "abc123"
+    assert config.qa_generation_info.version_id == "v1"
+    assert config.qa_generation_info.llm_model == "gpt-4o-mini"
 
     # Test that auto-generated fields are present
     assert config.batch_id is not None
@@ -50,11 +61,13 @@ def test_expected_chunk():
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
+        content="This is the test content",
     )
     assert expected.name == "test_doc"
     assert expected.source == "test_dataset"
     assert expected.chunk_id == "chunk123"
     assert expected.content_hash == "hash456"
+    assert expected.content == "This is the test content"
 
 
 def test_retrieved_chunk():
@@ -78,6 +91,7 @@ def test_evaluation_result():
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
+        content="This is the test content",
     )
     retrieved_chunk = RetrievedChunk(
         chunk_id="chunk123",
@@ -94,6 +108,7 @@ def test_evaluation_result():
         rank_if_found=1,
         retrieval_time_ms=100.5,
         retrieved_chunks=[retrieved_chunk],
+        dataset="test_dataset",
     )
 
     # Test that fields are set correctly
@@ -105,6 +120,7 @@ def test_evaluation_result():
     assert result.rank_if_found == 1
     assert result.retrieval_time_ms == 100.5
     assert result.retrieved_chunks == [retrieved_chunk]
+    assert result.dataset == "test_dataset"
     assert result.timestamp is not None
 
 

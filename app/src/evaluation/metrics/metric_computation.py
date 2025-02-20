@@ -1,11 +1,11 @@
 """Metrics computation for evaluation results."""
 
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
-from ..models.metrics import (
+from ..data_models import (
     DatasetMetrics,
     EvaluationResult,
     IncorrectRetrievalsAnalysis,

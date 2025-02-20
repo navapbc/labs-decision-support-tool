@@ -1,8 +1,8 @@
-"""Tests for timer utility."""
+"""Tests for timer utilities."""
 
 import time
 
-from src.metrics.utils.timer import Timer, measure_time
+from src.evaluation.utils.timer import Timer, measure_time
 
 
 def test_timer_elapsed_ms():

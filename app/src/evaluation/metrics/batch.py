@@ -3,13 +3,16 @@ Batch processing for evaluation runs.
 Not to be confused with batch_process.py (used via the API).
 """
 
+import logging
 import random
 import subprocess
 from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 
-from ..models.metrics import BatchConfig, EvaluationConfig, QAGenerationInfo, SoftwareInfo
+import numpy as np
+
+from ..data_models import BatchConfig, EvaluationConfig, QAGenerationInfo, SoftwareInfo
 from ..utils.storage import QAPairStorage
 from src.util.sampling import get_stratified_sample
 
