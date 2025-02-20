@@ -28,7 +28,6 @@ class CaPublicChargeSpider(CrawlSpider):
                     "find-help",
                 ),
                 allow_domains=allowed_domains,
-                # deny_domains=("https://s3.amazonaws.com","publicsuffix.org"),
                 canonicalize=True,
                 unique=True,
             ),
