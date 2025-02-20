@@ -1,7 +1,7 @@
 """Results processing for evaluation runs."""
 
 from hashlib import md5
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from src.app_config import app_config
 from src.db.models.document import Chunk
@@ -98,7 +98,10 @@ def process_retrieved_chunks(
 
 
 def batch_process_results(
-    questions: List[Dict], retrieval_func: Any, k: int
+    questions: List[Dict],
+    retrieval_func: Any,
+    k: int,
+    progress_tracker: Optional[ProgressTracker] = None,
 ) -> List[EvaluationResult]:
     """Process multiple questions in batches.
 
@@ -106,12 +109,13 @@ def batch_process_results(
         questions: List of questions to process
         retrieval_func: Function to retrieve chunks for a question
         k: Number of chunks to retrieve
+        progress_tracker: Optional progress tracker for monitoring
 
     Returns:
         List of EvaluationResult objects
     """
     results = []
-    progress = ProgressTracker("Evaluation")
+    progress = progress_tracker or ProgressTracker("Evaluation")
 
     # Process each question individually to avoid pgvector batch issues
     with measure_time() as timer:
@@ -125,13 +129,14 @@ def batch_process_results(
                 retrieval_time = timer.elapsed_ms() / len(questions)  # Average time per question
                 results.append(process_retrieved_chunks(question, retrieved, retrieval_time))
 
-    # Log completion stats
-    progress.log_completion(
-        {
-            "Questions processed": len(questions),
-            "Average retrieval time (ms)": timer.elapsed_ms() / len(questions),
-            "items_processed": len(questions),
-        }
-    )
+    # Log completion stats if progress tracker exists
+    if progress:
+        progress.log_completion(
+            {
+                "Questions processed": len(questions),
+                "Average retrieval time (ms)": timer.elapsed_ms() / len(questions),
+                "items_processed": len(questions),
+            }
+        )
 
     return results

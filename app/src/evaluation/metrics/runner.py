@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from src.retrieve import retrieve_with_scores
 
+from ..utils.progress import ProgressTracker
 from .batch import create_batch_config, filter_questions, stratified_sample
 from .logging import EvaluationLogger
 from .metric_computation import compute_metrics_summary
@@ -25,15 +26,22 @@ def create_retrieval_function(min_score: float) -> Callable[[str, int], Sequence
 class EvaluationRunner:
     """Runs evaluation batches and logs results."""
 
-    def __init__(self, retrieval_func: Any, log_dir: str = "src/evaluation/data/logs/evaluations"):
+    def __init__(
+        self,
+        retrieval_func: Any,
+        log_dir: str = "src/evaluation/data/logs/evaluations",
+        progress_tracker: Optional[ProgressTracker] = None,
+    ):
         """Initialize the runner.
 
         Args:
             retrieval_func: Function to retrieve chunks for questions (uses model from app_config)
             log_dir: Directory for log files (defaults to module's data directory)
+            progress_tracker: Optional progress tracker for monitoring
         """
         self.retrieval_func = retrieval_func
         self.log_dir = log_dir
+        self.progress = progress_tracker or ProgressTracker("Evaluation")
 
     def load_questions(self, file_path: str) -> List[Dict]:
         """Load questions from CSV file."""
@@ -121,8 +129,13 @@ class EvaluationRunner:
                 # Start batch
                 logger.start_batch(config)
 
-                # Process results
-                results = batch_process_results(questions, self.retrieval_func, k)
+                # Process results with progress tracking
+                results = batch_process_results(
+                    questions,
+                    self.retrieval_func,
+                    k,
+                    progress_tracker=self.progress,
+                )
 
                 # Log individual results
                 for result in results:
@@ -154,9 +167,14 @@ def run_evaluation(
     random_seed: Optional[int] = None,
     log_dir: str = "src/evaluation/data/logs/evaluations",
     commit: Optional[str] = None,
+    progress_tracker: Optional[ProgressTracker] = None,
 ) -> None:
     """Convenience function to run evaluation."""
-    runner = EvaluationRunner(retrieval_func=retrieval_func, log_dir=log_dir)
+    runner = EvaluationRunner(
+        retrieval_func=retrieval_func,
+        log_dir=log_dir,
+        progress_tracker=progress_tracker,
+    )
     runner.run_evaluation(
         questions_file=questions_file,
         k_values=k_values,

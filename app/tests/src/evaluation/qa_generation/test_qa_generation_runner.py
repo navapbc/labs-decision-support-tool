@@ -85,6 +85,7 @@ def test_run_generation_basic(tmp_path, mock_session, mock_documents, mock_qa_pa
         patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
         patch("src.evaluation.qa_generation.runner.QAGenerator") as mock_generator_class,
         patch("src.evaluation.qa_generation.runner.QAPairStorage") as MockQAPairStorage,
+        patch("src.evaluation.qa_generation.runner.ProgressTracker") as MockProgressTracker,
     ):
         # Setup mocks
         mock_app_config.db_session.return_value = mock_session
@@ -95,6 +96,9 @@ def test_run_generation_basic(tmp_path, mock_session, mock_documents, mock_qa_pa
         expected_path = output_dir / "qa_pairs/test_version/qa_pairs.csv"
         mock_storage.save_qa_pairs.return_value = expected_path
 
+        # Setup progress tracker mock
+        mock_progress = MockProgressTracker.return_value
+
         # Run generation
         result_path = run_generation(config=config, output_dir=output_dir)
 
@@ -102,7 +106,13 @@ def test_run_generation_basic(tmp_path, mock_session, mock_documents, mock_qa_pa
         assert result_path == expected_path
         mock_generator.generate_from_documents.assert_called_once_with(mock_documents)
         mock_storage.save_qa_pairs.assert_called_once()
-        mock_generator.progress.log_completion.assert_called_once()
+        mock_progress.log_completion.assert_called_once_with(
+            {
+                "Total QA pairs": len(mock_qa_pairs),
+                "Output path": str(expected_path),
+                "items_processed": len(mock_qa_pairs),
+            }
+        )
 
 
 def test_run_generation_with_dataset_filter(tmp_path, mock_session, mock_documents):

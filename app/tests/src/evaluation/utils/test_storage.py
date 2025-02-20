@@ -4,6 +4,8 @@ import csv
 import json
 import os
 from datetime import UTC, datetime
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -296,3 +298,118 @@ def test_save_qa_pairs_existing_version(storage, sample_qa_pairs):
     second_path = storage.save_qa_pairs(sample_qa_pairs, version_id)
     assert first_path == second_path
     assert first_path.exists()
+
+
+def test_get_latest_version_race_condition(storage, sample_qa_pairs):
+    """Test handling of race conditions in get_latest_version."""
+    version1 = "20240219_test"
+    version2 = "20240220_test"
+
+    # Save first version
+    storage.save_qa_pairs(sample_qa_pairs, version1)
+
+    # Create a broken symlink to simulate race condition
+    latest_link = storage.base_path / "latest"
+    latest_link.unlink()
+    nonexistent = storage.base_path / "nonexistent"
+    latest_link.symlink_to(nonexistent)
+
+    # Save second version - should handle broken symlink
+    storage.save_qa_pairs(sample_qa_pairs, version2)
+
+    # Get latest version should work and fix symlink
+    latest = storage.get_latest_version()
+    assert latest == version2
+    assert latest_link.exists()
+    assert latest_link.resolve().name == version2
+
+
+def test_save_qa_pairs_io_error(storage, sample_qa_pairs, monkeypatch):
+    """Test handling of IO errors during save."""
+    version_id = "test_version"
+
+    def mock_dump(*args, **kwargs):
+        raise IOError("Simulated IO error")
+
+    # Patch json.dump to simulate IO error
+    monkeypatch.setattr(json, "dump", mock_dump)
+
+    with pytest.raises(IOError):
+        storage.save_qa_pairs(sample_qa_pairs, version_id)
+
+
+def test_get_latest_version_multiple_symlink_errors(storage, sample_qa_pairs):
+    """Test handling of multiple symlink errors in get_latest_version."""
+    version_id = "test_version"
+    storage.save_qa_pairs(sample_qa_pairs, version_id)
+
+    latest_link = storage.base_path / "latest"
+    latest_link.unlink()  # Remove existing symlink
+
+    # Create a situation where symlink operations fail multiple times
+    error_count = 0
+    original_symlink_to = Path.symlink_to
+
+    def mock_symlink_to(self, *args, **kwargs):
+        nonlocal error_count
+        error_count += 1
+        if error_count <= 2:  # Fail twice
+            raise OSError("Simulated symlink error")
+        # Actually create the symlink on third try
+        return original_symlink_to(self, *args, **kwargs)
+
+    with patch.object(Path, "symlink_to", new=mock_symlink_to):
+        # Should still succeed after retries
+        latest = storage.get_latest_version()
+        assert latest == version_id
+        assert error_count == 3  # Should have tried exactly 3 times
+
+
+def test_get_latest_version_no_symlink(storage, sample_qa_pairs):
+    """Test getting latest version works even without symlink support."""
+    version_id = "test_version"
+    storage.save_qa_pairs(sample_qa_pairs, version_id)
+
+    # Mock symlink operations to always fail
+    def mock_symlink_to(*args, **kwargs):
+        raise OSError("Symlinks not supported")
+
+    with patch.object(Path, "symlink_to", side_effect=mock_symlink_to):
+        # Should still get correct version even without symlink
+        latest = storage.get_latest_version()
+        assert latest == version_id
+
+
+def test_save_qa_pairs_csv_error_handling(storage, sample_qa_pairs, monkeypatch):
+    """Test handling of CSV writing errors."""
+    version_id = "test_version"
+
+    class MockWriter:
+        def writeheader(self):
+            pass
+
+        def writerow(self, row):
+            raise csv.Error("Simulated CSV error")
+
+    def mock_dictwriter(*args, **kwargs):
+        return MockWriter()
+
+    # Patch csv.DictWriter to simulate CSV writing error
+    monkeypatch.setattr(csv, "DictWriter", mock_dictwriter)
+
+    with pytest.raises(csv.Error):
+        storage.save_qa_pairs(sample_qa_pairs, version_id)
+
+
+def test_get_version_metadata_corrupted_json(storage, sample_qa_pairs):
+    """Test handling of corrupted metadata JSON file."""
+    version_id = "test_version"
+    storage.save_qa_pairs(sample_qa_pairs, version_id)
+
+    # Corrupt the metadata file
+    metadata_path = storage.get_version_path(version_id) / "metadata.json"
+    with open(metadata_path, "w") as f:
+        f.write("corrupted json{")
+
+    with pytest.raises(json.JSONDecodeError):
+        storage.get_version_metadata(version_id)

@@ -2,11 +2,15 @@
 
 import csv
 import json
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import List, Optional
 
 from ..data_models import QAPair
+
+MAX_RETRIES = 3
+RETRY_DELAY = 0.1
 
 
 class QAPairStorage:
@@ -20,6 +24,39 @@ class QAPairStorage:
         """
         self.base_path = base_path
         self.base_path.mkdir(parents=True, exist_ok=True)
+
+    def _update_symlink(self, target_dir: Path, max_retries: int = MAX_RETRIES) -> None:
+        """Update latest symlink with retry logic.
+
+        Args:
+            target_dir: Directory to link to
+            max_retries: Maximum number of retry attempts
+        """
+        latest_link = self.base_path / "latest"
+        temp_link = None
+
+        for attempt in range(max_retries):
+            try:
+                # Create temp symlink with unique name
+                temp_link = self.base_path / f"latest.{datetime.now().timestamp()}"
+                if temp_link.exists():
+                    temp_link.unlink()
+                temp_link.symlink_to(target_dir, target_is_directory=True)
+
+                # Atomic rename of temp symlink to latest
+                if latest_link.exists():
+                    latest_link.unlink()
+                temp_link.rename(latest_link)
+                return
+
+            except (OSError, RuntimeError) as e:
+                if attempt == max_retries - 1:
+                    raise e
+                time.sleep(RETRY_DELAY)
+            finally:
+                # Clean up temp link if it exists and wasn't renamed
+                if temp_link and temp_link.exists():
+                    temp_link.unlink()
 
     def save_qa_pairs(
         self,
@@ -125,8 +162,6 @@ class QAPairStorage:
         Raises:
             ValueError if no QA pairs found
         """
-        latest_link = self.base_path / "latest"
-
         # First try to find latest version by timestamp
         versions = sorted(
             [d for d in self.base_path.iterdir() if d.is_dir() and d.name != "latest"],
@@ -138,34 +173,13 @@ class QAPairStorage:
 
         latest_version = versions[0]
 
-        # Handle symlink creation/update
+        # Handle symlink creation/update with retries
         try:
-            # If symlink exists but points to wrong place, remove it
-            if latest_link.exists():
-                try:
-                    if latest_link.resolve() != latest_version:
-                        latest_link.unlink()
-                        latest_link.symlink_to(latest_version, target_is_directory=True)
-                except (OSError, RuntimeError):
-                    # Handle edge cases (broken symlink, permission issues, etc)
-                    if latest_link.exists():
-                        latest_link.unlink()
-                    latest_link.symlink_to(latest_version, target_is_directory=True)
-            else:
-                # Create new symlink
-                latest_link.symlink_to(latest_version, target_is_directory=True)
-
-        except FileExistsError:
-            # Race condition: another process created the symlink
-            # Just verify it points to our version
-            try:
-                if latest_link.resolve() != latest_version:
-                    latest_link.unlink()
-                    latest_link.symlink_to(latest_version, target_is_directory=True)
-            except (OSError, RuntimeError):
-                if latest_link.exists():
-                    latest_link.unlink()
-                latest_link.symlink_to(latest_version, target_is_directory=True)
+            self._update_symlink(latest_version)
+        except (OSError, RuntimeError):
+            # If symlink operations fail completely, just return the version
+            # This maintains core functionality even if symlink fails
+            pass
 
         return latest_version.name
 

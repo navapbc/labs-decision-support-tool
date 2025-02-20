@@ -245,6 +245,63 @@ def test_qa_generator_future_error_handling(mock_document):
         assert len(pairs) == 0
 
 
+def test_qa_generator_concurrent_generation_with_errors(mock_document):
+    """Test concurrent generation with mixed success and failures."""
+    # Create multiple documents
+    docs = [mock_document] * 3  # Create 3 copies
+
+    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, questions_per_unit=1)
+    generator = QAGenerator(config)
+
+    # Mock completion to alternate between success and failure
+    success_response = MagicMock(
+        choices=[MagicMock(message=MagicMock(content='{"question": "Test?", "answer": "Answer"}'))]
+    )
+
+    call_count = 0
+
+    def mock_completion(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count % 2 == 0:
+            raise Exception("API Error")
+        return success_response
+
+    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_completion):
+        pairs = list(generator.generate_from_documents(docs))
+        # Should get some successful pairs despite failures
+        assert len(pairs) > 0
+        assert len(pairs) < len(docs)  # But not all should succeed
+        for pair in pairs:
+            assert isinstance(pair, QAPair)
+            assert pair.question == "Test?"
+            assert pair.answer == "Answer"
+
+
+def test_qa_generator_invalid_llm_response_formats(mock_document):
+    """Test handling of various invalid LLM response formats."""
+    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, questions_per_unit=1)
+    generator = QAGenerator(config)
+
+    invalid_responses = [
+        # Empty response
+        MagicMock(choices=[MagicMock(message=MagicMock(content=""))]),
+        # Invalid JSON
+        MagicMock(choices=[MagicMock(message=MagicMock(content="not json"))]),
+        # Missing required fields
+        MagicMock(choices=[MagicMock(message=MagicMock(content='{"other": "field"}'))]),
+        # Null response
+        MagicMock(choices=[MagicMock(message=MagicMock(content="null"))]),
+        # Array with invalid items
+        MagicMock(choices=[MagicMock(message=MagicMock(content='[{"invalid": "item"}]'))]),
+    ]
+
+    for response in invalid_responses:
+        with patch("src.evaluation.qa_generation.generator.completion", return_value=response):
+            pairs = list(generator.generate_from_documents([mock_document]))
+            assert len(pairs) == 0  # Should handle all invalid formats gracefully
+
+
 def test_qa_generator_progress_tracking(mock_document, mock_completion_response):
     """Test progress tracking during generation."""
     # Mock ProgressTracker first
@@ -309,3 +366,76 @@ def test_qa_generator_progress_tracking(mock_document, mock_completion_response)
             completion_stats = mock_tracker.log_completion.call_args[0][0]
             assert "Total QA pairs" in completion_stats
             assert "items_processed" in completion_stats
+
+
+def test_qa_generator_progress_tracking_with_errors(mock_document):
+    """Test progress tracking handles errors properly."""
+    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, questions_per_unit=1)
+    mock_tracker = MagicMock()
+    generator = QAGenerator(config, progress_tracker=mock_tracker)
+
+    # Mock document to have valid content and source
+    mock_document.content = "Test content"
+    mock_document.source = "test_source"
+    mock_document.dataset = "test_dataset"
+    mock_document.created_at = datetime.now(UTC)
+
+    # Set up mock executor to run tasks synchronously
+    mock_executor_instance = MagicMock()
+    futures_dict = {}
+
+    def mock_submit(fn, *args, **kwargs):
+        mock_future = MagicMock()
+        try:
+            result = fn(*args, **kwargs)
+            mock_future.result.return_value = result
+        except Exception as e:
+            mock_future.result.side_effect = e
+        futures_dict[mock_future] = args[0]  # Store the future with its document
+        return mock_future
+
+    mock_executor_instance.submit = mock_submit
+
+    # Create a context manager mock
+    mock_context = MagicMock()
+    mock_context.__enter__.return_value = mock_executor_instance
+    mock_context.__exit__.return_value = None
+
+    # Mock as_completed to ensure futures are processed
+    def mock_as_completed(futures):
+        return list(futures)
+
+    with (
+        patch(
+            "src.evaluation.qa_generation.generator.completion", side_effect=Exception("API Error")
+        ),
+        patch(
+            "src.evaluation.qa_generation.generator.ThreadPoolExecutor", return_value=mock_context
+        ),
+        patch("src.evaluation.qa_generation.generator.as_completed", side_effect=mock_as_completed),
+        patch.object(QAGenerator, "_get_chunks_to_process", return_value=[(mock_document, 1)]),
+    ):
+        # Run the generation
+        list(generator.generate_from_documents([mock_document]))
+
+        # Verify progress tracking was called
+        mock_tracker.track_futures.assert_called_once()
+        mock_tracker.log_completion.assert_called_once()
+
+        # Verify completion stats
+        completion_stats = mock_tracker.log_completion.call_args[0][0]
+        assert completion_stats["Total QA pairs"] == 0
+        assert completion_stats["items_processed"] == 1
+
+
+def test_qa_generator_without_progress_tracking(mock_document, mock_completion_response):
+    """Test QA generation works without progress tracking."""
+    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, questions_per_unit=1)
+    generator = QAGenerator(config, progress_tracker=None)
+
+    with patch(
+        "src.evaluation.qa_generation.generator.completion", return_value=mock_completion_response
+    ):
+        pairs = list(generator.generate_from_documents([mock_document]))
+        assert len(pairs) == 1
+        assert isinstance(pairs[0], QAPair)

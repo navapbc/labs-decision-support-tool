@@ -5,7 +5,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from hashlib import md5
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 from litellm import completion
 
@@ -149,9 +149,17 @@ def generate_qa_pairs(
 class QAGenerator:
     """Handles QA pair generation with progress tracking."""
 
-    def __init__(self, config: GenerationConfig):
+    def __init__(
+        self, config: GenerationConfig, progress_tracker: Optional[ProgressTracker] = None
+    ):
+        """Initialize generator with config and optional progress tracker.
+
+        Args:
+            config: Generation configuration
+            progress_tracker: Optional progress tracker for CLI feedback
+        """
         self.config = config
-        self.progress = ProgressTracker("QA Generation")
+        self.progress = progress_tracker or ProgressTracker("QA Generation")
         self.llm = config.llm_model or app_config.llm
 
     def _get_chunks_to_process(
@@ -166,6 +174,16 @@ class QAGenerator:
                 items.extend((chunk, self.config.questions_per_unit) for chunk in doc.chunks)
         return items
 
+    def _track_progress(self, futures: dict, description: str) -> None:
+        """Track progress of futures if progress tracker is enabled."""
+        if self.progress:
+            self.progress.track_futures(futures, description)
+
+    def _log_completion(self, stats: dict) -> None:
+        """Log completion stats if progress tracker is enabled."""
+        if self.progress:
+            self.progress.log_completion(stats)
+
     def generate_from_documents(self, documents: List[Document]) -> Iterator[QAPair]:
         """Generate QA pairs from documents."""
         items = self._get_chunks_to_process(documents)
@@ -178,7 +196,7 @@ class QAGenerator:
             }
 
             # Track progress of QA generation
-            self.progress.track_futures(futures, "Generating QA pairs")
+            self._track_progress(futures, "Generating QA pairs")
 
             # Process results as they complete
             qa_pairs = []
@@ -193,7 +211,7 @@ class QAGenerator:
                     continue
 
             # Log completion stats
-            self.progress.log_completion(
+            self._log_completion(
                 {
                     "Total QA pairs": len(qa_pairs),
                     "items_processed": len(items),

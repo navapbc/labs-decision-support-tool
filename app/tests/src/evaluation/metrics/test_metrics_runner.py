@@ -227,7 +227,11 @@ def test_run_evaluation_cli_integration(mock_retrieval_func, tmp_path):
         )
 
         # Verify runner was called with correct parameters
-        MockRunner.assert_called_once_with(retrieval_func=mock_retrieval_func, log_dir=str(log_dir))
+        MockRunner.assert_called_once_with(
+            retrieval_func=mock_retrieval_func,
+            log_dir=str(log_dir),
+            progress_tracker=None,
+        )
         mock_runner.run_evaluation.assert_called_once_with(
             questions_file=str(questions_file),
             k_values=[5],

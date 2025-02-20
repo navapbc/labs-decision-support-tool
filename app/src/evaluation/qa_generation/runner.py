@@ -7,6 +7,7 @@ from src.app_config import app_config
 from src.db.models.document import Document
 from src.util.sampling import get_stratified_sample
 
+from ..utils.progress import ProgressTracker
 from ..utils.storage import QAPairStorage
 from .config import GenerationConfig
 from .generator import QAGenerator
@@ -37,8 +38,9 @@ def run_generation(
     if not config.llm_model:
         raise ValueError("No LLM model specified for QA generation")
 
-    # Generate QA pairs
-    generator = QAGenerator(config)
+    # Create progress tracker and generator
+    progress = ProgressTracker("QA Generation")
+    generator = QAGenerator(config, progress_tracker=progress)
 
     # Load documents from DB
     with app_config.db_session() as session:
@@ -73,7 +75,7 @@ def run_generation(
         )
 
         # Log completion stats
-        generator.progress.log_completion(
+        progress.log_completion(
             {
                 "Total QA pairs": len(qa_pairs),
                 "Output path": str(qa_pairs_path),
