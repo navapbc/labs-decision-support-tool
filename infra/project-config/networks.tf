@@ -46,9 +46,13 @@ locals {
 
       domain_config = {
         manage_dns  = true
-        hosted_zone = "hosted.zone.for.prod.network.com"
+        hosted_zone = "decision-support-tool-prod.navateam.com"
 
-        certificate_configs = {}
+        certificate_configs = {
+          "decision-support-tool-prod.navateam.com" = {
+            source = "issued"
+          }
+        }
       }
     }
   }
