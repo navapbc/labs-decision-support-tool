@@ -27,6 +27,10 @@ docker-compose.override.yml
 
 # Evaluation data and QA pairs
 app/src/evaluation/data/
+app/src/evaluation/metrics/data/
+app/src/evaluation/metrics/logs/
+app/src/metrics/data/
+app/src/metrics/logs/
 
 # Local development files
 app/Makefile.local
