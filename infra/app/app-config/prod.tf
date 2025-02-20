@@ -5,7 +5,7 @@ module "prod_config" {
   default_region                  = module.project_config.default_region
   environment                     = "prod"
   account_name                    = "dev" # This is hosted in the same AWS account as dev
-  network_name                    = "dev" # This uses the same VPN as dev
+  network_name                    = "prod"
   domain_name                     = "decision-support-tool-prod.navateam.com"
   enable_https                    = true
   has_database                    = true
