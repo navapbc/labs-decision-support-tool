@@ -169,9 +169,9 @@ def test_batch_process_results(mock_question, mock_chunk):
         mock_config.db_session.return_value.__enter__.return_value = mock_session
         mock_config.db_session.return_value.__exit__.return_value = None
 
-        # Create a mock timer object with elapsed_ms as a property
+        # Create a mock timer object with elapsed_ms as a method
         mock_timer_obj = MagicMock()
-        type(mock_timer_obj).elapsed_ms = PropertyMock(return_value=100.5)
+        mock_timer_obj.elapsed_ms.return_value = 100.5
         mock_timer.return_value.__enter__.return_value = mock_timer_obj
 
         mock_md5.return_value.hexdigest.return_value = mock_question["content_hash"]
