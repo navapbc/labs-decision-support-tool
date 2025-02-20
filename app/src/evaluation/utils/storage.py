@@ -131,7 +131,7 @@ class QAPairStorage:
         try:
             latest_link = self.base_path / "latest"
             temp_link = self.base_path / f"latest.{datetime.now().timestamp()}"
-            
+
             try:
                 if temp_link.exists():
                     temp_link.unlink()
@@ -167,7 +167,7 @@ class QAPairStorage:
                 key=lambda d: d.name,
                 reverse=True,
             )
-        except (OSError, PermissionError) as e:
+        except OSError as e:
             raise ValueError("No QA pairs found - error accessing directory") from e
 
         if not versions:

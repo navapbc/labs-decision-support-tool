@@ -256,7 +256,7 @@ def test_load_questions_invalid_csv(mock_retrieval_func, tmp_path):
     # Create invalid CSV file
     questions_file = tmp_path / "invalid.csv"
     questions_file.write_text("This is not a CSV file at all")  # Not even CSV format
-    
+
     runner = EvaluationRunner(mock_retrieval_func)
     with pytest.raises(RuntimeError, match="Error loading questions"):
         runner.load_questions(str(questions_file))
@@ -265,7 +265,7 @@ def test_load_questions_invalid_csv(mock_retrieval_func, tmp_path):
 def test_run_evaluation_empty_k_values(mock_retrieval_func, mock_questions):
     """Test run_evaluation handles empty k_values list."""
     runner = EvaluationRunner(mock_retrieval_func)
-    
+
     with patch.object(runner, "load_questions", return_value=mock_questions):
         # Should complete without running any batches
         runner.run_evaluation(questions_file="test.csv", k_values=[])
@@ -274,26 +274,22 @@ def test_run_evaluation_empty_k_values(mock_retrieval_func, mock_questions):
 def test_run_evaluation_invalid_sample_fraction(mock_retrieval_func, mock_questions):
     """Test run_evaluation handles invalid sample fraction."""
     runner = EvaluationRunner(mock_retrieval_func)
-    
+
     with patch.object(runner, "load_questions", return_value=mock_questions):
         with pytest.raises(ValueError):
             runner.run_evaluation(
-                questions_file="test.csv",
-                k_values=[5],
-                sample_fraction=2.0  # Invalid: > 1.0
+                questions_file="test.csv", k_values=[5], sample_fraction=2.0  # Invalid: > 1.0
             )
 
 
 def test_run_evaluation_all_filtered_out(mock_retrieval_func, mock_questions):
     """Test run_evaluation handles case where all questions are filtered out."""
     runner = EvaluationRunner(mock_retrieval_func)
-    
+
     with patch.object(runner, "load_questions", return_value=mock_questions):
         with pytest.raises(ValueError, match="No questions to evaluate"):
             runner.run_evaluation(
-                questions_file="test.csv",
-                k_values=[5],
-                dataset_filter=["nonexistent_dataset"]
+                questions_file="test.csv", k_values=[5], dataset_filter=["nonexistent_dataset"]
             )
 
 
@@ -302,10 +298,7 @@ def test_run_evaluation_empty_questions(mock_retrieval_func, tmp_path):
     # Create empty CSV file with headers
     questions_file = tmp_path / "empty.csv"
     questions_file.write_text("id,question,answer,document_id,dataset\n")
-    
+
     runner = EvaluationRunner(mock_retrieval_func)
     with pytest.raises(ValueError, match="No questions to evaluate"):
-        runner.run_evaluation(
-            questions_file=str(questions_file),
-            k_values=[5]
-        )
+        runner.run_evaluation(questions_file=str(questions_file), k_values=[5])

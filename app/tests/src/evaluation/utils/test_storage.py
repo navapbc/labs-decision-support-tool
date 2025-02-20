@@ -419,7 +419,7 @@ def test_update_symlink_max_retries(storage, sample_qa_pairs):
     """Test _update_symlink retries and eventually fails after max attempts."""
     version_id = "test_version"
     storage.save_qa_pairs(sample_qa_pairs, version_id)
-    
+
     # Mock symlink_to to always fail
     with patch.object(Path, "symlink_to", side_effect=OSError("Simulated error")):
         with pytest.raises(OSError):
@@ -430,20 +430,20 @@ def test_update_symlink_cleanup(storage, sample_qa_pairs):
     """Test _update_symlink cleans up temp files even on failure."""
     version_id = "test_version"
     storage.save_qa_pairs(sample_qa_pairs, version_id)
-    
+
     # Count how many temp files exist before and after
     def count_temp_links():
         return len([f for f in storage.base_path.iterdir() if f.name.startswith("latest.")])
-    
+
     initial_count = count_temp_links()
-    
+
     # Force a failure
     with patch.object(Path, "symlink_to", side_effect=OSError("Simulated error")):
         try:
             storage._update_symlink(storage.base_path / version_id)
         except OSError:
             pass
-    
+
     # Should have same number of temp files as before
     assert count_temp_links() == initial_count
 
@@ -453,16 +453,16 @@ def test_update_symlink_retry_success(storage, sample_qa_pairs):
     version_id = "test_version"
     version_dir = storage.base_path / version_id
     storage.save_qa_pairs(sample_qa_pairs, version_id)
-    
+
     fail_count = [0]
     original_symlink_to = Path.symlink_to
-    
+
     def mock_symlink_to(self, *args, **kwargs):
         if fail_count[0] < 2:  # Fail twice then succeed
             fail_count[0] += 1
             raise OSError("Mock symlink error")
         return original_symlink_to(self, *args, **kwargs)
-    
+
     with patch.object(Path, "symlink_to", new=mock_symlink_to):
         storage._update_symlink(version_dir)
         assert (storage.base_path / "latest").resolve() == version_dir
@@ -474,29 +474,30 @@ def test_update_symlink_temp_cleanup_on_error(storage, sample_qa_pairs):
     version_id = "test_version"
     version_dir = storage.base_path / version_id
     storage.save_qa_pairs(sample_qa_pairs, version_id)
-    
+
     def mock_rename(*args, **kwargs):
         raise OSError("Mock rename error")
-    
+
     with (
         patch.object(Path, "rename", side_effect=mock_rename),
-        pytest.raises(OSError, match="Mock rename error")
+        pytest.raises(OSError, match="Mock rename error"),
     ):
         storage._update_symlink(version_dir)
-    
+
     # Verify no temporary symlinks are left
     temp_links = [f for f in storage.base_path.iterdir() if f.name.startswith("latest.")]
     assert not temp_links
+
 
 def test_get_version_metadata_json_error(storage, sample_qa_pairs):
     """Test get_version_metadata handles JSON parsing errors."""
     version_id = "test_version"
     storage.save_qa_pairs(sample_qa_pairs, version_id)
-    
+
     # Corrupt the metadata file with invalid JSON
     metadata_path = storage.get_version_path(version_id) / "metadata.json"
     metadata_path.write_text("invalid{json")
-    
+
     with pytest.raises(json.JSONDecodeError):
         storage.get_version_metadata(version_id)
 
@@ -504,11 +505,11 @@ def test_get_version_metadata_json_error(storage, sample_qa_pairs):
 def test_save_qa_pairs_csv_write_error(storage, sample_qa_pairs):
     """Test save_qa_pairs handles CSV writing errors."""
     version_id = "test_version"
-    
+
     # Mock csv.DictWriter to raise error
     mock_writer = MagicMock()
     mock_writer.writeheader.side_effect = csv.Error("CSV write error")
-    
+
     with patch("csv.DictWriter", return_value=mock_writer):
         with pytest.raises(csv.Error, match="CSV write error"):
             storage.save_qa_pairs(sample_qa_pairs, version_id)
@@ -520,7 +521,7 @@ def test_get_latest_version_empty_dir_with_latest(storage):
     latest_link = storage.base_path / "latest"
     nonexistent = storage.base_path / "nonexistent"
     latest_link.symlink_to(nonexistent, target_is_directory=True)
-    
+
     with pytest.raises(ValueError, match="No QA pairs found"):
         storage.get_latest_version()
 
@@ -528,10 +529,10 @@ def test_get_latest_version_empty_dir_with_latest(storage):
 def test_save_qa_pairs_metadata_write_error(storage, sample_qa_pairs):
     """Test save_qa_pairs handles metadata writing errors."""
     version_id = "test_version"
-    
+
     def mock_dump(*args, **kwargs):
         raise IOError("Metadata write error")
-    
+
     with patch("json.dump", side_effect=mock_dump):
         with pytest.raises(IOError, match="Metadata write error"):
             storage.save_qa_pairs(sample_qa_pairs, version_id)
@@ -540,23 +541,23 @@ def test_save_qa_pairs_metadata_write_error(storage, sample_qa_pairs):
 def test_save_qa_pairs_directory_creation_error(storage, sample_qa_pairs):
     """Test save_qa_pairs handles directory creation errors."""
     version_id = "test_version"
-    
+
     # Mock mkdir to raise error
-    with patch.object(Path, "mkdir", side_effect=PermissionError("Permission denied")):
-        with pytest.raises(PermissionError, match="Permission denied"):
+    with patch.object(Path, "mkdir", side_effect=OSError("Permission denied")):
+        with pytest.raises(OSError, match="Permission denied"):
             storage.save_qa_pairs(sample_qa_pairs, version_id)
 
 
 def test_save_qa_pairs_symlink_resolution_mismatch(storage, sample_qa_pairs):
     """Test save_qa_pairs handles symlink resolution mismatch."""
     version_id = "test_version"
-    
+
     # Create a symlink pointing to a different directory
     other_dir = storage.base_path / "other_dir"
     other_dir.mkdir()
     latest_link = storage.base_path / "latest"
     latest_link.symlink_to(other_dir, target_is_directory=True)
-    
+
     # Save should succeed and update symlink
     csv_path = storage.save_qa_pairs(sample_qa_pairs, version_id)
     assert latest_link.resolve() == csv_path.parent
@@ -565,10 +566,10 @@ def test_save_qa_pairs_symlink_resolution_mismatch(storage, sample_qa_pairs):
 def test_save_qa_pairs_symlink_update_error(storage, sample_qa_pairs):
     """Test save_qa_pairs handles symlink update errors."""
     version_id = "test_version"
-    
+
     def mock_symlink_to(*args, **kwargs):
         raise OSError("Symlink error")
-    
+
     with patch.object(Path, "symlink_to", side_effect=mock_symlink_to):
         # Should still save files even if symlink fails
         csv_path = storage.save_qa_pairs(sample_qa_pairs, version_id)
@@ -581,7 +582,7 @@ def test_get_latest_version_same_timestamp(storage, sample_qa_pairs):
     versions = ["20240220_test1", "20240220_test2"]
     for version_id in versions:
         storage.save_qa_pairs(sample_qa_pairs, version_id)
-    
+
     # Should get alphabetically last version
     latest = storage.get_latest_version()
     assert latest == "20240220_test2"
@@ -591,10 +592,10 @@ def test_get_latest_version_directory_error(storage, sample_qa_pairs):
     """Test get_latest_version handles directory iteration errors."""
     version_id = "test_version"
     storage.save_qa_pairs(sample_qa_pairs, version_id)
-    
+
     def mock_iterdir(*args):
-        raise PermissionError("Permission denied")
-    
+        raise OSError("Permission denied")
+
     with patch.object(Path, "iterdir", side_effect=mock_iterdir):
         with pytest.raises(ValueError, match="No QA pairs found"):
             storage.get_latest_version()
@@ -603,10 +604,10 @@ def test_get_latest_version_directory_error(storage, sample_qa_pairs):
 def test_get_version_path_not_directory(storage, sample_qa_pairs):
     """Test get_version_path when path exists but is not a directory."""
     version_id = "test_version"
-    
+
     # Create a file instead of a directory
     version_path = storage.base_path / version_id
     version_path.write_text("not a directory")
-    
+
     with pytest.raises(ValueError, match="Version .* not found"):
         storage.get_version_path(version_id)
