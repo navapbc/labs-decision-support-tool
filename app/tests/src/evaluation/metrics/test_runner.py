@@ -135,9 +135,7 @@ def test_run_evaluation_with_sampling(mock_retrieval_func, mock_questions):
         runner.run_evaluation(questions_file="test.csv", k_values=[5], sample_fraction=0.5)
 
         # Verify sampled questions were passed to batch
-        mock_sample.assert_called_once_with(
-            mock_questions, sample_fraction=0.5, random_seed=None
-        )
+        mock_sample.assert_called_once_with(mock_questions, sample_fraction=0.5, random_seed=None)
         call_args = mock_run_batch.call_args[0]
         sampled_questions = call_args[0]
         assert len(sampled_questions) == 1

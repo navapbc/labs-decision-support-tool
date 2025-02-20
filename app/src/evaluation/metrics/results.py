@@ -8,6 +8,7 @@ from src.app_config import app_config
 from src.db.models.document import Chunk
 
 from ..data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
+from ..utils.id_generator import generate_stable_id
 from ..utils.progress import ProgressTracker
 from ..utils.timer import measure_time
 
@@ -26,11 +27,9 @@ def generate_qa_pair_id(question: str, answer: str, dataset: str) -> str:
     Returns:
         UUID string stable on QA and dataset content
     """
-    # Combine all fields to create a stable hash
-    content = f"{dataset}||{question}||{answer}".encode("utf-8")
-    content_hash = md5(content, usedforsecurity=False).digest()
-    # Use the first 16 bytes of the hash to create a UUID
-    return str(uuid.UUID(bytes=content_hash[:16]))
+    # For backwards compatibility, include dataset in the hash
+    answer_with_dataset = f"{answer}||{dataset}"
+    return str(generate_stable_id(question, answer_with_dataset))
 
 
 def process_retrieved_chunks(

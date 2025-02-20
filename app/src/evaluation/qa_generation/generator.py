@@ -14,6 +14,7 @@ from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.generate import completion_args
 
+from ..utils.id_generator import generate_stable_id
 from ..utils.progress import ProgressTracker
 from .config import GenerationConfig, QuestionSource
 from .models import QAPair, QAPairVersion
@@ -121,9 +122,7 @@ def generate_qa_pairs(
     # Process each generated pair
     for pair in generated_pairs:
         # Generate stable ID from content
-        content = f"{pair['question']}||{pair['answer']}||{document.source}".encode("utf-8")
-        content_hash = md5(content, usedforsecurity=False).digest()
-        qa_id = UUID(bytes=content_hash[:16])
+        qa_id = generate_stable_id(pair["question"], pair["answer"])
 
         qa_pair = QAPair(
             id=qa_id,
