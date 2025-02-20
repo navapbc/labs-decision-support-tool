@@ -9,7 +9,7 @@ import pytest
 from src.db.models.document import Chunk, Document
 from src.evaluation.qa_generation.config import GenerationConfig, QuestionSource
 from src.evaluation.qa_generation.generator import QAGenerator, generate_qa_pairs
-from src.evaluation.qa_generation.models import QAPair, QAPairVersion
+from src.evaluation.qa_generation.models import QAPair
 
 
 @pytest.fixture

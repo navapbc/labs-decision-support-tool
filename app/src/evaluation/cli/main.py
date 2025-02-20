@@ -4,8 +4,7 @@
 import argparse
 from pathlib import Path
 
-from ..metrics.cli import create_retrieval_function
-from ..metrics.runner import run_evaluation
+from ..metrics.runner import create_retrieval_function, run_evaluation
 from ..qa_generation.config import GenerationConfig
 from ..qa_generation.runner import run_generation
 from ..utils.storage import QAPairStorage

@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from hashlib import md5
 from typing import Iterator, List
-from uuid import UUID
 
 from litellm import completion
 

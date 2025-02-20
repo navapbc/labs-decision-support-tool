@@ -4,13 +4,32 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from src.evaluation.metrics.runner import EvaluationRunner, run_evaluation
+from src.evaluation.metrics.runner import (
+    EvaluationRunner,
+    create_retrieval_function,
+    run_evaluation,
+)
 
 
 @pytest.fixture
 def mock_retrieval_func():
     """Create a mock retrieval function."""
     return MagicMock()
+
+
+def test_create_retrieval_function():
+    """Test create_retrieval_function."""
+    min_score = 0.5
+    retrieval_func = create_retrieval_function(min_score)
+
+    with patch("src.evaluation.metrics.runner.retrieve_with_scores") as mock_retrieve:
+        # Test that function passes parameters correctly
+        retrieval_func("test query", 5)
+        mock_retrieve.assert_called_once_with(
+            query="test query",
+            retrieval_k=5,
+            retrieval_k_min_score=min_score,
+        )
 
 
 @pytest.fixture

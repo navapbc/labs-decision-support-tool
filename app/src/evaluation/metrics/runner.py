@@ -3,12 +3,23 @@
 import csv
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
+
+from src.retrieve import retrieve_with_scores
 
 from .batch import create_batch_config, filter_questions, stratified_sample
 from .logging import EvaluationLogger
 from .metric_computation import compute_metrics_summary
 from .results import batch_process_results
+
+
+def create_retrieval_function(min_score: float) -> Callable[[str, int], Sequence[Any]]:
+    """Create retrieval function with configured min_score."""
+
+    def retrieval_func(query: str, k: int) -> Sequence[Any]:
+        return retrieve_with_scores(query=query, retrieval_k=k, retrieval_k_min_score=min_score)
+
+    return retrieval_func
 
 
 class EvaluationRunner:

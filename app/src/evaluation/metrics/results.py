@@ -1,6 +1,5 @@
 """Results processing for evaluation runs."""
 
-import uuid
 from hashlib import md5
 from typing import Any, Dict, List
 
