@@ -25,7 +25,7 @@ def test_create_engine_Imagine_LA():
     assert engine.name == ImagineLaEngine.name
     assert engine.datasets == [
         "CA EDD",
-        "Imagine LA",
+        "Benefits Information Hub",
         "DPSS Policy",
         "IRS",
         "Keep Your Benefits",
