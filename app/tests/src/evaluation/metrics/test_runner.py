@@ -93,7 +93,7 @@ def test_run_evaluation_batch(mock_retrieval_func, mock_questions):
         assert call_args["dataset_filter"] is None
         assert call_args["git_commit"] is None
         assert str(call_args["qa_pairs_path"]) == "test.csv"
-        
+
         mock_logger_cls.assert_called_once_with(runner.log_dir)
         mock_logger.start_batch.assert_called_once_with(mock_config)
         mock_process.assert_called_once_with(mock_questions, mock_retrieval_func, 5)
@@ -136,7 +136,7 @@ def test_run_evaluation_with_sampling(mock_retrieval_func, mock_questions):
 
         # Verify sampled questions were passed to batch
         mock_sample.assert_called_once_with(
-            mock_questions, sample_fraction=0.5, min_per_dataset=1, random_seed=None
+            mock_questions, sample_fraction=0.5, random_seed=None
         )
         call_args = mock_run_batch.call_args[0]
         sampled_questions = call_args[0]
