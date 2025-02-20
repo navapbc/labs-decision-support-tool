@@ -1,7 +1,7 @@
 """Metrics computation for evaluation results."""
 
 from collections import defaultdict
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List
 
 import numpy as np
 

@@ -10,9 +10,9 @@ from src.evaluation.data_models import (
     ExpectedChunk,
     IncorrectRetrievalsAnalysis,
     MetricsSummary,
+    QAGenerationInfo,
     RetrievedChunk,
     SoftwareInfo,
-    QAGenerationInfo,
 )
 
 

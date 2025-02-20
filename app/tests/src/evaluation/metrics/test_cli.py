@@ -1,10 +1,11 @@
 """Tests for metrics CLI module."""
 
-import json
-from unittest.mock import MagicMock, patch
 import csv
-import pytest
+import json
 import tempfile
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.evaluation.metrics.cli import create_retrieval_function, format_metric_value, main
 
@@ -12,21 +13,25 @@ from src.evaluation.metrics.cli import create_retrieval_function, format_metric_
 @pytest.fixture
 def test_questions_file():
     """Create a temporary questions file for testing."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
-        writer = csv.DictWriter(f, fieldnames=['id', 'question', 'answer', 'dataset'])
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        writer = csv.DictWriter(f, fieldnames=["id", "question", "answer", "dataset"])
         writer.writeheader()
-        writer.writerow({
-            'id': '1',
-            'question': 'test question 1?',
-            'answer': 'test answer 1',
-            'dataset': 'dataset1'
-        })
-        writer.writerow({
-            'id': '2',
-            'question': 'test question 2?',
-            'answer': 'test answer 2',
-            'dataset': 'dataset2'
-        })
+        writer.writerow(
+            {
+                "id": "1",
+                "question": "test question 1?",
+                "answer": "test answer 1",
+                "dataset": "dataset1",
+            }
+        )
+        writer.writerow(
+            {
+                "id": "2",
+                "question": "test question 2?",
+                "answer": "test answer 2",
+                "dataset": "dataset2",
+            }
+        )
         return f.name
 
 

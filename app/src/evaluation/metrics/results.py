@@ -4,14 +4,12 @@ import uuid
 from hashlib import md5
 from typing import Any, Dict, List
 
-from tqdm import tqdm
-
 from src.app_config import app_config
 from src.db.models.document import Chunk
 
 from ..data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
-from ..utils.timer import measure_time
 from ..utils.progress import ProgressTracker
+from ..utils.timer import measure_time
 
 
 def generate_qa_pair_id(question: str, answer: str, dataset: str) -> str:
@@ -71,13 +69,20 @@ def process_retrieved_chunks(
     content_hashes = []
 
     for chunk in retrieved_chunks:
-        content = chunk.chunk.content
+        if not chunk or not hasattr(chunk, "chunk") or not hasattr(chunk, "score"):
+            continue
+
+        chunk_obj = chunk.chunk
+        if not chunk_obj or not hasattr(chunk_obj, "content") or not hasattr(chunk_obj, "id"):
+            continue
+
+        content = chunk_obj.content
         content_hash = md5(content.encode("utf-8"), usedforsecurity=False).hexdigest()
         content_hashes.append(content_hash)
 
         processed_chunks.append(
             RetrievedChunk(
-                chunk_id=str(chunk.chunk.id),
+                chunk_id=str(chunk_obj.id),
                 score=chunk.score,
                 content=content,
                 content_hash=content_hash,
@@ -139,12 +144,14 @@ def batch_process_results(
                 # Process results
                 retrieval_time = timer.elapsed_ms() / len(questions)  # Average time per question
                 results.append(process_retrieved_chunks(question, retrieved, retrieval_time))
-                
+
     # Log completion stats
-    progress.log_completion({
-        "Questions processed": len(questions),
-        "Average retrieval time (ms)": timer.elapsed_ms() / len(questions),
-        "items_processed": len(questions),
-    })
+    progress.log_completion(
+        {
+            "Questions processed": len(questions),
+            "Average retrieval time (ms)": timer.elapsed_ms() / len(questions),
+            "items_processed": len(questions),
+        }
+    )
 
     return results

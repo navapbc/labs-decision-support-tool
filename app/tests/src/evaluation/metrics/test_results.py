@@ -1,6 +1,6 @@
 """Tests for evaluation results processing."""
 
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -66,7 +66,9 @@ def test_process_retrieved_chunks_found(mock_question, mock_chunk):
     """Test processing retrieved chunks when correct chunk is found."""
     # Create a list of retrieved chunks where the first one matches
     mock_chunk.chunk.id = mock_question["chunk_id"]  # Match the chunk ID
-    mock_chunk.chunk.content = "matching content"  # This will generate the same hash as mock_question
+    mock_chunk.chunk.content = (
+        "matching content"  # This will generate the same hash as mock_question
+    )
     mock_chunk.score = 0.85
     retrieved_chunks = [mock_chunk]
 
@@ -182,4 +184,6 @@ def test_batch_process_results(mock_question, mock_chunk):
         assert len(results) == 1
         assert isinstance(results[0], EvaluationResult)
         assert results[0].question == mock_question["question"]
-        assert abs(results[0].retrieval_time_ms - 100.5) < 0.1  # Allow small floating point difference
+        assert (
+            abs(results[0].retrieval_time_ms - 100.5) < 0.1
+        )  # Allow small floating point difference

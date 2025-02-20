@@ -1,22 +1,23 @@
-from typing import List, TypeVar, Sequence
 import random
+from typing import Any, Callable, List, Sequence, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 def get_stratified_sample(
     items: Sequence[T],
     sample_fraction: float | None = None,
     random_seed: int | None = None,
-    key_func: callable = lambda x: x
+    key_func: Callable[[T], Any] = lambda x: x,
 ) -> List[T]:
     """Get a stratified sample of items.
-    
+
     Args:
         items: Sequence of items to sample from
         sample_fraction: Fraction of items to sample (0.0 to 1.0)
         random_seed: Random seed for reproducible sampling
         key_func: Function to extract stratification key from items
-    
+
     Returns:
         List of sampled items, maintaining relative proportions of key_func values
     """
@@ -45,4 +46,4 @@ def get_stratified_sample(
     if random_seed is not None:
         random.seed()
 
-    return sampled_items 
+    return sampled_items

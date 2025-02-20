@@ -1,14 +1,10 @@
 """Tests for metric computation functions."""
 
-from typing import Dict, List
-
-import pytest
-
 from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 from src.evaluation.metrics.metric_computation import (
     compute_dataset_metrics,
-    compute_metrics_summary,
     compute_incorrect_analysis,
+    compute_metrics_summary,
 )
 
 

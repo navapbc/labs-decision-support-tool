@@ -3,18 +3,14 @@ Batch processing for evaluation runs.
 Not to be confused with batch_process.py (used via the API).
 """
 
-import logging
-import random
 import subprocess
-from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
 from pathlib import Path
+from typing import Dict, List, Optional
 
-import numpy as np
+from src.util.sampling import get_stratified_sample
 
 from ..data_models import BatchConfig, EvaluationConfig, QAGenerationInfo, SoftwareInfo
 from ..utils.storage import QAPairStorage
-from src.util.sampling import get_stratified_sample
 
 
 def get_git_commit() -> str:
@@ -57,13 +53,13 @@ def create_batch_config(
     git_commit: Optional[str] = None,
 ) -> BatchConfig:
     """Create a new batch configuration.
-    
+
     Args:
         k_value: Number of chunks to retrieve
         qa_pairs_path: Path to QA pairs CSV file
         dataset_filter: Optional list of datasets to filter by
         git_commit: Optional git commit hash
-        
+
     Returns:
         BatchConfig with evaluation settings and QA generation metadata
     """
@@ -71,7 +67,7 @@ def create_batch_config(
     storage = QAPairStorage(qa_pairs_path.parent.parent)  # Go up two levels to qa_pairs dir
     version_id = qa_pairs_path.parent.name
     qa_metadata = storage.get_version_metadata(version_id)
-    
+
     qa_generation_info = QAGenerationInfo(
         version_id=qa_metadata["version_id"],
         timestamp=qa_metadata["timestamp"],
@@ -80,18 +76,18 @@ def create_batch_config(
         datasets=qa_metadata["datasets"],
         git_commit=qa_metadata["git_commit"],
     )
-    
+
     eval_config = EvaluationConfig(
         k_value=k_value,
         num_samples=0,  # Will be updated when questions are loaded
         dataset_filter=dataset_filter or [],
     )
-    
+
     software_info = SoftwareInfo(
         package_version=get_package_version(),
         git_commit=git_commit or get_git_commit(),
     )
-    
+
     return BatchConfig(
         evaluation_config=eval_config,
         software_info=software_info,
@@ -109,7 +105,7 @@ def stratified_sample(
         questions,
         sample_fraction=sample_fraction,
         random_seed=random_seed,
-        key_func=lambda q: q["dataset"]
+        key_func=lambda q: q["dataset"],
     )
 
 

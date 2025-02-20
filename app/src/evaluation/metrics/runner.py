@@ -2,14 +2,13 @@
 
 import csv
 import os
-from typing import Any, Dict, List, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from .batch import create_batch_config, filter_questions, stratified_sample
 from .logging import EvaluationLogger
 from .metric_computation import compute_metrics_summary
 from .results import batch_process_results
-from ..utils.storage import QAPairStorage
 
 
 class EvaluationRunner:
@@ -73,7 +72,6 @@ class EvaluationRunner:
             questions = stratified_sample(
                 questions,
                 sample_fraction=sample_fraction,
-                min_per_dataset=1,
                 random_seed=random_seed,
             )
             print(f"After sampling: {len(questions)} questions")

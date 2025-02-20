@@ -1,19 +1,22 @@
-from typing import List, Iterator
-from uuid import UUID
-from litellm import completion
-from hashlib import md5
+"""QA pair generation functionality."""
+
 import json
 import logging
-from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
+from datetime import datetime
+from hashlib import md5
+from typing import Iterator, List
+from uuid import UUID
+
+from litellm import completion
 
 from src.app_config import app_config
-from src.db.models.document import Document, Chunk
+from src.db.models.document import Chunk, Document
 from src.generate import completion_args
-from .models import QAPair, QAPairVersion
-from .config import GenerationConfig, QuestionSource
+
 from ..utils.progress import ProgressTracker
+from .config import GenerationConfig, QuestionSource
+from .models import QAPair, QAPairVersion
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +32,10 @@ Do not include any additional formatting, newlines, or text outside the JSON.
 
 MAX_WORKERS = 5  # Limit concurrent API calls
 
-def generate_qa_pairs(document_or_chunk: Document | Chunk, num_pairs: int = 1, llm: str = "gpt-4o-mini") -> List[QAPair]:
+
+def generate_qa_pairs(
+    document_or_chunk: Document | Chunk, num_pairs: int = 1, llm: str = "gpt-4o-mini"
+) -> List[QAPair]:
     """Generate QA pairs from a document or chunk."""
     # Get document and chunk info
     if isinstance(document_or_chunk, Document):
@@ -38,13 +44,18 @@ def generate_qa_pairs(document_or_chunk: Document | Chunk, num_pairs: int = 1, l
     else:
         document = document_or_chunk.document
         chunk_id = document_or_chunk.id
-    
+
+    # Skip if content is None
+    if not document_or_chunk.content:
+        logger.warning(f"Skipping QA generation for {document_or_chunk} - content is None")
+        return []
+
     # Create version info
     version = QAPairVersion(
         version_id=datetime.now().strftime("%Y-%m-%d"),
         llm_model=llm,
     )
-    
+
     response = completion(
         model=llm,
         messages=[
@@ -60,12 +71,12 @@ def generate_qa_pairs(document_or_chunk: Document | Chunk, num_pairs: int = 1, l
         temperature=app_config.temperature,
         **completion_args(llm),
     )
-    
+
     content = response.choices[0].message.content
     try:
         # Clean up the response
         content = content.strip()
-        
+
         # Handle different JSON formats
         # Try parsing as a list first
         if content.startswith("["):
@@ -84,18 +95,18 @@ def generate_qa_pairs(document_or_chunk: Document | Chunk, num_pairs: int = 1, l
                         generated_pairs.append(pair)
                     except json.JSONDecodeError:
                         continue
-        
+
         # Validate required fields
         valid_pairs = []
         for pair in generated_pairs:
             if "question" in pair and "answer" in pair:
                 valid_pairs.append(pair)
         generated_pairs = valid_pairs
-        
+
         if not generated_pairs:
             logger.error(f"No valid QA pairs found in response: {content}")
             return []
-        
+
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM response: {content}")
         logger.error(f"Error: {e}")
@@ -104,7 +115,7 @@ def generate_qa_pairs(document_or_chunk: Document | Chunk, num_pairs: int = 1, l
         logger.error(f"Unexpected error processing response: {e}")
         logger.error(f"Response content: {content}")
         return []
-    
+
     qa_pairs: List[QAPair] = []
 
     # Process each generated pair
@@ -116,58 +127,58 @@ def generate_qa_pairs(document_or_chunk: Document | Chunk, num_pairs: int = 1, l
 
         qa_pair = QAPair(
             id=qa_id,
-            question=pair['question'],
-            answer=pair['answer'],
+            question=pair["question"],
+            answer=pair["answer"],
             document_name=document.name,
             document_source=document.source,
             document_id=document.id,
             chunk_id=chunk_id,
-            content_hash=md5(document_or_chunk.content.encode('utf-8'), usedforsecurity=False).hexdigest(),
+            content_hash=md5(
+                document_or_chunk.content.encode("utf-8"), usedforsecurity=False
+            ).hexdigest(),
             dataset=document.dataset,
             created_at=document.created_at,
-            version=version
+            version=version,
         )
         qa_pairs.append(qa_pair)
 
-    return qa_pairs 
+    return qa_pairs
+
 
 class QAGenerator:
     """Handles QA pair generation with progress tracking."""
-    
+
     def __init__(self, config: GenerationConfig):
         self.config = config
         self.progress = ProgressTracker("QA Generation")
         self.llm = config.llm_model or app_config.llm
-        
-    def _get_chunks_to_process(self, documents: List[Document]) -> List[tuple[Document | Chunk, int]]:
+
+    def _get_chunks_to_process(
+        self, documents: List[Document]
+    ) -> List[tuple[Document | Chunk, int]]:
         """Get list of (document/chunk, num_pairs) tuples to process."""
-        items = []
+        items: List[tuple[Document | Chunk, int]] = []
         if self.config.question_source == QuestionSource.DOCUMENT:
             items.extend((doc, self.config.questions_per_unit) for doc in documents)
         else:
             for doc in documents:
                 items.extend((chunk, self.config.questions_per_unit) for chunk in doc.chunks)
         return items
-        
+
     def generate_from_documents(self, documents: List[Document]) -> Iterator[QAPair]:
         """Generate QA pairs from documents."""
         items = self._get_chunks_to_process(documents)
-        
+
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             # Submit all generation tasks
             futures = {
-                executor.submit(
-                    generate_qa_pairs,
-                    item,
-                    num_pairs,
-                    self.config.llm_model
-                ): item 
+                executor.submit(generate_qa_pairs, item, num_pairs, self.config.llm_model): item
                 for item, num_pairs in items
             }
-            
+
             # Track progress of QA generation
             self.progress.track_futures(futures, "Generating QA pairs")
-            
+
             # Process results as they complete
             qa_pairs = []
             for future in as_completed(futures):
@@ -179,9 +190,11 @@ class QAGenerator:
                 except Exception as e:
                     logger.error(f"Error generating QA pair: {e}")
                     continue
-            
+
             # Log completion stats
-            self.progress.log_completion({
-                "Total QA pairs": len(qa_pairs),
-                "items_processed": len(items),
-            }) 
+            self.progress.log_completion(
+                {
+                    "Total QA pairs": len(qa_pairs),
+                    "items_processed": len(items),
+                }
+            )
