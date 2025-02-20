@@ -6,10 +6,6 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import SelectorList
 from scrapy.spiders.crawl import CrawlSpider, Rule
 
-from src.util import string_utils  # noqa: E402
-
-AccordionSections = dict[str, list[str]]
-
 
 class CaPublicChargeSpider(CrawlSpider):
     # This name is used on the commandline: scrapy crawl ca_public_charge_spider
@@ -32,7 +28,6 @@ class CaPublicChargeSpider(CrawlSpider):
                     "find-help",
                 ),
                 allow_domains=allowed_domains,
-                deny_domains=("https://s3.amazonaws.com",),
                 canonicalize=True,
                 unique=True,
             ),
@@ -41,22 +36,30 @@ class CaPublicChargeSpider(CrawlSpider):
         ),
     )
 
-    def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
+    def parse_page(self, response: HtmlResponse) -> dict[str, str]:
         self.logger.info("Parsing %s", response.url)
         extractions = {"url": response.url}
         title = response.css("title::text").get().removesuffix("| Keep Your Benefits")
         extractions["title"] = title.strip()
-        base_url = response.url
 
         # remove icon text
         response.css("div.ic-icon").drop()
 
-        # extractions |= self.parse_module_full(base_url, response.css("div.module-full"))
-        extractions |= self.parse_main_content(base_url, response.css("div.GTM-1"))
-
+        self.resolveAnchorHrefs(response)
+        extractions |= self.parse_main_content(response.css("div.GTM-1"))
         return extractions
 
-    def to_markdown(self, base_url: str, html: str) -> str:
+    def resolveAnchorHrefs(self, response: HtmlResponse) -> None:
+        """
+        Resolve anchor URLs to absolute URL
+        response.url cannot be reliably used as a prefix for relative URLs
+        """
+        href_anchors = [anchor for anchor in response.css("a") if "href" in anchor.attrib]
+        for anchor in href_anchors:
+            absolute_href = response.urljoin(anchor.attrib["href"])
+            anchor.root.attrib.update({"href": absolute_href})
+
+    def to_markdown(self, html: str) -> str:
         # convert larger text to header
         larger_font_pattern = (
             r'<p class="title fontsize-30 weightier colored text-center"([^>]*?)>(.*?)<\/p>'
@@ -78,15 +81,13 @@ class CaPublicChargeSpider(CrawlSpider):
         markdown = (
             re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ").replace("\n\u2022", "-")
         )
-        # Replace non-absolute URLs with absolute URLs
-        markdown = string_utils.resolve_urls(base_url, markdown)
         return markdown.replace("\r", "").strip()
 
-    def parse_module_full(self, base_url: str, module_full: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(base_url, module_full.get())
+    def parse_module_full(self, module_full: SelectorList) -> dict[str, str]:
+        markdown = self.to_markdown(module_full.get())
         return {"module_full": markdown}
 
-    def parse_main_content(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
+    def parse_main_content(self, main_content: SelectorList) -> dict[str, str]:
         markdown = ""
         two_column_details = main_content.css("div.list-twocolumn").getall()
         # first middler element is state selection dropdown item
@@ -94,9 +95,9 @@ class CaPublicChargeSpider(CrawlSpider):
 
         if two_column_details:
             for one_column in two_column_details:
-                markdown += "\n" + self.to_markdown(base_url, one_column)
+                markdown += "\n\n" + self.to_markdown(one_column)
         if middler_details:
             for middle_detail in middler_details:
-                markdown += "\n" + self.to_markdown(base_url, middle_detail)
+                markdown += "\n\n" + self.to_markdown(middle_detail)
 
         return {"markdown": markdown}
