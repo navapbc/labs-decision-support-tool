@@ -5,29 +5,23 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
-from src.evaluation.metrics.results import (
-    batch_process_results,
-    generate_qa_pair_id,
-    process_retrieved_chunks,
-)
+from src.evaluation.metrics.results import batch_process_results, process_retrieved_chunks
+from src.evaluation.utils.id_generator import generate_stable_id
 
 
-def test_generate_qa_pair_id():
+def test_generate_stable_id():
     """Test UUID generation for QA pairs."""
     # Test that same inputs generate same UUID
-    uuid1 = generate_qa_pair_id("test question?", "test answer", "test_dataset")
-    uuid2 = generate_qa_pair_id("test question?", "test answer", "test_dataset")
+    uuid1 = str(generate_stable_id("test question?", "test answer"))
+    uuid2 = str(generate_stable_id("test question?", "test answer"))
     assert uuid1 == uuid2
 
     # Test that different inputs generate different UUIDs
-    uuid3 = generate_qa_pair_id("different question?", "test answer", "test_dataset")
+    uuid3 = str(generate_stable_id("different question?", "test answer"))
     assert uuid1 != uuid3
 
-    uuid4 = generate_qa_pair_id("test question?", "different answer", "test_dataset")
+    uuid4 = str(generate_stable_id("test question?", "different answer"))
     assert uuid1 != uuid4
-
-    uuid5 = generate_qa_pair_id("test question?", "test answer", "different_dataset")
-    assert uuid1 != uuid5
 
 
 @pytest.fixture
