@@ -2,7 +2,7 @@
 
 import csv
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -44,7 +44,7 @@ class QAPairStorage:
         # Save metadata
         metadata = {
             "version_id": version_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "llm_model": qa_pairs[0].version.llm_model if qa_pairs else None,
             "total_pairs": len(qa_pairs),
             "datasets": list(set(p.document_source for p in qa_pairs)),

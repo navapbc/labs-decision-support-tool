@@ -3,7 +3,7 @@
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import UTC, datetime
 from hashlib import md5
 from typing import Iterator, List
 
@@ -54,28 +54,28 @@ def generate_qa_pairs(
 
     # Create version info
     version = QAPairVersion(
-        version_id=datetime.now().strftime("%Y-%m-%d"),
+        version_id=datetime.now(UTC).strftime("%Y-%m-%d"),
         llm_model=llm,
     )
 
-    response = completion(
-        model=llm,
-        messages=[
-            {
-                "content": GENERATE_QUESTION_ANSWER_PROMPT,
-                "role": "system",
-            },
-            {
-                "content": f"Please create one high-quality question-answer pair from this content: {document_or_chunk.content}",
-                "role": "user",
-            },
-        ],
-        temperature=app_config.temperature,
-        **completion_args(llm),
-    )
-
-    content = response.choices[0].message.content
     try:
+        response = completion(
+            model=llm,
+            messages=[
+                {
+                    "content": GENERATE_QUESTION_ANSWER_PROMPT,
+                    "role": "system",
+                },
+                {
+                    "content": f"Please create one high-quality question-answer pair from this content: {document_or_chunk.content}",
+                    "role": "user",
+                },
+            ],
+            temperature=app_config.temperature,
+            **completion_args(llm),
+        )
+
+        content = response.choices[0].message.content
         # Clean up the response
         content = content.strip()
 
@@ -115,7 +115,8 @@ def generate_qa_pairs(
         return []
     except Exception as e:
         logger.error(f"Unexpected error processing response: {e}")
-        logger.error(f"Response content: {content}")
+        if hasattr(e, "response"):
+            logger.error(f"Response content: {e.response}")
         return []
 
     qa_pairs: List[QAPair] = []
