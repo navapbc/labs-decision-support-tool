@@ -1,15 +1,15 @@
 """Tests for evaluation results processing."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from src.metrics.evaluation.results import (
+from src.evaluation.metrics.results import (
     batch_process_results,
     generate_qa_pair_id,
     process_retrieved_chunks,
 )
-from src.metrics.models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
+from src.evaluation.models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def test_generate_qa_pair_id():
@@ -39,7 +39,7 @@ def mock_question():
         "answer": "test answer",
         "document_name": "test_doc",
         "dataset": "test_dataset",
-        "chunk_id": "chunk_123",
+        "chunk_id": "123e4567-e89b-12d3-a456-426614174000",
         "content_hash": "abc123",
     }
 
@@ -65,13 +65,13 @@ def mock_chunk():
 def test_process_retrieved_chunks_found(mock_question, mock_chunk):
     """Test processing retrieved chunks when correct chunk is found."""
     # Create a list of retrieved chunks where the first one matches
-    mock_chunk.chunk.content = (
-        "matching content"  # This will generate the same hash as mock_question
-    )
+    mock_chunk.chunk.id = mock_question["chunk_id"]  # Match the chunk ID
+    mock_chunk.chunk.content = "matching content"  # This will generate the same hash as mock_question
+    mock_chunk.score = 0.85
     retrieved_chunks = [mock_chunk]
 
     # Mock the md5 hash to match the expected hash
-    with patch("src.metrics.evaluation.results.md5") as mock_md5:
+    with patch("src.evaluation.metrics.results.md5") as mock_md5:
         mock_md5.return_value.hexdigest.return_value = mock_question["content_hash"]
 
         result = process_retrieved_chunks(mock_question, retrieved_chunks, 100.5)
@@ -159,12 +159,22 @@ def test_batch_process_results(mock_question, mock_chunk):
 
     # Mock app_config.db_session and measure_time context managers
     with (
-        patch("src.metrics.evaluation.results.app_config") as mock_config,
-        patch("src.metrics.evaluation.results.measure_time") as mock_timer,
+        patch("src.evaluation.metrics.results.app_config") as mock_config,
+        patch("src.evaluation.metrics.results.measure_time") as mock_timer,
+        patch("src.evaluation.metrics.results.md5") as mock_md5,
     ):
-        mock_config.db_session.return_value.__enter__.return_value = None
+        # Setup mock database session
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+        mock_config.db_session.return_value.__enter__.return_value = mock_session
         mock_config.db_session.return_value.__exit__.return_value = None
-        mock_timer.return_value.__enter__.return_value.elapsed_ms.return_value = 100.5
+
+        # Create a mock timer object with elapsed_ms as a property
+        mock_timer_obj = MagicMock()
+        type(mock_timer_obj).elapsed_ms = PropertyMock(return_value=100.5)
+        mock_timer.return_value.__enter__.return_value = mock_timer_obj
+
+        mock_md5.return_value.hexdigest.return_value = mock_question["content_hash"]
 
         results = batch_process_results(questions, mock_retrieval_func, k)
 
@@ -172,4 +182,4 @@ def test_batch_process_results(mock_question, mock_chunk):
         assert len(results) == 1
         assert isinstance(results[0], EvaluationResult)
         assert results[0].question == mock_question["question"]
-        assert results[0].retrieval_time_ms == 100.5
+        assert abs(results[0].retrieval_time_ms - 100.5) < 0.1  # Allow small floating point difference

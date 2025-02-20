@@ -137,14 +137,13 @@ def batch_process_results(
                 retrieved = retrieval_func(query, k)
 
                 # Process results
-                retrieval_time = timer.elapsed_ms() / len(questions)  # Average time per question
-                result = process_retrieved_chunks(question, retrieved, retrieval_time)
-                results.append(result)
+                retrieval_time = timer.elapsed_ms / len(questions)  # Average time per question
+                results.append(process_retrieved_chunks(question, retrieved, retrieval_time))
                 
     # Log completion stats
     progress.log_completion({
         "Questions processed": len(questions),
-        "Average retrieval time (ms)": timer.elapsed_ms() / len(questions),
+        "Average retrieval time (ms)": timer.elapsed_ms / len(questions),
         "items_processed": len(questions),
     })
 

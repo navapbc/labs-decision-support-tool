@@ -1,8 +1,9 @@
 """Tests for batch processing functions."""
 
+from pathlib import Path
 from unittest.mock import mock_open, patch
 
-from src.metrics.evaluation.batch import (
+from src.evaluation.metrics.batch import (
     create_batch_config,
     filter_questions,
     get_git_commit,
@@ -64,11 +65,22 @@ def test_create_batch_config():
     """Test batch configuration creation."""
     # Mock git commit and package version
     with (
-        patch("src.metrics.evaluation.batch.get_git_commit", return_value="abc123"),
-        patch("src.metrics.evaluation.batch.get_package_version", return_value="1.0.0"),
+        patch("src.evaluation.metrics.batch.get_git_commit", return_value="abc123"),
+        patch("src.evaluation.metrics.batch.get_package_version", return_value="1.0.0"),
+        patch("src.evaluation.metrics.batch.QAPairStorage") as mock_storage,
     ):
+        # Mock the QA storage version info
+        mock_storage.return_value.get_version_info.return_value = {
+            "version_id": "test_version",
+            "timestamp": "2024-02-11T12:00:00",
+            "llm_model": "test_model",
+            "total_pairs": 100,
+            "datasets": ["test_dataset"],
+            "git_commit": "test123",
+        }
+
         # Test with minimal parameters
-        config = create_batch_config(k_value=5)
+        config = create_batch_config(k_value=5, qa_pairs_path=Path("test.csv"))
         assert config.evaluation_config.k_value == 5
         assert config.evaluation_config.num_samples == 0
         assert config.evaluation_config.dataset_filter == []
@@ -82,6 +94,7 @@ def test_create_batch_config():
             k_value=10,
             dataset_filter=["dataset1"],
             git_commit="def456",
+            qa_pairs_path=Path("test.csv"),
         )
         assert config.evaluation_config.k_value == 10
         assert config.evaluation_config.dataset_filter == ["dataset1"]
@@ -106,15 +119,15 @@ def test_stratified_sample():
 
     # Test with 50% sampling
     half_sample = stratified_sample(questions, 0.5)
-    assert len(half_sample) >= 2  # At least min_per_dataset for each dataset
+    assert len(half_sample) >= 2  # Should get at least one from each dataset
     dataset1_count = len([q for q in half_sample if q["dataset"] == "dataset1"])
     dataset2_count = len([q for q in half_sample if q["dataset"] == "dataset2"])
     assert dataset1_count >= 1
     assert dataset2_count >= 1
 
-    # Test with very small sampling but respecting min_per_dataset
-    min_sample = stratified_sample(questions, 0.1, min_per_dataset=1)
-    assert len(min_sample) >= 2  # At least 1 per dataset
+    # Test with very small sampling
+    min_sample = stratified_sample(questions, 0.1)
+    assert len(min_sample) >= 2  # Should get at least one from each dataset
     assert len([q for q in min_sample if q["dataset"] == "dataset1"]) >= 1
     assert len([q for q in min_sample if q["dataset"] == "dataset2"]) >= 1
 
@@ -125,7 +138,6 @@ def test_stratified_sample():
 
     # Test that random seed is properly reset
     import random
-
     random.seed(123)
     val1 = random.random()
     stratified_sample(questions, 0.5, random_seed=42)

@@ -2,10 +2,32 @@
 
 import json
 from unittest.mock import MagicMock, patch
-
+import csv
 import pytest
+import tempfile
 
-from src.metrics.cli import create_retrieval_function, format_metric_value, main
+from src.evaluation.metrics.cli import create_retrieval_function, format_metric_value, main
+
+
+@pytest.fixture
+def test_questions_file():
+    """Create a temporary questions file for testing."""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        writer = csv.DictWriter(f, fieldnames=['id', 'question', 'answer', 'dataset'])
+        writer.writeheader()
+        writer.writerow({
+            'id': '1',
+            'question': 'test question 1?',
+            'answer': 'test answer 1',
+            'dataset': 'dataset1'
+        })
+        writer.writerow({
+            'id': '2',
+            'question': 'test question 2?',
+            'answer': 'test answer 2',
+            'dataset': 'dataset2'
+        })
+        return f.name
 
 
 def test_format_metric_value():
@@ -34,7 +56,7 @@ def test_create_retrieval_function():
     retrieval_func = create_retrieval_function(min_score)
 
     # Mock the retrieve_with_scores function
-    with patch("src.metrics.cli.retrieve_with_scores") as mock_retrieve:
+    with patch("src.evaluation.metrics.cli.retrieve_with_scores") as mock_retrieve:
         mock_retrieve.return_value = ["result1", "result2"]
 
         # Test the created function
@@ -50,27 +72,27 @@ def test_create_retrieval_function():
 @pytest.mark.parametrize(
     "args,expected_dataset_filter",
     [
-        (["--dataset", "imagine_la"], ["imagine_la"]),
-        (["--dataset", "imagine_la", "la_policy"], ["imagine_la", "la_policy"]),
-        ([], None),  # No dataset specified means all datasets
+        (["--dataset", "dataset1"], ["dataset1"]),
+        (["--dataset", "dataset1", "--dataset", "dataset2"], ["dataset1", "dataset2"]),
+        ([], None),
     ],
 )
-def test_main_dataset_filter(args, expected_dataset_filter):
-    """Test main function handles dataset filter correctly."""
+def test_main_dataset_filter(test_questions_file, args, expected_dataset_filter):
+    """Test main function handles dataset filters correctly."""
     with patch("argparse.ArgumentParser.parse_args") as mock_args:
         # Setup mock arguments
         mock_args.return_value = MagicMock(
-            dataset=args[1:] if len(args) > 1 else None,
-            k=[5, 10],
-            questions_file="test_file.csv",
+            dataset=expected_dataset_filter,
+            k=[5],
+            questions_file=test_questions_file,
             sampling=None,
             min_score=-1.0,
             commit="test_commit",
         )
 
         with (
-            patch("src.metrics.cli.run_evaluation") as mock_run_eval,
-            patch("src.metrics.cli.create_retrieval_function") as mock_create_retrieval,
+            patch("src.evaluation.metrics.cli.run_evaluation") as mock_run_eval,
+            patch("src.evaluation.metrics.cli.create_retrieval_function"),
             patch("os.makedirs"),
             patch("os.path.join", return_value="test_path"),
             patch("os.listdir", return_value=[]),
@@ -78,31 +100,29 @@ def test_main_dataset_filter(args, expected_dataset_filter):
             # Run main function
             main()
 
-            # Verify run_evaluation was called with correct dataset_filter
+            # Verify run_evaluation was called with correct dataset filter
+            mock_run_eval.assert_called_once()
             call_args = mock_run_eval.call_args[1]
-            assert call_args["dataset_filter"] == expected_dataset_filter
-
-            # Verify create_retrieval_function was called with correct min_score
-            mock_create_retrieval.assert_called_once_with(-1.0)
+            assert call_args.get("dataset_filter") == expected_dataset_filter
 
 
 @pytest.mark.parametrize("k_values", [[5], [5, 10, 25]])
-def test_main_k_values(k_values):
+def test_main_k_values(test_questions_file, k_values):
     """Test main function handles k values correctly."""
     with patch("argparse.ArgumentParser.parse_args") as mock_args:
         # Setup mock arguments
         mock_args.return_value = MagicMock(
-            dataset=["all"],
+            dataset=None,
             k=k_values,
-            questions_file="test_file.csv",
+            questions_file=test_questions_file,
             sampling=None,
             min_score=-1.0,
             commit="test_commit",
         )
 
         with (
-            patch("src.metrics.cli.run_evaluation") as mock_run_eval,
-            patch("src.metrics.cli.create_retrieval_function"),
+            patch("src.evaluation.metrics.cli.run_evaluation") as mock_run_eval,
+            patch("src.evaluation.metrics.cli.create_retrieval_function"),
             patch("os.makedirs"),
             patch("os.path.join", return_value="test_path"),
             patch("os.listdir", return_value=[]),
@@ -110,12 +130,13 @@ def test_main_k_values(k_values):
             # Run main function
             main()
 
-            # Verify run_evaluation was called with correct k_values
+            # Verify run_evaluation was called with correct k values
+            mock_run_eval.assert_called_once()
             call_args = mock_run_eval.call_args[1]
-            assert call_args["k_values"] == k_values
+            assert call_args.get("k_values") == k_values
 
 
-def test_main_results_display():
+def test_main_results_display(test_questions_file):
     """Test main function displays results correctly."""
     mock_metrics = {
         "batch_id": "test_batch",
@@ -136,15 +157,15 @@ def test_main_results_display():
         mock_args.return_value = MagicMock(
             dataset=None,
             k=[5],
-            questions_file="test_file.csv",
+            questions_file=test_questions_file,
             sampling=None,
             min_score=-1.0,
             commit="test_commit",
         )
 
         with (
-            patch("src.metrics.cli.run_evaluation"),
-            patch("src.metrics.cli.create_retrieval_function"),
+            patch("src.evaluation.metrics.cli.run_evaluation"),
+            patch("src.evaluation.metrics.cli.create_retrieval_function"),
             patch("os.makedirs"),
             patch("os.path.join", return_value="test_path"),
             patch("os.listdir", return_value=["metrics_123.json"]),

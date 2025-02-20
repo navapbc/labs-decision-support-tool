@@ -1,11 +1,11 @@
 """Tests for metrics computation functions."""
 
-from src.metrics.evaluation.metric_computation import (
+from src.evaluation.metrics.metric_computation import (
     compute_dataset_metrics,
     compute_incorrect_analysis,
     compute_metrics_summary,
 )
-from src.metrics.models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
+from src.evaluation.models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def create_test_result(
@@ -23,6 +23,7 @@ def create_test_result(
         source=source,
         chunk_id="chunk123",
         content_hash="hash456",
+        content="test expected content",
     )
 
     retrieved_chunks = []
@@ -31,7 +32,7 @@ def create_test_result(
             RetrievedChunk(
                 chunk_id=f"chunk{i + 1}",
                 score=score,
-                content="test content",
+                content=f"test retrieved content {i + 1}",
                 content_hash="hash456" if i == 0 and correct else f"hash{i + 1}",
             )
         )
@@ -45,6 +46,7 @@ def create_test_result(
         rank_if_found=rank if correct else None,
         retrieval_time_ms=100.5,
         retrieved_chunks=retrieved_chunks,
+        dataset=source,
     )
 
 
