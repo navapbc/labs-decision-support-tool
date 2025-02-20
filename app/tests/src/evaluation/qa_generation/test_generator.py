@@ -7,9 +7,9 @@ from uuid import UUID
 import pytest
 
 from src.db.models.document import Chunk, Document
+from src.evaluation.data_models import QAPair
 from src.evaluation.qa_generation.config import GenerationConfig, QuestionSource
 from src.evaluation.qa_generation.generator import QAGenerator, generate_qa_pairs
-from src.evaluation.qa_generation.models import QAPair
 
 
 @pytest.fixture
@@ -104,6 +104,20 @@ def test_generate_qa_pairs_invalid_response(mock_document):
     ):
         pairs = generate_qa_pairs(mock_document)
         assert len(pairs) == 0
+
+
+def test_generate_qa_pairs_invalid_document(mock_document):
+    """Test handling of invalid document properties."""
+    # Test with None content
+    mock_document.content = None
+    pairs = generate_qa_pairs(mock_document)
+    assert len(pairs) == 0
+
+    # Test with None source
+    mock_document.content = "Test content"
+    mock_document.source = None
+    pairs = generate_qa_pairs(mock_document)
+    assert len(pairs) == 0
 
 
 def test_qa_generator_get_chunks_to_process(mock_document, mock_chunk):

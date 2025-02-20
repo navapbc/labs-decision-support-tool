@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from ..qa_generation.models import QAPair
+from ..data_models import QAPair
 
 
 class QAPairStorage:
@@ -78,7 +78,8 @@ class QAPairStorage:
             )
             writer.writeheader()
             for pair in qa_pairs:
-                row = pair.dict()
+                # Convert dataclass to dict and handle nested version
+                row = pair.__dict__.copy()
                 # Flatten version info into row
                 row["version_id"] = pair.version.version_id
                 row["version_timestamp"] = pair.version.timestamp

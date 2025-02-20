@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
+from uuid import UUID
 
 
 @dataclass
@@ -110,3 +111,30 @@ class MetricsSummary:
     overall_metrics: Dict[str, float]
     dataset_metrics: Dict[str, DatasetMetrics]
     incorrect_analysis: IncorrectRetrievalsAnalysis
+
+
+# QA Generation Models
+@dataclass
+class QAPairVersion:
+    """Version information for a QA pair set."""
+
+    version_id: str
+    llm_model: str  # Model used for generation
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class QAPair:
+    """A question-answer pair with versioning."""
+
+    id: UUID  # Stable ID generated at creation time
+    question: str
+    answer: str
+    document_name: str
+    document_source: str
+    document_id: UUID
+    chunk_id: Optional[UUID]
+    content_hash: str
+    dataset: str
+    version: QAPairVersion
+    created_at: datetime = field(default_factory=datetime.utcnow)

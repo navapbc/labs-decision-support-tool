@@ -13,10 +13,10 @@ from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.generate import completion_args
 
+from ..data_models import QAPair, QAPairVersion
 from ..utils.id_generator import generate_stable_id
 from ..utils.progress import ProgressTracker
 from .config import GenerationConfig, QuestionSource
-from .models import QAPair, QAPairVersion
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +45,11 @@ def generate_qa_pairs(
         document = document_or_chunk.document
         chunk_id = document_or_chunk.id
 
-    # Skip if content is None
-    if not document_or_chunk.content:
-        logger.warning(f"Skipping QA generation for {document_or_chunk} - content is None")
+    # Skip if content is None or source is None
+    if not document_or_chunk.content or not document.source:
+        logger.warning(
+            f"Skipping QA generation for {document_or_chunk} - content or source is None"
+        )
         return []
 
     # Create version info
