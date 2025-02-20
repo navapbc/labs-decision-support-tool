@@ -199,6 +199,26 @@ def test_generate_qa_pairs_multiline_response(mock_document):
         assert pairs[1].answer == "A2"
 
 
+def test_generate_qa_pairs_newline_separated_response(mock_document):
+    """Test handling of newline-separated JSON response format."""
+    response = MagicMock()
+    response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content='Here are the pairs:\n{"question": "Q1?", "answer": "A1"}\n{"question": "Q2?", "answer": "A2"}'
+            )
+        )
+    ]
+
+    with patch("src.evaluation.qa_generation.generator.completion", return_value=response):
+        pairs = generate_qa_pairs(mock_document)
+        assert len(pairs) == 2
+        assert pairs[0].question == "Q1?"
+        assert pairs[0].answer == "A1"
+        assert pairs[1].question == "Q2?"
+        assert pairs[1].answer == "A2"
+
+
 def test_generate_qa_pairs_completion_error(mock_document):
     """Test handling of completion API error."""
     with patch(
