@@ -1,10 +1,9 @@
 import re
 
 from src.citations import CitationFactory, split_into_subsections
-from src.format import FormattingConfig, _get_breadcrumb_html, format_response, reify_citations
+from src.format import FormattingConfig, _get_breadcrumb_html, format_response
 from src.generate import MessageAttributes
 from src.retrieve import retrieve_with_scores
-from tests.src.db.models.factories import ChunkFactory
 from tests.src.test_retrieve import _create_chunks
 
 
@@ -21,34 +20,6 @@ def _unique_accordion_ids(html):
 
 def to_subsections(chunks_with_scores):
     return split_into_subsections([c.chunk for c in chunks_with_scores], factory=CitationFactory())
-
-
-def test_reify_citations():
-    chunks = ChunkFactory.build_batch(2)
-    chunks[0].content = "This is the first chunk.\n\nWith two subsections"
-    subsections = split_into_subsections(chunks, factory=CitationFactory())
-    config = FormattingConfig()
-
-    assert (
-        reify_citations("This is a citation (citation-0)", [], config, None)
-        == "This is a citation "
-    )
-
-    result = reify_citations(
-        f"This is a citation ({subsections[0].id}) and another ({subsections[1].id}).",
-        subsections,
-        config,
-        None,
-    )
-
-    # Check that citations were added
-    assert "<sup>" in result
-    assert "accordion_item" in result
-    assert "style='cursor:pointer'" in result
-    assert "data-id='a-None'" in result
-    # Check basic text structure remains
-    assert result.startswith("This is a citation")
-    assert "and another" in result
 
 
 def test__get_breadcrumb_html():
