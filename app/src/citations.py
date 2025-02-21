@@ -214,13 +214,10 @@ def move_citations_after_punctuation(response: str) -> str:
         # match.group(2) only has the last citation in match.group(1)
         # see https://stackoverflow.com/a/43866169/23458508
         punctuation = match.group(3)
-        # Since citations appear after a punctuation, if there's a subsequent sentence,
-        # then someone might associate `(citation-N)` with that subsequent sentence,
-        # so insert a new line after the citations.
-        return f"{punctuation} {citations}\n"
+        return f"{punctuation} {citations}"
 
-    # Include any trailing spaces and a single newline so they can be replaced
-    return re.sub(r" *(( *\(citation-\d+\))+) *([\.\?\!]) *\n?", move_citation, response).strip()
+    # Include any left-side spaces so the replacement punctuation immediately follows the last word
+    return re.sub(r" *(( *\(citation-\d+\))+) *([\.\?\!])", move_citation, response).strip()
 
 
 @dataclass
