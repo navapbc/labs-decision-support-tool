@@ -36,29 +36,6 @@ Arguments:
 - `random_seed`: Random seed for reproducible sampling
 - `output_dir`: Base directory for storing results (default: src/evaluation/data)
 
-### Python API
-
-```python
-from src.evaluation.qa_generation.config import GenerationConfig
-from src.evaluation.qa_generation.runner import run_generation
-
-# Configure generation
-config = GenerationConfig(
-    llm_model="gpt-4o-mini",
-    dataset_filter=["imagine_la"],
-    sample_fraction=0.1,
-    question_source="chunk",
-    questions_per_unit=1
-)
-
-# Run generation
-qa_pairs_path = run_generation(
-    config=config,
-    output_dir=Path("src/evaluation/data"),
-    random_seed=42
-)
-```
-
 ## Data Storage
 
 Generated QA pairs are stored in a simple directory structure:
