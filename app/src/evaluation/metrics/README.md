@@ -16,7 +16,7 @@ The metrics module allows you to:
 
 Before running evaluations, you'll need the questions CSV file:
 1. Download the questions file from [this Google Sheet](https://docs.google.com/spreadsheets/d/1KBFMyRUSohqA94ic6yAv3Ne22GwEBJHHYHM49rEKFsc/edit?usp=sharing)
-2. Save it as `question_answer_pairs.csv` in `app/src/metrics/data/`
+2. Save it as `question_answer_pairs.csv` in `app/src/evaluation/metrics/data/`
 
 #### Input CSV Format
 
@@ -51,7 +51,7 @@ Arguments:
   - `imagine_la`: Imagine LA dataset
   - `la_policy`: LA County Policy dataset
 - `k`: One or more k values to evaluate (default: "5 10 25")
-- `questions_file`: Path to questions CSV file (default: src/metrics/data/question_answer_pairs.csv)
+- `questions_file`: Path to questions CSV file (default: src/evaluation/metrics/data/question_answer_pairs.csv)
 - `min_score`: Minimum similarity score for retrieval (default: -1.0)
 - `sampling`: Fraction of questions to sample (e.g., 0.1) for each specified dataset (default: 1.0)
 - `random_seed`: Random seed for reproducible sampling (only used if sampling is specified)
@@ -59,8 +59,8 @@ Arguments:
 ### Log Storage
 
 By default, evaluation logs and data are stored in:
-- `app/src/metrics/data/` - Contains the generated QA files used for evaluation
-- `app/src/metrics/logs/YYYY-MM-DD/` - Contains all evaluation run logs
+- `app/src/evaluation/metrics/data/` - Contains the generated QA files used for evaluation
+- `app/src/evaluation/metrics/logs/YYYY-MM-DD/` - Contains all evaluation run logs
 
 ### Log File Structure
 
