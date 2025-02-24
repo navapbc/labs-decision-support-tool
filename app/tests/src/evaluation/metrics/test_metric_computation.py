@@ -5,7 +5,7 @@ from src.evaluation.metrics.metric_computation import (
     compute_incorrect_analysis,
     compute_metrics_summary,
 )
-from src.evaluation.metrics.models import EvaluationResult, ExpectedChunk, RetrievedChunk
+from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def create_test_result(

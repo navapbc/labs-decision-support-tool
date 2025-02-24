@@ -111,7 +111,6 @@ def main() -> None:
     else:
         db_datasets = None
 
-    # Use consistent base path for both commands
     base_path = args.output_dir if hasattr(args, "output_dir") else Path("src/evaluation/data")
     qa_pairs_dir = base_path / "qa_pairs"
 
@@ -120,7 +119,7 @@ def main() -> None:
         try:
             qa_pairs_path = run_generation(
                 config=config,
-                output_dir=base_path,  # Pass base path, not qa_pairs_dir
+                output_dir=base_path,
                 dataset_filter=db_datasets,
                 sample_fraction=args.sampling,
                 random_seed=args.random_seed,
@@ -138,8 +137,7 @@ def main() -> None:
 
     elif args.command == "evaluate":
         try:
-            # In our simplified version, we don't need to get the latest version
-            # We just use the qa_pairs.csv file directly
+            # Use the qa_pairs.csv file
             qa_pairs_path = qa_pairs_dir / "qa_pairs.csv"
 
             print(f"Using QA pairs from: {qa_pairs_path}")

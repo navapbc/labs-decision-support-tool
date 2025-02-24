@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.evaluation.metrics.models import EvaluationResult, ExpectedChunk, RetrievedChunk
+from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 from src.evaluation.metrics.results import (
     batch_process_results,
     generate_qa_pair_id,

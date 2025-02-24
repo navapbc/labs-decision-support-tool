@@ -9,7 +9,7 @@ from tqdm import tqdm
 from src.app_config import app_config
 
 from ..utils.timer import measure_time
-from .models import EvaluationResult, ExpectedChunk, RetrievedChunk
+from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def generate_qa_pair_id(question: str, answer: str, dataset: str) -> str:
