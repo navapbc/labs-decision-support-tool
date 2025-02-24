@@ -8,7 +8,7 @@ The QA generation module provides:
 1. Generation of QA pairs from documents or chunks
 2. Configurable LLM models and parameters
 3. Stratified sampling for targeted generation
-4. Versioned storage with metadata tracking
+4. Simple storage with metadata tracking
 
 ## Usage
 
@@ -61,17 +61,13 @@ qa_pairs_path = run_generation(
 
 ## Data Storage
 
-Generated QA pairs are stored in versioned directories:
+Generated QA pairs are stored in a simple directory structure:
 
 ```
 src/evaluation/data/qa_pairs/
-├── YYYYMMDD_HHMMSS/        # Version-specific directory
-│   ├── qa_pairs.csv        # Generated QA pairs
-│   └── metadata.json       # Generation metadata
-└── latest -> YYYYMMDD.../  # Symlink to latest version
+├── qa_pairs.csv        # Generated QA pairs
+└── metadata.json       # Generation metadata
 ```
-
-Each generation run creates a new timestamped directory and updates the `latest` symlink to point to it. This allows easy access to the most recent QA pairs while preserving previous versions.
 
 ### QA Pairs CSV Format
 
@@ -86,16 +82,13 @@ The `qa_pairs.csv` file contains:
 - `chunk_id`: Source chunk ID (if from chunks)
 - `content_hash`: Hash of source content
 - `created_at`: Generation timestamp
-- `version_id`: Generation version ID
-- `version_timestamp`: Generation timestamp
-- `version_llm_model`: LLM model used
+- `llm_model`: LLM model used
 
 ### Generation Metadata
 
 The `metadata.json` file tracks:
 ```json
 {
-  "version_id": "20240220_123456",
   "timestamp": "2024-02-20T12:34:56",
   "llm_model": "gpt-4o-mini",
   "total_pairs": 1000,
