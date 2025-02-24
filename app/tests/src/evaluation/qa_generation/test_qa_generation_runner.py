@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -69,9 +68,9 @@ def mock_qa_pairs():
     return [qa_pair1, qa_pair2]
 
 
-def test_qa_pair_storage_init():
+def test_qa_pair_storage_init(tmp_path):
     """Test QAPairStorage initialization."""
-    output_dir = Path("/tmp/qa_pairs")
+    output_dir = tmp_path / "qa_pairs"
 
     with patch("pathlib.Path.mkdir") as mock_mkdir:
         storage = QAPairStorage(output_dir)
@@ -96,12 +95,12 @@ def test_qa_pair_storage_save_qa_pairs(mock_qa_pairs, tmp_path):
         assert mock_writer_instance.writerow.call_count == len(mock_qa_pairs)
 
 
-def test_run_generation_basic(mock_documents, mock_qa_pairs):
+def test_run_generation_basic(mock_documents, mock_qa_pairs, tmp_path):
     """Test basic run_generation functionality."""
     config = GenerationConfig(
         question_source=QuestionSource.DOCUMENT, questions_per_unit=1, llm_model="gpt-4o-mini"
     )
-    output_dir = Path("/tmp/qa_output")
+    output_dir = tmp_path / "qa_output"
 
     with (
         patch("src.evaluation.qa_generation.runner.QAGenerator") as mock_generator_cls,
@@ -140,12 +139,12 @@ def test_run_generation_basic(mock_documents, mock_qa_pairs):
         mock_storage_instance.save_qa_pairs.assert_called_once_with(qa_pairs=mock_qa_pairs)
 
 
-def test_run_generation_with_dataset_filter(mock_documents, mock_qa_pairs):
+def test_run_generation_with_dataset_filter(mock_documents, mock_qa_pairs, tmp_path):
     """Test run_generation with dataset filter."""
     config = GenerationConfig(
         question_source=QuestionSource.DOCUMENT, questions_per_unit=1, llm_model="gpt-4o-mini"
     )
-    output_dir = Path("/tmp/qa_output")
+    output_dir = tmp_path / "qa_output"
     dataset_filter = ["Dataset 1"]
 
     with (
@@ -183,12 +182,12 @@ def test_run_generation_with_dataset_filter(mock_documents, mock_qa_pairs):
         mock_query.filter.assert_called_once()  # Should filter by dataset
 
 
-def test_run_generation_with_sampling(mock_documents, mock_qa_pairs):
+def test_run_generation_with_sampling(mock_documents, mock_qa_pairs, tmp_path):
     """Test run_generation with sampling."""
     config = GenerationConfig(
         question_source=QuestionSource.DOCUMENT, questions_per_unit=1, llm_model="gpt-4o-mini"
     )
-    output_dir = Path("/tmp/qa_output")
+    output_dir = tmp_path / "qa_output"
     sample_fraction = 0.5
     random_seed = 42
 
@@ -241,12 +240,12 @@ def test_run_generation_with_sampling(mock_documents, mock_qa_pairs):
         mock_generator_instance.generate_from_documents.assert_called_once_with(mock_documents[:1])
 
 
-def test_run_generation_no_documents():
+def test_run_generation_no_documents(tmp_path):
     """Test run_generation with no documents found."""
     config = GenerationConfig(
         question_source=QuestionSource.DOCUMENT, questions_per_unit=1, llm_model="gpt-4o-mini"
     )
-    output_dir = Path("/tmp/qa_output")
+    output_dir = tmp_path / "qa_output"
 
     with (
         patch("src.evaluation.qa_generation.runner.QAGenerator") as mock_generator_cls,
