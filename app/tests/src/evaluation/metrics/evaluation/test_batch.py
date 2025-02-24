@@ -2,7 +2,7 @@
 
 from unittest.mock import mock_open, patch
 
-from src.metrics.evaluation.batch import (
+from src.evaluation.metrics.evaluation.batch import (
     create_batch_config,
     filter_questions,
     get_git_commit,
@@ -64,8 +64,8 @@ def test_create_batch_config():
     """Test batch configuration creation."""
     # Mock git commit and package version
     with (
-        patch("src.metrics.evaluation.batch.get_git_commit", return_value="abc123"),
-        patch("src.metrics.evaluation.batch.get_package_version", return_value="1.0.0"),
+        patch("src.evaluation.metrics.evaluation.batch.get_git_commit", return_value="abc123"),
+        patch("src.evaluation.metrics.evaluation.batch.get_package_version", return_value="1.0.0"),
     ):
         # Test with minimal parameters
         config = create_batch_config(k_value=5)

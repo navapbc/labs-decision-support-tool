@@ -6,8 +6,8 @@ from datetime import datetime
 
 import pytest
 
-from src.metrics.evaluation.logging import EvaluationLogger
-from src.metrics.models.metrics import (
+from src.evaluation.metrics.evaluation.logging import EvaluationLogger
+from src.evaluation.metrics.models.metrics import (
     BatchConfig,
     DatasetMetrics,
     EvaluationConfig,
