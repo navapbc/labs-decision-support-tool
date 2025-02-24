@@ -208,6 +208,18 @@ def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection
     return re.sub(CITATION_PATTERN, replace_citation, response)
 
 
+def move_citations_after_punctuation(response: str) -> str:
+    def move_citation(match: Match) -> str:
+        citations = match.group(1)
+        # match.group(2) only has the last citation in match.group(1)
+        # see https://stackoverflow.com/a/43866169/23458508
+        punctuation = match.group(3)
+        return f"{punctuation} {citations}"
+
+    # Include any left-side spaces so the replacement punctuation immediately follows the last word
+    return re.sub(r" *(( *\(citation-\d+\))+) *([\.\?\!])", move_citation, response).strip()
+
+
 @dataclass
 class ResponseWithSubsections:
     response: str
@@ -221,6 +233,7 @@ def simplify_citation_numbers(result: ResponseWithSubsections) -> ResponseWithSu
     The returned subsections only contain citations used in the response
     and are ordered consecutively starting from 1.
     """
-    remapped_citations = remap_citation_ids(result.subsections, result.response)
-    remapped_response = replace_citation_ids(result.response, remapped_citations)
+    formatted_response = move_citations_after_punctuation(result.response)
+    remapped_citations = remap_citation_ids(result.subsections, formatted_response)
+    remapped_response = replace_citation_ids(formatted_response, remapped_citations)
     return ResponseWithSubsections(remapped_response, tuple(remapped_citations.values()))
