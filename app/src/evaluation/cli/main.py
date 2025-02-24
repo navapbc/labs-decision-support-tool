@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""CLI for running evaluation metrics."""
+"""Unified CLI for QA generation and evaluation."""
 
 import argparse
 from pathlib import Path
-from typing import Any
 
 from ..metrics.runner import create_retrieval_function, run_evaluation
+from ..qa_generation.config import GenerationConfig
+from ..qa_generation.runner import run_generation
 
 # Map CLI dataset names to DB dataset names
 DATASET_MAPPING = {
@@ -18,18 +19,41 @@ DATASET_MAPPING = {
 }
 
 
-def format_metric_value(value: Any) -> str:
-    """Format a metric value for display."""
-    if isinstance(value, (float, int)):
-        return f"{value:.4f}"
-    return str(value)
-
-
 def create_parser() -> argparse.ArgumentParser:
     """Create argument parser for the CLI."""
-    parser = argparse.ArgumentParser(description="Evaluation Metrics Tools")
+    parser = argparse.ArgumentParser(description="QA Generation and Evaluation Tools")
+    subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
-    parser.add_argument(
+    # QA Generation command
+    gen_parser = subparsers.add_parser("generate", help="Generate QA pairs from documents")
+    gen_parser.add_argument(
+        "--dataset",
+        type=str,
+        nargs="+",
+        help="One or more datasets to generate QA pairs for (e.g., imagine_la la_policy). If not specified, generates for all datasets.",
+        required=False,
+        default=None,
+    )
+    gen_parser.add_argument(
+        "--sampling", type=float, help="Fraction of documents to sample (e.g. 0.1)"
+    )
+    gen_parser.add_argument("--random-seed", type=int, help="Random seed for reproducible sampling")
+    gen_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("src/evaluation/data"),
+        help="Base directory for storing QA pairs and evaluation results",
+    )
+    gen_parser.add_argument(
+        "--llm", type=str, default="gpt-4o-mini", help="LLM model to use for QA generation"
+    )
+    gen_parser.add_argument(
+        "--commit", type=str, help="Git commit hash for tracking generation runs"
+    )
+
+    # Evaluation command
+    eval_parser = subparsers.add_parser("evaluate", help="Run evaluation on QA pairs")
+    eval_parser.add_argument(
         "--dataset",
         type=str,
         nargs="+",
@@ -37,39 +61,48 @@ def create_parser() -> argparse.ArgumentParser:
         required=False,
         default=None,
     )
-    parser.add_argument(
+    eval_parser.add_argument(
         "--k",
         type=int,
         nargs="+",
         default=[5, 10, 25],
         help="One or more k values to evaluate (e.g., 5 10 25)",
     )
-    parser.add_argument(
-        "--questions-file",
-        type=Path,
-        default=Path("src/evaluation/data/qa_pairs/question_answer_pairs.csv"),
-        help="Path to questions CSV file",
+    eval_parser.add_argument(
+        "--qa-pairs-version",
+        type=str,
+        help="Version ID of QA pairs to evaluate. Defaults to latest.",
     )
-    parser.add_argument(
-        "--min-score", type=float, default=-1.0, help="Minimum similarity score for retrieval"
-    )
-    parser.add_argument("--sampling", type=float, help="Fraction of questions to sample (e.g. 0.1)")
-    parser.add_argument("--random-seed", type=int, help="Random seed for reproducible sampling")
-    parser.add_argument("--commit", type=str, help="Git commit hash for tracking evaluation runs")
-    parser.add_argument(
+    eval_parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("src/evaluation/data"),
-        help="Base directory for evaluation results",
+        help="Base directory containing QA pairs and evaluation results",
+    )
+    eval_parser.add_argument(
+        "--min-score", type=float, default=-1.0, help="Minimum similarity score for retrieval"
+    )
+    eval_parser.add_argument(
+        "--sampling", type=float, help="Fraction of questions to sample (e.g. 0.1)"
+    )
+    eval_parser.add_argument(
+        "--random-seed", type=int, help="Random seed for reproducible sampling"
+    )
+    eval_parser.add_argument(
+        "--commit", type=str, help="Git commit hash for tracking evaluation runs"
     )
 
     return parser
 
 
 def main() -> None:
-    """Run the metrics evaluation CLI."""
+    """Run the CLI application."""
     parser = create_parser()
     args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        return
 
     # Map CLI dataset names to DB names if specified
     if args.dataset:
@@ -78,31 +111,59 @@ def main() -> None:
     else:
         db_datasets = None
 
-    # Set up evaluation logs directory
-    log_dir = args.output_dir / "logs" / "evaluations"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Writing logs to: {log_dir.absolute()}")
+    # Use consistent base path for both commands
+    base_path = args.output_dir if hasattr(args, "output_dir") else Path("src/evaluation/data")
+    qa_pairs_dir = base_path / "qa_pairs"
 
-    try:
-        # Create retrieval function with min_score
-        retrieval_func = create_retrieval_function(args.min_score)
+    if args.command == "generate":
+        config = GenerationConfig.from_cli_args(args)
+        try:
+            qa_pairs_path = run_generation(
+                config=config,
+                output_dir=base_path,  # Pass base path, not qa_pairs_dir
+                dataset_filter=db_datasets,
+                sample_fraction=args.sampling,
+                random_seed=args.random_seed,
+                git_commit=args.commit,
+            )
+            print(f"Generated QA pairs saved to: {qa_pairs_path}")
 
-        # Run evaluation
-        run_evaluation(
-            questions_file=str(args.questions_file),
-            k_values=args.k,
-            dataset_filter=db_datasets,
-            sample_fraction=args.sampling,
-            random_seed=args.random_seed,
-            min_score=args.min_score,
-            retrieval_func=retrieval_func,
-            log_dir=str(log_dir),
-            commit=args.commit,
-        )
+        except ValueError as e:
+            if "No documents found" in str(e):
+                print(
+                    f"No documents found matching criteria. Available datasets: {list(DATASET_MAPPING.keys())}"
+                )
+                return
+            raise
 
-    except Exception as e:
-        print(f"Error running evaluation: {str(e)}")
-        raise
+    elif args.command == "evaluate":
+        try:
+            # In our simplified version, we don't need to get the latest version
+            # We just use the qa_pairs.csv file directly
+            qa_pairs_path = qa_pairs_dir / "qa_pairs.csv"
+
+            print(f"Using QA pairs from: {qa_pairs_path}")
+
+            # Create retrieval function with min_score
+            retrieval_func = create_retrieval_function(args.min_score)
+
+            # Use evaluation logs directory within our module's data directory
+            eval_logs_dir = base_path / "logs" / "evaluations"
+
+            run_evaluation(
+                questions_file=str(qa_pairs_path),
+                k_values=args.k,
+                dataset_filter=db_datasets,
+                sample_fraction=args.sampling,
+                random_seed=args.random_seed,
+                min_score=args.min_score,
+                retrieval_func=retrieval_func,
+                log_dir=str(eval_logs_dir),  # Pass the module-specific log directory
+                commit=args.commit,
+            )
+        except Exception as e:
+            print(f"Error running evaluation: {str(e)}")
+            raise
 
 
 if __name__ == "__main__":
