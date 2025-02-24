@@ -50,11 +50,13 @@ def test_expected_chunk():
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
+        content="test content",
     )
     assert expected.name == "test_doc"
     assert expected.source == "test_dataset"
     assert expected.chunk_id == "chunk123"
     assert expected.content_hash == "hash456"
+    assert expected.content == "test content"
 
 
 def test_retrieved_chunk():
@@ -78,6 +80,7 @@ def test_evaluation_result():
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
+        content="test content",
     )
     retrieved_chunk = RetrievedChunk(
         chunk_id="chunk123",
@@ -94,6 +97,7 @@ def test_evaluation_result():
         rank_if_found=1,
         retrieval_time_ms=100.5,
         retrieved_chunks=[retrieved_chunk],
+        dataset="test_dataset",
     )
 
     # Test that fields are set correctly
@@ -106,6 +110,7 @@ def test_evaluation_result():
     assert result.retrieval_time_ms == 100.5
     assert result.retrieved_chunks == [retrieved_chunk]
     assert result.timestamp is not None
+    assert result.dataset == "test_dataset"
 
 
 def test_dataset_metrics():

@@ -7,9 +7,9 @@ from typing import Any, Dict, List
 from tqdm import tqdm
 
 from src.app_config import app_config
+from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 from ..utils.timer import measure_time
-from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def generate_qa_pair_id(question: str, answer: str, dataset: str) -> str:
@@ -52,6 +52,7 @@ def process_retrieved_chunks(
         source=question.get("dataset", ""),
         chunk_id=question.get("chunk_id", ""),
         content_hash=question.get("content_hash", ""),
+        content=question.get("content", ""),
     )
 
     # Process retrieved chunks
@@ -96,6 +97,7 @@ def process_retrieved_chunks(
         rank_if_found=rank_if_found,
         retrieval_time_ms=retrieval_time_ms,
         retrieved_chunks=processed_chunks,
+        dataset=expected_chunk.source,
     )
 
 

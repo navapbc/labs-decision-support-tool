@@ -6,7 +6,6 @@ from datetime import datetime
 
 import pytest
 
-from src.evaluation.metrics.logging import EvaluationLogger
 from src.evaluation.data_models import (
     BatchConfig,
     DatasetMetrics,
@@ -18,6 +17,7 @@ from src.evaluation.data_models import (
     RetrievedChunk,
     SoftwareInfo,
 )
+from src.evaluation.metrics.logging import EvaluationLogger
 
 
 @pytest.fixture
@@ -54,6 +54,7 @@ def test_evaluation_result():
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
+        content="test content",
     )
     retrieved_chunk = RetrievedChunk(
         chunk_id="chunk123",
@@ -70,6 +71,7 @@ def test_evaluation_result():
         rank_if_found=1,
         retrieval_time_ms=100.5,
         retrieved_chunks=[retrieved_chunk],
+        dataset="test_dataset",
     )
 
 
