@@ -56,14 +56,14 @@ def test_get_stratified_sample_with_random_seed():
     """Test that random seed produces consistent results."""
     # Create a list of items
     items = list(range(100))
-    
+
     # Get two samples with the same seed
     result1 = get_stratified_sample(items, sample_fraction=0.1, random_seed=42)
     result2 = get_stratified_sample(items, sample_fraction=0.1, random_seed=42)
-    
+
     # Results should be identical with the same seed
     assert result1 == result2
-    
+
     # Test that the function handles the random seed parameter correctly
     # We don't need to verify that different seeds produce different results,
     # just that the function correctly uses the seed parameter
