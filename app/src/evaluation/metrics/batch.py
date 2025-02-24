@@ -8,7 +8,7 @@ import subprocess
 from collections import defaultdict
 from typing import Dict, List, Optional
 
-from ..models.metrics import BatchConfig, EvaluationConfig, SoftwareInfo
+from .models import BatchConfig, EvaluationConfig, SoftwareInfo
 
 
 def get_git_commit() -> str:
