@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from literalai import Score
+from literalai.my_types import ScoreType
 
 from src import chat_api
 from src.chat_api import (
@@ -32,30 +33,45 @@ class MockContextManager:
         pass
 
 
-def mock_literalai():
-    mock = MagicMock()
-    mock.thread.return_value = MockContextManager()
-    mock.step.return_value = MockContextManager()
-    return mock
+class MockLiteralAI:
+    def __init__(self):
+        self.api = AsyncMock()
+        self.api.get_or_create_user = AsyncMock()
+        self.api.get_or_create_user.return_value = self.api
+        self.api.message = MagicMock()
+        self.api.message.return_value.thread_id = 12345
+        self.api.create_score = AsyncMock()
+
+    def thread(self, *args, **kwargs):
+        return MockContextManager()
+
+    def step(self, *args, **kwargs):
+        return MockContextManager()
+
+    def message(self, *args, **kwargs):
+        mock_msg = MagicMock()
+        mock_msg.thread_id = 12345
+        print(f"-----  Mock message: {mock_msg}")
+        return mock_msg
 
 
 @pytest.fixture
 def client(monkeypatch):
-    mock = mock_literalai()
-    monkeypatch.setattr(mock, "api", AsyncMock())
-    monkeypatch.setattr(chat_api, "literalai", lambda: mock)
+    lai_mock = MockLiteralAI()
+    lai_mock.api = MockLiteralAIApi()
+    monkeypatch.setattr(chat_api, "literalai", lambda: lai_mock)
     return TestClient(router)
 
 
 class MockLiteralAIApi:
     async def get_or_create_user(self, identifier, metadata):
-        self.id = identifier
+        self.id = f"litai_uuid_for_{identifier}"
         return self
 
     async def create_score(
         self,
-        name: str | None,
-        type: str,
+        name: str,
+        type: ScoreType,
         value: float,
         step_id: Optional[str] = None,
         comment: Optional[str] = None,
@@ -72,22 +88,13 @@ class MockLiteralAIApi:
         )
 
 
-@pytest.fixture
-def literalai_client(monkeypatch):
-    mock = mock_literalai()
-    monkeypatch.setattr(mock, "api", MockLiteralAIApi())
-    monkeypatch.setattr(chat_api, "literalai", lambda: mock)
-
-    return TestClient(router)
-
-
 def test_api_engines(client):
     response = client.get("/api/engines?user_id=TestUser")
     assert response.status_code == 200
     assert response.json() == ["imagine-la"]
 
 
-def test_api_query(monkeypatch, client):
+def test_api_query(monkeypatch, client, db_session):
     async def mock_run_query(engine, question, chat_history):
         return QueryResponse(
             response_text=f"Response from LLM: {chat_history}",
@@ -111,7 +118,10 @@ def test_api_query(monkeypatch, client):
         raise AssertionError("Expected HTTPException")
     except HTTPException as e:
         assert e.status_code == 409
-        assert e.detail == "Cannot start a new session with existing session_id: Session0"
+        assert (
+            e.detail
+            == "Cannot start a new session with an existing session_id: Session0 associated with thread_id: 12345"
+        )
 
     # Test chat history
     response = client.post(
@@ -134,7 +144,7 @@ def test_api_query__nonexistent_session_id(monkeypatch, client):
         raise AssertionError("Expected HTTPException")
     except HTTPException as e:
         assert e.status_code == 409
-        assert e.detail == "Chat history for existing session not found: NewSession999"
+        assert e.detail == "LiteralAI thread ID for existing session not found: NewSession999"
 
 
 def test_api_query__bad_request(client):
@@ -236,6 +246,7 @@ def user_info():
 def test_get_chat_engine(user_info):
     session = UserSession(
         user=user_info,
+        session_id="session1",
         chat_engine_settings=ChatEngineSettings("ca-edd-web", retrieval_k=6),
     )
     engine = get_chat_engine(session)
@@ -245,6 +256,7 @@ def test_get_chat_engine(user_info):
 def test_get_chat_engine__unknown(user_info):
     session = UserSession(
         user=user_info,
+        session_id="session1",
         chat_engine_settings=ChatEngineSettings("engine_y"),
     )
     with pytest.raises(HTTPException, match="Unknown engine: engine_y"):
@@ -254,14 +266,15 @@ def test_get_chat_engine__unknown(user_info):
 def test_get_chat_engine_not_allowed(user_info):
     session = UserSession(
         user=user_info,
+        session_id="session1",
         chat_engine_settings=ChatEngineSettings("bridges-eligibility-manual"),
     )
     with pytest.raises(HTTPException, match="Unknown engine: bridges-eligibility-manual"):
         get_chat_engine(session)
 
 
-def test_post_feedback_success(literalai_client):
-    response = literalai_client.post(
+def test_post_feedback_success(client):
+    response = client.post(
         "/api/feedback",
         json={
             "session_id": "Session2",
@@ -274,9 +287,9 @@ def test_post_feedback_success(literalai_client):
     assert response.status_code == 200
 
 
-def test_post_feedback_fail(monkeypatch, literalai_client):
+def test_post_feedback_fail(monkeypatch, client):
     try:
-        literalai_client.post(
+        client.post(
             "/api/feedback",
             json={
                 "session_id": "Session2",

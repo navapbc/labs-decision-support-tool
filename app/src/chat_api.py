@@ -66,29 +66,46 @@ class ChatEngineSettings:
 @dataclass
 class UserSession:
     user: UserInfo
+    session_id: str
     chat_engine_settings: ChatEngineSettings
     literalai_user_id: Optional[str] = None
+    literalai_thread_id: Optional[str] = None
     message_history: Optional[Sequence[ChatMessage]] = None
 
 
-def __query_user_session(user_id: str) -> UserSession:
+# FIXME: Replace this with a real DB table
+DB_SESSIONS: dict[str, UserSession] = {}
+
+
+def __query_user_session(user_id: str, session_id: str) -> UserSession:
     """
-    Placeholder for creating/retrieving user's session from the DB, including settings and constraints
+    FIXME: Placeholder for creating/retrieving user's session from the DB, including settings and constraints
     """
+    if session_id in DB_SESSIONS:
+        logger.info("Found user session for: %s", user_id)
+        return DB_SESSIONS[session_id]
+
     session = UserSession(
         user=UserInfo(user_id, ["imagine-la"]),
+        session_id=session_id,
         chat_engine_settings=ChatEngineSettings("imagine-la"),
     )
+    DB_SESSIONS[session_id] = session
     logger.info("Found user session for: %s", user_id)
     return session
 
 
-async def _get_user_session(user_id: str) -> UserSession:
-    session = __query_user_session(user_id)
+async def _get_user_session(user_id: str | None, session_id: str) -> UserSession:
+    user_id = user_id or "Anonymous"
+    session = __query_user_session(user_id, session_id)
     # Ensure user exists in Literal AI
     literalai_user = await literalai().api.get_or_create_user(user_id, session.user.__dict__)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
     session.literalai_user_id = literalai_user.id
+    print(f"User {user_id} has LiteralAI ID: {literalai_user.id}")
+    print(
+        f"Session {session.session_id} is associated with LiteralAI thread_id: {session.literalai_thread_id}"
+    )
     return session
 
 
@@ -108,7 +125,7 @@ def _load_chat_history(db_session: db.Session, session_id: str) -> ChatHistory:
 # Make sure to use async functions for faster responses
 @router.get("/engines")
 async def engines(user_id: str) -> list[str]:
-    session = await _get_user_session(user_id)
+    session = await _get_user_session(user_id, "")
     # Example of using Literal AI to log the request and response
     with literalai().thread(name="API:/engines", participant_id=session.literalai_user_id):
         request_msg = literalai().message(
@@ -151,17 +168,8 @@ async def feedback(
         response_id: the response_id of the chatbot response
         comment: user comment for the feedback
         user_id: the user's id
-
-    Returns:
-        FeedbackResponse
-        user_id: the user's id
-        value: 1 if is_positive was "true" and 0 if is_positive was "false"
-        step_id: ID of the step associated with the score
-        comment: the initial user comment for the feedback
     """
-    user_session_id = request.user_id if request.user_id else request.session_id
-
-    session = await _get_user_session(user_session_id)
+    session = await _get_user_session(request.user_id, request.session_id)
     # API endpoint to send feedback https://docs.literalai.com/guides/logs#add-a-score
     response = await literalai().api.create_score(
         step_id=request.response_id,
@@ -242,14 +250,40 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
-    user_session_id = request.user_id if request.user_id else request.session_id
-    session = await _get_user_session(user_session_id)
-    one_line_question = request.message.strip().splitlines()[0] or "API:/query"
+    logger.info("Query request: %s", request)
+    session = await _get_user_session(request.user_id, request.session_id)
+    _validate_session_against_literalai(request, session)
+
+    one_line_question = None
+    if request.new_session:
+        # Only set the LiteralAI thread name if it's a new session; otherwise the thread name will be updated with the last message
+        one_line_question = request.message.strip().splitlines()[0] or "API:/query"
     with (
-        literalai().thread(name=one_line_question, participant_id=session.literalai_user_id),
+        literalai().thread(
+            name=one_line_question,
+            participant_id=session.literalai_user_id,
+            thread_id=session.literalai_thread_id,
+        ),
         app_config.db_session() as db_session,
         db_session.begin(),  # session is auto-committed or rolled back upon exception
     ):
+        # Load history BEFORE adding the new message to the DB
+        chat_history = _load_chat_history(db_session, request.session_id)
+        if request.new_session and chat_history:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot start a new session with an existing session_id: {request.session_id}",
+            )
+        elif not request.new_session and not chat_history:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Chat history for existing session not found: {request.session_id}",
+            )
+        # Now, add message to DB
+        db_session.add(
+            ChatMessage(session_id=request.session_id, role="user", content=request.message)
+        )
+        # Log the message to LiteralAI
         request_msg = literalai().message(
             content=request.message,
             type="user_message",
@@ -257,24 +291,11 @@ async def query(request: QueryRequest) -> QueryResponse:
             metadata={
                 "request": request.__dict__,
                 "user": session.user.__dict__,
+                "chat_history": chat_history,
             },
         )
-        # Load history BEFORE saving the new message
-        chat_history = _load_chat_history(db_session, request.session_id)
-        if request.new_session and chat_history:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Cannot start a new session with existing session_id: {request.session_id}",
-            )
-        elif not request.new_session and not chat_history:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Chat history for existing session not found: {request.session_id}",
-            )
 
-        db_session.add(
-            ChatMessage(session_id=request.session_id, role="user", content=request.message)
-        )
+        _validate_literalai_message(session, request_msg)
 
         engine = get_chat_engine(session)
         response: QueryResponse = await run_query(engine, request.message, chat_history)
@@ -299,6 +320,40 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
+def _validate_session_against_literalai(request, session):
+    thread_id = session.literalai_thread_id
+    # Check if request is consisten with LiteralAI thread
+    if request.new_session:
+        if thread_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot start a new session with an existing session_id: {request.session_id} associated with thread_id: {thread_id}",
+            )
+    else:
+        if not thread_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"LiteralAI thread ID for existing session not found: {request.session_id}",
+            )
+
+
+def _validate_literalai_message(session, request_msg):
+    if not session.literalai_thread_id:
+        if not request_msg.thread_id:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Unexpected: thread_id is not set on LiteralAI message: {request_msg}",
+            )
+        # This is for new sessions
+        session.literalai_thread_id = request_msg.thread_id
+        logger.info("Started new session with thread_id: %s", session.literalai_thread_id)
+    elif session.literalai_thread_id != request_msg.thread_id:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected: LiteralAI thread ID mismatch: {session.literalai_thread_id} != {request_msg.thread_id}",
+        )
+
+
 # Temporarily True until API client handles alert_message field
 INCLUDE_ALERT_IN_RESPONSE = True
 
@@ -306,7 +361,7 @@ INCLUDE_ALERT_IN_RESPONSE = True
 async def run_query(
     engine: ChatEngineInterface, question: str, chat_history: Optional[ChatHistory] = None
 ) -> QueryResponse:
-    logger.info("Received: %s with history: %s", question, chat_history)
+    logger.info("Received: '%s' with history: %s", question, chat_history)
     result = await asyncify(lambda: engine.on_message(question, chat_history))()
     logger.info("Response: %s", result.response)
 
