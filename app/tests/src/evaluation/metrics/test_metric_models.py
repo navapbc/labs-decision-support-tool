@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from src.evaluation.metrics.models.metrics import (
+from src.evaluation.metrics.models import (
     BatchConfig,
     DatasetMetrics,
     EvaluationConfig,

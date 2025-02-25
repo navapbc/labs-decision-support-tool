@@ -2,12 +2,36 @@
 
 import csv
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
+
+from src.retrieve import retrieve_with_scores
 
 from .batch import create_batch_config, filter_questions, stratified_sample
 from .logging import EvaluationLogger
 from .metric_computation import compute_metrics_summary
 from .results import batch_process_results
+
+
+def create_retrieval_function(
+    min_score: Optional[float] = None,
+) -> Callable[[str, int], Sequence[Any]]:
+    """Create a function to retrieve chunks for a question.
+
+    Args:
+        min_score: Optional minimum similarity score for retrieval
+
+    Returns:
+        Function that takes a question and k value and returns retrieved chunks
+    """
+
+    def retrieval_func(query: str, k: int) -> Sequence[Any]:
+        # Default to -1.0 if no min_score provided
+        score_threshold = min_score if min_score is not None else -1.0
+        return retrieve_with_scores(
+            query=query, retrieval_k=k, retrieval_k_min_score=score_threshold
+        )
+
+    return retrieval_func
 
 
 class EvaluationRunner:

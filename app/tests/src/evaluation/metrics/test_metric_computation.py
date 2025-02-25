@@ -1,11 +1,11 @@
 """Tests for metrics computation functions."""
 
-from src.evaluation.metrics.evaluation.metric_computation import (
+from src.evaluation.metrics.metric_computation import (
     compute_dataset_metrics,
     compute_incorrect_analysis,
     compute_metrics_summary,
 )
-from src.evaluation.metrics.models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
+from src.evaluation.metrics.models import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def create_test_result(

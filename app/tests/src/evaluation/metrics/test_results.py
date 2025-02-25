@@ -4,12 +4,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.evaluation.metrics.evaluation.results import (
+from src.evaluation.metrics.models import EvaluationResult, ExpectedChunk, RetrievedChunk
+from src.evaluation.metrics.results import (
     batch_process_results,
     generate_qa_pair_id,
     process_retrieved_chunks,
 )
-from src.evaluation.metrics.models.metrics import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def test_generate_qa_pair_id():
@@ -71,7 +71,7 @@ def test_process_retrieved_chunks_found(mock_question, mock_chunk):
     retrieved_chunks = [mock_chunk]
 
     # Mock the md5 hash to match the expected hash
-    with patch("src.evaluation.metrics.evaluation.results.md5") as mock_md5:
+    with patch("src.evaluation.metrics.results.md5") as mock_md5:
         mock_md5.return_value.hexdigest.return_value = mock_question["content_hash"]
 
         result = process_retrieved_chunks(mock_question, retrieved_chunks, 100.5)
@@ -159,8 +159,8 @@ def test_batch_process_results(mock_question, mock_chunk):
 
     # Mock app_config.db_session and measure_time context managers
     with (
-        patch("src.evaluation.metrics.evaluation.results.app_config") as mock_config,
-        patch("src.evaluation.metrics.evaluation.results.measure_time") as mock_timer,
+        patch("src.evaluation.metrics.results.app_config") as mock_config,
+        patch("src.evaluation.metrics.results.measure_time") as mock_timer,
     ):
         mock_config.db_session.return_value.__enter__.return_value = None
         mock_config.db_session.return_value.__exit__.return_value = None

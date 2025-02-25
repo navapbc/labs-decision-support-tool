@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from src.evaluation.metrics.utils.jsonl_to_csv import (
+from src.evaluation.utils.jsonl_to_csv import (
     convert_batch_results_to_csv,
     convert_results_to_csv,
     explode_result_to_rows,
