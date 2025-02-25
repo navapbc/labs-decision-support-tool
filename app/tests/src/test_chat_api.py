@@ -184,7 +184,7 @@ async def test_run_query__2_citations(subsections):
                     translated_message="",
                     benefit_program="CalFresh",
                     canned_response="",
-                    alert_message="Some alert message.",
+                    alert_message="**Policy update**: Some alert message.\n\nThe rest of this answer may be outdated.",
                 ),
                 chunks_with_scores=[],
                 subsections=subsections,
