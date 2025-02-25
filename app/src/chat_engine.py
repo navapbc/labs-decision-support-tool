@@ -267,6 +267,7 @@ Analyze the user's message to respond with a JSON dictionary populated with the 
 - alert_message: empty string
 - needs_context: True
 - translated_message: empty string
+- benefit_program: empty string
 The canned_response string should be in the same language as the user's question. \
 If canned_response is set to a non-empty string, leave the other JSON fields as their default values.
 
