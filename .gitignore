@@ -25,9 +25,7 @@ docker-compose.override.yml
 # Temporary files created in the container by batch processing
 .files*
 
-# Evaluation result logfiles and local data
-app/src/evaluation/metrics/logs/
-app/src/evaluation/metrics/data/
+# Evaluation data and QA pairs
 app/src/evaluation/data/
 
 # Local development files

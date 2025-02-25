@@ -1,6 +1,7 @@
 """Tests for metrics models."""
 
 from datetime import datetime
+from uuid import UUID
 
 from src.evaluation.data_models import (
     BatchConfig,
@@ -10,6 +11,9 @@ from src.evaluation.data_models import (
     ExpectedChunk,
     IncorrectRetrievalsAnalysis,
     MetricsSummary,
+    QAGenerationInfo,
+    QAPair,
+    QAPairVersion,
     RetrievedChunk,
     SoftwareInfo,
 )
@@ -26,9 +30,17 @@ def test_batch_config_creation():
         package_version="1.0.0",
         git_commit="abc123",
     )
+    qa_generation_info = QAGenerationInfo(
+        version_id="v1",
+        timestamp=datetime.now().isoformat(),
+        llm_model="gpt-4o-mini",
+        total_pairs=100,
+        datasets=["dataset1", "dataset2"],
+    )
     config = BatchConfig(
         evaluation_config=eval_config,
         software_info=software_info,
+        qa_generation_info=qa_generation_info,
     )
 
     # Test that required fields are set
@@ -37,6 +49,8 @@ def test_batch_config_creation():
     assert config.evaluation_config.dataset_filter == ["dataset1", "dataset2"]
     assert config.software_info.package_version == "1.0.0"
     assert config.software_info.git_commit == "abc123"
+    assert config.qa_generation_info.version_id == "v1"
+    assert config.qa_generation_info.llm_model == "gpt-4o-mini"
 
     # Test that auto-generated fields are present
     assert config.batch_id is not None
@@ -50,13 +64,13 @@ def test_expected_chunk():
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
-        content="test content",
+        content="This is the test content",
     )
     assert expected.name == "test_doc"
     assert expected.source == "test_dataset"
     assert expected.chunk_id == "chunk123"
     assert expected.content_hash == "hash456"
-    assert expected.content == "test content"
+    assert expected.content == "This is the test content"
 
 
 def test_retrieved_chunk():
@@ -80,7 +94,7 @@ def test_evaluation_result():
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
-        content="test content",
+        content="This is the test content",
     )
     retrieved_chunk = RetrievedChunk(
         chunk_id="chunk123",
@@ -109,8 +123,8 @@ def test_evaluation_result():
     assert result.rank_if_found == 1
     assert result.retrieval_time_ms == 100.5
     assert result.retrieved_chunks == [retrieved_chunk]
-    assert result.timestamp is not None
     assert result.dataset == "test_dataset"
+    assert result.timestamp is not None
 
 
 def test_dataset_metrics():
@@ -172,3 +186,47 @@ def test_metrics_summary():
     assert isinstance(summary.dataset_metrics["dataset1"], DatasetMetrics)
     assert isinstance(summary.dataset_metrics["dataset2"], DatasetMetrics)
     assert isinstance(summary.incorrect_analysis, IncorrectRetrievalsAnalysis)
+
+
+def test_qa_pair_version():
+    """Test QAPairVersion creation."""
+    version = QAPairVersion(
+        version_id="v1",
+        llm_model="gpt-4o-mini",
+    )
+    assert version.version_id == "v1"
+    assert version.llm_model == "gpt-4o-mini"
+    assert isinstance(version.timestamp, datetime)
+
+
+def test_qa_pair():
+    """Test QAPair creation with all fields."""
+    version = QAPairVersion(
+        version_id="v1",
+        llm_model="gpt-4o-mini",
+    )
+    qa_pair = QAPair(
+        id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+        question="Test question?",
+        answer="Test answer",
+        document_name="test_doc",
+        document_source="test_source",
+        document_id=UUID("123e4567-e89b-12d3-a456-426614174001"),
+        chunk_id=UUID("123e4567-e89b-12d3-a456-426614174002"),
+        content_hash="test_hash",
+        dataset="test_dataset",
+        version=version,
+    )
+
+    # Test that fields are set correctly
+    assert qa_pair.id == UUID("123e4567-e89b-12d3-a456-426614174000")
+    assert qa_pair.question == "Test question?"
+    assert qa_pair.answer == "Test answer"
+    assert qa_pair.document_name == "test_doc"
+    assert qa_pair.document_source == "test_source"
+    assert qa_pair.document_id == UUID("123e4567-e89b-12d3-a456-426614174001")
+    assert qa_pair.chunk_id == UUID("123e4567-e89b-12d3-a456-426614174002")
+    assert qa_pair.content_hash == "test_hash"
+    assert qa_pair.dataset == "test_dataset"
+    assert qa_pair.version == version
+    assert isinstance(qa_pair.created_at, datetime)

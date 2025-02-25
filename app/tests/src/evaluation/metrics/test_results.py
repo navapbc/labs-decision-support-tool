@@ -5,29 +5,23 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
-from src.evaluation.metrics.results import (
-    batch_process_results,
-    generate_qa_pair_id,
-    process_retrieved_chunks,
-)
+from src.evaluation.metrics.results import batch_process_results, process_retrieved_chunks
+from src.evaluation.utils.id_generator import generate_stable_id
 
 
-def test_generate_qa_pair_id():
+def test_generate_stable_id():
     """Test UUID generation for QA pairs."""
     # Test that same inputs generate same UUID
-    uuid1 = generate_qa_pair_id("test question?", "test answer", "test_dataset")
-    uuid2 = generate_qa_pair_id("test question?", "test answer", "test_dataset")
+    uuid1 = str(generate_stable_id("test question?", "test answer"))
+    uuid2 = str(generate_stable_id("test question?", "test answer"))
     assert uuid1 == uuid2
 
     # Test that different inputs generate different UUIDs
-    uuid3 = generate_qa_pair_id("different question?", "test answer", "test_dataset")
+    uuid3 = str(generate_stable_id("different question?", "test answer"))
     assert uuid1 != uuid3
 
-    uuid4 = generate_qa_pair_id("test question?", "different answer", "test_dataset")
+    uuid4 = str(generate_stable_id("test question?", "different answer"))
     assert uuid1 != uuid4
-
-    uuid5 = generate_qa_pair_id("test question?", "test answer", "different_dataset")
-    assert uuid1 != uuid5
 
 
 @pytest.fixture
@@ -39,7 +33,7 @@ def mock_question():
         "answer": "test answer",
         "document_name": "test_doc",
         "dataset": "test_dataset",
-        "chunk_id": "chunk_123",
+        "chunk_id": "123e4567-e89b-12d3-a456-426614174000",
         "content_hash": "abc123",
     }
 
@@ -65,9 +59,11 @@ def mock_chunk():
 def test_process_retrieved_chunks_found(mock_question, mock_chunk):
     """Test processing retrieved chunks when correct chunk is found."""
     # Create a list of retrieved chunks where the first one matches
+    mock_chunk.chunk.id = mock_question["chunk_id"]  # Match the chunk ID
     mock_chunk.chunk.content = (
         "matching content"  # This will generate the same hash as mock_question
     )
+    mock_chunk.score = 0.85
     retrieved_chunks = [mock_chunk]
 
     # Mock the md5 hash to match the expected hash
@@ -161,10 +157,20 @@ def test_batch_process_results(mock_question, mock_chunk):
     with (
         patch("src.evaluation.metrics.results.app_config") as mock_config,
         patch("src.evaluation.metrics.results.measure_time") as mock_timer,
+        patch("src.evaluation.metrics.results.md5") as mock_md5,
     ):
-        mock_config.db_session.return_value.__enter__.return_value = None
+        # Setup mock database session
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter.return_value.first.return_value = None
+        mock_config.db_session.return_value.__enter__.return_value = mock_session
         mock_config.db_session.return_value.__exit__.return_value = None
-        mock_timer.return_value.__enter__.return_value.elapsed_ms.return_value = 100.5
+
+        # Create a mock timer object with elapsed_ms as a method
+        mock_timer_obj = MagicMock()
+        mock_timer_obj.elapsed_ms.return_value = 100.5
+        mock_timer.return_value.__enter__.return_value = mock_timer_obj
+
+        mock_md5.return_value.hexdigest.return_value = mock_question["content_hash"]
 
         results = batch_process_results(questions, mock_retrieval_func, k)
 
@@ -172,4 +178,6 @@ def test_batch_process_results(mock_question, mock_chunk):
         assert len(results) == 1
         assert isinstance(results[0], EvaluationResult)
         assert results[0].question == mock_question["question"]
-        assert results[0].retrieval_time_ms == 100.5
+        assert (
+            abs(results[0].retrieval_time_ms - 100.5) < 0.1
+        )  # Allow small floating point difference

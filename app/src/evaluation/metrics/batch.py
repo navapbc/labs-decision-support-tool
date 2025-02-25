@@ -3,12 +3,14 @@ Batch processing for evaluation runs.
 Not to be confused with batch_process.py (used via the API).
 """
 
-import random
 import subprocess
-from collections import defaultdict
+from pathlib import Path
 from typing import Dict, List, Optional
 
-from src.evaluation.data_models import BatchConfig, EvaluationConfig, SoftwareInfo
+from src.util.sampling import get_stratified_sample
+
+from ..data_models import BatchConfig, EvaluationConfig, QAGenerationInfo, SoftwareInfo
+from ..utils.storage import QAPairStorage
 
 
 def get_git_commit() -> str:
@@ -45,69 +47,66 @@ def get_package_version() -> str:
 
 
 def create_batch_config(
-    k_value: int, dataset_filter: Optional[List[str]] = None, git_commit: Optional[str] = None
+    k_value: int,
+    qa_pairs_path: Path,
+    dataset_filter: Optional[List[str]] = None,
+    git_commit: Optional[str] = None,
 ) -> BatchConfig:
-    """Create a new batch configuration."""
+    """Create a new batch configuration.
+
+    Args:
+        k_value: Number of chunks to retrieve
+        qa_pairs_path: Path to QA pairs CSV file
+        dataset_filter: Optional list of datasets to filter by
+        git_commit: Optional git commit hash
+
+    Returns:
+        BatchConfig with evaluation settings and QA generation metadata
+    """
+    # Get QA generation metadata
+    storage = QAPairStorage(qa_pairs_path.parent.parent)  # Go up two levels to qa_pairs dir
+    version_id = qa_pairs_path.parent.name
+    qa_metadata = storage.get_version_metadata(version_id)
+
+    qa_generation_info = QAGenerationInfo(
+        version_id=qa_metadata["version_id"],
+        timestamp=qa_metadata["timestamp"],
+        llm_model=qa_metadata["llm_model"],
+        total_pairs=qa_metadata["total_pairs"],
+        datasets=qa_metadata["datasets"],
+        git_commit=qa_metadata["git_commit"],
+    )
+
     eval_config = EvaluationConfig(
         k_value=k_value,
         num_samples=0,  # Will be updated when questions are loaded
         dataset_filter=dataset_filter or [],
     )
+
     software_info = SoftwareInfo(
         package_version=get_package_version(),
         git_commit=git_commit or get_git_commit(),
     )
+
     return BatchConfig(
         evaluation_config=eval_config,
         software_info=software_info,
+        qa_generation_info=qa_generation_info,
     )
 
 
 def stratified_sample(
     questions: List[Dict],
-    sample_fraction: float,
-    min_per_dataset: int = 1,
+    sample_fraction: Optional[float] = None,
     random_seed: Optional[int] = None,
 ) -> List[Dict]:
-    """Take a stratified sample of questions based on dataset.
-
-    Args:
-        questions: List of questions to sample from
-        sample_fraction: Fraction of questions to sample (0-1)
-        min_per_dataset: Minimum number of questions per dataset
-        random_seed: Optional seed for random sampling to make runs reproducible
-
-    Returns:
-        Sampled questions maintaining dataset proportions. The sampling is stratified,
-        meaning it maintains the relative proportions of questions from each dataset
-        while ensuring at least min_per_dataset (default: 1) questions from each.
-    """
-    if sample_fraction >= 1.0:
-        return questions
-
-    # Set random seed if provided
-    if random_seed is not None:
-        random.seed(random_seed)
-
-    # Group questions by dataset
-    dataset_groups = defaultdict(list)
-    for q in questions:
-        dataset_groups[q["dataset"]].append(q)
-
-    # Sample from each dataset
-    sampled_questions = []
-    for _, group in dataset_groups.items():
-        sample_size = max(min_per_dataset, int(len(group) * sample_fraction))
-        sampled_questions.extend(random.sample(group, sample_size))
-
-    # Shuffle the combined sample
-    random.shuffle(sampled_questions)
-
-    # Reset random seed
-    if random_seed is not None:
-        random.seed()
-
-    return sampled_questions
+    """Sample questions while maintaining dataset proportions."""
+    return get_stratified_sample(
+        questions,
+        sample_fraction=sample_fraction,
+        random_seed=random_seed,
+        key_func=lambda q: q["dataset"],
+    )
 
 
 def filter_questions(

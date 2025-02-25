@@ -1,4 +1,4 @@
-"""Tests for JSONL to CSV conversion utility."""
+"""Tests for JSONL to CSV conversion utilities."""
 
 import json
 import os

@@ -1,4 +1,4 @@
-"""Tests for metrics computation functions."""
+"""Tests for metric computation functions."""
 
 from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 from src.evaluation.metrics.metric_computation import (
@@ -23,7 +23,7 @@ def create_test_result(
         source=source,
         chunk_id="chunk123",
         content_hash="hash456",
-        content="test content",
+        content="test expected content",
     )
 
     retrieved_chunks = []
@@ -32,7 +32,7 @@ def create_test_result(
             RetrievedChunk(
                 chunk_id=f"chunk{i + 1}",
                 score=score,
-                content="test content",
+                content=f"test retrieved content {i + 1}",
                 content_hash="hash456" if i == 0 and correct else f"hash{i + 1}",
             )
         )

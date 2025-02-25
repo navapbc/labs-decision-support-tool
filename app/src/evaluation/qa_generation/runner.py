@@ -1,4 +1,3 @@
-import csv
 from pathlib import Path
 from typing import List, Optional
 
@@ -8,54 +7,10 @@ from src.app_config import app_config
 from src.db.models.document import Document
 from src.util.sampling import get_stratified_sample
 
+from ..utils.progress import ProgressTracker
+from ..utils.storage import QAPairStorage
 from .config import GenerationConfig
 from .generator import QAGenerator
-
-
-class QAPairStorage:
-    """Writes QA pairs to a CSV file"""
-
-    def __init__(self, output_dir: Path):
-        """Initialize with output directory."""
-        self.output_dir = output_dir
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-
-    def save_qa_pairs(self, qa_pairs: List) -> Path:
-        """Save QA pairs to a CSV file.
-
-        Args:
-            qa_pairs: List of QA pairs to save
-
-        Returns:
-            Path to saved QA pairs CSV
-        """
-        # Create QA pairs CSV file
-        csv_path = self.output_dir / "qa_pairs.csv"
-
-        with open(csv_path, "w", newline="") as f:
-            writer = csv.DictWriter(
-                f,
-                fieldnames=[
-                    "id",
-                    "question",
-                    "answer",
-                    "document_name",
-                    "document_source",
-                    "document_id",
-                    "chunk_id",
-                    "content_hash",
-                    "dataset",
-                    "created_at",
-                    "llm_model",
-                ],
-            )
-            writer.writeheader()
-            for pair in qa_pairs:
-                # Convert dataclass to dict
-                row = pair.__dict__.copy()
-                writer.writerow(row)
-
-        return csv_path
 
 
 def run_generation(
@@ -74,7 +29,7 @@ def run_generation(
         dataset_filter: List of dataset names to include
         sample_fraction: Fraction of documents to sample
         random_seed: Random seed for reproducible sampling
-        git_commit: Git commit hash for tracking generation runs (not used in this simplified version)
+        git_commit: Git commit hash for tracking generation runs
 
     Returns:
         Path to generated QA pairs CSV
@@ -83,8 +38,9 @@ def run_generation(
     if not config.llm_model:
         raise ValueError("No LLM model specified for QA generation")
 
-    # Create generator
-    generator = QAGenerator(config)
+    # Create progress tracker and generator
+    progress = ProgressTracker("QA Generation")
+    generator = QAGenerator(config, progress_tracker=progress)
 
     # Load documents from DB
     with app_config.db_session() as session:
@@ -112,8 +68,19 @@ def run_generation(
 
         # Save QA pairs
         storage = QAPairStorage(output_dir / "qa_pairs")
-        qa_pairs_path = storage.save_qa_pairs(qa_pairs=qa_pairs)
+        qa_pairs_path = storage.save_qa_pairs(
+            qa_pairs=qa_pairs,
+            version_id=config.version_id,
+            git_commit=git_commit,
+        )
 
-        print(f"Generated {len(qa_pairs)} QA pairs")
+        # Log completion stats
+        progress.log_completion(
+            {
+                "Total QA pairs": len(qa_pairs),
+                "Output path": str(qa_pairs_path),
+                "items_processed": len(qa_pairs),
+            }
+        )
 
         return qa_pairs_path

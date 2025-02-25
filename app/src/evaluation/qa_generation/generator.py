@@ -3,8 +3,9 @@
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
 from hashlib import md5
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 from litellm import completion
 
@@ -12,8 +13,9 @@ from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.generate import completion_args
 
-from ..data_models import QAPair
+from ..data_models import QAPair, QAPairVersion
 from ..utils.id_generator import generate_stable_id
+from ..utils.progress import ProgressTracker
 from .config import GenerationConfig, QuestionSource
 
 logger = logging.getLogger(__name__)
@@ -49,6 +51,12 @@ def generate_qa_pairs(
             f"Skipping QA generation for {document_or_chunk} - content or source is None"
         )
         return []
+
+    # Create version info
+    version = QAPairVersion(
+        version_id=datetime.now(UTC).strftime("%Y-%m-%d"),
+        llm_model=llm,
+    )
 
     try:
         response = completion(
@@ -130,8 +138,8 @@ def generate_qa_pairs(
                 document_or_chunk.content.encode("utf-8"), usedforsecurity=False
             ).hexdigest(),
             dataset=document.dataset,
-            llm_model=llm,
             created_at=document.created_at,
+            version=version,
         )
         qa_pairs.append(qa_pair)
 
@@ -139,15 +147,19 @@ def generate_qa_pairs(
 
 
 class QAGenerator:
-    """Handles QA pair generation."""
+    """Handles QA pair generation with progress tracking."""
 
-    def __init__(self, config: GenerationConfig):
-        """Initialize generator with config.
+    def __init__(
+        self, config: GenerationConfig, progress_tracker: Optional[ProgressTracker] = None
+    ):
+        """Initialize generator with config and optional progress tracker.
 
         Args:
             config: Generation configuration
+            progress_tracker: Optional progress tracker for CLI feedback
         """
         self.config = config
+        self.progress = progress_tracker or ProgressTracker("QA Generation")
         self.llm = config.llm_model or app_config.llm
 
     def _get_chunks_to_process(
@@ -162,6 +174,16 @@ class QAGenerator:
                 items.extend((chunk, self.config.questions_per_unit) for chunk in doc.chunks)
         return items
 
+    def _track_progress(self, futures: dict, description: str) -> None:
+        """Track progress of futures if progress tracker is enabled."""
+        if self.progress:
+            self.progress.track_futures(futures, description)
+
+    def _log_completion(self, stats: dict) -> None:
+        """Log completion stats if progress tracker is enabled."""
+        if self.progress:
+            self.progress.log_completion(stats)
+
     def generate_from_documents(self, documents: List[Document]) -> Iterator[QAPair]:
         """Generate QA pairs from documents."""
         items = self._get_chunks_to_process(documents)
@@ -172,6 +194,9 @@ class QAGenerator:
                 executor.submit(generate_qa_pairs, item, num_pairs, self.config.llm_model): item
                 for item, num_pairs in items
             }
+
+            # Track progress of QA generation
+            self._track_progress(futures, "Generating QA pairs")
 
             # Process results as they complete
             qa_pairs = []
@@ -185,4 +210,10 @@ class QAGenerator:
                     logger.error(f"Error generating QA pair: {e}")
                     continue
 
-            logger.info(f"Generated {len(qa_pairs)} QA pairs from {len(items)} items")
+            # Log completion stats
+            self._log_completion(
+                {
+                    "Total QA pairs": len(qa_pairs),
+                    "items_processed": len(items),
+                }
+            )

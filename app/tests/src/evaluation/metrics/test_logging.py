@@ -14,6 +14,7 @@ from src.evaluation.data_models import (
     ExpectedChunk,
     IncorrectRetrievalsAnalysis,
     MetricsSummary,
+    QAGenerationInfo,
     RetrievedChunk,
     SoftwareInfo,
 )
@@ -40,9 +41,18 @@ def test_batch_config():
         package_version="1.0.0",
         git_commit="test123",
     )
+    qa_info = QAGenerationInfo(
+        version_id="test_version",
+        timestamp=datetime.now().isoformat(),
+        llm_model="test_model",
+        total_pairs=100,
+        datasets=["test_dataset"],
+        git_commit="test123",
+    )
     return BatchConfig(
         evaluation_config=eval_config,
         software_info=software_info,
+        qa_generation_info=qa_info,
     )
 
 
@@ -54,12 +64,12 @@ def test_evaluation_result():
         source="test_dataset",
         chunk_id="chunk123",
         content_hash="hash456",
-        content="test content",
+        content="test expected content",
     )
     retrieved_chunk = RetrievedChunk(
         chunk_id="chunk123",
         score=0.85,
-        content="test content",
+        content="test retrieved content",
         content_hash="hash456",
     )
     return EvaluationResult(

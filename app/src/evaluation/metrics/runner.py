@@ -2,34 +2,23 @@
 
 import csv
 import os
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from src.retrieve import retrieve_with_scores
 
+from ..utils.progress import ProgressTracker
 from .batch import create_batch_config, filter_questions, stratified_sample
 from .logging import EvaluationLogger
 from .metric_computation import compute_metrics_summary
 from .results import batch_process_results
 
 
-def create_retrieval_function(
-    min_score: Optional[float] = None,
-) -> Callable[[str, int], Sequence[Any]]:
-    """Create a function to retrieve chunks for a question.
-
-    Args:
-        min_score: Optional minimum similarity score for retrieval
-
-    Returns:
-        Function that takes a question and k value and returns retrieved chunks
-    """
+def create_retrieval_function(min_score: float) -> Callable[[str, int], Sequence[Any]]:
+    """Create retrieval function with configured min_score."""
 
     def retrieval_func(query: str, k: int) -> Sequence[Any]:
-        # Default to -1.0 if no min_score provided
-        score_threshold = min_score if min_score is not None else -1.0
-        return retrieve_with_scores(
-            query=query, retrieval_k=k, retrieval_k_min_score=score_threshold
-        )
+        return retrieve_with_scores(query=query, retrieval_k=k, retrieval_k_min_score=min_score)
 
     return retrieval_func
 
@@ -37,15 +26,22 @@ def create_retrieval_function(
 class EvaluationRunner:
     """Runs evaluation batches and logs results."""
 
-    def __init__(self, retrieval_func: Any, log_dir: str = "logs/evaluations"):
+    def __init__(
+        self,
+        retrieval_func: Any,
+        log_dir: str = "src/evaluation/data/logs/evaluations",
+        progress_tracker: Optional[ProgressTracker] = None,
+    ):
         """Initialize the runner.
 
         Args:
             retrieval_func: Function to retrieve chunks for questions (uses model from app_config)
-            log_dir: Directory for log files
+            log_dir: Directory for log files (defaults to module's data directory)
+            progress_tracker: Optional progress tracker for monitoring
         """
         self.retrieval_func = retrieval_func
         self.log_dir = log_dir
+        self.progress = progress_tracker or ProgressTracker("Evaluation")
 
     def load_questions(self, file_path: str) -> List[Dict]:
         """Load questions from CSV file."""
@@ -53,6 +49,12 @@ class EvaluationRunner:
         try:
             with open(file_path, mode="r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
+                # Verify required headers are present
+                required_headers = {"id", "question", "answer", "document_id", "dataset"}
+                if not reader.fieldnames or not required_headers.issubset(set(reader.fieldnames)):
+                    raise RuntimeError(
+                        f"Invalid CSV format. Required headers: {required_headers}. Found: {reader.fieldnames}"
+                    )
                 questions = list(reader)
                 print(f"Loaded {len(questions)} questions")
                 return questions
@@ -95,7 +97,6 @@ class EvaluationRunner:
             questions = stratified_sample(
                 questions,
                 sample_fraction=sample_fraction,
-                min_per_dataset=1,
                 random_seed=random_seed,
             )
             print(f"After sampling: {len(questions)} questions")
@@ -106,12 +107,13 @@ class EvaluationRunner:
         # Run evaluation for each k value
         for k in k_values:
             print(f"\nEvaluating k={k}")
-            self.run_evaluation_batch(questions, k, dataset_filter, commit)
+            self.run_evaluation_batch(questions, k, questions_file, dataset_filter, commit)
 
     def run_evaluation_batch(
         self,
         questions: List[Dict],
         k: int,
+        qa_pairs_file: str,
         dataset_filter: Optional[List[str]] = None,
         commit: Optional[str] = None,
     ) -> None:
@@ -119,7 +121,10 @@ class EvaluationRunner:
         try:
             # Create batch config
             config = create_batch_config(
-                k_value=k, dataset_filter=dataset_filter, git_commit=commit
+                k_value=k,
+                qa_pairs_path=Path(qa_pairs_file),
+                dataset_filter=dataset_filter,
+                git_commit=commit,
             )
             config.evaluation_config.num_samples = len(questions)
 
@@ -130,8 +135,13 @@ class EvaluationRunner:
                 # Start batch
                 logger.start_batch(config)
 
-                # Process results
-                results = batch_process_results(questions, self.retrieval_func, k)
+                # Process results with progress tracking
+                results = batch_process_results(
+                    questions,
+                    self.retrieval_func,
+                    k,
+                    progress_tracker=self.progress,
+                )
 
                 # Log individual results
                 for result in results:
@@ -161,11 +171,16 @@ def run_evaluation(
     min_score: Optional[float] = None,
     sample_fraction: Optional[float] = None,
     random_seed: Optional[int] = None,
-    log_dir: str = "logs/evaluations",
+    log_dir: str = "src/evaluation/data/logs/evaluations",
     commit: Optional[str] = None,
+    progress_tracker: Optional[ProgressTracker] = None,
 ) -> None:
     """Convenience function to run evaluation."""
-    runner = EvaluationRunner(retrieval_func=retrieval_func, log_dir=log_dir)
+    runner = EvaluationRunner(
+        retrieval_func=retrieval_func,
+        log_dir=log_dir,
+        progress_tracker=progress_tracker,
+    )
     runner.run_evaluation(
         questions_file=questions_file,
         k_values=k_values,

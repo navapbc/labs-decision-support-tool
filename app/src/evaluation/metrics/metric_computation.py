@@ -5,7 +5,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from src.evaluation.data_models import (
+from ..data_models import (
     DatasetMetrics,
     EvaluationResult,
     IncorrectRetrievalsAnalysis,

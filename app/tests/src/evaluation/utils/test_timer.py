@@ -1,4 +1,4 @@
-"""Tests for timer utility."""
+"""Tests for timer utilities."""
 
 import time
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from ..metrics.runner import create_retrieval_function, run_evaluation
 from ..qa_generation.config import GenerationConfig
 from ..qa_generation.runner import run_generation
+from ..utils.storage import QAPairStorage
 
 # Map CLI dataset names to DB dataset names
 DATASET_MAPPING = {
@@ -111,6 +112,7 @@ def main() -> None:
     else:
         db_datasets = None
 
+    # Use consistent base path for both commands
     base_path = args.output_dir if hasattr(args, "output_dir") else Path("src/evaluation/data")
     qa_pairs_dir = base_path / "qa_pairs"
 
@@ -119,7 +121,7 @@ def main() -> None:
         try:
             qa_pairs_path = run_generation(
                 config=config,
-                output_dir=base_path,
+                output_dir=base_path,  # Pass base path, not qa_pairs_dir
                 dataset_filter=db_datasets,
                 sample_fraction=args.sampling,
                 random_seed=args.random_seed,
@@ -137,8 +139,16 @@ def main() -> None:
 
     elif args.command == "evaluate":
         try:
-            # Use the qa_pairs.csv file
-            qa_pairs_path = qa_pairs_dir / "qa_pairs.csv"
+            # Get QA pairs version using same output_dir as generation
+            storage = QAPairStorage(qa_pairs_dir)
+            try:
+                version_id = args.qa_pairs_version or storage.get_latest_version()
+            except ValueError as e:
+                print(f"Error running evaluation: {str(e)}")
+                raise
+
+            version_dir = storage.get_version_path(version_id)
+            qa_pairs_path = version_dir / "qa_pairs.csv"
 
             print(f"Using QA pairs from: {qa_pairs_path}")
 

@@ -8,6 +8,18 @@ from uuid import UUID
 
 
 @dataclass
+class QAGenerationInfo:
+    """Information about the QA pairs used in evaluation."""
+
+    version_id: str
+    timestamp: str
+    llm_model: str
+    total_pairs: int
+    datasets: List[str]
+    git_commit: Optional[str] = None
+
+
+@dataclass
 class EvaluationConfig:
     """Configuration for evaluation parameters."""
 
@@ -30,6 +42,7 @@ class BatchConfig:
 
     evaluation_config: EvaluationConfig
     software_info: SoftwareInfo
+    qa_generation_info: QAGenerationInfo
     batch_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -102,8 +115,17 @@ class MetricsSummary:
 
 # QA Generation Models
 @dataclass
+class QAPairVersion:
+    """Version information for a QA pair set."""
+
+    version_id: str
+    llm_model: str  # Model used for generation
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
 class QAPair:
-    """A question-answer pair."""
+    """A question-answer pair with versioning."""
 
     id: UUID  # Stable ID generated at creation time
     question: str
@@ -114,5 +136,5 @@ class QAPair:
     chunk_id: Optional[UUID]
     content_hash: str
     dataset: str
-    llm_model: str  # Model used for generation
+    version: QAPairVersion
     created_at: datetime = field(default_factory=datetime.utcnow)
