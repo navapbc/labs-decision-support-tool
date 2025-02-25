@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from src.metrics.evaluation.runner import EvaluationRunner, run_evaluation
+from src.evaluation.metrics.evaluation.runner import EvaluationRunner, run_evaluation
 
 
 @pytest.fixture
@@ -72,10 +72,10 @@ def test_run_evaluation_batch(mock_retrieval_func, mock_questions):
     mock_logger = MagicMock()
 
     with (
-        patch("src.metrics.evaluation.runner.create_batch_config") as mock_create_config,
-        patch("src.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls,
-        patch("src.metrics.evaluation.runner.batch_process_results") as mock_process,
-        patch("src.metrics.evaluation.runner.compute_metrics_summary") as mock_compute,
+        patch("src.evaluation.metrics.evaluation.runner.create_batch_config") as mock_create_config,
+        patch("src.evaluation.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls,
+        patch("src.evaluation.metrics.evaluation.runner.batch_process_results") as mock_process,
+        patch("src.evaluation.metrics.evaluation.runner.compute_metrics_summary") as mock_compute,
     ):
         # Setup mocks
         mock_create_config.return_value = mock_config
@@ -120,7 +120,7 @@ def test_run_evaluation_with_sampling(mock_retrieval_func, mock_questions):
     with (
         patch.object(runner, "load_questions", return_value=mock_questions),
         patch.object(runner, "run_evaluation_batch") as mock_run_batch,
-        patch("src.metrics.evaluation.runner.stratified_sample") as mock_sample,
+        patch("src.evaluation.metrics.evaluation.runner.stratified_sample") as mock_sample,
     ):
         # Setup mock sampler
         mock_sample.return_value = [mock_questions[0]]
@@ -152,10 +152,10 @@ def test_run_evaluation_batch_error_handling(mock_retrieval_func, mock_questions
 
     # Test general error in batch processing
     with (
-        patch("src.metrics.evaluation.runner.create_batch_config"),
-        patch("src.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls,
+        patch("src.evaluation.metrics.evaluation.runner.create_batch_config"),
+        patch("src.evaluation.metrics.evaluation.runner.EvaluationLogger") as mock_logger_cls,
         patch(
-            "src.metrics.evaluation.runner.batch_process_results",
+            "src.evaluation.metrics.evaluation.runner.batch_process_results",
             side_effect=Exception("Test error"),
         ),
     ):
@@ -170,7 +170,7 @@ def test_run_evaluation_batch_error_handling(mock_retrieval_func, mock_questions
 
     # Test RuntimeError from batch configuration
     with patch(
-        "src.metrics.evaluation.runner.create_batch_config",
+        "src.evaluation.metrics.evaluation.runner.create_batch_config",
         side_effect=RuntimeError("Failed to get git commit hash"),
     ):
         with pytest.raises(RuntimeError, match="Failed to initialize batch configuration"):
@@ -179,7 +179,7 @@ def test_run_evaluation_batch_error_handling(mock_retrieval_func, mock_questions
 
 def test_convenience_function(mock_retrieval_func):
     """Test the convenience function run_evaluation."""
-    with patch("src.metrics.evaluation.runner.EvaluationRunner") as mock_runner_cls:
+    with patch("src.evaluation.metrics.evaluation.runner.EvaluationRunner") as mock_runner_cls:
         mock_runner = MagicMock()
         mock_runner_cls.return_value = mock_runner
 

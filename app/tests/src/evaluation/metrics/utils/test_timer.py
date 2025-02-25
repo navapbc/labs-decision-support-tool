@@ -2,7 +2,7 @@
 
 import time
 
-from src.metrics.utils.timer import Timer, measure_time
+from src.evaluation.metrics.utils.timer import Timer, measure_time
 
 
 def test_timer_elapsed_ms():

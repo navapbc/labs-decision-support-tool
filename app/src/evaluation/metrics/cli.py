@@ -50,7 +50,7 @@ def main() -> None:
     parser.add_argument(
         "--questions-file",
         type=str,
-        default="src/metrics/data/question_answer_pairs.csv",
+        default="src/evaluation/metrics/data/question_answer_pairs.csv",
         help="Path to questions CSV file",
     )
     parser.add_argument(
@@ -73,9 +73,9 @@ def main() -> None:
     # Set up dataset filter - None means all datasets
     dataset_filter = args.dataset
 
-    # Evaluation results stored in src/metrics/logs/YYYY-MM-DD/
+    # Evaluation results stored in src/evaluation/metrics/logs/YYYY-MM-DD/
     # See README.md for details on log storage and structure
-    log_dir = os.path.join("src", "metrics", "logs")
+    log_dir = os.path.join("src", "evaluation", "metrics", "logs")
     os.makedirs(log_dir, exist_ok=True)
     print(f"Writing logs to: {os.path.abspath(log_dir)}")
 

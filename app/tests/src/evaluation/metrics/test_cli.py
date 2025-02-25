@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.metrics.cli import create_retrieval_function, format_metric_value, main
+from src.evaluation.metrics.cli import create_retrieval_function, format_metric_value, main
 
 
 def test_format_metric_value():
@@ -34,7 +34,7 @@ def test_create_retrieval_function():
     retrieval_func = create_retrieval_function(min_score)
 
     # Mock the retrieve_with_scores function
-    with patch("src.metrics.cli.retrieve_with_scores") as mock_retrieve:
+    with patch("src.evaluation.metrics.cli.retrieve_with_scores") as mock_retrieve:
         mock_retrieve.return_value = ["result1", "result2"]
 
         # Test the created function
@@ -69,8 +69,8 @@ def test_main_dataset_filter(args, expected_dataset_filter):
         )
 
         with (
-            patch("src.metrics.cli.run_evaluation") as mock_run_eval,
-            patch("src.metrics.cli.create_retrieval_function") as mock_create_retrieval,
+            patch("src.evaluation.metrics.cli.run_evaluation") as mock_run_eval,
+            patch("src.evaluation.metrics.cli.create_retrieval_function") as mock_create_retrieval,
             patch("os.makedirs"),
             patch("os.path.join", return_value="test_path"),
             patch("os.listdir", return_value=[]),
@@ -101,8 +101,8 @@ def test_main_k_values(k_values):
         )
 
         with (
-            patch("src.metrics.cli.run_evaluation") as mock_run_eval,
-            patch("src.metrics.cli.create_retrieval_function"),
+            patch("src.evaluation.metrics.cli.run_evaluation") as mock_run_eval,
+            patch("src.evaluation.metrics.cli.create_retrieval_function"),
             patch("os.makedirs"),
             patch("os.path.join", return_value="test_path"),
             patch("os.listdir", return_value=[]),
@@ -143,8 +143,8 @@ def test_main_results_display():
         )
 
         with (
-            patch("src.metrics.cli.run_evaluation"),
-            patch("src.metrics.cli.create_retrieval_function"),
+            patch("src.evaluation.metrics.cli.run_evaluation"),
+            patch("src.evaluation.metrics.cli.create_retrieval_function"),
             patch("os.makedirs"),
             patch("os.path.join", return_value="test_path"),
             patch("os.listdir", return_value=["metrics_123.json"]),
