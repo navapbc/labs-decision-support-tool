@@ -1,10 +1,15 @@
 from sqlalchemy import delete, select
 
 import src.adapters.db as db
-from src.db.models.conversation import ChatMessage
+from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Chunk, Document
 from tests.mock.mock_sentence_transformer import MockSentenceTransformer
-from tests.src.db.models.factories import ChatMessageFactory, ChunkFactory, DocumentFactory
+from tests.src.db.models.factories import (
+    ChatMessageFactory,
+    ChunkFactory,
+    DocumentFactory,
+    UserSessionFactory,
+)
 
 
 def test_document_factory(enable_factory_create, db_session: db.Session):
@@ -40,15 +45,39 @@ def test_chunk_factory(enable_factory_create, db_session: db.Session):
     assert chunk_db_record.mpnet_embedding == MockSentenceTransformer().encode(chunk.content)
 
 
+def test_user_session_factory(enable_factory_create, db_session: db.Session):
+    # Delete UserSession created by other tests
+    db_session.execute(delete(UserSession))
+
+    user_session = UserSessionFactory.create()
+    user_session_record = db_session.execute(select(UserSession)).scalar_one()
+    assert user_session_record.session_id == user_session.session_id
+    assert user_session_record.user_id == user_session.user_id
+    assert user_session_record.chat_engine_id == user_session.chat_engine_id
+    assert user_session_record.lai_thread_id == user_session.lai_thread_id
+    assert user_session_record.created_at == user_session.created_at
+    assert user_session_record.updated_at == user_session.updated_at
+    assert user_session_record.chat_messages == []
+
+
 def test_chat_message_factory(db_session: db.Session, enable_factory_create):
+    # Delete UserSession and ChatMessage records created by other tests
+    db_session.execute(delete(UserSession))
     db_session.execute(delete(ChatMessage))
 
-    # Create some messages
-    ChatMessageFactory.create_batch(4)
+    # Create some messages for the same user session
+    user_session = UserSessionFactory.create()
+    ChatMessageFactory.create_batch(4, session=user_session)
+    assert db_session.query(ChatMessage).count() == 4
+    assert db_session.query(UserSession).count() == 1
+
+    for msg in user_session.chat_messages:
+        assert msg.session_id == user_session.session_id
+        assert msg.session == user_session
 
     # Create messages with a specific session_id to test
-    session_id = "session_10"
-    msgs: list[ChatMessage] = ChatMessageFactory.create_batch(3, session_id=session_id)
+    user_session2 = UserSessionFactory.create()
+    msgs: list[ChatMessage] = ChatMessageFactory.create_batch(3, session=user_session2)
     # Prepend the message content with the index so the ordering is obvious
     for i, msg in enumerate(msgs):
         msg.content = f"Message {i}: {msg.content}"
@@ -60,9 +89,12 @@ def test_chat_message_factory(db_session: db.Session, enable_factory_create):
 
     all_msgs = db_session.scalars(
         select(ChatMessage)
-        .where(ChatMessage.session_id == session_id)
+        .where(ChatMessage.session_id == user_session2.session_id)
         .order_by(ChatMessage.created_at)
     ).all()
     assert len(all_msgs) == 3
     for i, msg in enumerate(all_msgs):
+        assert msg.content.startswith(f"Message {i}: ")
+
+    for i, msg in enumerate(user_session2.chat_messages):
         assert msg.content.startswith(f"Message {i}: ")
