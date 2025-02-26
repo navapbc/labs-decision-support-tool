@@ -146,7 +146,12 @@ def test_api_query__nonexistent_session_id(monkeypatch, client, db_session):
     try:
         client.post(
             "/api/query",
-            json={"user_id": "user8", "session_id": "NewSession999", "new_session": False, "message": "Should fail"},
+            json={
+                "user_id": "user8",
+                "session_id": "NewSession999",
+                "new_session": False,
+                "message": "Should fail",
+            },
         )
         raise AssertionError("Expected HTTPException")
     except HTTPException as e:
@@ -156,7 +161,9 @@ def test_api_query__nonexistent_session_id(monkeypatch, client, db_session):
 
 def test_api_query__bad_request(client, db_session):
     try:
-        client.post("/api/query", json={"user_id": "user7", "session_id": "Session0", "new_session": True})
+        client.post(
+            "/api/query", json={"user_id": "user7", "session_id": "Session0", "new_session": True}
+        )
         raise AssertionError("Expected RequestValidationError")
     except RequestValidationError as e:
         error = e.errors()[0]
