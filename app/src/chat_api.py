@@ -11,7 +11,7 @@ from typing import Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request, Response
-from literalai import AsyncLiteralClient
+from literalai import AsyncLiteralClient, Message
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -102,9 +102,8 @@ async def _get_user_session(user_id: str | None, session_id: str) -> UserSession
     literalai_user = await literalai().api.get_or_create_user(user_id, session.user.__dict__)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
     session.literalai_user_id = literalai_user.id
-    print(f"User {user_id} has LiteralAI ID: {literalai_user.id}")
-    print(
-        f"Session {session.session_id} is associated with LiteralAI thread_id: {session.literalai_thread_id}"
+    logger.info(
+        f"User {user_id!r} session {session_id!r}: LiteralAI thread_id={session.literalai_thread_id}"
     )
     return session
 
@@ -250,7 +249,6 @@ def get_chat_engine(session: UserSession) -> ChatEngineInterface:
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
-    logger.info("Query request: %s", request)
     session = await _get_user_session(request.user_id, request.session_id)
     _validate_session_against_literalai(request, session)
 
@@ -296,6 +294,10 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
 
         _validate_literalai_message(session, request_msg)
+        if not session.literalai_thread_id and request_msg.thread_id:
+            # session.literalai_thread_id is None when request.new_session=True
+            session.literalai_thread_id = request_msg.thread_id
+            logger.info("Started new session with thread_id: %s", session.literalai_thread_id)
 
         engine = get_chat_engine(session)
         response: QueryResponse = await run_query(engine, request.message, chat_history)
@@ -321,33 +323,32 @@ async def query(request: QueryRequest) -> QueryResponse:
 
 
 def _validate_session_against_literalai(request: QueryRequest, session: UserSession) -> None:
-    thread_id = session.literalai_thread_id
-    # Check if request is consisten with LiteralAI thread
-    if request.new_session:
-        if thread_id:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Cannot start a new session '{request.session_id}' that is already associated with thread_id: {thread_id}",
-            )
-    else:
-        if not thread_id:
-            raise HTTPException(
-                status_code=409,
-                detail=f"LiteralAI thread ID for existing session not found: {request.session_id}",
-            )
+    # Check if request is consistent with LiteralAI thread
+    if request.new_session and session.literalai_thread_id:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot start a new session {request.session_id!r} that is "
+                f"already associated with thread_id {session.literalai_thread_id!r}"
+            ),
+        )
+
+    if not request.new_session and not session.literalai_thread_id:
+        raise HTTPException(
+            status_code=409,
+            detail=f"LiteralAI thread ID for existing session {request.session_id!r} not found",
+        )
 
 
-def _validate_literalai_message(session: UserSession, request_msg: ChatMessage) -> None:
-    if not session.literalai_thread_id:
-        if not request_msg.thread_id:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Unexpected: thread_id is not set on LiteralAI message: {request_msg}",
-            )
-        # This is for new sessions
-        session.literalai_thread_id = request_msg.thread_id
-        logger.info("Started new session with thread_id: %s", session.literalai_thread_id)
-    elif session.literalai_thread_id != request_msg.thread_id:
+def _validate_literalai_message(session: UserSession, request_msg: Message) -> None:
+    if not request_msg.thread_id:
+        # Should never happen
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected: thread_id is not set on LiteralAI message: {request_msg}",
+        )
+
+    if session.literalai_thread_id and session.literalai_thread_id != request_msg.thread_id:
         raise HTTPException(
             status_code=500,
             detail=f"Unexpected: LiteralAI thread ID mismatch: {session.literalai_thread_id} != {request_msg.thread_id}",

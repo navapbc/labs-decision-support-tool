@@ -1,7 +1,7 @@
 import logging
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -33,12 +33,7 @@ def mockContextManager():
 
 class MockLiteralAI:
     def __init__(self):
-        self.api = AsyncMock()
-        self.api.get_or_create_user = AsyncMock()
-        self.api.get_or_create_user.return_value = self.api
-        self.api.message = MagicMock()
-        self.api.message.return_value.thread_id = 12345
-        self.api.create_score = AsyncMock()
+        self.api = MockLiteralAIApi()
 
     def thread(self, *args, **kwargs):
         return mockContextManager()
@@ -48,7 +43,7 @@ class MockLiteralAI:
 
     def message(self, *args, **kwargs):
         mock_msg = MagicMock()
-        mock_msg.thread_id = 12345
+        mock_msg.thread_id = "12345"
         return mock_msg
 
 
@@ -80,7 +75,6 @@ class MockLiteralAIApi:
 @pytest.fixture
 def client(monkeypatch):
     lai_mock = MockLiteralAI()
-    lai_mock.api = MockLiteralAIApi()
     monkeypatch.setattr(chat_api, "literalai", lambda: lai_mock)
     return TestClient(router)
 
@@ -117,7 +111,7 @@ def test_api_query(monkeypatch, client, db_session):
         assert e.status_code == 409
         assert (
             e.detail
-            == "Cannot start a new session 'Session0' that is already associated with thread_id: 12345"
+            == "Cannot start a new session 'Session0' that is already associated with thread_id '12345'"
         )
 
     # Test chat history
@@ -141,7 +135,7 @@ def test_api_query__nonexistent_session_id(monkeypatch, client):
         raise AssertionError("Expected HTTPException")
     except HTTPException as e:
         assert e.status_code == 409
-        assert e.detail == "LiteralAI thread ID for existing session not found: NewSession999"
+        assert e.detail == "LiteralAI thread ID for existing session 'NewSession999' not found"
 
 
 def test_api_query__bad_request(client):
