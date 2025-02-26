@@ -13,8 +13,8 @@ from literalai.my_types import ScoreType
 from src import chat_api
 from src.chat_api import (
     ChatEngineSettings,
+    ChatSession,
     QueryResponse,
-    UserInfo,
     UserSession,
     get_chat_engine,
     router,
@@ -79,7 +79,7 @@ def client(monkeypatch):
     return TestClient(router)
 
 
-def test_api_engines(client):
+def test_api_engines(client, db_session):
     response = client.get("/api/engines?user_id=TestUser")
     assert response.status_code == 200
     assert response.json() == ["imagine-la"]
@@ -126,7 +126,7 @@ def test_api_query(monkeypatch, client, db_session):
     )
 
 
-def test_api_query__nonexistent_session_id(monkeypatch, client):
+def test_api_query__nonexistent_session_id(monkeypatch, client, db_session):
     try:
         client.post(
             "/api/query",
@@ -138,7 +138,7 @@ def test_api_query__nonexistent_session_id(monkeypatch, client):
         assert e.detail == "LiteralAI thread ID for existing session 'NewSession999' not found"
 
 
-def test_api_query__bad_request(client):
+def test_api_query__bad_request(client, db_session):
     try:
         client.post("/api/query", json={"session_id": "Session0", "new_session": True})
         raise AssertionError("Expected RequestValidationError")
@@ -230,41 +230,49 @@ async def test_run_query__unknown_citation(subsections, caplog):
 
 
 @pytest.fixture
-def user_info():
-    return UserInfo("TestUser", ["ca-edd-web"])
-
-
-def test_get_chat_engine(user_info):
-    session = UserSession(
-        user=user_info,
+def user_session(user_id: str = "TestUser"):
+    return UserSession(
         session_id="session1",
+        user_id=user_id,
+        lai_thread_id=None,
+        chat_engine_id="imagine-la",
+    )
+
+
+def test_get_chat_engine(user_session):
+    session = ChatSession(
+        user_session=user_session,
+        literalai_user_id="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("ca-edd-web", retrieval_k=6),
+        allowed_engines=["ca-edd-web"],
     )
     engine = get_chat_engine(session)
     assert engine.retrieval_k == 6
 
 
-def test_get_chat_engine__unknown(user_info):
-    session = UserSession(
-        user=user_info,
-        session_id="session1",
+def test_get_chat_engine__unknown(user_session):
+    session = ChatSession(
+        user_session=user_session,
+        literalai_user_id="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("engine_y"),
+        allowed_engines=["ca-edd-web"],
     )
     with pytest.raises(HTTPException, match="Unknown engine: engine_y"):
         get_chat_engine(session)
 
 
-def test_get_chat_engine_not_allowed(user_info):
-    session = UserSession(
-        user=user_info,
-        session_id="session1",
+def test_get_chat_engine_not_allowed(user_session):
+    session = ChatSession(
+        user_session=user_session,
+        literalai_user_id="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("bridges-eligibility-manual"),
+        allowed_engines=["ca-edd-web"],
     )
     with pytest.raises(HTTPException, match="Unknown engine: bridges-eligibility-manual"):
         get_chat_engine(session)
 
 
-def test_post_feedback_success(client):
+def test_post_feedback_success(client, db_session):
     response = client.post(
         "/api/feedback",
         json={
@@ -278,7 +286,7 @@ def test_post_feedback_success(client):
     assert response.status_code == 200
 
 
-def test_post_feedback_fail(monkeypatch, client):
+def test_post_feedback_fail(monkeypatch, client, db_session):
     try:
         client.post(
             "/api/feedback",
