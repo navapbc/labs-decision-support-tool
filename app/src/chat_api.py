@@ -320,14 +320,14 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
-def _validate_session_against_literalai(request, session):
+def _validate_session_against_literalai(request: QueryRequest, session: UserSession) -> None:
     thread_id = session.literalai_thread_id
     # Check if request is consisten with LiteralAI thread
     if request.new_session:
         if thread_id:
             raise HTTPException(
                 status_code=409,
-                detail=f"Cannot start a new session with an existing session_id: {request.session_id} associated with thread_id: {thread_id}",
+                detail=f"Cannot start a new session '{request.session_id}' that is already associated with thread_id: {thread_id}",
             )
     else:
         if not thread_id:
@@ -337,7 +337,7 @@ def _validate_session_against_literalai(request, session):
             )
 
 
-def _validate_literalai_message(session, request_msg):
+def _validate_literalai_message(session: UserSession, request_msg: ChatMessage) -> None:
     if not session.literalai_thread_id:
         if not request_msg.thread_id:
             raise HTTPException(

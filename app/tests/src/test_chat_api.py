@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
@@ -25,12 +26,9 @@ from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory
 
 
-class MockContextManager:
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
+@contextmanager
+def mockContextManager():
+    yield
 
 
 class MockLiteralAI:
@@ -43,24 +41,15 @@ class MockLiteralAI:
         self.api.create_score = AsyncMock()
 
     def thread(self, *args, **kwargs):
-        return MockContextManager()
+        return mockContextManager()
 
     def step(self, *args, **kwargs):
-        return MockContextManager()
+        return mockContextManager()
 
     def message(self, *args, **kwargs):
         mock_msg = MagicMock()
         mock_msg.thread_id = 12345
-        print(f"-----  Mock message: {mock_msg}")
         return mock_msg
-
-
-@pytest.fixture
-def client(monkeypatch):
-    lai_mock = MockLiteralAI()
-    lai_mock.api = MockLiteralAIApi()
-    monkeypatch.setattr(chat_api, "literalai", lambda: lai_mock)
-    return TestClient(router)
 
 
 class MockLiteralAIApi:
@@ -86,6 +75,14 @@ class MockLiteralAIApi:
             dataset_experiment_item_id=None,
             tags=None,
         )
+
+
+@pytest.fixture
+def client(monkeypatch):
+    lai_mock = MockLiteralAI()
+    lai_mock.api = MockLiteralAIApi()
+    monkeypatch.setattr(chat_api, "literalai", lambda: lai_mock)
+    return TestClient(router)
 
 
 def test_api_engines(client):
@@ -120,7 +117,7 @@ def test_api_query(monkeypatch, client, db_session):
         assert e.status_code == 409
         assert (
             e.detail
-            == "Cannot start a new session with an existing session_id: Session0 associated with thread_id: 12345"
+            == "Cannot start a new session 'Session0' that is already associated with thread_id: 12345"
         )
 
     # Test chat history
