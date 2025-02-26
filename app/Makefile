@@ -278,7 +278,7 @@ ingest-runner: ## Ingest scrapings into DB: `make ingest-runner args="dataset"`
 ##################################################
 
 evaluate: ## Run evaluation with configurable parameters
-	$(PY_RUN_CMD) python -m src.evaluation.cli.main evaluate \
+	$(PY_RUN_CMD) python -m src.evaluation.cli.evaluate \
 		$(if $(dataset),--dataset $(dataset),) \
 		$(if $(k),--k $(k),) \
 		$(if $(qa_pairs_version),--qa-pairs-version=$(qa_pairs_version),) \
@@ -289,7 +289,7 @@ evaluate: ## Run evaluation with configurable parameters
 		--commit=$(shell git rev-parse HEAD)
 
 generate-qa: ## Generate QA pairs from documents
-	$(PY_RUN_CMD) python -m src.evaluation.cli.main generate \
+	$(PY_RUN_CMD) python -m src.evaluation.cli.generate \
 		$(if $(dataset),--dataset $(dataset),) \
 		$(if $(output_dir),--output-dir $(output_dir),) \
 		$(if $(llm),--llm $(llm),) \
