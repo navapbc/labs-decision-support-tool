@@ -107,11 +107,10 @@ def __get_or_create_chat_session(
 
 
 async def _get_chat_session(
-    user_id: str | None,
+    user_id: str,
     session_id: str | None,
     user_meta: Optional[dict] = None,
 ) -> ChatSession:
-    user_id = user_id or "NOT_PROVIDED"  # Temporary until user_id is required
     # Ensure user exists in Literal AI
     literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
@@ -172,11 +171,11 @@ async def engines(user_id: str) -> list[str]:
 
 
 class FeedbackRequest(BaseModel):
+    user_id: str
     session_id: str
     response_id: str  # id of the chatbot response this feedback is about
     is_positive: bool  # if chatbot response answer is helpful or not
     comment: Optional[str] = None  # user comment for the feedback
-    user_id: Optional[str] = None
 
 
 @router.post("/feedback")
@@ -184,11 +183,10 @@ async def feedback(
     request: FeedbackRequest,
 ) -> Response:
     """Endpoint for creating feedback for a chatbot response message"""
-    session = await _get_chat_session(request.user_id, request.session_id)
     # API endpoint to send feedback https://docs.literalai.com/guides/logs#add-a-score
     response = await literalai().api.create_score(
         step_id=request.response_id,
-        name=request.user_id or session.user_session.user_id,
+        name=request.user_id,
         type="HUMAN",
         value=1 if request.is_positive else 0,
         comment=request.comment,
@@ -208,8 +206,7 @@ class QueryRequest(BaseModel):
     session_id: str
     new_session: bool
     message: str
-
-    user_id: Optional[str] = None
+    user_id: str
     agency_id: Optional[str] = None
     beneficiary_id: Optional[str] = None
 

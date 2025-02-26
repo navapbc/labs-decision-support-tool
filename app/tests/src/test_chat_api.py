@@ -95,7 +95,13 @@ def test_api_query(monkeypatch, client, db_session):
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
 
     response = client.post(
-        "/api/query", json={"session_id": "Session0", "new_session": True, "message": "Hello"}
+        "/api/query",
+        json={
+            "user_id": "user9",
+            "session_id": "Session0",
+            "new_session": True,
+            "message": "Hello",
+        },
     )
     assert response.status_code == 200
     assert response.json()["response_text"] == "Response from LLM: []"
@@ -104,7 +110,12 @@ def test_api_query(monkeypatch, client, db_session):
     try:
         client.post(
             "/api/query",
-            json={"session_id": "Session0", "new_session": True, "message": "Hello again"},
+            json={
+                "user_id": "user9",
+                "session_id": "Session0",
+                "new_session": True,
+                "message": "Hello again",
+            },
         )
         raise AssertionError("Expected HTTPException")
     except HTTPException as e:
@@ -117,7 +128,12 @@ def test_api_query(monkeypatch, client, db_session):
     # Test chat history
     response = client.post(
         "/api/query",
-        json={"session_id": "Session0", "new_session": False, "message": "Hello again"},
+        json={
+            "user_id": "user9",
+            "session_id": "Session0",
+            "new_session": False,
+            "message": "Hello again",
+        },
     )
     assert response.status_code == 200
     assert (
@@ -130,7 +146,12 @@ def test_api_query__nonexistent_session_id(monkeypatch, client, db_session):
     try:
         client.post(
             "/api/query",
-            json={"session_id": "NewSession999", "new_session": False, "message": "Should fail"},
+            json={
+                "user_id": "user8",
+                "session_id": "NewSession999",
+                "new_session": False,
+                "message": "Should fail",
+            },
         )
         raise AssertionError("Expected HTTPException")
     except HTTPException as e:
@@ -140,7 +161,9 @@ def test_api_query__nonexistent_session_id(monkeypatch, client, db_session):
 
 def test_api_query__bad_request(client, db_session):
     try:
-        client.post("/api/query", json={"session_id": "Session0", "new_session": True})
+        client.post(
+            "/api/query", json={"user_id": "user7", "session_id": "Session0", "new_session": True}
+        )
         raise AssertionError("Expected RequestValidationError")
     except RequestValidationError as e:
         error = e.errors()[0]
@@ -277,6 +300,7 @@ def test_post_feedback_success(client, db_session):
         "/api/feedback",
         json={
             "session_id": "Session2",
+            "user_id": "user2",
             "is_positive": "true",
             "response_id": "response_id0",
             "comment": "great answer",
@@ -292,6 +316,7 @@ def test_post_feedback_fail(monkeypatch, client, db_session):
             "/api/feedback",
             json={
                 "session_id": "Session2",
+                "user_id": "user2",
                 "is_positive": "true",
                 "comment": "great answer",
             },
