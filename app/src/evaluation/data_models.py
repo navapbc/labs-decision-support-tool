@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
+from uuid import UUID
 
 
 @dataclass
@@ -41,6 +42,7 @@ class ExpectedChunk:
     source: str
     chunk_id: str
     content_hash: str
+    content: str  # The actual text content of the chunk
 
 
 @dataclass
@@ -65,6 +67,7 @@ class EvaluationResult:
     rank_if_found: Optional[int]
     retrieval_time_ms: float
     retrieved_chunks: List[RetrievedChunk]
+    dataset: str  # Dataset name for this QA pair
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -95,3 +98,21 @@ class MetricsSummary:
     overall_metrics: Dict[str, float]
     dataset_metrics: Dict[str, DatasetMetrics]
     incorrect_analysis: IncorrectRetrievalsAnalysis
+
+
+# QA Generation Models
+@dataclass
+class QAPair:
+    """A question-answer pair."""
+
+    id: UUID  # Stable ID generated at creation time
+    question: str
+    answer: str
+    document_name: str
+    document_source: str
+    document_id: UUID
+    chunk_id: Optional[UUID]
+    content_hash: str
+    dataset: str
+    llm_model: str  # Model used for generation
+    created_at: datetime = field(default_factory=datetime.utcnow)

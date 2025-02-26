@@ -6,8 +6,9 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Any, Optional, TextIO
 
+from src.evaluation.data_models import BatchConfig, EvaluationResult, MetricsSummary
+
 from ..utils.jsonl_to_csv import convert_results_to_csv
-from .models import BatchConfig, EvaluationResult, MetricsSummary
 
 
 class EvaluationLogger:

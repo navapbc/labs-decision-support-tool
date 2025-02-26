@@ -1,11 +1,11 @@
 """Tests for metrics computation functions."""
 
+from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 from src.evaluation.metrics.metric_computation import (
     compute_dataset_metrics,
     compute_incorrect_analysis,
     compute_metrics_summary,
 )
-from src.evaluation.metrics.models import EvaluationResult, ExpectedChunk, RetrievedChunk
 
 
 def create_test_result(
@@ -23,6 +23,7 @@ def create_test_result(
         source=source,
         chunk_id="chunk123",
         content_hash="hash456",
+        content="test content",
     )
 
     retrieved_chunks = []
@@ -45,6 +46,7 @@ def create_test_result(
         rank_if_found=rank if correct else None,
         retrieval_time_ms=100.5,
         retrieved_chunks=retrieved_chunks,
+        dataset=source,
     )
 
 

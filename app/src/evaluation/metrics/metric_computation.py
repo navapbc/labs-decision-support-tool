@@ -5,7 +5,12 @@ from typing import Dict, List
 
 import numpy as np
 
-from .models import DatasetMetrics, EvaluationResult, IncorrectRetrievalsAnalysis, MetricsSummary
+from src.evaluation.data_models import (
+    DatasetMetrics,
+    EvaluationResult,
+    IncorrectRetrievalsAnalysis,
+    MetricsSummary,
+)
 
 
 def compute_dataset_metrics(results: List[EvaluationResult]) -> DatasetMetrics:
