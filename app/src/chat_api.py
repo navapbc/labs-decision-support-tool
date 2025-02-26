@@ -81,7 +81,7 @@ def __query_user_session(user_id: str, session_id: str) -> UserSession:
     """
     FIXME: Placeholder for creating/retrieving user's session from the DB, including settings and constraints
     """
-    if session_id in DB_SESSIONS:
+    if session_id and session_id in DB_SESSIONS:
         logger.info("Found user session for: %s", user_id)
         return DB_SESSIONS[session_id]
 
@@ -95,9 +95,9 @@ def __query_user_session(user_id: str, session_id: str) -> UserSession:
     return session
 
 
-async def _get_user_session(user_id: str | None, session_id: str) -> UserSession:
+async def _get_user_session(user_id: str | None, session_id: str | None) -> UserSession:
     user_id = user_id or "Anonymous"
-    session = __query_user_session(user_id, session_id)
+    session = __query_user_session(user_id, session_id or "")
     # Ensure user exists in Literal AI
     literalai_user = await literalai().api.get_or_create_user(user_id, session.user.__dict__)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
@@ -124,7 +124,7 @@ def _load_chat_history(db_session: db.Session, session_id: str) -> ChatHistory:
 # Make sure to use async functions for faster responses
 @router.get("/engines")
 async def engines(user_id: str) -> list[str]:
-    session = await _get_user_session(user_id, "")
+    session = await _get_user_session(user_id, None)
     # Example of using Literal AI to log the request and response
     with literalai().thread(name="API:/engines", participant_id=session.literalai_user_id):
         request_msg = literalai().message(
