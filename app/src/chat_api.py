@@ -61,7 +61,7 @@ class ChatEngineSettings:
 @dataclass
 class ChatSession:
     user_session: UserSession
-    # This user ID is always retrieved from LiteralAI
+    # This user ID is always retrieved from LiteralAI so it doesn't need to be stored in the DB
     literalai_user_id: str
     chat_engine_settings: ChatEngineSettings
     allowed_engines: list[str]
@@ -71,8 +71,6 @@ def __get_or_create_chat_session(
     user_id: str, session_id: str | None, literalai_user_id: str
 ) -> ChatSession:
     "Creating/retrieving user's session from the DB"
-    if not session_id:
-        session_id = str(uuid.uuid4())
     if user_session := _load_user_session(session_id):
         logger.info("Found user session %r for: %s", session_id, user_id)
         if user_session.user_id != user_id:
@@ -86,13 +84,12 @@ def __get_or_create_chat_session(
             chat_engine_settings=ChatEngineSettings(user_session.chat_engine_id),
             allowed_engines=["imagine-la"],
         )
-
     with (
         app_config.db_session() as db_session,
         db_session.begin(),  # session is auto-committed or rolled back upon exception
     ):
         user_session = UserSession(
-            session_id=session_id,
+            session_id=session_id or str(uuid.uuid4()),
             user_id=user_id,
             chat_engine_id="imagine-la",
             lai_thread_id=None,
