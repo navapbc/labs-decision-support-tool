@@ -173,9 +173,9 @@ async def engines(user_id: str) -> list[str]:
 
 class FeedbackRequest(BaseModel):
     session_id: str
-    is_positive: bool
-    response_id: str
-    comment: Optional[str] = None
+    response_id: str  # id of the chatbot response this feedback is about
+    is_positive: bool  # if chatbot response answer is helpful or not
+    comment: Optional[str] = None  # user comment for the feedback
     user_id: Optional[str] = None
 
 
@@ -183,20 +183,12 @@ class FeedbackRequest(BaseModel):
 async def feedback(
     request: FeedbackRequest,
 ) -> Response:
-    """Endpoint for creating feedback for a chatbot response message
-
-    Args:
-        request (FeedbackRequest):
-        session_id: the session id, used if user_id is None
-        is_positive: if chatbot response answer is helpful or not
-        response_id: the response_id of the chatbot response
-        comment: user comment for the feedback
-        user_id: the user's id
-    """
+    """Endpoint for creating feedback for a chatbot response message"""
+    session = await _get_chat_session(request.user_id, request.session_id)
     # API endpoint to send feedback https://docs.literalai.com/guides/logs#add-a-score
     response = await literalai().api.create_score(
         step_id=request.response_id,
-        name=request.user_id or request.session_id,
+        name=request.user_id or session.user_session.user_id,
         type="HUMAN",
         value=1 if request.is_positive else 0,
         comment=request.comment,
