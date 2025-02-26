@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from litellm.main import ModelResponse
+from pydantic import ValidationError
 
 from src.evaluation.data_models import QAPair
 from src.evaluation.qa_generation.config import GenerationConfig, QuestionSource
@@ -76,7 +77,10 @@ def test_generate_qa_pair_invalid_json():
     message.content = "This is not valid JSON"
     response.choices = [MagicMock(message=message)]
 
-    with patch("src.evaluation.qa_generation.generator.completion", return_value=response):
+    with patch("src.evaluation.qa_generation.generator.completion", return_value=response), patch(
+        "src.evaluation.qa_generation.generator.QAPairResponse.model_validate_json",
+        side_effect=ValidationError.from_exception_data("test", []),
+    ):
         pairs = generate_qa_pair(document)
 
         assert len(pairs) == 0  # Should return empty list for invalid JSON
@@ -92,7 +96,10 @@ def test_generate_qa_pair_missing_fields():
     )
     response.choices = [MagicMock(message=message)]
 
-    with patch("src.evaluation.qa_generation.generator.completion", return_value=response):
+    with patch("src.evaluation.qa_generation.generator.completion", return_value=response), patch(
+        "src.evaluation.qa_generation.generator.QAPairResponse.model_validate_json",
+        side_effect=ValidationError.from_exception_data("test", []),
+    ):
         pairs = generate_qa_pair(document)
 
         assert len(pairs) == 0  # Should return empty list for missing fields
@@ -138,10 +145,7 @@ def test_qa_generator_init():
 
 def test_qa_generator_generate_from_documents_document_level(mock_completion_response):
     """Test generating QA pairs from documents at document level."""
-    documents = [
-        DocumentFactory.build(content=f"Test document {i} content", source="test_source")
-        for i in range(2)
-    ]
+    documents = DocumentFactory.build_batch(2)
     config = GenerationConfig(question_source=QuestionSource.DOCUMENT)
     generator = QAGenerator(config)
 
@@ -184,10 +188,7 @@ def test_qa_generator_generate_from_documents_chunk_level(mock_completion_respon
 
 def test_qa_generator_generate_from_documents_with_errors():
     """Test error handling during generation."""
-    documents = [
-        DocumentFactory.build(content=f"Test document {i} content", source="test_source")
-        for i in range(2)
-    ]
+    documents = DocumentFactory.build_batch(2)
     config = GenerationConfig(question_source=QuestionSource.DOCUMENT)
     generator = QAGenerator(config)
 

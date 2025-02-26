@@ -1,12 +1,12 @@
 """QA pair generation functionality."""
 
-import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from hashlib import md5
 from typing import Iterator, List
 
 from litellm import completion
+from pydantic import BaseModel, Field
 
 from src.app_config import app_config
 from src.db.models.document import Chunk, Document
@@ -17,14 +17,17 @@ from .config import GenerationConfig, QuestionSource
 
 logger = logging.getLogger(__name__)
 
+
+class QAPairResponse(BaseModel):
+    """Pydantic model for QA pair response from LLM."""
+
+    question: str = Field(..., description="A specific question based on the content")
+    answer: str = Field(..., description="A clear and accurate answer from the content")
+
+
 GENERATE_QUESTION_ANSWER_PROMPT = """
-Using the provided text, generate unique questions and answers, avoid rephrasing or changing the punctuation of the question to ensure distinct questions and answers.
-Respond with a single JSON dictionary in the following format:
-{
-  "question": "A specific question based on the content",
-  "answer": "A clear and accurate answer from the content"
-}
-Do not include any additional formatting, newlines, or text outside the JSON.
+Using the provided text, generate a unique question and answer, avoid rephrasing or changing the punctuation of the question to ensure distinct questions and answers.
+Respond with a single question-answer pair based on the content in JSON format with 'question' and 'answer' fields.
 """
 
 MAX_WORKERS = 5  # Limit concurrent API calls
@@ -56,65 +59,29 @@ def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-min
                     "role": "system",
                 },
                 {
-                    "content": f"Please create one high-quality question-answer pair from this content: {document_or_chunk.content}",
+                    "content": f"Please create one high-quality question-answer pair from this content and format it as JSON: {document_or_chunk.content}",
                     "role": "user",
                 },
             ],
             temperature=app_config.temperature,
+            response_format={"type": "json_object"},
             **completion_args(llm),
         )
 
         content = response.choices[0].message.content
-        # Clean up the response
-        content = content.strip()
 
-        # Handle different JSON formats
-        # Try parsing as a list first
-        if content.startswith("["):
-            generated_pairs = json.loads(content)
-        # Try parsing as a single object
-        elif content.startswith("{"):
-            generated_pairs = [json.loads(content)]
-        else:
-            # Try parsing each line as a separate JSON object
-            generated_pairs = []
-            for line in content.split("\n"):
-                line = line.strip()
-                if line and line.startswith("{"):
-                    try:
-                        pair = json.loads(line)
-                        generated_pairs.append(pair)
-                    except json.JSONDecodeError:
-                        continue
-
-        # Validate required fields
-        valid_pairs = []
-        for pair in generated_pairs:
-            if "question" in pair and "answer" in pair:
-                valid_pairs.append(pair)
-        generated_pairs = valid_pairs
-
-        if not generated_pairs:
-            logger.error(f"No valid QA pair found in response: {content}")
+        # Parse the response using Pydantic
+        try:
+            qa_response = QAPairResponse.model_validate_json(content)
+        except Exception as e:
+            logger.error(f"Failed to parse LLM response: {content}")
+            logger.error(f"Error: {e}")
             return []
 
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse LLM response: {content}")
-        logger.error(f"Error: {e}")
-        return []
-    except Exception as e:
-        logger.error(f"Unexpected error processing response: {e}")
-        if hasattr(e, "response"):
-            logger.error(f"Response content: {e.response}")
-        return []
-
-    qa_pairs: List[QAPair] = []
-
-    # Process each generated pair
-    for pair in generated_pairs:
+        # Create QAPair from the validated response
         qa_pair = QAPair(
-            question=pair["question"],
-            answer=pair["answer"],
+            question=qa_response.question,
+            answer=qa_response.answer,
             document_name=document.name,
             document_source=document.source,
             document_id=document.id,
@@ -126,9 +93,14 @@ def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-min
             llm_model=llm,
             created_at=document.created_at,
         )
-        qa_pairs.append(qa_pair)
 
-    return qa_pairs
+        return [qa_pair]
+
+    except Exception as e:
+        logger.error(f"Unexpected error processing response: {e}")
+        if hasattr(e, "response"):
+            logger.error(f"Response content: {e.response}")
+        return []
 
 
 class QAGenerator:
