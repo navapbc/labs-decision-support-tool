@@ -14,55 +14,48 @@ The metrics module allows you to:
 
 ### Setup
 
-Before running evaluations, you'll need the questions CSV file:
-1. Download the questions file from [this Google Sheet](https://docs.google.com/spreadsheets/d/1KBFMyRUSohqA94ic6yAv3Ne22GwEBJHHYHM49rEKFsc/edit?usp=sharing)
-2. Save it as `question_answer_pairs.csv` in `app/src/evaluation/metrics/data/`
+The metrics module works in conjunction with the QA generation module. Before running evaluations:
 
-#### Input CSV Format
+1. Generate QA pairs using the QA generation module:
+```bash
+make generate-qa dataset="imagine_la" llm="gpt-4o-mini"
+```
 
-The questions CSV file should have the following columns:
-- question: The question text
-- answer: Expected answer text
-- document_name: Name of source document
-- dataset: Dataset identifier (e.g., "Imagine LA")
-- chunk_id: ID of chunk containing answer
-- content_hash: Hash of chunk content for verification
+2. The generated QA pairs will be stored in:
+   `app/src/evaluation/data/qa_pairs/YYYYMMDD_HHMMSS/qa_pairs.csv`
+
+The generation process automatically maintains a `latest` symlink to the most recent QA pairs. This is what the evaluation module uses by default when no specific version is provided.
 
 ### Command Line Interface
 
-The `src.metrics.cli` module provides a CLI for running evaluations:
+The evaluation CLI provides commands for both generation and evaluation:
 
 ```bash
-# Evaluate all datasets with default k values
-make run-evaluation
+# Generate QA pairs for specific dataset
+make generate-qa dataset="imagine_la" llm="gpt-4o-mini" sampling=0.1
 
-# Evaluate a single dataset
-make run-evaluation dataset="imagine_la"
+# Evaluate using latest QA pairs
+make evaluate dataset="imagine_la" k="5 10 25"
 
-# Evaluate multiple datasets with specific k values
-make run-evaluation dataset="imagine_la la_policy" k="5 10 25"
-
-# Evaluate all datasets with sampling
-make run-evaluation sampling=0.1
+# Evaluate specific QA pairs version
+make evaluate dataset="imagine_la" qa_pairs_version="20240220_123456"
 ```
 
 Arguments:
-- `dataset`: Optional. One or more datasets to evaluate (e.g., "imagine_la la_policy"). If not specified, evaluates all available datasets. Currently supports:
-  - `imagine_la`: Imagine LA dataset
+- `dataset`: Optional. One or more datasets (e.g., "imagine_la la_policy"). Currently supports:
+  - `imagine_la`: Imagine LA Benefits Information Hub dataset
   - `la_policy`: LA County Policy dataset
 - `k`: One or more k values to evaluate (default: "5 10 25")
-- `questions_file`: Path to questions CSV file (default: src/evaluation/metrics/data/question_answer_pairs.csv)
+- `qa_pairs_version`: Optional version ID of QA pairs to evaluate (defaults to latest)
 - `min_score`: Minimum similarity score for retrieval (default: -1.0)
 - `sampling`: Fraction of questions to sample (e.g., 0.1) for each specified dataset (default: 1.0)
 - `random_seed`: Random seed for reproducible sampling (only used if sampling is specified)
-
-### Log Storage
-
-By default, evaluation logs and data are stored in:
-- `app/src/evaluation/metrics/data/` - Contains the generated QA files used for evaluation
-- `app/src/evaluation/metrics/logs/YYYY-MM-DD/` - Contains all evaluation run logs
+- `output_dir`: Base directory for storing results (default: src/evaluation/data)
 
 ### Log File Structure
+
+Evaluation logs are stored in:
+- `app/src/evaluation/data/logs/evaluations/YYYY-MM-DD/` - Evaluation logs
 
 Each evaluation run creates four files in the logs directory:
 
@@ -79,6 +72,14 @@ Each evaluation run creates four files in the logs directory:
   "software_info": {
     "package_version": "0.1.0",
     "git_commit": "abc123"
+  },
+  "qa_generation_info": {
+    "version_id": "20240220_123456",
+    "timestamp": "2024-02-20T12:34:56",
+    "llm_model": "gpt-4o-mini",
+    "total_pairs": 1000,
+    "datasets": ["..."],
+    "git_commit": "def456"
   }
 }
 ```
@@ -93,7 +94,8 @@ Each evaluation run creates four files in the logs directory:
     "name": "document.pdf",
     "source": "imagine_la",
     "chunk_id": "123",
-    "content_hash": "abc..."
+    "content_hash": "abc...",
+    "content": "..."
   },
   "evaluation_result": {
     "correct_chunk_retrieved": true,
@@ -107,17 +109,10 @@ Each evaluation run creates four files in the logs directory:
       "content": "...",
       "content_hash": "abc..."
     }
-  ]
+  ],
+  "dataset": "imagine_la"
 }
 ```
-
-Note: The `qa_pair_id` is deterministic to question, answer, and dataset content. This ensures:
-- Same QA pair gets same ID across different eval runs
-- IDs change if question/answer content changes
-- IDs are unique across different datasets
-- Valid until:
-  - QA pair generation module is implemented
-  - We move to multiple ground truths per question (in which case we may remove dataset from UUID)
 
 3. `results_${UUID}.csv` - Flattened version of `results_${UUID}.jsonl` for analysis:
 - One row per retrieved chunk
@@ -134,6 +129,7 @@ The CSV contains the following columns:
 - `retrieved_content`: Content of the retrieved chunk
 - `retrieved_content_hash`: Hash of the retrieved chunk content
 - `expected_chunk_content_hash`: Hash of the expected (ground truth) chunk content
+- `expected_chunk_content`: Content of expected chunk
 - `expected_chunk_name`: Name of the expected source document
 - `expected_chunk_source`: Source dataset of the expected chunk
 - `expected_chunk_id`: ID of the expected chunk
