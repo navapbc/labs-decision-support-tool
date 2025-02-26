@@ -97,9 +97,7 @@ def test_qa_pair_storage_save_qa_pairs(mock_qa_pairs, tmp_path):
 
 def test_run_generation_basic(mock_documents, mock_qa_pairs, tmp_path):
     """Test basic run_generation functionality."""
-    config = GenerationConfig(
-        question_source=QuestionSource.DOCUMENT, questions_per_unit=1, llm_model="gpt-4o-mini"
-    )
+    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, llm_model="gpt-4o-mini")
     output_dir = tmp_path / "qa_output"
 
     with (
@@ -141,9 +139,7 @@ def test_run_generation_basic(mock_documents, mock_qa_pairs, tmp_path):
 
 def test_run_generation_with_dataset_filter(mock_documents, mock_qa_pairs, tmp_path):
     """Test run_generation with dataset filter."""
-    config = GenerationConfig(
-        question_source=QuestionSource.DOCUMENT, questions_per_unit=1, llm_model="gpt-4o-mini"
-    )
+    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, llm_model="gpt-4o-mini")
     output_dir = tmp_path / "qa_output"
     dataset_filter = ["Dataset 1"]
 
@@ -184,9 +180,7 @@ def test_run_generation_with_dataset_filter(mock_documents, mock_qa_pairs, tmp_p
 
 def test_run_generation_with_sampling(mock_documents, mock_qa_pairs, tmp_path):
     """Test run_generation with sampling."""
-    config = GenerationConfig(
-        question_source=QuestionSource.DOCUMENT, questions_per_unit=1, llm_model="gpt-4o-mini"
-    )
+    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, llm_model="gpt-4o-mini")
     output_dir = tmp_path / "qa_output"
     sample_fraction = 0.5
     random_seed = 42
@@ -242,9 +236,7 @@ def test_run_generation_with_sampling(mock_documents, mock_qa_pairs, tmp_path):
 
 def test_run_generation_no_documents(tmp_path):
     """Test run_generation with no documents found."""
-    config = GenerationConfig(
-        question_source=QuestionSource.DOCUMENT, questions_per_unit=1, llm_model="gpt-4o-mini"
-    )
+    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, llm_model="gpt-4o-mini")
     output_dir = tmp_path / "qa_output"
 
     with (

@@ -29,7 +29,6 @@ def test_generation_config_defaults():
     assert config.sample_fraction is None
     assert config.random_seed is None
     assert config.question_source == QuestionSource.CHUNK
-    assert config.questions_per_unit == 1
 
 
 def test_generation_config_custom_values():
@@ -41,7 +40,6 @@ def test_generation_config_custom_values():
         sample_fraction=0.5,
         random_seed=42,
         question_source=QuestionSource.DOCUMENT,
-        questions_per_unit=3,
     )
 
     assert config.llm_model == "test-model"
@@ -50,7 +48,6 @@ def test_generation_config_custom_values():
     assert config.sample_fraction == 0.5
     assert config.random_seed == 42
     assert config.question_source == QuestionSource.DOCUMENT
-    assert config.questions_per_unit == 3
 
 
 def test_generation_config_from_cli_args(mock_args):

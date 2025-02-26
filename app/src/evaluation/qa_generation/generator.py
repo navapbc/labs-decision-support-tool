@@ -30,10 +30,8 @@ Do not include any additional formatting, newlines, or text outside the JSON.
 MAX_WORKERS = 5  # Limit concurrent API calls
 
 
-def generate_qa_pairs(
-    document_or_chunk: Document | Chunk, num_pairs: int = 1, llm: str = "gpt-4o-mini"
-) -> List[QAPair]:
-    """Generate QA pairs from a document or chunk."""
+def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-mini") -> List[QAPair]:
+    """Generate QA pair from a document or chunk."""
     # Get document and chunk info
     if isinstance(document_or_chunk, Document):
         document = document_or_chunk
@@ -97,7 +95,7 @@ def generate_qa_pairs(
         generated_pairs = valid_pairs
 
         if not generated_pairs:
-            logger.error(f"No valid QA pairs found in response: {content}")
+            logger.error(f"No valid QA pair found in response: {content}")
             return []
 
     except json.JSONDecodeError as e:
@@ -145,39 +143,35 @@ class QAGenerator:
         self.config = config
         self.llm = config.llm_model or app_config.llm
 
-    def _get_chunks_to_process(
-        self, documents: List[Document]
-    ) -> List[tuple[Document | Chunk, int]]:
-        """Get list of (document/chunk, num_pairs) tuples to process."""
-        items: List[tuple[Document | Chunk, int]] = []
+    def _get_chunks_to_process(self, documents: List[Document]) -> List[Document | Chunk]:
+        """Get list of documents or chunks to process."""
+        items: List[Document | Chunk] = []
         if self.config.question_source == QuestionSource.DOCUMENT:
-            items.extend((doc, self.config.questions_per_unit) for doc in documents)
+            items.extend(documents)
         else:
             for doc in documents:
-                items.extend((chunk, self.config.questions_per_unit) for chunk in doc.chunks)
+                items.extend(doc.chunks)
         return items
 
     def generate_from_documents(self, documents: List[Document]) -> Iterator[QAPair]:
-        """Generate QA pairs from documents."""
+        """Generate QA pair from documents."""
         items = self._get_chunks_to_process(documents)
 
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             # Submit all generation tasks
             futures = {
-                executor.submit(generate_qa_pairs, item, num_pairs, self.config.llm_model): item
-                for item, num_pairs in items
+                executor.submit(generate_qa_pair, item, self.config.llm_model): item
+                for item in items
             }
 
             # Process results as they complete
-            qa_pairs = []
             for future in as_completed(futures):
                 try:
                     pairs = future.result()
-                    qa_pairs.extend(pairs)
                     for pair in pairs:
                         yield pair
                 except Exception as e:
                     logger.error(f"Error generating QA pair: {e}")
                     continue
 
-            logger.info(f"Generated {len(qa_pairs)} QA pairs from {len(items)} items")
+            logger.info(f"Generated QA pair from {len(items)} items")

@@ -25,7 +25,6 @@ class GenerationConfig:
         sample_fraction: Optional[float] = None,
         random_seed: Optional[int] = None,
         question_source: QuestionSource = QuestionSource.CHUNK,
-        questions_per_unit: int = 1,
     ):
         self.llm_model = llm_model
         self.output_dir = output_dir
@@ -33,7 +32,6 @@ class GenerationConfig:
         self.sample_fraction = sample_fraction
         self.random_seed = random_seed
         self.question_source = question_source
-        self.questions_per_unit = questions_per_unit
 
         # Generate version ID using timestamp for unique identification
         self.version_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
