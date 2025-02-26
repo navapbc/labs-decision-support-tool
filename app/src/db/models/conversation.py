@@ -17,6 +17,7 @@ class ChatMessage(Base, IdMixin, TimestampMixin):
     )
     role: Mapped[str] = mapped_column(comment="Role of the message speaker")
     content: Mapped[str] = mapped_column(comment="Content of the message")
+    session: Mapped["UserSession"] = relationship("UserSession", back_populates="chat_messages")
 
 
 class UserSession(Base, TimestampMixin):
@@ -31,6 +32,6 @@ class UserSession(Base, TimestampMixin):
         comment="LiteralAI's thread ID corresponding to session_id"
     )
     chat_messages: Mapped[list[ChatMessage]] = relationship(
-        backref="ChatMessage.session_id",
+        back_populates="session",
         order_by="ChatMessage.created_at",
     )

@@ -6,7 +6,6 @@ Create Date: 2025-02-26 17:44:42.696396
 
 """
 
-import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.orm import Session
 
