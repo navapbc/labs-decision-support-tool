@@ -3,6 +3,7 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from hashlib import md5
 from typing import Dict, List, Optional
 from uuid import UUID
 
@@ -105,7 +106,6 @@ class MetricsSummary:
 class QAPair:
     """A question-answer pair."""
 
-    id: UUID  # Stable ID generated at creation time
     question: str
     answer: str
     document_name: str
@@ -115,4 +115,13 @@ class QAPair:
     content_hash: str
     dataset: str
     llm_model: str  # Model used for generation
+    id: Optional[UUID] = None  # Stable ID generated at creation time
     created_at: datetime = field(default_factory=datetime.utcnow)
+
+    def __post_init__(self) -> None:
+        """Generate a stable ID based on question and answer if not provided."""
+        # Generate a stable UUID based on content if id is None
+        if self.id is None:
+            content = f"{self.question}||{self.answer}".encode("utf-8")
+            content_hash = md5(content, usedforsecurity=False).digest()
+            self.id = UUID(bytes=content_hash[:16])

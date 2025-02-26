@@ -13,7 +13,6 @@ from src.db.models.document import Chunk, Document
 from src.generate import completion_args
 
 from ..data_models import QAPair
-from ..utils.id_generator import generate_stable_id
 from .config import GenerationConfig, QuestionSource
 
 logger = logging.getLogger(__name__)
@@ -115,11 +114,7 @@ def generate_qa_pairs(
 
     # Process each generated pair
     for pair in generated_pairs:
-        # Generate stable ID from content
-        qa_id = generate_stable_id(pair["question"], pair["answer"])
-
         qa_pair = QAPair(
-            id=qa_id,
             question=pair["question"],
             answer=pair["answer"],
             document_name=document.name,
