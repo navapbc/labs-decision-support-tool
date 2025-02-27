@@ -8,7 +8,7 @@ import functools
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Annotated, Optional, Sequence
+from typing import Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Query, Request, Response
@@ -25,6 +25,9 @@ from src.db.models.document import Subsection
 from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
 from src.util.string_utils import format_highlighted_uri
+
+# from typing import Annotated, Optional, Sequence
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Chat API"])
@@ -111,8 +114,9 @@ async def _get_chat_session(
     session_id: str | None,
     user_meta: Optional[dict] = None,
 ) -> ChatSession:
-    if not user_id:
-        raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
+    if user_id == "":
+        user_id = "EMPTY_USER_ID"  # temporary fix for empty user_id
+        # raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
     # Ensure user exists in Literal AI
     literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
@@ -150,7 +154,8 @@ def _load_chat_history(user_session: UserSession) -> ChatHistory:
 
 # Make sure to use async functions for faster responses
 @router.get("/engines")
-async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
+async def engines(user_id: str) -> list[str]:
+    # async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
     session = await _get_chat_session(user_id, None)
     # Example of using Literal AI to log the request and response
     with literalai().thread(name="API:/engines", participant_id=session.literalai_user_id):
@@ -170,7 +175,8 @@ async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
 
 
 class FeedbackRequest(BaseModel):
-    user_id: Annotated[str, Query(min_length=1)]
+    user_id: str
+    # user_id: Annotated[str, Query(min_length=1)]
     session_id: str
     response_id: str  # id of the chatbot response this feedback is about
     is_positive: bool  # if chatbot response answer is helpful or not
@@ -205,7 +211,8 @@ class QueryRequest(BaseModel):
     session_id: str
     new_session: bool
     message: str
-    user_id: Annotated[str, Query(min_length=1)]
+    user_id: str
+    # user_id: Annotated[str, Query(min_length=1)]
     agency_id: Optional[str] = None
     beneficiary_id: Optional[str] = None
 
