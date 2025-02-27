@@ -36,11 +36,9 @@ def test_create_parser():
 def test_main_with_dataset(mock_run_generation):
     """Test the main function with a dataset specified."""
     with mock.patch("sys.argv", ["generate.py", "--dataset", "imagine_la", "--llm", "gpt-4"]):
-        with mock.patch(
-            "src.evaluation.cli.generate.GenerationConfig.from_cli_args"
-        ) as mock_config:
+        with mock.patch("src.evaluation.cli.generate.GenerationConfig") as mock_config_class:
             mock_config_instance = mock.MagicMock()
-            mock_config.return_value = mock_config_instance
+            mock_config_class.return_value = mock_config_instance
 
             generate.main()
 
@@ -58,11 +56,9 @@ def test_main_with_dataset(mock_run_generation):
 def test_main_with_sampling(mock_run_generation):
     """Test the main function with sampling specified."""
     with mock.patch("sys.argv", ["generate.py", "--sampling", "0.5", "--random-seed", "42"]):
-        with mock.patch(
-            "src.evaluation.cli.generate.GenerationConfig.from_cli_args"
-        ) as mock_config:
+        with mock.patch("src.evaluation.cli.generate.GenerationConfig") as mock_config_class:
             mock_config_instance = mock.MagicMock()
-            mock_config.return_value = mock_config_instance
+            mock_config_class.return_value = mock_config_instance
 
             generate.main()
 
@@ -81,7 +77,7 @@ def test_main_no_documents_found(mock_run_generation):
     mock_run_generation.side_effect = ValueError("No documents found")
 
     with mock.patch("sys.argv", ["generate.py"]):
-        with mock.patch("src.evaluation.cli.generate.GenerationConfig.from_cli_args"):
+        with mock.patch("src.evaluation.cli.generate.GenerationConfig"):
             with mock.patch("builtins.print") as mock_print:
                 generate.main()
 

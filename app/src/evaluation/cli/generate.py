@@ -60,7 +60,7 @@ def main() -> None:
 
     base_path = args.output_dir if hasattr(args, "output_dir") else Path("src/evaluation/data")
 
-    config = GenerationConfig.from_cli_args(args)
+    config = GenerationConfig(args=args)
     try:
         qa_pairs_path = run_generation(
             config=config,

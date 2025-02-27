@@ -25,13 +25,30 @@ class GenerationConfig:
         sample_fraction: Optional[float] = None,
         random_seed: Optional[int] = None,
         question_source: QuestionSource = QuestionSource.CHUNK,
+        args: Optional[Namespace] = None,
     ):
-        self.llm_model = llm_model
-        self.output_dir = output_dir
-        self.dataset_filter = dataset_filter
-        self.sample_fraction = sample_fraction
-        self.random_seed = random_seed
-        self.question_source = question_source
+        """
+        Initialize configuration for QA pair generation.
+
+        Args can be provided either directly or via a Namespace object (e.g., from argparse).
+        If args is provided, it takes precedence over other parameters.
+        """
+        if args is not None:
+            # Initialize from CLI arguments if provided
+            self.llm_model = args.llm
+            self.output_dir = args.output_dir
+            self.dataset_filter = args.dataset
+            self.sample_fraction = args.sampling
+            self.random_seed = args.random_seed
+            self.question_source = question_source  # Not in CLI args, use default
+        else:
+            # Initialize from direct parameters
+            self.llm_model = llm_model
+            self.output_dir = output_dir
+            self.dataset_filter = dataset_filter
+            self.sample_fraction = sample_fraction
+            self.random_seed = random_seed
+            self.question_source = question_source
 
         # Generate version ID using timestamp for unique identification
         self.version_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -45,14 +62,3 @@ class GenerationConfig:
     def latest_symlink(self) -> Path:
         """Get the path to the 'latest' symlink."""
         return self.output_dir / "qa_pairs" / "latest"
-
-    @classmethod
-    def from_cli_args(cls, args: Namespace) -> "GenerationConfig":
-        """Create config from CLI arguments."""
-        return cls(
-            llm_model=args.llm,
-            output_dir=args.output_dir,
-            dataset_filter=args.dataset,
-            sample_fraction=args.sampling,
-            random_seed=args.random_seed,
-        )

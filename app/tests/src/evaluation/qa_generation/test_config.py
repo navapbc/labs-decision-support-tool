@@ -52,7 +52,7 @@ def test_generation_config_custom_values():
 
 def test_generation_config_from_cli_args(mock_args):
     """Test creating config from CLI arguments."""
-    config = GenerationConfig.from_cli_args(mock_args)
+    config = GenerationConfig(args=mock_args)
 
     assert config.llm_model == "test-model"
     assert config.output_dir == Path("test/output")
@@ -83,3 +83,25 @@ def test_latest_symlink():
     assert latest_link.name == "latest"
     assert latest_link.parent.name == "qa_pairs"
     assert latest_link.parent.parent == Path("test/output")
+
+
+def test_generation_config_args_precedence(mock_args):
+    """Test that args parameter takes precedence over direct parameters."""
+    # Create config with both direct parameters and args
+    config = GenerationConfig(
+        llm_model="direct-model",
+        output_dir=Path("direct/path"),
+        dataset_filter=["direct_dataset"],
+        sample_fraction=0.1,
+        random_seed=100,
+        args=mock_args,
+    )
+
+    # Args should take precedence
+    assert config.llm_model == "test-model"
+    assert config.output_dir == Path("test/output")
+    assert config.dataset_filter == ["test_dataset"]
+    assert config.sample_fraction == 0.5
+    assert config.random_seed == 42
+    # question_source should still be the default since it's not in args
+    assert config.question_source == QuestionSource.CHUNK
