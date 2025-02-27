@@ -1,4 +1,5 @@
 import random
+from collections import defaultdict
 from typing import Any, Callable, List, Sequence, TypeVar
 
 T = TypeVar("T")
@@ -28,12 +29,10 @@ def get_stratified_sample(
     if random_seed is not None:
         random.seed(random_seed)
 
-    # Group items by key
-    groups: dict[str, List[T]] = {}
+    # Group items by key using defaultdict
+    groups: dict[str, List[T]] = defaultdict(list)
     for item in items:
         key = key_func(item)
-        if key not in groups:
-            groups[key] = []
         groups[key].append(item)
 
     # Sample from each group
