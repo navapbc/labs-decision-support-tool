@@ -3,7 +3,7 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from hashlib import md5
-from typing import Iterator, List
+from typing import List
 
 from litellm import completion
 from pydantic import BaseModel, Field
@@ -125,9 +125,17 @@ class QAGenerator:
                 items.extend(doc.chunks)
         return items
 
-    def generate_from_documents(self, documents: List[Document]) -> Iterator[QAPair]:
-        """Generate QA pair from documents."""
+    def generate_from_documents(self, documents: List[Document]) -> List[QAPair]:
+        """Generate QA pair from documents.
+
+        Args:
+            documents: List of documents to generate QA pairs from
+
+        Returns:
+            List of generated QA pairs
+        """
         items = self._get_chunks_to_process(documents)
+        results = []
 
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             # Submit all generation tasks
@@ -140,10 +148,11 @@ class QAGenerator:
             for future in as_completed(futures):
                 try:
                     pairs = future.result()
-                    for pair in pairs:
-                        yield pair
+                    results.extend(pairs)
                 except Exception as e:
                     logger.error(f"Error generating QA pair: {e}")
                     continue
 
-            logger.info(f"Generated QA pair from {len(items)} items")
+            logger.info(f"Generated QA pairs from {len(items)} items")
+
+        return results
