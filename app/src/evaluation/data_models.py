@@ -115,6 +115,7 @@ class QAPair:
     content_hash: str
     dataset: str
     llm_model: str  # Model used for generation
+    expected_chunk_content: str = ""  # Content of the chunk that contains the answer
     id: Optional[UUID] = None  # Stable ID generated at creation time
     created_at: datetime = field(default_factory=datetime.utcnow)
 

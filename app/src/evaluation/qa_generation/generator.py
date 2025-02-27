@@ -91,6 +91,7 @@ def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-min
             ).hexdigest(),
             dataset=document.dataset,
             llm_model=llm,
+            expected_chunk_content=document_or_chunk.content,
             created_at=document.created_at,
         )
 

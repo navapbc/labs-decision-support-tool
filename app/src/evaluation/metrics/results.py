@@ -52,7 +52,7 @@ def process_retrieved_chunks(
         source=question.get("dataset", ""),
         chunk_id=question.get("chunk_id", ""),
         content_hash=question.get("content_hash", ""),
-        content=question.get("content", ""),
+        content=question.get("expected_chunk_content", ""),
     )
 
     # Process retrieved chunks

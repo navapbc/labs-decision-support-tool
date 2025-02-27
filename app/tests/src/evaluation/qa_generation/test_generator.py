@@ -46,6 +46,7 @@ def test_generate_qa_pair_basic(mock_completion_response):
         assert pairs[0].document_source == document.source
         assert pairs[0].chunk_id is None  # Should be None for document-level generation
         assert pairs[0].dataset == document.dataset
+        assert pairs[0].expected_chunk_content == document.content  # Check expected_chunk_content
 
 
 def test_generate_qa_pair_from_chunk(mock_completion_response):
@@ -67,6 +68,7 @@ def test_generate_qa_pair_from_chunk(mock_completion_response):
         assert pairs[0].document_source == chunk.document.source
         assert pairs[0].chunk_id == chunk.id  # Should be set for chunk-level generation
         assert pairs[0].dataset == chunk.document.dataset
+        assert pairs[0].expected_chunk_content == chunk.content  # Check expected_chunk_content
 
 
 def test_generate_qa_pair_invalid_json():
