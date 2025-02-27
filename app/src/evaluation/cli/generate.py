@@ -4,7 +4,6 @@
 import argparse
 from pathlib import Path
 
-from ..qa_generation.config import GenerationConfig
 from ..qa_generation.runner import run_generation
 
 # Map CLI dataset names to DB dataset names
@@ -60,10 +59,9 @@ def main() -> None:
 
     base_path = args.output_dir if hasattr(args, "output_dir") else Path("src/evaluation/data")
 
-    config = GenerationConfig(args=args)
     try:
         qa_pairs_path = run_generation(
-            config=config,
+            llm_model=args.llm,
             output_dir=base_path,
             dataset_filter=db_datasets,
             sample_fraction=args.sampling,

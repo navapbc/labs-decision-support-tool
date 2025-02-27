@@ -1,5 +1,6 @@
 import csv
 from dataclasses import asdict, fields
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -10,8 +11,7 @@ from src.db.models.document import Document
 from src.evaluation.data_models import QAPair
 from src.util.sampling import get_stratified_sample
 
-from .config import GenerationConfig
-from .generator import QAGenerator
+from .generator import generate_from_documents
 
 
 def save_qa_pairs(output_dir: Path, qa_pairs: List[QAPair]) -> Path:
@@ -39,17 +39,17 @@ def save_qa_pairs(output_dir: Path, qa_pairs: List[QAPair]) -> Path:
 
 
 def run_generation(
-    config: GenerationConfig,
+    llm_model: str,
     output_dir: Path,
     dataset_filter: Optional[List[str]] = None,
     sample_fraction: Optional[float] = None,
     random_seed: Optional[int] = None,
     git_commit: Optional[str] = None,
 ) -> Path:
-    """Run QA pair generation with given configuration.
+    """Run QA pair generation with given parameters.
 
     Args:
-        config: Generation configuration
+        llm_model: LLM model to use for generation
         output_dir: Directory to store output files
         dataset_filter: List of dataset names to include
         sample_fraction: Fraction of documents to sample
@@ -60,11 +60,12 @@ def run_generation(
         Path to generated QA pairs CSV
     """
     # Validate LLM model is specified
-    if not config.llm_model:
+    if not llm_model:
         raise ValueError("No LLM model specified for QA generation")
 
-    # Create generator
-    generator = QAGenerator(config)
+    # Generate version ID using timestamp for unique identification
+    version_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    qa_pairs_dir = output_dir / "qa_pairs" / version_id
 
     # Load documents from DB
     with app_config.db_session() as session:
@@ -88,10 +89,10 @@ def run_generation(
             )
 
         # Generate QA pairs
-        qa_pairs = generator.generate_from_documents(documents)
+        qa_pairs = list(generate_from_documents(llm_model=llm_model, documents=documents))
 
         # Save QA pairs
-        qa_pairs_path = save_qa_pairs(output_dir / "qa_pairs", qa_pairs)
+        qa_pairs_path = save_qa_pairs(qa_pairs_dir, qa_pairs)
 
         print(f"Generated {len(qa_pairs)} QA pairs")
 

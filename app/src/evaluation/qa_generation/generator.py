@@ -3,7 +3,7 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from hashlib import md5
-from typing import List
+from typing import Iterator, List
 
 from litellm import completion
 from pydantic import BaseModel, Field
@@ -13,7 +13,6 @@ from src.db.models.document import Chunk, Document
 from src.generate import completion_args
 
 from ..data_models import QAPair
-from .config import GenerationConfig, QuestionSource
 
 logger = logging.getLogger(__name__)
 
@@ -104,56 +103,33 @@ def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-min
         return []
 
 
-class QAGenerator:
-    """Handles QA pair generation."""
+def generate_from_documents(llm_model: str, documents: List[Document]) -> Iterator[QAPair]:
+    """Generate QA pairs from document chunks.
 
-    def __init__(self, config: GenerationConfig):
-        """Initialize generator with config.
+    Args:
+        llm_model: The LLM model to use for generation
+        documents: List of documents to generate QA pairs from
 
-        Args:
-            config: Generation configuration
-        """
-        self.config = config
-        self.llm = config.llm_model or app_config.llm
+    Returns:
+        Iterator of generated QA pairs
+    """
+    # Get list of chunks to process
+    items: List[Chunk] = []
+    for doc in documents:
+        items.extend(doc.chunks)
 
-    def _get_chunks_to_process(self, documents: List[Document]) -> List[Document | Chunk]:
-        """Get list of documents or chunks to process."""
-        items: List[Document | Chunk] = []
-        if self.config.question_source == QuestionSource.DOCUMENT:
-            items.extend(documents)
-        else:
-            for doc in documents:
-                items.extend(doc.chunks)
-        return items
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        # Submit all generation tasks
+        futures = {executor.submit(generate_qa_pair, item, llm_model): item for item in items}
 
-    def generate_from_documents(self, documents: List[Document]) -> List[QAPair]:
-        """Generate QA pair from documents.
+        # Process results as they complete
+        for future in as_completed(futures):
+            try:
+                pairs = future.result()
+                for pair in pairs:
+                    yield pair
+            except Exception as e:
+                logger.error(f"Error generating QA pair: {e}")
+                continue
 
-        Args:
-            documents: List of documents to generate QA pairs from
-
-        Returns:
-            List of generated QA pairs
-        """
-        items = self._get_chunks_to_process(documents)
-        results = []
-
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            # Submit all generation tasks
-            futures = {
-                executor.submit(generate_qa_pair, item, self.config.llm_model): item
-                for item in items
-            }
-
-            # Process results as they complete
-            for future in as_completed(futures):
-                try:
-                    pairs = future.result()
-                    results.extend(pairs)
-                except Exception as e:
-                    logger.error(f"Error generating QA pair: {e}")
-                    continue
-
-            logger.info(f"Generated QA pairs from {len(items)} items")
-
-        return results
+        logger.info(f"Generated QA pairs from {len(items)} chunks")

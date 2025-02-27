@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.evaluation.data_models import QAPair
-from src.evaluation.qa_generation.config import GenerationConfig, QuestionSource
 from src.evaluation.qa_generation.runner import run_generation, save_qa_pairs
 from tests.src.db.models.factories import DocumentFactory
 
@@ -77,19 +76,21 @@ def test_save_qa_pairs(qa_pairs, tmp_path):
 
 def test_run_generation_basic(qa_pairs, tmp_path):
     """Test basic run_generation functionality with minimal mocking."""
-    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, llm_model="gpt-4o-mini")
     output_dir = tmp_path / "qa_output"
+    llm_model = "gpt-4o-mini"
 
     # Create test documents using DocumentFactory
     documents = DocumentFactory.build_batch(2)
 
     with (
-        # Only mock the generate_qa_pair method, not the entire QAGenerator class
-        patch("src.evaluation.qa_generation.generator.generate_qa_pair") as mock_generate_qa_pair,
+        # Mock the generate_from_documents function
+        patch(
+            "src.evaluation.qa_generation.runner.generate_from_documents"
+        ) as mock_generate_from_documents,
         patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
     ):
         # Set up the mock to return our test QA pairs
-        mock_generate_qa_pair.return_value = [qa_pairs[0]]  # Return one QA pair per document
+        mock_generate_from_documents.return_value = qa_pairs
 
         # Mock db_session to return our test documents
         mock_session = MagicMock()
@@ -105,14 +106,16 @@ def test_run_generation_basic(qa_pairs, tmp_path):
         mock_app_config.db_session.return_value = mock_session_cm
 
         # Run the function
-        result = run_generation(config, output_dir)
+        result = run_generation(llm_model=llm_model, output_dir=output_dir)
 
         # Verify results
         assert result.exists()
-        assert result == output_dir / "qa_pairs" / "qa_pairs.csv"
+        assert "qa_pairs" in str(result)
 
-        # Verify the generate_qa_pair function was called for each document
-        assert mock_generate_qa_pair.call_count == len(documents)
+        # Verify the generate_from_documents function was called with correct parameters
+        mock_generate_from_documents.assert_called_once_with(
+            llm_model=llm_model, documents=documents
+        )
 
         # Verify the CSV file exists and contains data
         with open(result, "r", newline="") as f:
@@ -123,8 +126,8 @@ def test_run_generation_basic(qa_pairs, tmp_path):
 
 def test_run_generation_with_dataset_filter(qa_pairs, tmp_path):
     """Test run_generation with dataset filter."""
-    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, llm_model="gpt-4o-mini")
     output_dir = tmp_path / "qa_output"
+    llm_model = "gpt-4o-mini"
     dataset_filter = ["Dataset 1"]
 
     # Create test documents with different datasets
@@ -134,11 +137,13 @@ def test_run_generation_with_dataset_filter(qa_pairs, tmp_path):
     ]
 
     with (
-        patch("src.evaluation.qa_generation.generator.generate_qa_pair") as mock_generate_qa_pair,
+        patch(
+            "src.evaluation.qa_generation.runner.generate_from_documents"
+        ) as mock_generate_from_documents,
         patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
     ):
         # Set up the mock to return our test QA pairs
-        mock_generate_qa_pair.return_value = [qa_pairs[0]]
+        mock_generate_from_documents.return_value = qa_pairs
 
         # Mock db_session
         mock_session = MagicMock()
@@ -154,11 +159,15 @@ def test_run_generation_with_dataset_filter(qa_pairs, tmp_path):
         mock_app_config.db_session.return_value = mock_session_cm
 
         # Run the function
-        result = run_generation(config, output_dir, dataset_filter=dataset_filter)
+        result = run_generation(
+            llm_model=llm_model,
+            output_dir=output_dir,
+            dataset_filter=dataset_filter,
+        )
 
         # Verify results
         assert result.exists()
-        assert result == output_dir / "qa_pairs" / "qa_pairs.csv"
+        assert "qa_pairs" in str(result)
 
         # Verify the filter was applied
         mock_query.filter.assert_called_once()
@@ -166,8 +175,8 @@ def test_run_generation_with_dataset_filter(qa_pairs, tmp_path):
 
 def test_run_generation_with_sampling(qa_pairs, tmp_path):
     """Test run_generation with sampling using real sampling function."""
-    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, llm_model="gpt-4o-mini")
     output_dir = tmp_path / "qa_output"
+    llm_model = "gpt-4o-mini"
     sample_fraction = 0.5
     random_seed = 42
 
@@ -175,11 +184,13 @@ def test_run_generation_with_sampling(qa_pairs, tmp_path):
     documents = DocumentFactory.build_batch(4, dataset="Dataset 1")
 
     with (
-        patch("src.evaluation.qa_generation.generator.generate_qa_pair") as mock_generate_qa_pair,
+        patch(
+            "src.evaluation.qa_generation.runner.generate_from_documents"
+        ) as mock_generate_from_documents,
         patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
     ):
         # Set up the mock to return our test QA pairs
-        mock_generate_qa_pair.return_value = [qa_pairs[0]]
+        mock_generate_from_documents.return_value = qa_pairs
 
         # Mock db_session
         mock_session = MagicMock()
@@ -196,18 +207,21 @@ def test_run_generation_with_sampling(qa_pairs, tmp_path):
 
         # Run the function with real sampling
         result = run_generation(
-            config, output_dir, sample_fraction=sample_fraction, random_seed=random_seed
+            llm_model=llm_model,
+            output_dir=output_dir,
+            sample_fraction=sample_fraction,
+            random_seed=random_seed,
         )
 
         # Verify results
         assert result.exists()
-        assert result == output_dir / "qa_pairs" / "qa_pairs.csv"
+        assert "qa_pairs" in str(result)
 
 
 def test_run_generation_no_documents(tmp_path):
     """Test run_generation with no documents found."""
-    config = GenerationConfig(question_source=QuestionSource.DOCUMENT, llm_model="gpt-4o-mini")
     output_dir = tmp_path / "qa_output"
+    llm_model = "gpt-4o-mini"
 
     with (patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,):
         # Mock db_session to return empty list
@@ -225,4 +239,4 @@ def test_run_generation_no_documents(tmp_path):
 
         # Run the function and expect ValueError
         with pytest.raises(ValueError, match="No documents found matching filter criteria"):
-            run_generation(config, output_dir)
+            run_generation(llm_model=llm_model, output_dir=output_dir)

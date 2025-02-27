@@ -8,8 +8,7 @@ from litellm.main import ModelResponse
 from pydantic import ValidationError
 
 from src.evaluation.data_models import QAPair
-from src.evaluation.qa_generation.config import GenerationConfig, QuestionSource
-from src.evaluation.qa_generation.generator import QAGenerator, generate_qa_pair
+from src.evaluation.qa_generation.generator import generate_from_documents, generate_qa_pair
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
@@ -136,68 +135,38 @@ def test_generate_qa_pair_empty_source():
     assert len(pairs) == 0  # Should return empty list for empty source
 
 
-def test_qa_generator_init():
-    """Test QA generator initialization."""
-    config = GenerationConfig(question_source=QuestionSource.DOCUMENT)
-    generator = QAGenerator(config)
-
-    assert generator.config == config
-    assert generator.llm == config.llm_model
-
-
-def test_qa_generator_generate_from_documents_document_level(mock_completion_response):
-    """Test generating QA pairs from documents at document level."""
-    documents = DocumentFactory.build_batch(2)
-    config = GenerationConfig(question_source=QuestionSource.DOCUMENT)
-    generator = QAGenerator(config)
-
-    with patch(
-        "src.evaluation.qa_generation.generator.generate_qa_pair",
-        return_value=[MagicMock(spec=QAPair)],
-    ) as mock_generate:
-        pairs = list(generator.generate_from_documents(documents))
-
-        assert len(pairs) == 2  # One pair per document
-        # Verify generate_qa_pair was called with each document
-        assert mock_generate.call_count == 2
-        mock_generate.assert_any_call(documents[0], generator.config.llm_model)
-        mock_generate.assert_any_call(documents[1], generator.config.llm_model)
-
-
-def test_qa_generator_generate_from_documents_chunk_level(mock_completion_response):
-    """Test generating QA pairs from documents at chunk level."""
+def test_generate_from_documents_with_chunks():
+    """Test generating QA pairs from document chunks."""
     # Create documents with chunks
     document = DocumentFactory.build(content="Parent document content", source="test_source")
     chunk1 = ChunkFactory.build(document=document, content="Test chunk 1 content")
     chunk2 = ChunkFactory.build(document=document, content="Test chunk 2 content")
     document.chunks = [chunk1, chunk2]
 
-    config = GenerationConfig(question_source=QuestionSource.CHUNK)
-    generator = QAGenerator(config)
-
     with patch(
         "src.evaluation.qa_generation.generator.generate_qa_pair",
         return_value=[MagicMock(spec=QAPair)],
     ) as mock_generate:
-        pairs = list(generator.generate_from_documents([document]))
+        pairs = list(generate_from_documents(llm_model="gpt-4o-mini", documents=[document]))
 
         assert len(pairs) == 2  # One pair per chunk
         # Verify generate_qa_pair was called with each chunk
         assert mock_generate.call_count == 2
-        mock_generate.assert_any_call(chunk1, generator.config.llm_model)
-        mock_generate.assert_any_call(chunk2, generator.config.llm_model)
+        mock_generate.assert_any_call(chunk1, "gpt-4o-mini")
+        mock_generate.assert_any_call(chunk2, "gpt-4o-mini")
 
 
-def test_qa_generator_generate_from_documents_with_errors():
+def test_generate_from_documents_with_errors():
     """Test error handling during generation."""
-    documents = DocumentFactory.build_batch(2)
-    config = GenerationConfig(question_source=QuestionSource.DOCUMENT)
-    generator = QAGenerator(config)
+    # Create documents with chunks
+    document = DocumentFactory.build(content="Parent document content", source="test_source")
+    chunk = ChunkFactory.build(document=document, content="Test chunk content")
+    document.chunks = [chunk]
 
     with patch(
         "src.evaluation.qa_generation.generator.generate_qa_pair",
         side_effect=Exception("Test error"),
     ):
-        pairs = list(generator.generate_from_documents(documents))
+        pairs = list(generate_from_documents(llm_model="gpt-4o-mini", documents=[document]))
 
         assert len(pairs) == 0  # Should handle errors and continue
