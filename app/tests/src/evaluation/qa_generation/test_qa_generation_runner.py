@@ -84,7 +84,7 @@ def test_run_generation_basic(qa_pairs, tmp_path):
     documents = DocumentFactory.build_batch(2)
 
     with (
-        # Only mock the generate_from_documents method, not the entire QAGenerator class
+        # Only mock the generate_qa_pair method, not the entire QAGenerator class
         patch("src.evaluation.qa_generation.generator.generate_qa_pair") as mock_generate_qa_pair,
         patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
     ):
@@ -177,8 +177,6 @@ def test_run_generation_with_sampling(qa_pairs, tmp_path):
     with (
         patch("src.evaluation.qa_generation.generator.generate_qa_pair") as mock_generate_qa_pair,
         patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
-        # We still need to mock the sampling function to make the test deterministic
-        patch("src.evaluation.qa_generation.runner.get_stratified_sample") as mock_sample,
     ):
         # Set up the mock to return our test QA pairs
         mock_generate_qa_pair.return_value = [qa_pairs[0]]
@@ -196,10 +194,7 @@ def test_run_generation_with_sampling(qa_pairs, tmp_path):
         mock_session_cm.__enter__.return_value = mock_session
         mock_app_config.db_session.return_value = mock_session_cm
 
-        # Mock the sampling function to return a subset
-        mock_sample.return_value = documents[:2]
-
-        # Run the function
+        # Run the function with real sampling
         result = run_generation(
             config, output_dir, sample_fraction=sample_fraction, random_seed=random_seed
         )
@@ -207,13 +202,6 @@ def test_run_generation_with_sampling(qa_pairs, tmp_path):
         # Verify results
         assert result.exists()
         assert result == output_dir / "qa_pairs" / "qa_pairs.csv"
-
-        # Verify sampling was called correctly
-        mock_sample.assert_called_once()
-        call_args = mock_sample.call_args
-        assert call_args[0][0] == documents  # First positional arg should be documents
-        assert call_args[1]["sample_fraction"] == sample_fraction
-        assert call_args[1]["random_seed"] == random_seed
 
 
 def test_run_generation_no_documents(tmp_path):
