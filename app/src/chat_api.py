@@ -26,9 +26,6 @@ from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
 from src.util.string_utils import format_highlighted_uri
 
-# from typing import Annotated, Optional, Sequence
-
-
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Chat API"])
 
