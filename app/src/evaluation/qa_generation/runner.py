@@ -59,10 +59,6 @@ def run_generation(
     Returns:
         Path to generated QA pairs CSV
     """
-    # Validate LLM model is specified
-    if not llm_model:
-        raise ValueError("No LLM model specified for QA generation")
-
     # Generate version ID using timestamp for unique identification
     version_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     qa_pairs_dir = output_dir / "qa_pairs" / version_id
