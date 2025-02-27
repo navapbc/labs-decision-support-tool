@@ -15,7 +15,6 @@ from src.chat_api import (
     ChatEngineSettings,
     ChatSession,
     QueryResponse,
-    UserSession,
     get_chat_engine,
     router,
     run_query,
@@ -23,7 +22,7 @@ from src.chat_api import (
 from src.chat_engine import ImagineLA_MessageAttributes, OnMessageResult
 from src.citations import CitationFactory, split_into_subsections
 from src.generate import MessageAttributes
-from tests.src.db.models.factories import ChunkFactory
+from tests.src.db.models.factories import ChunkFactory, UserSessionFactory
 
 
 @contextmanager
@@ -271,19 +270,9 @@ async def test_run_query__unknown_citation(subsections, caplog):
     assert query_response.citations[0].citation_id == "citation-1"
 
 
-@pytest.fixture
-def user_session(user_id: str = "TestUser"):
-    return UserSession(
-        session_id="session1",
-        user_id=user_id,
-        lai_thread_id=None,
-        chat_engine_id="imagine-la",
-    )
-
-
-def test_get_chat_engine(user_session):
+def test_get_chat_engine():
     session = ChatSession(
-        user_session=user_session,
+        user_session=UserSessionFactory.build(),
         literalai_user_id="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("ca-edd-web", retrieval_k=6),
         allowed_engines=["ca-edd-web"],
@@ -292,9 +281,9 @@ def test_get_chat_engine(user_session):
     assert engine.retrieval_k == 6
 
 
-def test_get_chat_engine__unknown(user_session):
+def test_get_chat_engine__unknown():
     session = ChatSession(
-        user_session=user_session,
+        user_session=UserSessionFactory.build(),
         literalai_user_id="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("engine_y"),
         allowed_engines=["ca-edd-web"],
@@ -303,9 +292,9 @@ def test_get_chat_engine__unknown(user_session):
         get_chat_engine(session)
 
 
-def test_get_chat_engine_not_allowed(user_session):
+def test_get_chat_engine_not_allowed():
     session = ChatSession(
-        user_session=user_session,
+        user_session=UserSessionFactory.build(),
         literalai_user_id="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("bridges-eligibility-manual"),
         allowed_engines=["ca-edd-web"],

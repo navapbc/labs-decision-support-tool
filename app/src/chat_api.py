@@ -137,13 +137,10 @@ def _load_user_session(session_id: str | None) -> Optional[UserSession]:
         ).first()
 
 
-def _load_chat_history(session_id: str) -> ChatHistory:
+def _load_chat_history(user_session: UserSession) -> ChatHistory:
     with app_config.db_session() as db_session:
-        session_msgs = db_session.scalars(
-            select(ChatMessage)
-            .where(ChatMessage.session_id == session_id)
-            .order_by(ChatMessage.created_at)
-        ).all()
+        db_user_session = db_session.merge(user_session)
+        session_msgs = db_user_session.chat_messages
         return [{"role": message.role, "content": message.content} for message in session_msgs]
 
 
@@ -268,7 +265,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     _validate_session_against_literalai(request, session)
 
     # Load history BEFORE adding the new message to the DB
-    chat_history = _load_chat_history(request.session_id)
+    chat_history = _load_chat_history(session.user_session)
     _validate_chat_history(request, chat_history)
 
     thread_name = None
