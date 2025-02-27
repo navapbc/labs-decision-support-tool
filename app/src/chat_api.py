@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Optional, Sequence
 
 from asyncer import asyncify
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response
 from literalai import AsyncLiteralClient, Message
 from pydantic import BaseModel
 from sqlalchemy import select
