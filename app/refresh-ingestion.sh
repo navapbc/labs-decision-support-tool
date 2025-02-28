@@ -74,16 +74,6 @@ scrape_and_ingest() {
         exit 22
     fi
 
-    if [ "$DATASET_ID" = "edd" ]; then
-        while grep "NotImplementedError: TableRow node" "logs/${DATASET_ID}-2ingest.log"; do
-            echo "Manually fix error: Edit src/ingestion/edd_scrapings.json (see edd_md/jobs_and_training/Layoff_Services_WARN/_index.md for reference)"
-            echo "by converting the last table row starting with 'Exceptions and Exemptions to Notice Requirements' into paragraphs by replacing '|' with '\\\n'."
-            echo "After fixing, press Enter to retry ingestion."
-            read OK
-            make ingest-runner args="$DATASET_ID $EXTRA_INGEST_ARGS" 2>&1 | tee "logs/${DATASET_ID}-2ingest.log"
-        done
-    fi
-
     create_md_zip "$DATASET_ID"
 
     echo "-----------------------------------"
