@@ -162,7 +162,7 @@ class EddSpider(CrawlSpider):
             del tr.attrs["style"]
             tds = tr.find_all("td", recursive=False)
             assert len(tds) == 3, "Expected three columns in table row"
-            for heading, td in zip(headings, tds):
+            for heading, td in zip(headings, tds, strict=True):
                 # Convert the td element to a paragraph
                 td.name = "p"
                 del td.attrs["style"]
