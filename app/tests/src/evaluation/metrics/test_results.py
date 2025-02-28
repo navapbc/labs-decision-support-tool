@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.evaluation.metrics.models import EvaluationResult, ExpectedChunk, RetrievedChunk
+from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 from src.evaluation.metrics.results import (
     batch_process_results,
     generate_qa_pair_id,
@@ -41,6 +41,7 @@ def mock_question():
         "dataset": "test_dataset",
         "chunk_id": "chunk_123",
         "content_hash": "abc123",
+        "expected_chunk_content": "test chunk content",
     }
 
 
@@ -91,6 +92,7 @@ def test_process_retrieved_chunks_found(mock_question, mock_chunk):
         assert result.expected_chunk.source == mock_question["dataset"]
         assert result.expected_chunk.chunk_id == mock_question["chunk_id"]
         assert result.expected_chunk.content_hash == mock_question["content_hash"]
+        assert result.expected_chunk.content == mock_question["expected_chunk_content"]
 
         # Verify retrieved chunks
         assert len(result.retrieved_chunks) == 1
@@ -146,6 +148,7 @@ def test_process_retrieved_chunks_empty():
     assert result.expected_chunk.source == ""
     assert result.expected_chunk.chunk_id == ""
     assert result.expected_chunk.content_hash == ""
+    assert result.expected_chunk.content == ""
 
 
 def test_batch_process_results(mock_question, mock_chunk):
