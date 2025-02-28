@@ -65,11 +65,17 @@ def run_generation(
 
     # Load documents from DB
     with app_config.db_session() as session:
+        # Start with base query
         query = session.query(Document)
+
+        # Apply dataset filter if specified
         if dataset_filter:
-            query = query.filter(Document.dataset.in_(dataset_filter)).options(
-                joinedload(Document.chunks)
-            )
+            query = query.filter(Document.dataset.in_(dataset_filter))
+
+        # Eagerly load chunks to avoid session issues
+        query = query.options(joinedload(Document.chunks))
+        
+        # Get all matching documents
         documents = query.all()
 
         if not documents:
@@ -83,6 +89,11 @@ def run_generation(
                 random_seed=random_seed,
                 key_func=lambda d: d.dataset,
             )
+
+        # Ensure we have all the data loaded before closing session
+        for doc in documents:
+            _ = doc.chunks  # Force load chunks
+            _ = doc.dataset  # Force load dataset
 
         # Generate QA pairs
         qa_pairs = list(generate_from_documents(llm_model=llm_model, documents=documents))

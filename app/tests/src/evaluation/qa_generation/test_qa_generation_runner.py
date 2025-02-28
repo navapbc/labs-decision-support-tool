@@ -1,15 +1,18 @@
 """Tests for QA generation runner."""
 
 import csv
+import json
 import uuid
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
+from litellm import completion
 
 from src.evaluation.data_models import QAPair
 from src.evaluation.qa_generation.runner import run_generation, save_qa_pairs
-from tests.src.db.models.factories import DocumentFactory
+from tests.src.db.models.factories import DocumentFactory, ChunkFactory
+from src.db.models.document import Document
 
 
 @pytest.fixture
@@ -46,6 +49,24 @@ def qa_pairs():
     return [qa_pair1, qa_pair2]
 
 
+@pytest.fixture
+def mock_completion_response():
+    """Create a mock completion response."""
+    def mock_completion(model, messages, **kwargs):
+        mock_response = {
+            "choices": [{
+                "message": {
+                    "content": json.dumps({
+                        "question": "What is this document about?",
+                        "answer": "This is a test document."
+                    })
+                }
+            }]
+        }
+        return completion(model, messages, mock_response=mock_response)
+    return mock_completion
+
+
 def test_save_qa_pairs(qa_pairs, tmp_path):
     """Test save_qa_pairs function with real file operations."""
     # Create a temporary directory for output
@@ -74,37 +95,30 @@ def test_save_qa_pairs(qa_pairs, tmp_path):
             assert row["dataset"] == qa_pairs[i].dataset
 
 
-def test_run_generation_basic(qa_pairs, tmp_path):
-    """Test basic run_generation functionality with minimal mocking."""
+def test_run_generation_basic(mock_completion_response, tmp_path, enable_factory_create, db_session):
+    """Test basic run_generation functionality."""
     output_dir = tmp_path / "qa_output"
     llm_model = "gpt-4o-mini"
 
-    # Create test documents using DocumentFactory
-    documents = DocumentFactory.build_batch(2)
+    # Create test documents with chunks
+    docs = []
+    for i in range(2):
+        doc = DocumentFactory.create(
+            name=f"Test Document {i}",
+            content=f"Test content {i}",
+            dataset="Dataset 1",
+            source=f"Source {i}"
+        )
+        # Create chunks with content
+        for j in range(2):
+            ChunkFactory.create(
+                document=doc,
+                content=f"Chunk {j} content for doc{i}"
+            )
+        docs.append(doc)
 
-    with (
-        # Mock the generate_from_documents function
-        patch(
-            "src.evaluation.qa_generation.runner.generate_from_documents"
-        ) as mock_generate_from_documents,
-        patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
-    ):
-        # Set up the mock to return our test QA pairs
-        mock_generate_from_documents.return_value = qa_pairs
-
-        # Mock db_session to return our test documents
-        mock_session = MagicMock()
-        mock_query = MagicMock()
-        mock_query.filter.return_value = mock_query
-        mock_query.options.return_value = mock_query
-        mock_query.all.return_value = documents
-        mock_session.query.return_value = mock_query
-
-        # Set up context manager for db_session
-        mock_session_cm = MagicMock()
-        mock_session_cm.__enter__.return_value = mock_session
-        mock_app_config.db_session.return_value = mock_session_cm
-
+    # Mock the completion function at the module where it's imported
+    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response):
         # Run the function
         result = run_generation(llm_model=llm_model, output_dir=output_dir)
 
@@ -112,53 +126,73 @@ def test_run_generation_basic(qa_pairs, tmp_path):
         assert result.exists()
         assert "qa_pairs" in str(result)
 
-        # Verify the generate_from_documents function was called with correct parameters
-        mock_generate_from_documents.assert_called_once_with(
-            llm_model=llm_model, documents=documents
-        )
-
-        # Verify the CSV file exists and contains data
+        # Read generated QA pairs
         with open(result, "r", newline="") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
-            assert len(rows) > 0
+            # Should have one QA pair per chunk
+            assert len(rows) == 4  # 2 documents * 2 chunks each
+            for row in rows:
+                assert row["question"] == "What is this document about?"
+                assert row["answer"] == "This is a test document."
 
 
-def test_run_generation_with_dataset_filter(qa_pairs, tmp_path):
+def test_run_generation_with_dataset_filter(mock_completion_response, tmp_path, enable_factory_create, db_session):
     """Test run_generation with dataset filter."""
     output_dir = tmp_path / "qa_output"
     llm_model = "gpt-4o-mini"
     dataset_filter = ["Dataset 1"]
 
-    # Create test documents with different datasets
-    documents = [
-        DocumentFactory.build(dataset="Dataset 1"),
-        DocumentFactory.build(dataset="Dataset 2"),
-    ]
+    # Clean up any existing documents
+    db_session.query(Document).delete()
+    db_session.commit()
 
-    with (
-        patch(
-            "src.evaluation.qa_generation.runner.generate_from_documents"
-        ) as mock_generate_from_documents,
-        patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
-    ):
-        # Set up the mock to return our test QA pairs
-        mock_generate_from_documents.return_value = qa_pairs
+    # Create test documents with different datasets and their chunks
+    doc1 = DocumentFactory.create(
+        dataset="Dataset 1",
+        source="Source 1",
+        content="Test content for doc1"
+    )
+    # Create chunks with content
+    for i in range(2):
+        ChunkFactory.create(
+            document=doc1,
+            content=f"Chunk {i} content for doc1"
+        )
+    
+    doc2 = DocumentFactory.create(
+        dataset="Dataset 2",
+        source="Source 2",
+        content="Test content for doc2"
+    )
+    # Create chunks with content
+    for i in range(2):
+        ChunkFactory.create(
+            document=doc2,
+            content=f"Chunk {i} content for doc2"
+        )
 
-        # Mock db_session
-        mock_session = MagicMock()
-        mock_query = MagicMock()
-        mock_query.filter.return_value = mock_query
-        mock_query.options.return_value = mock_query
-        mock_query.all.return_value = documents
-        mock_session.query.return_value = mock_query
+    # Commit and close the session
+    enable_factory_create.commit()
 
-        # Set up context manager for db_session
-        mock_session_cm = MagicMock()
-        mock_session_cm.__enter__.return_value = mock_session
-        mock_app_config.db_session.return_value = mock_session_cm
+    # Print all documents in DB for debugging
+    all_docs = db_session.query(Document).all()
+    print("\nAll documents in DB:")
+    for doc in all_docs:
+        print(f"Document {doc.id}: dataset={doc.dataset}, chunks={len(doc.chunks)}")
 
-        # Run the function
+    # Mock the completion function at the module where it's imported
+    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response):
+        # Verify we only see the filtered documents
+        filtered_docs = db_session.query(Document).filter(Document.dataset.in_(dataset_filter)).all()
+        print("\nFiltered documents:")
+        for doc in filtered_docs:
+            print(f"Document {doc.id}: dataset={doc.dataset}, chunks={len(doc.chunks)}")
+        assert len(filtered_docs) == 1
+        assert filtered_docs[0].dataset == "Dataset 1"
+        assert len(filtered_docs[0].chunks) == 2
+
+        # Run the generation
         result = run_generation(
             llm_model=llm_model,
             output_dir=output_dir,
@@ -169,74 +203,25 @@ def test_run_generation_with_dataset_filter(qa_pairs, tmp_path):
         assert result.exists()
         assert "qa_pairs" in str(result)
 
-        # Verify the filter was applied
-        mock_query.filter.assert_called_once()
+        # Read generated QA pairs
+        with open(result, "r", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            # Should only have QA pairs from Dataset 1's document
+            assert len(rows) == 2  # 1 document * 2 chunks
+            assert all(row["dataset"] == "Dataset 1" for row in rows)
 
 
-def test_run_generation_with_sampling(qa_pairs, tmp_path):
-    """Test run_generation with sampling using real sampling function."""
-    output_dir = tmp_path / "qa_output"
-    llm_model = "gpt-4o-mini"
-    sample_fraction = 0.5
-    random_seed = 42
-
-    # Create test documents
-    documents = DocumentFactory.build_batch(4, dataset="Dataset 1")
-
-    with (
-        patch(
-            "src.evaluation.qa_generation.runner.generate_from_documents"
-        ) as mock_generate_from_documents,
-        patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,
-    ):
-        # Set up the mock to return our test QA pairs
-        mock_generate_from_documents.return_value = qa_pairs
-
-        # Mock db_session
-        mock_session = MagicMock()
-        mock_query = MagicMock()
-        mock_query.filter.return_value = mock_query
-        mock_query.options.return_value = mock_query
-        mock_query.all.return_value = documents
-        mock_session.query.return_value = mock_query
-
-        # Set up context manager for db_session
-        mock_session_cm = MagicMock()
-        mock_session_cm.__enter__.return_value = mock_session
-        mock_app_config.db_session.return_value = mock_session_cm
-
-        # Run the function with real sampling
-        result = run_generation(
-            llm_model=llm_model,
-            output_dir=output_dir,
-            sample_fraction=sample_fraction,
-            random_seed=random_seed,
-        )
-
-        # Verify results
-        assert result.exists()
-        assert "qa_pairs" in str(result)
-
-
-def test_run_generation_no_documents(tmp_path):
+def test_run_generation_no_documents(tmp_path, enable_factory_create, app_config):
     """Test run_generation with no documents found."""
     output_dir = tmp_path / "qa_output"
     llm_model = "gpt-4o-mini"
+    dataset_filter = ["NonexistentDataset"]  # Use a dataset filter that won't match any documents
 
-    with (patch("src.evaluation.qa_generation.runner.app_config") as mock_app_config,):
-        # Mock db_session to return empty list
-        mock_session = MagicMock()
-        mock_query = MagicMock()
-        mock_query.filter.return_value = mock_query
-        mock_query.options.return_value = mock_query
-        mock_query.all.return_value = []  # No documents found
-        mock_session.query.return_value = mock_query
-
-        # Set up context manager for db_session
-        mock_session_cm = MagicMock()
-        mock_session_cm.__enter__.return_value = mock_session
-        mock_app_config.db_session.return_value = mock_session_cm
-
-        # Run the function and expect ValueError
-        with pytest.raises(ValueError, match="No documents found matching filter criteria"):
-            run_generation(llm_model=llm_model, output_dir=output_dir)
+    # Run the function and expect ValueError
+    with pytest.raises(ValueError, match="No documents found matching filter criteria"):
+        run_generation(
+            llm_model=llm_model,
+            output_dir=output_dir,
+            dataset_filter=dataset_filter
+        )

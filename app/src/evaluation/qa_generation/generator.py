@@ -63,7 +63,7 @@ def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-min
                 },
             ],
             temperature=app_config.temperature,
-            response_format={"type": "json_object"},
+            response_format=QAPairResponse,
             **completion_args(llm),
         )
 
@@ -116,7 +116,8 @@ def generate_from_documents(llm_model: str, documents: List[Document]) -> Iterat
     # Get list of chunks to process
     items: List[Chunk] = []
     for doc in documents:
-        items.extend(doc.chunks)
+        # Only include chunks that have content
+        items.extend([chunk for chunk in doc.chunks if chunk.content])
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         # Submit all generation tasks
