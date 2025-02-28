@@ -2,9 +2,7 @@
 
 import csv
 import os
-from typing import Any, Callable, Dict, List, Optional, Sequence
-
-from src.retrieve import retrieve_with_scores
+from typing import Dict, List, Optional
 
 from .batch import create_batch_config, filter_questions, stratified_sample
 from .logging import EvaluationLogger
@@ -12,39 +10,15 @@ from .metric_computation import compute_metrics_summary
 from .results import batch_process_results
 
 
-def create_retrieval_function(
-    min_score: Optional[float] = None,
-) -> Callable[[str, int], Sequence[Any]]:
-    """Create a function to retrieve chunks for a question.
-
-    Args:
-        min_score: Optional minimum similarity score for retrieval
-
-    Returns:
-        Function that takes a question and k value and returns retrieved chunks
-    """
-
-    def retrieval_func(query: str, k: int) -> Sequence[Any]:
-        # Default to -1.0 if no min_score provided
-        score_threshold = min_score if min_score is not None else -1.0
-        return retrieve_with_scores(
-            query=query, retrieval_k=k, retrieval_k_min_score=score_threshold
-        )
-
-    return retrieval_func
-
-
 class EvaluationRunner:
     """Runs evaluation batches and logs results."""
 
-    def __init__(self, retrieval_func: Any, log_dir: str = "logs/evaluations"):
+    def __init__(self, log_dir: str = "logs/evaluations"):
         """Initialize the runner.
 
         Args:
-            retrieval_func: Function to retrieve chunks for questions (uses model from app_config)
             log_dir: Directory for log files
         """
-        self.retrieval_func = retrieval_func
         self.log_dir = log_dir
 
     def load_questions(self, file_path: str) -> List[Dict]:
@@ -64,7 +38,6 @@ class EvaluationRunner:
         questions_file: str,
         k_values: List[int],
         dataset_filter: Optional[List[str]] = None,
-        min_score: Optional[float] = None,
         sample_fraction: Optional[float] = None,
         random_seed: Optional[int] = None,
         commit: Optional[str] = None,
@@ -75,7 +48,6 @@ class EvaluationRunner:
             questions_file: Path to questions CSV file
             k_values: List of k values to evaluate
             dataset_filter: Optional list of datasets to filter questions by
-            min_score: Optional minimum similarity score for retrieval
             sample_fraction: Optional fraction of questions to sample
             random_seed: Optional seed for reproducible sampling
             commit: Optional git commit hash
@@ -117,21 +89,19 @@ class EvaluationRunner:
     ) -> None:
         """Run evaluation for a single k value."""
         try:
-            # Create batch config
-            config = create_batch_config(
-                k_value=k, dataset_filter=dataset_filter, git_commit=commit
-            )
-            config.evaluation_config.num_samples = len(questions)
+            # Process results first before creating any files
+            results = batch_process_results(questions, k)
 
-            # Initialize logger
-            logger = EvaluationLogger(self.log_dir)
+            # Only create files if processing succeeded
+            with EvaluationLogger(self.log_dir) as logger:
+                # Create batch config
+                config = create_batch_config(
+                    k_value=k, dataset_filter=dataset_filter, git_commit=commit
+                )
+                config.evaluation_config.num_samples = len(questions)
 
-            try:
-                # Start batch
+                # Start batch and write files
                 logger.start_batch(config)
-
-                # Process results
-                results = batch_process_results(questions, self.retrieval_func, k)
 
                 # Log individual results
                 for result in results:
@@ -141,36 +111,26 @@ class EvaluationRunner:
                 metrics = compute_metrics_summary(results, config.batch_id)
                 logger.finish_batch(metrics)
 
-            except Exception as e:
-                print(f"Error running evaluation batch: {e}")
-                raise
-            finally:
-                # Ensure logger is cleaned up
-                logger.__exit__(None, None, None)
-        except RuntimeError as e:
-            error_msg = f"Failed to initialize batch configuration: {e}"
-            print(error_msg)
-            raise RuntimeError(error_msg) from e
+        except Exception as e:
+            print(f"Error running evaluation batch: {e}")
+            raise
 
 
 def run_evaluation(
     questions_file: str,
     k_values: List[int],
-    retrieval_func: Any,
     dataset_filter: Optional[List[str]] = None,
-    min_score: Optional[float] = None,
     sample_fraction: Optional[float] = None,
     random_seed: Optional[int] = None,
     log_dir: str = "logs/evaluations",
     commit: Optional[str] = None,
 ) -> None:
     """Convenience function to run evaluation."""
-    runner = EvaluationRunner(retrieval_func=retrieval_func, log_dir=log_dir)
+    runner = EvaluationRunner(log_dir=log_dir)
     runner.run_evaluation(
         questions_file=questions_file,
         k_values=k_values,
         dataset_filter=dataset_filter,
-        min_score=min_score,
         sample_fraction=sample_fraction,
         random_seed=random_seed,
         commit=commit,

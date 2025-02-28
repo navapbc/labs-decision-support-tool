@@ -4,7 +4,7 @@
 import argparse
 from pathlib import Path
 
-from ..metrics.runner import create_retrieval_function, run_evaluation
+from ..metrics.runner import run_evaluation
 
 # Map CLI dataset names to DB dataset names
 DATASET_MAPPING = {
@@ -47,9 +47,6 @@ def create_parser() -> argparse.ArgumentParser:
         default=Path("src/evaluation/data"),
         help="Base directory containing QA pairs and evaluation results",
     )
-    parser.add_argument(
-        "--min-score", type=float, default=-1.0, help="Minimum similarity score for retrieval"
-    )
     parser.add_argument("--sampling", type=float, help="Fraction of questions to sample (e.g. 0.1)")
     parser.add_argument("--random-seed", type=int, help="Random seed for reproducible sampling")
     parser.add_argument("--commit", type=str, help="Git commit hash for tracking evaluation runs")
@@ -78,9 +75,6 @@ def main() -> None:
 
         print(f"Using QA pairs from: {qa_pairs_path}")
 
-        # Create retrieval function with min_score
-        retrieval_func = create_retrieval_function(args.min_score)
-
         # Use evaluation logs directory within our module's data directory
         eval_logs_dir = base_path / "logs" / "evaluations"
 
@@ -90,8 +84,6 @@ def main() -> None:
             dataset_filter=db_datasets,
             sample_fraction=args.sampling,
             random_seed=args.random_seed,
-            min_score=args.min_score,
-            retrieval_func=retrieval_func,
             log_dir=str(eval_logs_dir),  # Pass the module-specific log directory
             commit=args.commit,
         )
