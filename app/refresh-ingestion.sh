@@ -155,13 +155,32 @@ echo_stats(){
     echo "Markdown file count: $(find "${DATASET_ID}-${TODAY}_md" -type f -iname '*.md' | wc -l)"
     echo "-----------------------------------"
     echo "REMINDERS:"
-    echo "1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
+    echo_cmds
+}
+
+echo_cmds(){
+    local DATASET_ID="$1"
+    echo "# 1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
     echo "   $(ls -l "${DATASET_ID}_md.zip")"
-    echo "2. Upload ingester input files (e.g., *-scrapings.json) and stats to S3:"
-    echo "   aws s3 sync src/ingestion/${DATASET_ID}_scrapings*.json s3://decision-support-tool-app-dev/${DATASET_ID}"
-    echo "   aws s3 cp logs/${DATASET_ID}-${TODAY}_stats.json s3://decision-support-tool-app-dev/${DATASET_ID}/stats/${TODAY}_stats.json"
-    echo "3. Run ingestion on deployed app:"
-    echo "   ./bin/run-command app dev ..."
+    echo ""
+    echo "# 2. Upload ingester input files (e.g., *-scrapings.json) and stats to S3:"
+
+    if [ "$DATASET_ID" == "imagine_la" ]; then
+        local S3_HTML_DIR="s3://decision-support-tool-app-dev/imagine_la-${TODAY}"
+        echo "aws s3 sync app/src/ingestion/imagine_la/scrape/pages/ $S3_HTML_DIR/"
+        echo "aws s3 cp app/logs/${DATASET_ID}-${TODAY}_stats.json ${S3_HTML_DIR}/stats/${TODAY}_stats.json"
+        echo ""
+        echo "# 3. Run ingestion on deployed app:"
+        echo "./bin/run-command app dev '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California:LA County\", \"$S3_HTML_DIR\"]'"
+    else
+        local S3_DIR="s3://decision-support-tool-app-dev/${DATASET_ID}"
+        local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
+        echo "aws s3 cp app/src/ingestion/${DATASET_ID}_scrapings.json $S3_SCRAPINGS_FILE"
+        echo "aws s3 cp app/logs/${DATASET_ID}-${TODAY}_stats.json ${S3_DIR}/stats/${TODAY}_stats.json"
+        echo ""
+        echo "# 3. Run ingestion on deployed app:"
+        echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]'"
+    fi
 }
 
 check_preconditions(){
@@ -188,6 +207,7 @@ fi
 
 mkdir -p logs
 export TODAY=$(date "+%Y-%m-%d")
+: ${DEPLOY_ENV:=dev}
 
 case "$1" in
     imagine_la)
@@ -201,6 +221,13 @@ case "$1" in
         fi
         EXTRA_INGEST_ARGS="--json_input=ssa_scrapings.json"
         scrape_and_ingest "$1"
+        ;;
+    cmds)
+        if [ -z "$2" ]; then
+            echo "Usage: '$0 cmds <DATASET_ID>'"
+            exit 3
+        fi
+        echo_cmds "$2"
         ;;
     *)
         scrape_and_ingest "$1"
