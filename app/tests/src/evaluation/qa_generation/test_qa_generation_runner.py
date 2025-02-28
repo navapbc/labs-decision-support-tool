@@ -9,10 +9,10 @@ from unittest.mock import patch
 import pytest
 from litellm import completion
 
+from src.db.models.document import Document
 from src.evaluation.data_models import QAPair
 from src.evaluation.qa_generation.runner import run_generation, save_qa_pairs
-from tests.src.db.models.factories import DocumentFactory, ChunkFactory
-from src.db.models.document import Document
+from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
 @pytest.fixture
@@ -52,18 +52,24 @@ def qa_pairs():
 @pytest.fixture
 def mock_completion_response():
     """Create a mock completion response."""
+
     def mock_completion(model, messages, **kwargs):
         mock_response = {
-            "choices": [{
-                "message": {
-                    "content": json.dumps({
-                        "question": "What is this document about?",
-                        "answer": "This is a test document."
-                    })
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "question": "What is this document about?",
+                                "answer": "This is a test document.",
+                            }
+                        )
+                    }
                 }
-            }]
+            ]
         }
         return completion(model, messages, mock_response=mock_response)
+
     return mock_completion
 
 
@@ -95,7 +101,9 @@ def test_save_qa_pairs(qa_pairs, tmp_path):
             assert row["dataset"] == qa_pairs[i].dataset
 
 
-def test_run_generation_basic(mock_completion_response, tmp_path, enable_factory_create, db_session):
+def test_run_generation_basic(
+    mock_completion_response, tmp_path, enable_factory_create, db_session
+):
     """Test basic run_generation functionality."""
     output_dir = tmp_path / "qa_output"
     llm_model = "gpt-4o-mini"
@@ -107,18 +115,17 @@ def test_run_generation_basic(mock_completion_response, tmp_path, enable_factory
             name=f"Test Document {i}",
             content=f"Test content {i}",
             dataset="Dataset 1",
-            source=f"Source {i}"
+            source=f"Source {i}",
         )
         # Create chunks with content
         for j in range(2):
-            ChunkFactory.create(
-                document=doc,
-                content=f"Chunk {j} content for doc{i}"
-            )
+            ChunkFactory.create(document=doc, content=f"Chunk {j} content for doc{i}")
         docs.append(doc)
 
     # Mock the completion function at the module where it's imported
-    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response):
+    with patch(
+        "src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response
+    ):
         # Run the function
         result = run_generation(llm_model=llm_model, output_dir=output_dir)
 
@@ -137,7 +144,9 @@ def test_run_generation_basic(mock_completion_response, tmp_path, enable_factory
                 assert row["answer"] == "This is a test document."
 
 
-def test_run_generation_with_dataset_filter(mock_completion_response, tmp_path, enable_factory_create, db_session):
+def test_run_generation_with_dataset_filter(
+    mock_completion_response, tmp_path, enable_factory_create, db_session
+):
     """Test run_generation with dataset filter."""
     output_dir = tmp_path / "qa_output"
     llm_model = "gpt-4o-mini"
@@ -149,28 +158,18 @@ def test_run_generation_with_dataset_filter(mock_completion_response, tmp_path, 
 
     # Create test documents with different datasets and their chunks
     doc1 = DocumentFactory.create(
-        dataset="Dataset 1",
-        source="Source 1",
-        content="Test content for doc1"
+        dataset="Dataset 1", source="Source 1", content="Test content for doc1"
     )
     # Create chunks with content
     for i in range(2):
-        ChunkFactory.create(
-            document=doc1,
-            content=f"Chunk {i} content for doc1"
-        )
-    
+        ChunkFactory.create(document=doc1, content=f"Chunk {i} content for doc1")
+
     doc2 = DocumentFactory.create(
-        dataset="Dataset 2",
-        source="Source 2",
-        content="Test content for doc2"
+        dataset="Dataset 2", source="Source 2", content="Test content for doc2"
     )
     # Create chunks with content
     for i in range(2):
-        ChunkFactory.create(
-            document=doc2,
-            content=f"Chunk {i} content for doc2"
-        )
+        ChunkFactory.create(document=doc2, content=f"Chunk {i} content for doc2")
 
     # Commit and close the session
     enable_factory_create.commit()
@@ -182,9 +181,13 @@ def test_run_generation_with_dataset_filter(mock_completion_response, tmp_path, 
         print(f"Document {doc.id}: dataset={doc.dataset}, chunks={len(doc.chunks)}")
 
     # Mock the completion function at the module where it's imported
-    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response):
+    with patch(
+        "src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response
+    ):
         # Verify we only see the filtered documents
-        filtered_docs = db_session.query(Document).filter(Document.dataset.in_(dataset_filter)).all()
+        filtered_docs = (
+            db_session.query(Document).filter(Document.dataset.in_(dataset_filter)).all()
+        )
         print("\nFiltered documents:")
         for doc in filtered_docs:
             print(f"Document {doc.id}: dataset={doc.dataset}, chunks={len(doc.chunks)}")
@@ -220,8 +223,4 @@ def test_run_generation_no_documents(tmp_path, enable_factory_create, app_config
 
     # Run the function and expect ValueError
     with pytest.raises(ValueError, match="No documents found matching filter criteria"):
-        run_generation(
-            llm_model=llm_model,
-            output_dir=output_dir,
-            dataset_filter=dataset_filter
-        )
+        run_generation(llm_model=llm_model, output_dir=output_dir, dataset_filter=dataset_filter)

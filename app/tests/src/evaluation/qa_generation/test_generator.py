@@ -14,18 +14,24 @@ from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 @pytest.fixture
 def mock_completion_response():
     """Create a mock completion response using litellm.completion."""
+
     def mock_completion(model, messages, **kwargs):
         mock_response = {
-            "choices": [{
-                "message": {
-                    "content": json.dumps({
-                        "question": "What is the test content?",
-                        "answer": "The test content is for QA generation."
-                    })
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "question": "What is the test content?",
+                                "answer": "The test content is for QA generation.",
+                            }
+                        )
+                    }
                 }
-            }]
+            ]
         }
         return completion(model, messages, mock_response=mock_response)
+
     return mock_completion
 
 
@@ -33,7 +39,9 @@ def test_generate_qa_pair_basic(mock_completion_response):
     """Test basic QA pair generation from a document."""
     document = DocumentFactory.build(content="Test document content", source="test_source")
 
-    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response):
+    with patch(
+        "src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response
+    ):
         pairs = generate_qa_pair(document)
 
         assert len(pairs) == 1
@@ -53,7 +61,9 @@ def test_generate_qa_pair_from_chunk(mock_completion_response):
     document = DocumentFactory.build(content="Parent document content", source="test_source")
     chunk = ChunkFactory.build(document=document, content="Test chunk content")
 
-    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response):
+    with patch(
+        "src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response
+    ):
         pairs = generate_qa_pair(chunk)
 
         assert len(pairs) == 1
@@ -71,15 +81,9 @@ def test_generate_qa_pair_from_chunk(mock_completion_response):
 def test_generate_qa_pair_invalid_json(mock_completion_response):
     """Test handling of invalid JSON in LLM response."""
     document = DocumentFactory.build(content="Test document content", source="test_source")
-    
+
     def mock_invalid_json(model, messages, **kwargs):
-        mock_response = {
-            "choices": [{
-                "message": {
-                    "content": "This is not valid JSON"
-                }
-            }]
-        }
+        mock_response = {"choices": [{"message": {"content": "This is not valid JSON"}}]}
         return completion(model, messages, mock_response=mock_response)
 
     with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_invalid_json):
@@ -90,21 +94,27 @@ def test_generate_qa_pair_invalid_json(mock_completion_response):
 def test_generate_qa_pair_missing_fields(mock_completion_response):
     """Test handling of missing fields in LLM response."""
     document = DocumentFactory.build(content="Test document content", source="test_source")
-    
+
     def mock_missing_fields(model, messages, **kwargs):
         mock_response = {
-            "choices": [{
-                "message": {
-                    "content": json.dumps({
-                        "not_question": "What is missing?",
-                        "not_answer": "The question and answer fields"
-                    })
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "not_question": "What is missing?",
+                                "not_answer": "The question and answer fields",
+                            }
+                        )
+                    }
                 }
-            }]
+            ]
         }
         return completion(model, messages, mock_response=mock_response)
 
-    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_missing_fields):
+    with patch(
+        "src.evaluation.qa_generation.generator.completion", side_effect=mock_missing_fields
+    ):
         pairs = generate_qa_pair(document)
         assert len(pairs) == 0  # Should return empty list for missing fields
 
@@ -112,7 +122,7 @@ def test_generate_qa_pair_missing_fields(mock_completion_response):
 def test_generate_qa_pair_api_error():
     """Test handling of API errors during generation."""
     document = DocumentFactory.build(content="Test document content", source="test_source")
-    
+
     def mock_api_error(model, messages, **kwargs):
         raise Exception("API Error")
 
@@ -142,7 +152,9 @@ def test_generate_from_documents_with_chunks(mock_completion_response):
     chunk2 = ChunkFactory.build(document=document, content="Test chunk 2 content")
     document.chunks = [chunk1, chunk2]
 
-    with patch("src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response):
+    with patch(
+        "src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response
+    ):
         pairs = list(generate_from_documents(llm_model="gpt-4o-mini", documents=[document]))
 
         assert len(pairs) == 2  # One pair per chunk

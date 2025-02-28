@@ -74,7 +74,7 @@ def run_generation(
 
         # Eagerly load chunks to avoid session issues
         query = query.options(joinedload(Document.chunks))
-        
+
         # Get all matching documents
         documents = query.all()
 
