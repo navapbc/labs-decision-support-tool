@@ -6,14 +6,12 @@ from hashlib import md5
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy import delete
 
-from src.db.models.document import Document
 from src.evaluation.metrics.results import batch_process_results, process_retrieved_chunks
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 # Create mock version instead of importing from retrieve
-MockChunkWithScore = namedtuple('MockChunkWithScore', ['chunk', 'score'])
+MockChunkWithScore = namedtuple("MockChunkWithScore", ["chunk", "score"])
 
 
 @pytest.fixture
@@ -110,15 +108,17 @@ def test_batch_process_results(question_dict, enable_factory_create, db_session)
 
     # Mock retrieve_with_scores to return our chunk with a high score
     with patch("src.evaluation.metrics.results.retrieve_with_scores") as mock_retrieve:
-        mock_retrieve.return_value = [MockChunkWithScore(chunk=chunk, score=0.95)]  # High score that passes threshold
-        
+        mock_retrieve.return_value = [
+            MockChunkWithScore(chunk=chunk, score=0.95)
+        ]  # High score that passes threshold
+
         results = batch_process_results([question_dict], k=1)
 
         # Verify mock was called with correct parameters
         mock_retrieve.assert_called_once_with(
             question_dict["question"],
             1,  # k
-            retrieval_k_min_score=0.0  # Use same threshold as retrieval tests
+            retrieval_k_min_score=0.0,  # Use same threshold as retrieval tests
         )
 
         assert len(results) == 1

@@ -105,13 +105,13 @@ def test_create_parser(tmp_path):
 def test_main_with_dataset(questions_file, mock_git_commit, tmp_path):
     """Test the main function with a dataset specified."""
     output_dir = tmp_path / "logs" / "evaluations"
-    
+
     # Read the first dataset name from the questions file
     with open(questions_file, "r") as f:
         reader = csv.DictReader(f)
         first_row = next(reader)
         dataset_to_filter = first_row["dataset"]
-    
+
     test_args = [
         "evaluate.py",
         "--dataset",
