@@ -155,7 +155,7 @@ echo_stats(){
     echo "Markdown file count: $(find "${DATASET_ID}-${TODAY}_md" -type f -iname '*.md' | wc -l)"
     echo "-----------------------------------"
     echo "REMINDERS:"
-    echo_cmds
+    echo_cmds "$DATASET_ID"
 }
 
 echo_cmds(){
@@ -171,7 +171,7 @@ echo_cmds(){
         echo "aws s3 cp app/logs/${DATASET_ID}-${TODAY}_stats.json ${S3_HTML_DIR}/stats/${TODAY}_stats.json"
         echo ""
         echo "# 3. Run ingestion on deployed app:"
-        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California:LA County\", \"$S3_HTML_DIR\"]'"
+        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California\", \"$S3_HTML_DIR\"]'"
     elif [ "$DATASET_ID" == "ssa" ]; then
         echo "The 'ssa' datasource was manually scraped, so it doesn't need to be refreshed."
     else
