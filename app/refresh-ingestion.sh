@@ -30,6 +30,12 @@ ingest_imagine_la() {
 
     create_md_zip "$DATASET_ID"
 
+    echo "Uploading scraped html files and stats to S3:"
+    local S3_HTML_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/imagine_la-${TODAY}"
+    aws s3 sync "src/ingestion/imagine_la/scrape/pages/" "$S3_HTML_DIR/" || exit 35
+    aws s3 cp "logs/${DATASET_ID}-${TODAY}_stats.json" "${S3_HTML_DIR}/stats/${TODAY}_stats.json" || exit 36
+    aws s3 ls "$S3_HTML_DIR" || exit 36
+
     echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
     ls -ld src/ingestion/imagine_la/scrape/pages
@@ -75,6 +81,15 @@ scrape_and_ingest() {
     fi
 
     create_md_zip "$DATASET_ID"
+
+    if ! [ "$DATASET_ID" == "ssa" ]; then
+        echo "Uploading scraped html files and stats to S3:"
+        local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
+        local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
+        aws s3 cp "src/ingestion/${DATASET_ID}_scrapings.json" "$S3_SCRAPINGS_FILE" || exit 25
+        aws s3 cp "logs/${DATASET_ID}-${TODAY}_stats.json" "${S3_DIR}/stats/${TODAY}_stats.json" || exit 26
+        aws s3 ls "$S3_DIR" || exit 27
+    fi
 
     echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
@@ -163,25 +178,17 @@ echo_cmds(){
     echo "# 1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
     echo "   $(ls -l "${DATASET_ID}_md.zip")"
     echo ""
-    echo "# 2. Upload ingester input files (e.g., *-scrapings.json) and stats to S3:"
+    echo "# 2. Run ingestion on deployed app: cd .. && ./refresh-${DEPLOY_ENV}.sh"
 
     if [ "$DATASET_ID" == "imagine_la" ]; then
         local S3_HTML_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/imagine_la-${TODAY}"
-        echo "aws s3 sync app/src/ingestion/imagine_la/scrape/pages/ $S3_HTML_DIR/"
-        echo "aws s3 cp app/logs/${DATASET_ID}-${TODAY}_stats.json ${S3_HTML_DIR}/stats/${TODAY}_stats.json"
-        echo ""
-        echo "# 3. Run ingestion on deployed app:"
-        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California\", \"$S3_HTML_DIR\"]'"
+        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California\", \"$S3_HTML_DIR\"]'" >> ../refresh-${DEPLOY_ENV}.sh
     elif [ "$DATASET_ID" == "ssa" ]; then
         echo "The 'ssa' datasource was manually scraped, so it doesn't need to be refreshed."
     else
         local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
         local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
-        echo "aws s3 cp app/src/ingestion/${DATASET_ID}_scrapings.json $S3_SCRAPINGS_FILE"
-        echo "aws s3 cp app/logs/${DATASET_ID}-${TODAY}_stats.json ${S3_DIR}/stats/${TODAY}_stats.json"
-        echo ""
-        echo "# 3. Run ingestion on deployed app:"
-        echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]'"
+        echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]'" >> ../refresh-${DEPLOY_ENV}.sh
     fi
 }
 
@@ -195,7 +202,12 @@ check_preconditions(){
     done
     if [ "$ERROR" == "1" ]; then
         echo "Move or delete the file/folder(s) before running this script."
-        exit 20
+        exit 50
+    fi
+
+    if ! aws sts get-caller-identity; then
+        echo "ERROR: AWS CLI is not configured. Run 'aws configure' to set up."
+        exit 51
     fi
 }
 
