@@ -246,11 +246,6 @@ check_preconditions(){
         echo "Move or delete the file/folder(s) before running this script."
         exit 50
     fi
-
-    if ! aws sts get-caller-identity; then
-        echo "ERROR: AWS CLI is not configured. Run 'aws configure' to set up."
-        exit 51
-    fi
 }
 
 if ! [ -e "refresh-ingestion.sh" ]; then
@@ -265,7 +260,7 @@ if [ -z "$1" ]; then
     echo "If <DATASET_ID> is 'all', it will run re-scrape all the datasets and create scripts for both dev and prod."
     echo "  SKIP_LOCAL_EMBEDDING=true by default when <DATASET_ID>='all'."
     echo "Set DEPLOY_ENV to 'dev' (default) or 'prod' to create refresh-$DEPLOY_ENV.sh script for the appropriate environment."
-    echo "Set SKIP_LOCAL_INGEST=true to skip local ingestion but still creating files for upload and ingestion for the deployed app."
+    echo "Set SKIP_LOCAL_INGEST=true to skip local ingestion but still create files for upload and ingestion for the deployed app."
     echo "Set TODAY=YYYY-MM-DD to use a different date than the current day."
     exit 1
 fi
@@ -329,7 +324,7 @@ case "$1" in
         echo ""
         echo "REMINDERS:"
         echo "- Upload the zip files to the 'Chatbot Knowledge Markdown' Google Drive folder."
-        echo "- Review and run the refresh scripts for both dev and prod."
+        echo "- Review and run the refresh scripts (in the top-level folder): refresh-dev-${TODAY} and refresh-prod-${TODAY}."
         echo "- Restore local TF to dev environment: ./bin/terraform-init infra/app/service dev"
         ;;
     *)
