@@ -21,6 +21,8 @@ class CoveredCaliforniaSpider(scrapy.Spider):
         "https://www.coveredca.com/support/glossary/",
         # Different layout
         "https://www.coveredca.com/learning-center/information-for-immigrants/",
+        # Different layout - grid boxes
+        "https://www.coveredca.com/documents-to-confirm-eligibility/",
     ]
 
     # This is used to substitute the base URL in the cache storage
@@ -42,9 +44,8 @@ class CoveredCaliforniaSpider(scrapy.Spider):
                         self.logger.info("Found sidebar link: %s", link)
                         yield response.follow(link, callback=self.parse_learning_center_page)
                 else:
-                    extractions = self.parse_learning_center_body(response.url, col)
-                    yield extractions
-        else:
+                    yield self.parse_learning_center_body(response.url, col)
+        elif response.url.startswith("https://www.coveredca.com/support/"):
             body = response.css("div.gtm-content")
             topic = None
             for item in body.css("h2, a"):
@@ -61,6 +62,27 @@ class CoveredCaliforniaSpider(scrapy.Spider):
                     raise ValueError(f"Unexpected tag {item.root.tag}")
 
             yield self.parse_support_page(response)
+        elif response.url == "https://www.coveredca.com/documents-to-confirm-eligibility/":
+            title = to_markdown(response.css("h1").get().strip()).removeprefix("# ").strip()
+            assert title
+            markdown = to_markdown(response.css("#content").get(), response.url)
+            assert markdown
+            extractions = {
+                "url": response.url,
+                "title": title,
+                "markdown": markdown,
+            }
+            yield extractions
+
+            # Extract links to subpages
+            primary_section = response.css("section.bg-primary")
+            assert len(primary_section) == 1
+            for href in primary_section.css("a::attr(href)").getall():
+                assert href
+                self.logger.info("Found link: %s", href)
+                yield response.follow(href, callback=self.parse_eligibility_doc_page)
+        else:
+            raise ValueError(f"Unexpected URL: {response.url}")
 
     def parse_learning_center_page(
         self, response: HtmlResponse
@@ -104,14 +126,14 @@ class CoveredCaliforniaSpider(scrapy.Spider):
         body = response.css("div.gtm-content")
         if not body:
             body = response.css("div[data-cms-source]")
+        assert len(body) == 1
         markdown = to_markdown(body.get(), response.url)
         assert markdown
-        extractions = {
+        return {
             "url": response.url,
             "title": title,
             "markdown": f"# {title}\n\n{markdown}",
         }
-        return extractions
 
     def parse_glossary(self, response: HtmlResponse, topic: Optional[str] = None) -> dict[str, str]:
         self.logger.info("Parsing glossary: %s ", response.url)
@@ -136,12 +158,31 @@ class CoveredCaliforniaSpider(scrapy.Spider):
                     raise ValueError(f"Unexpected tag {d_tag.root.tag}")
 
         self.logger.info("Glossary has %i terms", (len(markdowns) - 1) / 2)
-        extractions = {
+        return {
             "url": response.url,
             "title": title,
             "markdown": "\n\n".join(markdowns),
         }
-        return extractions
+
+    def parse_eligibility_doc_page(self, response: HtmlResponse) -> dict[str, str]:
+        if (
+            response.url
+            == "https://www.coveredca.com/documents-to-confirm-eligibility/minimum-essential-coverage/"
+        ):
+            title = to_markdown(response.css("h1").get().strip()).removeprefix("# ").strip()
+
+            markdowns = []
+            for body in response.css("div.gtm-content"):
+                md = to_markdown(body.get(), response.url)
+                assert md
+                markdowns.append(md)
+            return {
+                "url": response.url,
+                "title": title,
+                "markdown": "\n\n".join(markdowns),
+            }
+
+        return self.parse_support_page(response)
 
 
 def to_markdown(html: str, base_url: Optional[str] = None) -> str:
