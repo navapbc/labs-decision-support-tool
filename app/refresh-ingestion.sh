@@ -20,21 +20,17 @@ ingest_imagine_la() {
     # Move any previous markdown files
     [ -d "${DATASET_ID}_md" ] && mv -iv "$DATASET_ID"{,-orig}_md
 
-    # Save markdown files and ingest into DB
-    make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California \
-        FILEPATH=src/ingestion/imagine_la/scrape/pages 2>&1 | tee logs/${DATASET_ID}-2ingest.log
-    if [ $? -ne 0 ] || grep -E 'make:.*Error' "logs/${DATASET_ID}-2ingest.log"; then
-        echo "ERROR: ingest-runner failed. Check logs/${DATASET_ID}-2ingest.log"
-        exit 32
+    if [ -z "$SKIP_LOCAL_INGEST" ]; then
+        # Save markdown files and ingest into DB
+        make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California \
+            FILEPATH=src/ingestion/imagine_la/scrape/pages 2>&1 | tee logs/${DATASET_ID}-2ingest.log
+        if [ $? -ne 0 ] || grep -E 'make:.*Error' "logs/${DATASET_ID}-2ingest.log"; then
+            echo "ERROR: ingest-runner failed. Check logs/${DATASET_ID}-2ingest.log"
+            exit 32
+        fi
     fi
 
     create_md_zip "$DATASET_ID"
-
-    echo "Uploading scraped html files and stats to S3:"
-    local S3_HTML_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/imagine_la-${TODAY}"
-    aws s3 sync "src/ingestion/imagine_la/scrape/pages/" "$S3_HTML_DIR/" || exit 35
-    aws s3 cp "logs/${DATASET_ID}-${TODAY}_stats.json" "${S3_HTML_DIR}/stats/${TODAY}_stats.json" || exit 36
-    aws s3 ls "$S3_HTML_DIR" || exit 36
 
     echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
@@ -42,6 +38,9 @@ ingest_imagine_la() {
     echo "HTML files scraped: "
     ls src/ingestion/imagine_la/scrape/pages | wc -l
     echo_stats "$DATASET_ID"
+    echo "-----------------------------------"
+    echo "REMINDERS:"
+    echo_cmds "$DATASET_ID"
 }
 
 scrape_and_ingest() {
@@ -57,11 +56,10 @@ scrape_and_ingest() {
     if [ -d "src/ingestion/.scrapy/httpcache/${DATASET_ID}_spider" ] && ! [ -d "src/ingestion/.scrapy/httpcache/${DATASET_ID}_spider-$TODAY" ]; then
         echo "Clearing Scrapy cache"
         mv -iv "src/ingestion/.scrapy/httpcache/${DATASET_ID}_spider"{,-$TODAY}
-    else
-        echo "Using Scrapy cache created today"
     fi
 
     if ! [ "$DATASET_ID" = "ssa" ]; then
+        echo "Using Scrapy cache created today"
         # Run Scrapy on html files to create markdown in JSON file
         make scrapy-runner args="$DATASET_ID --debug" 2>&1 | tee "logs/${DATASET_ID}-1scrape.log"
         if grep -E 'make:.*Error|log_count/ERROR' "logs/${DATASET_ID}-1scrape.log"; then
@@ -73,6 +71,10 @@ scrape_and_ingest() {
     # Move any previous markdown files
     [ -d "${DATASET_ID}_md" ] && mv -iv "$DATASET_ID"{,-orig}_md
 
+    if [ "$SKIP_LOCAL_EMBEDDING" = "true" ]; then
+        EXTRA_INGEST_ARGS="$EXTRA_INGEST_ARGS --skip_db"
+    fi
+
     # Save markdown files and ingest into DB
     make ingest-runner args="$DATASET_ID $EXTRA_INGEST_ARGS" 2>&1 | tee "logs/${DATASET_ID}-2ingest.log"
     if [ $? -ne 0 ] || grep -E 'make:.*Error' "logs/${DATASET_ID}-2ingest.log"; then
@@ -82,19 +84,13 @@ scrape_and_ingest() {
 
     create_md_zip "$DATASET_ID"
 
-    if ! [ "$DATASET_ID" == "ssa" ]; then
-        echo "Uploading scraped html files and stats to S3:"
-        local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
-        local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
-        aws s3 cp "src/ingestion/${DATASET_ID}_scrapings.json" "$S3_SCRAPINGS_FILE" || exit 25
-        aws s3 cp "logs/${DATASET_ID}-${TODAY}_stats.json" "${S3_DIR}/stats/${TODAY}_stats.json" || exit 26
-        aws s3 ls "$S3_DIR" || exit 27
-    fi
-
     echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
     grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
     echo_stats "$DATASET_ID"
+    echo "-----------------------------------"
+    echo "REMINDERS:"
+    echo_cmds "$DATASET_ID"
 }
 
 create_md_zip(){
@@ -168,9 +164,6 @@ echo_stats(){
     grep -E "Running with args|DONE splitting|Finished ingesting" "logs/${DATASET_ID}-2ingest.log"
     ls -ld "${DATASET_ID}-${TODAY}_md"
     echo "Markdown file count: $(find "${DATASET_ID}-${TODAY}_md" -type f -iname '*.md' | wc -l)"
-    echo "-----------------------------------"
-    echo "REMINDERS:"
-    echo_cmds "$DATASET_ID"
 }
 
 echo_cmds(){
@@ -178,17 +171,51 @@ echo_cmds(){
     echo "# 1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
     echo "   $(ls -l "${DATASET_ID}_md.zip")"
     echo ""
-    echo "# 2. Run ingestion on deployed app: cd .. && ./refresh-${DEPLOY_ENV}.sh"
+    echo "# 2. Run ingestion on deployed app: (cd .. && sh ./refresh-${DEPLOY_ENV}-${TODAY}.sh) Review the script before running."
+
+    local REFRESH_SH="../refresh-${DEPLOY_ENV}-${TODAY}.sh"
+    if ! [ -e "$REFRESH_SH" ]; then
+        {
+            echo "#!/bin/sh"
+            echo "set -o errexit"
+            echo "./bin/terraform-init infra/app/service $DEPLOY_ENV"
+            echo ""
+        } > $REFRESH_SH
+        chmod +x $REFRESH_SH
+    else
+        echo "" >> $REFRESH_SH
+    fi
 
     if [ "$DATASET_ID" == "imagine_la" ]; then
+        {
+        echo "# $DATASET_ID: Upload to S3"
         local S3_HTML_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/imagine_la-${TODAY}"
-        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California\", \"$S3_HTML_DIR\"]'" >> ../refresh-${DEPLOY_ENV}.sh
+        echo "aws s3 sync \"app/src/ingestion/imagine_la/scrape/pages/\" \"$S3_HTML_DIR/\""
+        echo "aws s3 cp \"app/logs/${DATASET_ID}-${TODAY}_stats.json\" \"${S3_HTML_DIR}/stats/${TODAY}_stats.json\""
+
+        echo "# $DATASET_ID: Ingest"
+        local S3_HTML_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/imagine_la-${TODAY}"
+        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California\", \"$S3_HTML_DIR\"]'"
+        } >> $REFRESH_SH
     elif [ "$DATASET_ID" == "ssa" ]; then
-        echo "The 'ssa' datasource was manually scraped, so it doesn't need to be refreshed."
+        {
+        echo "# $DATASET_ID comes from S3 and was manually scraped"
+        echo "# $DATASET_ID: Ingest"
+        echo "./bin/run-command app dev '[\"ingest-runner\", \"ssa\", \"--json_input\", \"s3://decision-support-tool-app-dev/ssa/ssa_scrapings.json\"]'"
+        } >> $REFRESH_SH
     else
+        {
+        echo "# $DATASET_ID: Upload to S3"
         local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
         local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
-        echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]'" >> ../refresh-${DEPLOY_ENV}.sh
+        echo "aws s3 cp \"app/src/ingestion/${DATASET_ID}_scrapings.json\" \"$S3_SCRAPINGS_FILE\""
+        echo "aws s3 cp \"app/logs/${DATASET_ID}-${TODAY}_stats.json\" \"${S3_DIR}/stats/${TODAY}_stats.json\""
+
+        echo "# $DATASET_ID: Ingest"
+        local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
+        local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
+        echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]'"
+        } >> $REFRESH_SH
     fi
 }
 
@@ -211,17 +238,37 @@ check_preconditions(){
     fi
 }
 
+if ! [ -e "refresh-ingestion.sh" ]; then
+    echo "ERROR: Run this script from the 'app' directory."
+    exit 10
+fi
 if [ -z "$1" ]; then
     echo "Usage: '$0 <DATASET_ID>', where <DATASET_ID> is any of the following:"
     echo -n "  imagine_la"
     grep "case" src/ingest_runner.py | tr '":' ' ' | while read CASE DATASET_ID COLON; do [ "$DATASET_ID" != "_" ] && echo -n ", $DATASET_ID"; done
     echo ""
+    echo "If <DATASET_ID> is 'all', it will run re-scrape all the datasets and create scripts for both dev and prod."
+    echo "  SKIP_LOCAL_EMBEDDING=true by default when <DATASET_ID>='all'."
+    echo "Set DEPLOY_ENV to 'dev' (default) or 'prod' to create refresh-$DEPLOY_ENV.sh script for the appropriate environment."
+    echo "Set SKIP_LOCAL_INGEST=true to skip local ingestion but still creating files for upload and ingestion for the deployed app."
+    echo "Set TODAY=YYYY-MM-DD to use a different date than the current day."
     exit 1
 fi
 
+# Function to handle the exit signal
+handle_exit() {
+  exit_code=$?
+  if [ $exit_code -ne 0 ]; then
+    echo "Error: Script exited with code $exit_code" >&2
+  fi
+}
+# Trap the EXIT signal and call the handle_exit function
+trap handle_exit EXIT
+
 mkdir -p logs
-export TODAY=$(date "+%Y-%m-%d")
+: ${TODAY:=$(date "+%Y-%m-%d")}
 : ${DEPLOY_ENV:=dev}
+echo "Using TODAY=$TODAY DEPLOY_ENV=$DEPLOY_ENV"
 
 case "$1" in
     imagine_la)
@@ -242,6 +289,24 @@ case "$1" in
             exit 3
         fi
         echo_cmds "$2"
+        ;;
+    all)
+        mkdir -p OLD_INGESTION-$TODAY
+        mv -v *.zip *_md OLD_INGESTION-$TODAY/
+
+        : {SKIP_LOCAL_EMBEDDING:=true}
+        export DEPLOY_ENV=dev
+        for DATASET_ID in ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy; do
+            scrape_and_ingest "$DATASET_ID"
+        done
+        ingest_imagine_la
+
+        # Quickly create refresh script for prod
+        export DEPLOY_ENV=prod
+        for DATASET_ID in ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy; do
+            ./refresh-ingestion.sh cmds "$DATASET_ID"
+        done
+        ingest_imagine_la
         ;;
     *)
         scrape_and_ingest "$1"
