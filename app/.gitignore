@@ -50,6 +50,7 @@ documents/
 /logs/
 /*.zip
 ssa_scrapings.json
+/OLD_INGESTION*
 
 # Files for `make app-shell`
 /.app-shell.bashrc_local

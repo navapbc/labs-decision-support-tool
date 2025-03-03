@@ -6,8 +6,14 @@ import re
 import sys
 from pathlib import Path
 
+from src.app_config import app_config
 from src.ingester import ingest_json
-from src.util.ingest_utils import DefaultChunkingConfig, IngestConfig, start_ingestion
+from src.util.ingest_utils import (
+    DefaultChunkingConfig,
+    IngestConfig,
+    drop_existing_dataset,
+    start_ingestion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,11 +156,27 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset", help="scraper dataset id from `make scrapy-runner`")
     parser.add_argument("--json_input", help="path to the JSON file to ingest", action="append")
-    parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--skip_db", action="store_true")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume ingestion from previous run, skipping existing docs",
+    )
+    parser.add_argument("--skip_db", action="store_true", help="Skip reading from or writing to DB")
+    parser.add_argument(
+        "--drop-only", action="store_true", help="Only drop existing dataset; don't ingest"
+    )
     args = parser.parse_args(sys.argv[1:])
 
     config = get_ingester_config(args.dataset)
+
+    if args.drop_only:
+        with app_config.db_session() as db_session:
+            logger.info("Dropping existing dataset %r", config.dataset_label)
+            dropped = drop_existing_dataset(db_session, config.dataset_label)
+            if dropped:
+                logger.warning("Dropped existing dataset %r", config.dataset_label)
+            db_session.commit()
+        return
 
     output_file_prefix = os.path.join(config.md_base_dir, config.scraper_dataset)
     json_input = conditionally_consolidate_json_files(args.json_input, output_file_prefix)
