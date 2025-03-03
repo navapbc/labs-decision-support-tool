@@ -171,7 +171,7 @@ echo_cmds(){
     echo "# 1. Upload the zip file to the 'Chatbot Knowledge Markdown' Google Drive folder, replacing the old zip file."
     echo "   $(ls -l "${DATASET_ID}_md.zip")"
     echo ""
-    echo "# 2. Run ingestion on deployed app: (cd .. && sh ./refresh-${DEPLOY_ENV}-${TODAY}.sh) Review the script before running."
+    echo "# 2. Review and run the ingestion script to update deployment: (cd .. && sh ./refresh-${DEPLOY_ENV}-${TODAY}.sh >> refresh-${DEPLOY_ENV}-${TODAY}.log) "
 
     local REFRESH_SH="../refresh-${DEPLOY_ENV}-${TODAY}.sh"
     if ! [ -e "$REFRESH_SH" ]; then
@@ -199,9 +199,15 @@ echo_cmds(){
         } >> $REFRESH_SH
     elif [ "$DATASET_ID" == "ssa" ]; then
         {
-        echo "# $DATASET_ID comes from S3 and was manually scraped"
+        echo "# $DATASET_ID: Upload to S3"
+        echo "# $DATASET_ID was manually scraped"
+        local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
+        local S3_SCRAPINGS_FILE="${S3_DIR}/ssa_scrapings.json"
+        echo "Assuming files are directly under the app/ folder"
+        echo "aws s3 cp app/ssa_scrapings.json ${S3_SCRAPINGS_FILE}"
+        echo "aws s3 sync app/ssa_extra_md ${S3_DIR}/ssa_extra_md"
         echo "# $DATASET_ID: Ingest"
-        echo "./bin/run-command app dev '[\"ingest-runner\", \"ssa\", \"--json_input\", \"s3://decision-support-tool-app-dev/ssa/ssa_scrapings.json\"]'"
+        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-runner\", \"ssa\", \"--json_input\", \"${S3_SCRAPINGS_FILE}\"]'"
         } >> $REFRESH_SH
     else
         {
@@ -214,7 +220,16 @@ echo_cmds(){
         echo "# $DATASET_ID: Ingest"
         local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
         local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
-        echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]'"
+        if [ "$DATASET_ID" == "edd" ]; then
+            echo "#   Dropping table first so ingestion can use --resume in subsequent runs"
+            echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--drop-only\"]'"
+            echo "#   Ingest with --resume since it's a large dataset and can fail due to resource limits"
+            echo "while ! ./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\", \"--resume\"]'; do"
+            echo "   echo \"Resuming/retrying ...\""
+            echo "done"
+        else
+            echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]'"
+        fi
         } >> $REFRESH_SH
     fi
 }

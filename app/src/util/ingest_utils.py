@@ -19,7 +19,7 @@ from src.ingestion.markdown_chunking import ChunkingConfig
 logger = logging.getLogger(__name__)
 
 
-def _drop_existing_dataset(db_session: db.Session, dataset: str) -> bool:
+def drop_existing_dataset(db_session: db.Session, dataset: str) -> bool:
     dataset_exists = db_session.execute(select(Document).where(Document.dataset == dataset)).first()
     if dataset_exists:
         db_session.execute(delete(Document).where(Document.dataset == dataset))
@@ -129,7 +129,7 @@ def start_ingestion(
             ingestion_call(db_session, file_path, config, skip_db=skip_db, resume=resume)
         else:
             if not skip_db:
-                dropped = _drop_existing_dataset(db_session, config.dataset_label)
+                dropped = drop_existing_dataset(db_session, config.dataset_label)
                 if dropped:
                     logger.warning("Dropped existing dataset %s", config.dataset_label)
                 db_session.commit()
