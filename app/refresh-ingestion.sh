@@ -220,7 +220,7 @@ echo_cmds(){
         echo "# $DATASET_ID: Ingest"
         local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
         local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
-        if [ "$DATASET_ID" == "edd" ]; then
+        if [ "$DATASET_ID" == "edd" ] || [ "$DATASET_ID" == "la_policy" ]; then
             echo "#   Dropping table first so ingestion can use --resume in subsequent runs"
             echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--drop-only\"]'"
             echo "#   Ingest with --resume since it's a large dataset and can fail due to resource limits"
@@ -309,8 +309,11 @@ case "$1" in
         mkdir -p OLD_INGESTION-$TODAY
         mv -v *.zip *_md OLD_INGESTION-$TODAY/
 
+        # Don't need to update embeddings locally when refreshing deployed app
+        # Skipping creating local embeddings saves time
         : {SKIP_LOCAL_EMBEDDING:=true}
         export DEPLOY_ENV=dev
+        # Skip 'ssa' dataset since it was manually scraped and hence needs to be refreshed manually
         for DATASET_ID in ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy; do
             scrape_and_ingest "$DATASET_ID"
         done
@@ -322,6 +325,12 @@ case "$1" in
             ./refresh-ingestion.sh cmds "$DATASET_ID"
         done
         ingest_imagine_la
+
+        echo ""
+        echo "REMINDERS:"
+        echo "- Upload the zip files to the 'Chatbot Knowledge Markdown' Google Drive folder."
+        echo "- Review and run the refresh scripts for both dev and prod."
+        echo "- Restore local TF to dev environment: ./bin/terraform-init infra/app/service dev"
         ;;
     *)
         scrape_and_ingest "$1"
