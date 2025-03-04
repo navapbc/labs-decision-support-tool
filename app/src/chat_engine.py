@@ -300,8 +300,7 @@ set canned_response to a list that gives examples and describes categories for t
 Example prompts: "What do you know about?" "What info do you have?" "What can I ask you?" "What programs do you cover?" "What benefits do you cover?" "What topics do you know?"
 
 If the user's question is about how to reset their password for the Benefit Navigator, set canned_response to "If you already have a Navigator login and have forgotten that password:
-If you forgot the password for your personal login, click [Log In My Clients and Reports](https://benefitnavigator.web.app/casemanager/auth) from the Navigator home page, then [forgot password](https://benefitnavigator.web.app/casemanager/auth/forgot) at the bottom of the text on the login page. You should receive an email with a link to set a new password. Remember that it may take a few minutes for the email to show up, or you may find the email in your Spam folder.
-"
+If you forgot the password for your personal login, click [Log In My Clients and Reports](https://benefitnavigator.web.app/casemanager/auth) from the Navigator home page, then [forgot password](https://benefitnavigator.web.app/casemanager/auth/forgot) at the bottom of the text on the login page. You should receive an email with a link to set a new password. Remember that it may take a few minutes for the email to show up, or you may find the email in your Spam folder."
 
 If the user's question is about these questions related to the benefit navigator:
 - Change phone number for two-factor authentication
