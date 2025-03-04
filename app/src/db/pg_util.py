@@ -37,8 +37,10 @@ def backup_db() -> None:
     # In local environments, write to the current directory
     if env == "local":
         if not _pg_dump(config_dict, dumpfilename):
-            logger.info("DB data dumped to %r", dumpfilename)
+            logger.fatal("Failed to dump DB data to %r", dumpfilename)
+            return
 
+        logger.info("DB data dumped to %r", dumpfilename)
         logger.info("Skipping S3 upload since running in local environment")
         return
 
@@ -47,7 +49,9 @@ def backup_db() -> None:
         logger.info("Created temporary directory: %r", tmpdirname)
         stdout_file = f"{tmpdirname}/{dumpfilename}"
 
-        _pg_dump(config_dict, stdout_file)
+        if not _pg_dump(config_dict, stdout_file):
+            logger.fatal("Failed to dump DB data to %r", stdout_file)
+            return
 
         s3_client = get_s3_client()
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
@@ -83,12 +87,13 @@ def restore_db() -> None:
     else:
         logger.info("Skipping truncating tables; will attempt to append to existing data")
 
-    # if not _pg_restore(config_dict, dumpfilename):
-    #     logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
+    if not _pg_restore(config_dict, dumpfilename):
+        logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
 
     _print_row_counts()
 
 
+# pragma: no cover
 def _run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = None) -> bool:
     try:
         logger.info("Running: %r", " ".join(command))
@@ -141,7 +146,7 @@ def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
 def _truncate_db_tables(config_dict: dict[str, str], delay: bool) -> bool:
     if delay:
         logger.info(
-            "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use pg_dump to backup data)"
+            "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use backup-db to backup data)"
         )
         time.sleep(10)
     logger.info("Clearing out tables")
