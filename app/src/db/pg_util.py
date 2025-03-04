@@ -9,7 +9,7 @@ from typing import Optional, Sequence
 
 from botocore.exceptions import ClientError
 
-from src.adapters.db.clients import postgres_config
+from src.adapters.db.clients import postgres_client, postgres_config
 from src.app_config import app_config
 from src.db.models import conversation, document
 from src.util.file_util import get_s3_client
@@ -52,42 +52,42 @@ def pg_dump() -> None:
         )
         return
 
-    db_config = postgres_config.get_db_config()
-    if not db_config.password:
+    config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
+    if not config_dict["password"]:
         logger.fatal("DB password is not set")
         return
 
     print_row_counts()
 
-    with open(dumpfilename, "w", encoding="utf-8") as dumpfile:
+    stdout_file = f"/tmp/{dumpfilename}"
+    with open(stdout_file, "w", encoding="utf-8") as dumpfile:
         # PGPASSWORD is used by pg_dump
-        os.environ["PGPASSWORD"] = db_config.password
+        os.environ["PGPASSWORD"] = config_dict["password"]
         command = [
             "pg_dump",
             "--data-only",
             "--format=c",
             "-U",
-            db_config.username,
+            config_dict["user"],
             "-h",
-            db_config.host,
-            db_config.name,
+            config_dict["host"],
+            config_dict["dbname"],
         ]
         run_command(command, dumpfile)
+    logger.info("DB data dumped to %r", stdout_file)
 
     env = os.environ.get("ENVIRONMENT", "local")
     if env == "local":
         logger.info("Running in local environment; skipping S3 upload")
     else:
-        bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
-
         s3_client = get_s3_client()
-        dest_path = f"pg_dumps/{dumpfilename}-{datetime.now().strftime("%Y-%m-%d-%H_%M")}"
+        bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
+        dest_path = f"pg_dumps/{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}-{dumpfilename}"
         try:
-            s3_client.upload_file(dumpfilename, bucket, dest_path)
+            s3_client.upload_file(stdout_file, bucket, dest_path)
+            logger.info("DB dump uploaded to s3://%s/%s", bucket, dest_path)
         except ClientError as e:
             logging.error(e)
-
-    logger.info("DB data dumped to %r", dumpfilename)
 
 
 TRUE_STRINGS = ["true", "1", "t", "y", "yes"]
@@ -99,12 +99,13 @@ def pg_restore() -> None:
         logger.fatal("File %r not found; please set PG_DUMP_FILE to a valid file", dumpfilename)
         return
 
-    db_config = postgres_config.get_db_config()
-    if not db_config.password:
+    config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
+    if not config_dict["password"]:
         logger.fatal("DB password is not set")
         return
+
     # PGPASSWORD is used by psql and pg_restore
-    os.environ["PGPASSWORD"] = db_config.password
+    os.environ["PGPASSWORD"] = config_dict["password"]
 
     print_row_counts()
 
@@ -119,11 +120,11 @@ def pg_restore() -> None:
         command = [
             "psql",
             "-U",
-            db_config.username,
+            config_dict["user"],
             "-h",
-            db_config.host,
+            config_dict["host"],
             "-d",
-            db_config.name,
+            config_dict["dbname"],
             "-c",
             "TRUNCATE TABLE alembic_version, user_session, chat_message, document CASCADE;",
         ]
@@ -138,11 +139,11 @@ def pg_restore() -> None:
     command = [
         "pg_restore",
         "-U",
-        db_config.username,
+        config_dict["user"],
         "-h",
-        db_config.host,
+        config_dict["host"],
         "-d",
-        db_config.name,
+        config_dict["dbname"],
         dumpfilename,
     ]
     if not run_command(command):
