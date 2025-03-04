@@ -56,6 +56,3 @@ ssa_scrapings.json
 /.app-shell.bashrc_local
 /.app-shell.bash_history
 
-# Postgres dump files
-/*.dump
-

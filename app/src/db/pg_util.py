@@ -59,7 +59,10 @@ def pg_dump() -> None:
 
     print_row_counts()
 
-    stdout_file = f"/tmp/{dumpfilename}"
+    env = os.environ.get("ENVIRONMENT", "local")
+    # In local environments, write to the current directory.
+    # In deployed environments, write to /tmp/ since it is writeable.
+    stdout_file = dumpfilename if env == "local" else f"/tmp/{dumpfilename}"
     with open(stdout_file, "w", encoding="utf-8") as dumpfile:
         # PGPASSWORD is used by pg_dump
         os.environ["PGPASSWORD"] = config_dict["password"]
@@ -76,7 +79,6 @@ def pg_dump() -> None:
         run_command(command, dumpfile)
     logger.info("DB data dumped to %r", stdout_file)
 
-    env = os.environ.get("ENVIRONMENT", "local")
     if env == "local":
         logger.info("Skipping S3 upload since running in local environment")
     else:
