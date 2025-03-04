@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime
@@ -44,6 +45,14 @@ def run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = N
         return False
 
 
+def get_db_config() -> dict[str, str]:
+    config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
+    if not config_dict["password"]:
+        logger.fatal("DB password is not set")
+        sys.exit(2)
+    return config_dict
+
+
 def backup_db() -> None:
     dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
     if os.path.exists(dumpfilename):
@@ -53,11 +62,7 @@ def backup_db() -> None:
         )
         return
 
-    config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
-    if not config_dict["password"]:
-        logger.fatal("DB password is not set")
-        return
-
+    config_dict = get_db_config()
     print_row_counts()
 
     env = os.environ.get("ENVIRONMENT", "local")
@@ -84,7 +89,37 @@ def backup_db() -> None:
             logging.error(e)
 
 
-def pg_dump(config_dict, stdout_file):
+TRUE_STRINGS = ["true", "1", "t", "y", "yes"]
+
+
+def restore_db() -> None:
+    dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
+    if not os.path.exists(dumpfilename):
+        logger.fatal("File %r not found; please set PG_DUMP_FILE to a valid file", dumpfilename)
+        return
+
+    config_dict = get_db_config()
+    print_row_counts()
+
+    truncate_tables = os.environ.get("TRUNCATE_TABLES", "True").strip().lower() in TRUE_STRINGS
+    if truncate_tables:
+        delay = "TRUNCATE_TABLES" not in os.environ
+        success = clear_tables(config_dict, delay)
+        if success:
+            logger.info("Tables truncated")
+        else:
+            logger.fatal("Failed to truncate tables")
+            return
+    else:
+        logger.info("Skipping truncating tables; will attempt to append to existing data")
+
+    if not pg_restore(config_dict, dumpfilename):
+        logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
+
+    print_row_counts()
+
+
+def pg_dump(config_dict: dict[str, str], stdout_file: str) -> None:
     with open(stdout_file, "w", encoding="utf-8") as dumpfile:
         # PGPASSWORD is used by pg_dump
         os.environ["PGPASSWORD"] = config_dict["password"]
@@ -102,37 +137,32 @@ def pg_dump(config_dict, stdout_file):
     logger.info("DB data dumped to %r", stdout_file)
 
 
-TRUE_STRINGS = ["true", "1", "t", "y", "yes"]
-
-
-def restore_db() -> None:
-    dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
-    if not os.path.exists(dumpfilename):
-        logger.fatal("File %r not found; please set PG_DUMP_FILE to a valid file", dumpfilename)
-        return
-
-    config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
-    if not config_dict["password"]:
-        logger.fatal("DB password is not set")
-        return
-
-    # PGPASSWORD is used by psql and pg_restore
+def clear_tables(config_dict: dict[str, str], delay: bool) -> bool:
+    if delay:
+        logger.info(
+            "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use pg_dump to backup data)"
+        )
+        time.sleep(10)
+    logger.info("Clearing out tables")
+    # PGPASSWORD is used by psql
     os.environ["PGPASSWORD"] = config_dict["password"]
+    command = [
+        "psql",
+        "-U",
+        config_dict["user"],
+        "-h",
+        config_dict["host"],
+        "-d",
+        config_dict["dbname"],
+        "-c",
+        "TRUNCATE TABLE alembic_version, user_session, chat_message, document CASCADE;",
+    ]
+    return run_command(command)
 
-    print_row_counts()
 
-    truncate_tables = os.environ.get("TRUNCATE_TABLES", "True").strip().lower() in TRUE_STRINGS
-    if truncate_tables:
-        delay = "TRUNCATE_TABLES" not in os.environ
-        success = clear_tables(config_dict, delay)
-        if success:
-            logger.info("Tables truncated")
-        else:
-            logger.fatal("Failed to truncate tables")
-            return
-    else:
-        logger.info("Skipping truncating tables; will attempt to append to existing data")
-
+def pg_restore(config_dict: dict[str, str], dumpfilename: str) -> bool:
+    # PGPASSWORD is used by pg_restore
+    os.environ["PGPASSWORD"] = config_dict["password"]
     command = [
         "pg_restore",
         "-U",
@@ -143,30 +173,6 @@ def restore_db() -> None:
         config_dict["dbname"],
         dumpfilename,
     ]
-    if not run_command(command):
-        logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
-        return
-
-    print_row_counts()
-
-def clear_tables(config_dict: dict[str, str], delay: bool) -> bool:
-    if delay:
-        logger.info(
-                "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use pg_dump to backup data)"
-            )
-        time.sleep(10)
-    logger.info("Clearing out tables")
-    command = [
-            "psql",
-            "-U",
-            config_dict["user"],
-            "-h",
-            config_dict["host"],
-            "-d",
-            config_dict["dbname"],
-            "-c",
-            "TRUNCATE TABLE alembic_version, user_session, chat_message, document CASCADE;",
-        ]
     return run_command(command)
 
 
