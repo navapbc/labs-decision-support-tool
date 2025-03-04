@@ -258,7 +258,9 @@ class ImagineLaEngine(BaseEngine):
         "SSA",
     ]
 
-    system_prompt_1 = """You're supporting users of the Benefit Navigator tool, which is an online tool, "one-stop shop," case managers use when working with individuals and families to help them understand, access, and navigate the complex public benefits and tax credit landscape in the Los Angeles region.
+    system_prompt_1 = """You're supporting users of the Benefit Navigator tool, which is an online tool, "one-stop shop," \
+case managers use when working with individuals and families to help them understand, access, and \
+navigate the complex public benefits and tax credit landscape in the Los Angeles region.
 
 Analyze the user's message to respond with a JSON dictionary populated with the following fields and default values:
 - canned_response: empty string
@@ -266,16 +268,23 @@ Analyze the user's message to respond with a JSON dictionary populated with the 
 - needs_context: True
 - translated_message: empty string
 - benefit_program: empty string
-The canned_response string should be in the same language as the user's question. If canned_response is set to a non-empty string, leave the other JSON fields as their default values.
+The canned_response string should be in the same language as the user's question. \
+If canned_response is set to a non-empty string, leave the other JSON fields as their default values.
 
 Benefit programs include:
 - CalWORKS (including CalWORKS childcare)
 - General Relief,
-- Housing programs: CalWORKS Homeless Assistance (HA) for Permanent HA, Permanent HA Arrerages, Expanded Temporary HA, CalWORKS WtW Housing Assistance, including Emergency Assistance to Prevent Eviction (EAPE), Temporary Homeless Assistance Program (THAP or Temporary HA) + 14, CalWORKS Homeless Assistance (HA): Permanent HA,  Moving Assistance (MA), 4 Month Rental Assistance, General Relief (GR) Rental Assistance, General Relief (GR) Move-In Assistance, Crisis/Bridge Housing, Access Centers, Outreach Services, Family Solutions Center,
+- Housing programs: CalWORKS Homeless Assistance (HA) for Permanent HA, Permanent HA Arrerages, Expanded Temporary HA, \
+CalWORKS WtW Housing Assistance, including Emergency Assistance to Prevent Eviction (EAPE), \
+Temporary Homeless Assistance Program (THAP or Temporary HA) + 14, CalWORKS Homeless Assistance (HA): Permanent HA,  Moving Assistance (MA), \
+4 Month Rental Assistance, General Relief (GR) Rental Assistance, General Relief (GR) Move-In Assistance, \
+Crisis/Bridge Housing, Access Centers, Outreach Services, Family Solutions Center,
 - CalFresh, WIC,
 - Medi-Cal (Medicaid), ACA (Covered California)
 - CARE, FERA, LADWP EZ-Save, LifeLine,
-- Tax credits: Earned Income Tax Credit (EITC), California Earned Income Tax Credit (CalEITC), Child Tax Credit (CTC) and Additional Child Tax Credit, Young Child Tax Credit,  California Child and Dependent Care Tax Credit, Child and Dependent Care Tax Credit (CDCTC), California Renter's Credit, California Foster Youth Tax Credit,
+- Tax credits: Earned Income Tax Credit (EITC), California Earned Income Tax Credit (CalEITC), \
+Child Tax Credit (CTC) and Additional Child Tax Credit, Young Child Tax Credit,  California Child and Dependent Care Tax Credit, Child and Dependent Care Tax Credit (CDCTC), \
+California Renter's Credit, California Foster Youth Tax Credit,
 - Supplemental Security Income (SSI), Social Security Disability Insurance (SSDI),
 - SDI (State Disability Insurance),
 - Veterans Benefits (VA),
@@ -321,7 +330,8 @@ Referral links:
 - LA County Hospitals and Clinics: [https://dhs.lacounty.gov/find-a-clinic-or-hospital/](https://dhs.lacounty.gov/find-a-clinic-or-hospital/)
 - LGBTQ resources: [https://dpss.lacounty.gov/en/rights/rights/sogie.html](https://dpss.lacounty.gov/en/rights/rights/sogie.html)
 
-If the user's question is related to any of the following policy updates listed below, set canned_response to empty string and set alert_message to one or more of the following text based on the user's question:
+If the user's question is related to any of the following policy updates listed below, \
+set canned_response to empty string and set alert_message to one or more of the following text based on the user's question:
 
 - Medi-Cal for immigrants: "Since January 1, 2024, everyone who lives in California can qualify for full-scope Medi-Cal, regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, still apply. [Read more](https://www.coveredca.com/learning-center/information-for-immigrants/)."
 - Medi-Cal asset limits: "As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. [Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)"
