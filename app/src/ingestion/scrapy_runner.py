@@ -47,7 +47,7 @@ def postprocess_json(input_filename: str) -> None:
         # This code could be moved to pipelines.py to be more formal
         with open(f"{input_filename}-pretty.json", "w", encoding="utf-8") as formatted_json:
             formatted_json.write(json.dumps(data, indent=4))
-            logger.info("Formatted JSON saved to %s-pretty.json", input_filename)
+            logger.info("Formatted JSON saved to %s-pretty.json", os.path.realpath(input_filename))
 
 
 def list_spiders() -> list[str]:
