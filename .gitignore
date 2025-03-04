@@ -32,3 +32,7 @@ app/src/evaluation/data/
 
 # Local development files
 app/Makefile.local
+
+# Local refresh-ingestion-created scripts
+/refresh-*.sh
+
