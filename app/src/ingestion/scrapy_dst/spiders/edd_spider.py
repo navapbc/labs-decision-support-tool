@@ -1,5 +1,7 @@
 import re
 
+from bs4 import BeautifulSoup
+from bs4.element import Tag
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
@@ -124,11 +126,50 @@ class EddSpider(CrawlSpider):
         return {"main_content": markdown}
 
     def parse_entire_two_thirds(self, base_url: str, two_thirds: SelectorList) -> dict[str, str]:
-        markdown = self.to_markdown(base_url, two_thirds.get())
+        if base_url == "https://edd.ca.gov/en/jobs_and_training/Layoff_Services_WARN/":
+            table_sel = two_thirds.css("table")
+            assert len(table_sel) == 1, "Expected one table in two-thirds content"
+
+            # Use soup to convert the table cell into a div
+            soup = BeautifulSoup(table_sel.get(), "html.parser")
+            self.__table_to_subsections(soup, soup.find("table"))
+            table_md = self.to_markdown(base_url, str(soup))
+
+            # Drop the table from the two-thirds content
+            table_sel.drop()
+            # Convert the remaining content into markdown
+            partial_md = self.to_markdown(base_url, two_thirds.get())
+            # Combine the table and partial markdowns
+            markdown = "\n\n".join([partial_md, table_md])
+        else:
+            markdown = self.to_markdown(base_url, two_thirds.get())
+
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#collapse-(.*?)\)", r"\1", markdown)
         # FIXME: parse tab panes correctly -- https://edd.ca.gov/en/unemployment/
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#pane-(.*?)\)", r"\1", cleaned_markdown)
         return {"main_content": cleaned_markdown}
+
+    def __table_to_subsections(self, soup: BeautifulSoup, table: Tag) -> None:
+        table.name = "div"
+        del table.attrs["style"]
+        headings = [th.get_text() for th in table.find_all("th")]
+
+        assert len(headings) == 3, "Expected one table header"
+        table.find_next("tr").decompose()  # Remove the header row
+
+        for tr in table.find_all("tr"):
+            tr.name = "div"
+            del tr.attrs["style"]
+            tds = tr.find_all("td", recursive=False)
+            assert len(tds) == 3, "Expected three columns in table row"
+            for heading, td in zip(headings, tds, strict=True):
+                # Convert the td element to a paragraph
+                td.name = "p"
+                del td.attrs["style"]
+                # Add the heading as a prefix to the paragraph text
+                h5 = soup.new_tag("h5")
+                h5.string = heading
+                td.insert_before(h5)
 
     def parse_nonaccordion(self, base_url: str, main_content: SelectorList) -> dict[str, str]:
         # Create a copy for modification without affecting the original
