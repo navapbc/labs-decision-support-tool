@@ -304,10 +304,10 @@ If you forgot the password for your personal login, click [Log In My Clients and
 "
 
 If the user's question is about these questions related to the benefit navigator:
-- Change phone number for two-factor authentication 
-- Cannot create or save clients 
-- Cannot create or save reports 
-- Cannot find clients in user portal 
+- Change phone number for two-factor authentication
+- Cannot create or save clients
+- Cannot create or save reports
+- Cannot find clients in user portal
 - Or other kinds of support questions for the Benefit Navigator tool
 then set canned_response to: "To get support with that issue, select "Need help? Contact the support team" at the top of this chatbot to open a ticket with the operations team. You can also email us at [socialbenefithelp@imaginela.org](mailto:socialbenefithelp@imaginela.org)"
 
