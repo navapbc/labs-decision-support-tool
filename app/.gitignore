@@ -55,3 +55,7 @@ ssa_scrapings.json
 # Files for `make app-shell`
 /.app-shell.bashrc_local
 /.app-shell.bash_history
+
+# Postgres dump files
+/*.dump
+

@@ -10,15 +10,23 @@ FROM python:3.12-slim AS base
 # https://python-poetry.org
 RUN pip install --no-cache-dir poetry==1.5
 
-RUN apt-get update \
+# curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgres.gpg
+
+# echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/postgres.gpg] http://apt.postgresql.org/pub/repos/apt stable main" | tee /etc/apt/sources.list.d/postgres.list > /dev/null
+
+RUN apt-get update && apt-get install -y lsb-release wget gnupg && \
+    # Need to add the official PostgreSQL repo to install v16 -- https://askubuntu.com/a/1442247
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
+    echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/postgres.list && \
+    apt-get update \
     # Install security updates
     # https://pythonspeed.com/articles/security-updates-in-docker/
-    && apt-get upgrade --yes \
-    && apt-get install --no-install-recommends --yes \
+    && apt-get upgrade --yes 
+
+RUN apt-get install --no-install-recommends --yes \
     build-essential \
     libpq-dev \
-    postgresql \
-    wget \
+    postgresql-16 \
     # These are required by unstructured
     python3-opencv \
     # Reduce the image size by clear apt cached lists
