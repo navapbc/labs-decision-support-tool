@@ -69,8 +69,8 @@ db-migrate = "src.db.migrations.run:up"
 db-migrate-down = "src.db.migrations.run:down"
 db-migrate-down-all = "src.db.migrations.run:downall"
 
-pg-dump = "src.db.pg_util:pg_dump"
-pg-restore = "src.db.pg_util:pg_restore"
+backup-db = "src.db.pg_util:backup_db"
+restore-db = "src.db.pg_util:restore_db"
 
 scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 ingest-imagine-la = "src.ingestion.imagine_la.ingest:main"

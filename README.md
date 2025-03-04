@@ -95,6 +95,6 @@ The input file can have additional columns beyond `question`. They will be prese
 
 ## Backing up DB contents
 
-To backup DB contents for the `dev` deployment, run `./bin/run-command app dev '["poetry", "run", "pg-dump"]'` to create a [PostgreSQL dump file](https://www.postgresql.org/docs/current/backup-dump.html) and upload it to the `pg_dumps` folder in S3.
+To backup DB contents for the `dev` deployment, run `./bin/run-command app dev '["poetry", "run", "backup-db"]'` to create a [PostgreSQL dump file](https://www.postgresql.org/docs/current/backup-dump.html) and upload it to the `pg_dumps` folder in S3.
 
-To restore the DB contents locally, run `PG_DUMP_FILE=db.dump make pg-restore`, replacing the `PG_DUMP_FILE` value with the dump file downloaded from S3.
+To restore the DB contents locally, run `PG_DUMP_FILE=db.dump make restore-db`, replacing the `PG_DUMP_FILE` value with the dump file downloaded from S3.

@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import tempfile
 import time
 from datetime import datetime
 from io import TextIOWrapper
@@ -15,7 +16,7 @@ from src.db.models import conversation, document
 from src.util.file_util import get_s3_client
 
 logger = logging.getLogger(__name__)
-# Print INFO messages since this is often run from the terminal during local development
+# Print INFO messages since this file is run directly
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
@@ -43,7 +44,7 @@ def run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = N
         return False
 
 
-def pg_dump() -> None:
+def backup_db() -> None:
     dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
     if os.path.exists(dumpfilename):
         logger.fatal(
@@ -60,9 +61,30 @@ def pg_dump() -> None:
     print_row_counts()
 
     env = os.environ.get("ENVIRONMENT", "local")
-    # In local environments, write to the current directory.
-    # In deployed environments, write to /tmp/ since it is writeable.
-    stdout_file = dumpfilename if env == "local" else f"/tmp/{dumpfilename}"
+    # In local environments, write to the current directory
+    if env == "local":
+        pg_dump(config_dict, dumpfilename)
+        logger.info("Skipping S3 upload since running in local environment")
+        return
+
+    # In deployed environments, write to (writeable) temp directory and upload to S3
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        logger.info("Created temporary directory: %r", tmpdirname)
+        stdout_file = f"{tmpdirname}/{dumpfilename}"
+
+        pg_dump(config_dict, stdout_file)
+
+        s3_client = get_s3_client()
+        bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
+        dest_path = f"pg_dumps/{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}-{dumpfilename}"
+        try:
+            s3_client.upload_file(stdout_file, bucket, dest_path)
+            logger.info("DB dump uploaded to s3://%s/%s", bucket, dest_path)
+        except ClientError as e:
+            logging.error(e)
+
+
+def pg_dump(config_dict, stdout_file):
     with open(stdout_file, "w", encoding="utf-8") as dumpfile:
         # PGPASSWORD is used by pg_dump
         os.environ["PGPASSWORD"] = config_dict["password"]
@@ -79,23 +101,11 @@ def pg_dump() -> None:
         run_command(command, dumpfile)
     logger.info("DB data dumped to %r", stdout_file)
 
-    if env == "local":
-        logger.info("Skipping S3 upload since running in local environment")
-    else:
-        s3_client = get_s3_client()
-        bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
-        dest_path = f"pg_dumps/{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}-{dumpfilename}"
-        try:
-            s3_client.upload_file(stdout_file, bucket, dest_path)
-            logger.info("DB dump uploaded to s3://%s/%s", bucket, dest_path)
-        except ClientError as e:
-            logging.error(e)
-
 
 TRUE_STRINGS = ["true", "1", "t", "y", "yes"]
 
 
-def pg_restore() -> None:
+def restore_db() -> None:
     dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
     if not os.path.exists(dumpfilename):
         logger.fatal("File %r not found; please set PG_DUMP_FILE to a valid file", dumpfilename)
@@ -113,24 +123,9 @@ def pg_restore() -> None:
 
     truncate_tables = os.environ.get("TRUNCATE_TABLES", "True").strip().lower() in TRUE_STRINGS
     if truncate_tables:
-        if "TRUNCATE_TABLES" not in os.environ:
-            logger.info(
-                "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use pg_dump to backup data)"
-            )
-            time.sleep(10)
-        logger.info("Clearing out tables")
-        command = [
-            "psql",
-            "-U",
-            config_dict["user"],
-            "-h",
-            config_dict["host"],
-            "-d",
-            config_dict["dbname"],
-            "-c",
-            "TRUNCATE TABLE alembic_version, user_session, chat_message, document CASCADE;",
-        ]
-        if run_command(command):
+        delay = "TRUNCATE_TABLES" not in os.environ
+        success = clear_tables(config_dict, delay)
+        if success:
             logger.info("Tables truncated")
         else:
             logger.fatal("Failed to truncate tables")
@@ -153,6 +148,26 @@ def pg_restore() -> None:
         return
 
     print_row_counts()
+
+def clear_tables(config_dict: dict[str, str], delay: bool) -> bool:
+    if delay:
+        logger.info(
+                "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use pg_dump to backup data)"
+            )
+        time.sleep(10)
+    logger.info("Clearing out tables")
+    command = [
+            "psql",
+            "-U",
+            config_dict["user"],
+            "-h",
+            config_dict["host"],
+            "-d",
+            config_dict["dbname"],
+            "-c",
+            "TRUNCATE TABLE alembic_version, user_session, chat_message, document CASCADE;",
+        ]
+    return run_command(command)
 
 
 def print_row_counts() -> None:
