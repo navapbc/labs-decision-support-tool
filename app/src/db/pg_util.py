@@ -21,38 +21,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def _run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = None) -> bool:
-    try:
-        logger.info("Running: %r", " ".join(command))
-        if stdout_file:
-            result = subprocess.run(command, check=True, stdout=stdout_file)
-        else:
-            # capture_output=True ensures that both stdout and stderr are captured.
-            # check=True causes CalledProcessError when the command fails.
-            result = subprocess.run(command, capture_output=True, check=True)
-
-        if stdout_file:
-            logger.info("Output written to %r", stdout_file.name)
-        elif result.stdout:
-            logger.info("Stdout: %s", result.stdout.decode("utf-8").strip())
-        return True
-    except FileNotFoundError:
-        logger.fatal("pg_dump not found. Please install postgresql or postgresql-client v16+.")
-        return False
-    except CalledProcessError as e:
-        logger.fatal("Error: Command failed with return code %r", e.returncode)
-        logger.fatal("Stderr:\n%s", e.stderr)
-        return False
-
-
-def _get_db_config() -> dict[str, str]:
-    config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
-    if not config_dict["password"]:
-        logger.fatal("DB password is not set")
-        sys.exit(2)
-    return config_dict
-
-
 def backup_db() -> None:
     dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
     if os.path.exists(dumpfilename):
@@ -111,13 +79,46 @@ def restore_db() -> None:
         else:
             logger.fatal("Failed to truncate tables")
             return
+        _print_row_counts()
     else:
         logger.info("Skipping truncating tables; will attempt to append to existing data")
 
-    if not _pg_restore(config_dict, dumpfilename):
-        logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
+    # if not _pg_restore(config_dict, dumpfilename):
+    #     logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
 
     _print_row_counts()
+
+
+def _run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = None) -> bool:
+    try:
+        logger.info("Running: %r", " ".join(command))
+        if stdout_file:
+            result = subprocess.run(command, check=True, stdout=stdout_file)
+        else:
+            # capture_output=True ensures that both stdout and stderr are captured.
+            # check=True causes CalledProcessError when the command fails.
+            result = subprocess.run(command, capture_output=True, check=True)
+
+        if stdout_file:
+            logger.info("Output written to %r", stdout_file.name)
+        elif result.stdout:
+            logger.info("Stdout: %s", result.stdout.decode("utf-8").strip())
+        return True
+    except FileNotFoundError:
+        logger.fatal("pg_dump not found. Please install postgresql or postgresql-client v16+.")
+        return False
+    except CalledProcessError as e:
+        logger.fatal("Error: Command failed with return code %r", e.returncode)
+        logger.fatal("Stderr:\n%s", e.stderr.decode("utf-8").strip())
+        return False
+
+
+def _get_db_config() -> dict[str, str]:
+    config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
+    if not config_dict["password"]:
+        logger.fatal("DB password is not set")
+        sys.exit(2)
+    return config_dict
 
 
 def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:

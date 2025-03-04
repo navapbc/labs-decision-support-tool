@@ -129,10 +129,10 @@ start-db: ## Start only the database container
 ## Destroy current DB, setup new one
 db-recreate: clean-volumes init-db
 
-backup_db:
-	$(PY_RUN_CMD) backup_db
-pg-restore:
-	$(PY_RUN_CMD) restore_db
+backup-db:
+	$(PY_RUN_CMD) backup-db
+restore-db:
+	$(PY_RUN_CMD) restore-db
 
 #########################
 # DB Migrations
