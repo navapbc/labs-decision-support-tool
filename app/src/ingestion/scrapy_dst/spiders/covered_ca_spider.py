@@ -123,12 +123,16 @@ class CoveredCaliforniaSpider(scrapy.Spider):
         assert title
         title = f"{topic}: {title}" if topic else title
 
-        body = response.css("div.gtm-content")
-        if not body:
-            body = response.css("div[data-cms-source]")
-        assert len(body) == 1
-        markdown = to_markdown(body.get(), response.url)
-        assert markdown
+        body_sel = response.css("div.gtm-content")
+        if not body_sel:
+            body_sel = response.css("div[data-cms-source]")
+
+        markdowns = []
+        for body in body_sel:
+            md = to_markdown(body.get(), response.url)
+            assert md
+            markdowns.append(md)
+        markdown = "\n\n".join(markdowns)
         return {
             "url": response.url,
             "title": title,
@@ -165,23 +169,7 @@ class CoveredCaliforniaSpider(scrapy.Spider):
         }
 
     def parse_eligibility_doc_page(self, response: HtmlResponse) -> dict[str, str]:
-        if (
-            response.url
-            == "https://www.coveredca.com/documents-to-confirm-eligibility/minimum-essential-coverage/"
-        ):
-            title = to_markdown(response.css("h1").get().strip()).removeprefix("# ").strip()
-
-            markdowns = []
-            for body in response.css("div.gtm-content"):
-                md = to_markdown(body.get(), response.url)
-                assert md
-                markdowns.append(md)
-            return {
-                "url": response.url,
-                "title": title,
-                "markdown": "\n\n".join(markdowns),
-            }
-
+        # These pages can be parsed like support pages
         return self.parse_support_page(response)
 
 
