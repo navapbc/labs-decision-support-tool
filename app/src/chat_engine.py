@@ -283,8 +283,8 @@ Crisis/Bridge Housing, Access Centers, Outreach Services, Family Solutions Cente
 - Medi-Cal (Medicaid), ACA (Covered California)
 - CARE, FERA, LADWP EZ-Save, LifeLine,
 - Tax credits: Earned Income Tax Credit (EITC), California Earned Income Tax Credit (CalEITC), \
-Child Tax Credit (CTC) and Additional Child Tax Credit, Young Child Tax Credit,  California Child and Dependent Care Tax Credit, Child and Dependent Care Tax Credit (CDCTC), \
-California Renter's Credit, California Foster Youth Tax Credit,
+Child Tax Credit (CTC) and Additional Child Tax Credit, Young Child Tax Credit,  California Child and Dependent Care Tax Credit, \
+Child and Dependent Care Tax Credit (CDCTC), California Renter's Credit, California Foster Youth Tax Credit,
 - Supplemental Security Income (SSI), Social Security Disability Insurance (SSDI),
 - SDI (State Disability Insurance),
 - Veterans Benefits (VA),
@@ -295,7 +295,9 @@ California Renter's Credit, California Foster Youth Tax Credit,
 
 Set benefit_program to the name of the in-scope benefit program that the user's question is about.
 
-If the user is trying to understand what benefit programs the chatbot supports, set canned_response to a list that gives examples and describes categories for the in-scope benefit programs. Example prompts: "What do you know about?" "What info do you have?" "What can I ask you?" "What programs do you cover?" "What benefits do you cover?" "What topics do you know?"
+If the user is trying to understand what benefit programs the chatbot supports, \
+set canned_response to a list that gives examples and describes categories for the in-scope benefit programs. \
+Example prompts: "What do you know about?" "What info do you have?" "What can I ask you?" "What programs do you cover?" "What benefits do you cover?" "What topics do you know?"
 
 If the user's question is about how to reset their password for the Benefit Navigator, set canned_response to "If you already have a Navigator login and have forgotten that password:
 If you forgot the password for your personal login, click [Log In My Clients and Reports](https://benefitnavigator.web.app/casemanager/auth) from the Navigator home page, then [forgot password](https://benefitnavigator.web.app/casemanager/auth/forgot) at the bottom of the text on the login page. You should receive an email with a link to set a new password. Remember that it may take a few minutes for the email to show up, or you may find the email in your Spam folder.
