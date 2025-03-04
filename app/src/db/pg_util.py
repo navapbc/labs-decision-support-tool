@@ -78,7 +78,7 @@ def pg_dump() -> None:
 
     env = os.environ.get("ENVIRONMENT", "local")
     if env == "local":
-        logger.info("Running in local environment; skipping S3 upload")
+        logger.info("Skipping S3 upload since running in local environment")
     else:
         s3_client = get_s3_client()
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
