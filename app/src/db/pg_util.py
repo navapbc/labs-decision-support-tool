@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = None) -> bool:
+def _run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = None) -> bool:
     try:
         logger.info("Running: %r", " ".join(command))
         if stdout_file:
@@ -45,7 +45,7 @@ def run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = N
         return False
 
 
-def get_db_config() -> dict[str, str]:
+def _get_db_config() -> dict[str, str]:
     config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
     if not config_dict["password"]:
         logger.fatal("DB password is not set")
@@ -62,13 +62,15 @@ def backup_db() -> None:
         )
         return
 
-    config_dict = get_db_config()
-    print_row_counts()
+    config_dict = _get_db_config()
+    _print_row_counts()
 
     env = os.environ.get("ENVIRONMENT", "local")
     # In local environments, write to the current directory
     if env == "local":
-        pg_dump(config_dict, dumpfilename)
+        if not _pg_dump(config_dict, dumpfilename):
+            logger.info("DB data dumped to %r", dumpfilename)
+
         logger.info("Skipping S3 upload since running in local environment")
         return
 
@@ -77,7 +79,7 @@ def backup_db() -> None:
         logger.info("Created temporary directory: %r", tmpdirname)
         stdout_file = f"{tmpdirname}/{dumpfilename}"
 
-        pg_dump(config_dict, stdout_file)
+        _pg_dump(config_dict, stdout_file)
 
         s3_client = get_s3_client()
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
@@ -98,14 +100,13 @@ def restore_db() -> None:
         logger.fatal("File %r not found; please set PG_DUMP_FILE to a valid file", dumpfilename)
         return
 
-    config_dict = get_db_config()
-    print_row_counts()
+    config_dict = _get_db_config()
+    _print_row_counts()
 
     truncate_tables = os.environ.get("TRUNCATE_TABLES", "True").strip().lower() in TRUE_STRINGS
     if truncate_tables:
         delay = "TRUNCATE_TABLES" not in os.environ
-        success = clear_tables(config_dict, delay)
-        if success:
+        if _truncate_db_tables(config_dict, delay):
             logger.info("Tables truncated")
         else:
             logger.fatal("Failed to truncate tables")
@@ -113,13 +114,13 @@ def restore_db() -> None:
     else:
         logger.info("Skipping truncating tables; will attempt to append to existing data")
 
-    if not pg_restore(config_dict, dumpfilename):
+    if not _pg_restore(config_dict, dumpfilename):
         logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
 
-    print_row_counts()
+    _print_row_counts()
 
 
-def pg_dump(config_dict: dict[str, str], stdout_file: str) -> None:
+def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
     with open(stdout_file, "w", encoding="utf-8") as dumpfile:
         # PGPASSWORD is used by pg_dump
         os.environ["PGPASSWORD"] = config_dict["password"]
@@ -133,11 +134,10 @@ def pg_dump(config_dict: dict[str, str], stdout_file: str) -> None:
             config_dict["host"],
             config_dict["dbname"],
         ]
-        run_command(command, dumpfile)
-    logger.info("DB data dumped to %r", stdout_file)
+        return _run_command(command, dumpfile)
 
 
-def clear_tables(config_dict: dict[str, str], delay: bool) -> bool:
+def _truncate_db_tables(config_dict: dict[str, str], delay: bool) -> bool:
     if delay:
         logger.info(
             "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use pg_dump to backup data)"
@@ -157,10 +157,10 @@ def clear_tables(config_dict: dict[str, str], delay: bool) -> bool:
         "-c",
         "TRUNCATE TABLE alembic_version, user_session, chat_message, document CASCADE;",
     ]
-    return run_command(command)
+    return _run_command(command)
 
 
-def pg_restore(config_dict: dict[str, str], dumpfilename: str) -> bool:
+def _pg_restore(config_dict: dict[str, str], dumpfilename: str) -> bool:
     # PGPASSWORD is used by pg_restore
     os.environ["PGPASSWORD"] = config_dict["password"]
     command = [
@@ -173,10 +173,10 @@ def pg_restore(config_dict: dict[str, str], dumpfilename: str) -> bool:
         config_dict["dbname"],
         dumpfilename,
     ]
-    return run_command(command)
+    return _run_command(command)
 
 
-def print_row_counts() -> None:
+def _print_row_counts() -> None:
     with app_config.db_session() as db_session:
         for table in [
             document.Document,
