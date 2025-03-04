@@ -62,8 +62,8 @@ def test_user_session_factory(enable_factory_create, db_session: db.Session):
 
 def test_chat_message_factory(db_session: db.Session, enable_factory_create):
     # Delete UserSession and ChatMessage records created by other tests
-    db_session.execute(delete(UserSession))
     db_session.execute(delete(ChatMessage))
+    db_session.execute(delete(UserSession))
 
     # Create some messages for the same user session
     user_session = UserSessionFactory.create()

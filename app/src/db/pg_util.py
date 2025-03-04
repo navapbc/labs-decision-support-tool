@@ -48,6 +48,8 @@ def backup_db() -> None:
     with tempfile.TemporaryDirectory() as tmpdirname:
         logger.info("Created temporary directory: %r", tmpdirname)
         stdout_file = f"{tmpdirname}/{dumpfilename}"
+        # In case dumpfilename is a path, create the parent directories
+        os.makedirs(os.path.dirname(stdout_file), exist_ok=True)
 
         if not _pg_dump(config_dict, stdout_file):
             logger.fatal("Failed to dump DB data to %r", stdout_file)
@@ -55,12 +57,20 @@ def backup_db() -> None:
 
         s3_client = get_s3_client()
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
-        dest_path = f"pg_dumps/{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}-{dumpfilename}"
+        dated_filename = replace_extension(
+            dumpfilename, f"-{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}.dump"
+        )
+        dest_path = f"pg_dumps/{dated_filename}"
         try:
             s3_client.upload_file(stdout_file, bucket, dest_path)
             logger.info("DB dump uploaded to s3://%s/%s", bucket, dest_path)
         except ClientError as e:
             logging.error(e)
+
+
+def replace_extension(filename, new_extension):
+    base_name, _ = os.path.splitext(filename)
+    return base_name + new_extension
 
 
 TRUE_STRINGS = ["true", "1", "t", "y", "yes"]
@@ -89,12 +99,15 @@ def restore_db() -> None:
 
     if not _pg_restore(config_dict, dumpfilename):
         logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
+    else:
+        logger.info("DB data restored from %r", dumpfilename)
 
     _print_row_counts()
 
 
-# pragma: no cover
-def _run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = None) -> bool:
+def _run_command(
+    command: Sequence[str], stdout_file: Optional[TextIOWrapper] = None
+) -> bool:  # pragma: no cover
     try:
         logger.info("Running: %r", " ".join(command))
         if stdout_file:
@@ -120,7 +133,7 @@ def _run_command(command: Sequence[str], stdout_file: Optional[TextIOWrapper] = 
 
 def _get_db_config() -> dict[str, str]:
     config_dict = postgres_client.get_connection_parameters(postgres_config.get_db_config())
-    if not config_dict["password"]:
+    if not config_dict["password"]:  # pragma: no cover
         logger.fatal("DB password is not set")
         sys.exit(2)
     return config_dict
@@ -144,7 +157,7 @@ def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
 
 
 def _truncate_db_tables(config_dict: dict[str, str], delay: bool) -> bool:
-    if delay:
+    if delay:  # pragma: no cover
         logger.info(
             "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use backup-db to backup data)"
         )
