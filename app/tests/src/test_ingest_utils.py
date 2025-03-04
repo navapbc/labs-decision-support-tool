@@ -11,8 +11,8 @@ from sqlalchemy import delete, select
 from src.db.models.document import Document
 from src.util.ingest_utils import (
     IngestConfig,
-    _drop_existing_dataset,
     add_embeddings,
+    drop_existing_dataset,
     process_and_ingest_sys_args,
     save_json,
     tokenize,
@@ -27,11 +27,11 @@ def test__drop_existing_dataset(db_session, enable_factory_create):
     docs = DocumentFactory(dataset="1"), DocumentFactory(dataset="2")
 
     # This shouldn't do anything
-    assert _drop_existing_dataset(db_session, "nonexistent dataset") is False
+    assert drop_existing_dataset(db_session, "nonexistent dataset") is False
     assert len(db_session.execute(select(Document)).all()) == 2
 
     # After this, the only document left should be the second one
-    assert _drop_existing_dataset(db_session, docs[0].dataset) is True
+    assert drop_existing_dataset(db_session, docs[0].dataset) is True
     assert db_session.execute(select(Document)).one()[0].dataset == docs[1].dataset
 
 

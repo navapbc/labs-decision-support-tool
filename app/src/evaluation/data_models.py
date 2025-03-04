@@ -3,7 +3,9 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from hashlib import md5
 from typing import Dict, List, Optional
+from uuid import UUID
 
 
 @dataclass
@@ -41,6 +43,7 @@ class ExpectedChunk:
     source: str
     chunk_id: str
     content_hash: str
+    content: str  # The actual text content of the chunk
 
 
 @dataclass
@@ -65,6 +68,7 @@ class EvaluationResult:
     rank_if_found: Optional[int]
     retrieval_time_ms: float
     retrieved_chunks: List[RetrievedChunk]
+    dataset: str  # Dataset name for this QA pair
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -95,3 +99,30 @@ class MetricsSummary:
     overall_metrics: Dict[str, float]
     dataset_metrics: Dict[str, DatasetMetrics]
     incorrect_analysis: IncorrectRetrievalsAnalysis
+
+
+# QA Generation Models
+@dataclass
+class QAPair:
+    """A question-answer pair."""
+
+    question: str
+    answer: str
+    document_name: str
+    document_source: str
+    document_id: UUID
+    chunk_id: Optional[UUID]
+    content_hash: str
+    dataset: str
+    llm_model: str  # Model used for generation
+    expected_chunk_content: str = ""  # Content of the chunk that contains the answer
+    id: Optional[UUID] = None  # Stable ID generated at creation time
+    created_at: datetime = field(default_factory=datetime.utcnow)
+
+    def __post_init__(self) -> None:
+        """Generate a stable ID based on question and answer if not provided."""
+        # Generate a stable UUID based on content if id is None
+        if self.id is None:
+            content = f"{self.question}||{self.answer}".encode("utf-8")
+            content_hash = md5(content, usedforsecurity=False).digest()
+            self.id = UUID(bytes=content_hash[:16])

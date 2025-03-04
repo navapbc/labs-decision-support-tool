@@ -278,11 +278,21 @@ ingest-runner: ## Ingest scrapings into DB: `make ingest-runner args="dataset"`
 ##################################################
 
 evaluate: ## Run evaluation with configurable parameters
-	$(PY_RUN_CMD) python -m src.evaluation.cli.main \
+	$(PY_RUN_CMD) python -m src.evaluation.cli.evaluate \
 		$(if $(dataset),--dataset $(dataset),) \
 		$(if $(k),--k $(k),) \
-		$(if $(questions_file),--questions-file=$(questions_file),) \
+		$(if $(qa_pairs_version),--qa-pairs-version=$(qa_pairs_version),) \
 		$(if $(sampling),--sampling=$(sampling),) \
 		$(if $(min_score),--min-score=$(min_score),) \
+		$(if $(random_seed),--random-seed=$(random_seed),) \
+		$(if $(output_dir),--output-dir=$(output_dir),) \
+		--commit=$(shell git rev-parse HEAD)
+
+generate-qa: ## Generate QA pairs from documents
+	$(PY_RUN_CMD) python -m src.evaluation.cli.generate \
+		$(if $(dataset),--dataset $(dataset),) \
+		$(if $(output_dir),--output-dir $(output_dir),) \
+		$(if $(llm),--llm $(llm),) \
+		$(if $(sampling),--sampling=$(sampling),) \
 		$(if $(random_seed),--random-seed=$(random_seed),) \
 		--commit=$(shell git rev-parse HEAD)
