@@ -92,6 +92,9 @@ def test_backup_db_for_dev(enable_factory_create, db_session, caplog, mock_s3_de
     dumpfile = "dev_db.dump"
     pg_dump_util.backup_db(dumpfile, "dev")
 
+    for i, msg in enumerate(caplog.messages):
+        print(i, msg)
+
     assert any(
         re.match(
             "Writing DB dump to 's3://decision-support-tool-app-dev/pg_dumps/dev_db-.*.dump'",

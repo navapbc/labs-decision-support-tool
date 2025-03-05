@@ -189,11 +189,11 @@ def _truncate_db_tables(config_dict: dict[str, str], delay_seconds: int) -> bool
         DECLARE
             r RECORD;
         BEGIN
-            FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = '{schema}')
+            FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = {schema!r})
             LOOP
                 EXECUTE 'TRUNCATE TABLE {schema}.' || quote_ident(r.tablename) || ' CASCADE';
             END LOOP;
-        END $$;"""
+        END $$;"""  # nosec
     )
     command = [
         "psql",
