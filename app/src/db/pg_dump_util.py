@@ -102,7 +102,7 @@ def main() -> None:  # pragma: no cover
         logger.fatal("Unknown action %r", args.action)
 
 
-def file_exists(uri):
+def file_exists(uri: str) -> bool:
     try:
         with smart_open(uri, "rb"):
             return True
