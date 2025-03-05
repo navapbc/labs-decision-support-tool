@@ -3,20 +3,16 @@ import logging
 import os
 import subprocess
 import sys
-import tempfile
 import time
 from datetime import datetime
-from io import TextIOWrapper
 from smart_open import open as smart_open
 from subprocess import CalledProcessError
-from typing import Optional, Sequence
-
-from botocore.exceptions import ClientError
+from typing import Any, Optional, Sequence
 
 from src.adapters.db.clients import postgres_client, postgres_config
 from src.app_config import app_config
 from src.db.models import conversation, document
-from src.util.file_util import get_s3_client, replace_file_extension
+from src.util.file_util import replace_file_extension
 
 logger = logging.getLogger(__name__)
 # Configure logging since this file is run directly
@@ -24,52 +20,28 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def backup_db(dumpfilename: str, env) -> None:
-    _print_row_counts()
-
-    # In local environments, write to the current directory
-    if env == "local":
-        if os.path.exists(dumpfilename):
-            logger.fatal(
-                "File %r already exists; delete or move it first or specify a different file using --dumpfile",
-                dumpfilename,
-            )
-            return
-    else:
-        # In deployed environments, write to S3
-        # tmpdirname = tempfile.TemporaryDirectory()
-        # logger.info("Created temporary directory: %r", tmpdirname)
-        # dumpfilename = f"{tmpdirname}/{dumpfilename}"
-        # In case dumpfilename is a path, create the parent directories
-        # os.makedirs(os.path.dirname(dumpfilename), exist_ok=True)
-
+    # In not local environment, write to a specific S3 directory
+    if env != "local":
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
         dated_filename = replace_file_extension(
             dumpfilename, f"-{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}.dump"
         )
         dumpfilename = f"s3://{bucket}/pg_dumps/{dated_filename}"
 
+    if file_exists(dumpfilename):
+        logger.fatal(
+            "File %r already exists; delete or move it first or specify a different file using --dumpfile",
+            dumpfilename,
+        )
+        return
+
+    _print_row_counts()
     logger.info("Writing DB dump to %r", dumpfilename)
     config_dict = _get_db_config()
     if not _pg_dump(config_dict, dumpfilename):
         logger.fatal("Failed to dump DB data to %r", dumpfilename)
         return
-
     logger.info("DB data dumped to %r", dumpfilename)
-
-    # if env == "local":
-    #     logger.info("Skipping S3 upload since running in local environment")
-    # else:
-        # s3_client = get_s3_client()
-        # bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
-        # dated_filename = replace_file_extension(
-        #     dumpfilename, f"-{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}.dump"
-        # )
-        # dest_path = f"pg_dumps/{dated_filename}"
-        # try:
-        #     s3_client.upload_file(dumpfilename, bucket, dest_path)
-        #     logger.info("DB dump uploaded to s3://%s/%s", bucket, dest_path)
-        # except ClientError as e:
-        #     logging.error(e)
 
 
 def restore_db(dumpfilename: str, skip_truncate: bool, truncate_delay: int) -> None:
@@ -132,13 +104,26 @@ def main() -> None:
         logger.fatal("Unknown action %r", args.action)
 
 
+def file_exists(uri):
+    try:
+        with smart_open(uri, 'rb'):
+            return True
+    except Exception:
+        return False
+
 def _run_command(
-    command: Sequence[str], stdout_file: Optional[TextIOWrapper] = None
+    command: Sequence[str], stdout_file: Optional[Any] = None
 ) -> bool:  # pragma: no cover
     try:
         logger.info("Running: %r", " ".join(command))
         if stdout_file:
-            result = subprocess.run(command, check=True, stdout=stdout_file)
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            outs, errs = proc.communicate()
+            if proc.returncode > 0:
+                logger.error("Error: Command failed with return code %r", proc.returncode)
+                logger.error("Stderr:\n%s", errs.decode("utf-8").strip())
+                return False
+            stdout_file.write(outs)
         else:
             # capture_output=True ensures that both stdout and stderr are captured.
             # check=True causes CalledProcessError when the command fails.
@@ -167,7 +152,7 @@ def _get_db_config() -> dict[str, str]:
 
 
 def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
-    with smart_open(stdout_file, "w", encoding="utf-8") as dumpfile:
+    with smart_open(stdout_file, "wb") as dumpfile:
         # PGPASSWORD is used by pg_dump
         os.environ["PGPASSWORD"] = config_dict["password"]
         command = [
