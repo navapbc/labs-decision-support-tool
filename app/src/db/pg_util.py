@@ -57,7 +57,7 @@ def backup_db() -> None:
 
         s3_client = get_s3_client()
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
-        dated_filename = replace_extension(
+        dated_filename = _replace_extension(
             dumpfilename, f"-{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}.dump"
         )
         dest_path = f"pg_dumps/{dated_filename}"
@@ -68,7 +68,7 @@ def backup_db() -> None:
             logging.error(e)
 
 
-def replace_extension(filename, new_extension):
+def _replace_extension(filename: str, new_extension: str) -> str:
     base_name, _ = os.path.splitext(filename)
     return base_name + new_extension
 

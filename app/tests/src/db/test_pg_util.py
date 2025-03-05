@@ -3,7 +3,6 @@ import os
 import re
 import tempfile
 
-from datetime import datetime
 from sqlalchemy import delete, select
 
 from src.db import pg_util
@@ -48,14 +47,13 @@ def test_backup_and_restore_db(enable_factory_create, db_session, caplog, monkey
         assert f"DB data dumped to '{tmpdirname}/db.dump'" in caplog.messages
         assert "Skipping S3 upload since running in local environment" in caplog.messages
 
-
         for msg in caplog.messages:
             print(msg)
 
         pg_util.restore_db()
         assert "Clearing out tables" in caplog.messages
         assert "Tables truncated" in caplog.messages
-        assert f"DB data restored from '{os.environ["PG_DUMP_FILE"]}'" in caplog.messages
+        assert f"DB data restored from {os.environ["PG_DUMP_FILE"]!r}" in caplog.messages
 
 
 def test_backup_db_failure(enable_factory_create, db_session, caplog, monkeypatch):
@@ -78,16 +76,23 @@ def test_backup_db_for_dev(enable_factory_create, db_session, caplog, monkeypatc
         pg_util.backup_db()
 
         assert any(
-            re.match(f"DB dump uploaded to s3://decision-support-tool-app-dev/pg_dumps/{tmpdirname}/db-.*\.dump", msg)
+            re.match(
+                f"DB dump uploaded to s3://decision-support-tool-app-dev/pg_dumps/{tmpdirname}/db-.*.dump",
+                msg,
+            )
             for msg in caplog.messages
         )
+
 
 def test_restore_db_failure(enable_factory_create, db_session, caplog, monkeypatch):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         os.environ["PG_DUMP_FILE"] = f"{tmpdirname}/db.dump"
 
         pg_util.restore_db()
-        assert f"File '{tmpdirname}/db.dump' not found; please set PG_DUMP_FILE to a valid file" in caplog.messages
+        assert (
+            f"File '{tmpdirname}/db.dump' not found; please set PG_DUMP_FILE to a valid file"
+            in caplog.messages
+        )
 
         assert "Tables truncated" not in caplog.messages
         assert f"DB data restored from {os.environ["PG_DUMP_FILE"]}" not in caplog.messages
