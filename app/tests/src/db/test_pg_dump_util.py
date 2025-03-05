@@ -79,6 +79,17 @@ def test_backup_db__dump_failure(caplog, monkeypatch):
         assert f"Failed to dump DB data to '{tmpdirname}/db.dump'" in caplog.messages
 
 
+def test_backup_db__truncate_failure(caplog, monkeypatch):
+    monkeypatch.setattr(pg_dump_util, "_truncate_db_tables", lambda *args: False)
+    with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
+        dumpfile = f"{tmpdirname}/db.dump"
+        with open(dumpfile, "wb"):
+            pass
+        pg_dump_util.restore_db(dumpfile, False, 0)
+
+        assert "Failed to truncate tables" in caplog.messages
+
+
 @pytest.fixture
 def mock_s3_dev_bucket(mock_s3):
     bucket = mock_s3.Bucket("decision-support-tool-app-dev")
