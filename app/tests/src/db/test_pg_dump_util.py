@@ -89,11 +89,9 @@ def mock_s3_dev_bucket(mock_s3):
 def test_backup_db_for_dev(enable_factory_create, db_session, caplog, mock_s3_dev_bucket):
     _prep_test(db_session)
 
-    dumpfile = "dev_db.dump"
-    pg_dump_util.backup_db(dumpfile, "dev")
-
-    for i, msg in enumerate(caplog.messages):
-        print(i, msg)
+    with caplog.at_level(logging.INFO):
+        dumpfile = "dev_db.dump"
+        pg_dump_util.backup_db(dumpfile, "dev")
 
     assert any(
         re.match(
