@@ -15,6 +15,8 @@ The `engine_id` determines the endpoint of the chatbot, while the `datasets` lis
 
 The application supports using data from various sources including web scraping, JSON files, and PDFs. We have automated scripts for scraping and ingesting data from several sources.
 
+The `./refresh-ingestion.sh` script automates most of the scraping and ingestion process for all data sources. This is the recommended approach for refreshing data. The following subsections first describe how to use this script, then detail each step performed by the script in case you want to run them individually.
+
 ### Refreshing all data sources
 
 To refresh all data sources at once, use the refresh-ingestion.sh script from within `/app`:
@@ -47,6 +49,10 @@ CONTENTHUB_PASSWORD="your_password_here" ./refresh-ingestion.sh imagine_la
 ```
 
 Available datasets include: imagine_la, ca_ftb, ca_public_charge, ca_wic, covered_ca, irs, edd, la_policy, and ssa.
+
+### Manual Process: Individual Steps
+
+The following sections describe each step performed by the refresh-ingestion.sh script in case you want to run them individually.
 
 ### Web scraping
 
