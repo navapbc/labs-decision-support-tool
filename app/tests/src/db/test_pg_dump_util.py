@@ -11,13 +11,7 @@ from src.db.models.document import Document
 from tests.src.db.models.factories import ChatMessageFactory, ChunkFactory, UserSessionFactory
 
 
-def _prep_test(monkeypatch, run_command_return_value=True, db_session=None):
-    def _mock_run_command(_command, _stdout_file=None) -> bool:
-        # Don't run any commands b/c they affect the real DB
-        return run_command_return_value
-
-    monkeypatch.setattr(pg_dump_util, "_run_command", _mock_run_command)
-
+def _prep_test(db_session):
     if db_session:
         db_session.execute(delete(Document))
         db_session.execute(delete(ChatMessage))
@@ -31,8 +25,8 @@ def _prep_test(monkeypatch, run_command_return_value=True, db_session=None):
         ChatMessageFactory.create_batch(4, session=user_session)
 
 
-def test_backup_and_restore_db(enable_factory_create, db_session, caplog, monkeypatch):
-    _prep_test(monkeypatch, db_session=db_session)
+def test_backup_and_restore_db(enable_factory_create, db_session, caplog):
+    _prep_test(db_session)
 
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         dumpfile = f"{tmpdirname}/db.dump"
@@ -51,9 +45,7 @@ def test_backup_and_restore_db(enable_factory_create, db_session, caplog, monkey
         assert f"DB data restored from {dumpfile!r}" in caplog.messages
 
 
-def test_restore_db_without_truncating(caplog, monkeypatch):
-    _prep_test(monkeypatch)
-
+def test_restore_db_without_truncating(caplog):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         dumpfile = f"{tmpdirname}/db.dump"
         with open(dumpfile, "wb"):
@@ -79,8 +71,7 @@ def test_backup_db__file_exists(caplog):
 
 
 def test_backup_db__dump_failure(caplog, monkeypatch):
-    _prep_test(monkeypatch, run_command_return_value=False)
-
+    monkeypatch.setattr(pg_dump_util, "_pg_dump", lambda *args: False)
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         dumpfile = f"{tmpdirname}/db.dump"
         pg_dump_util.backup_db(dumpfile, "local")
@@ -95,10 +86,8 @@ def mock_s3_dev_bucket(mock_s3):
     yield bucket
 
 
-def test_backup_db_for_dev(
-    enable_factory_create, db_session, caplog, monkeypatch, mock_s3_dev_bucket
-):
-    _prep_test(monkeypatch, db_session=db_session)
+def test_backup_db_for_dev(enable_factory_create, db_session, caplog, mock_s3_dev_bucket):
+    _prep_test(db_session)
 
     dumpfile = "dev_db.dump"
     pg_dump_util.backup_db(dumpfile, "dev")
@@ -112,7 +101,7 @@ def test_backup_db_for_dev(
     )
 
 
-def test_restore_db_failure(caplog, monkeypatch):
+def test_restore_db_failure(caplog):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         dumpfile = f"{tmpdirname}/db.dump"
 

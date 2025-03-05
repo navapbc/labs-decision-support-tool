@@ -6,6 +6,7 @@ import sys
 import time
 from datetime import datetime
 from subprocess import CalledProcessError
+from textwrap import dedent
 from typing import Any, Optional, Sequence
 
 from smart_open import open as smart_open
@@ -154,6 +155,8 @@ def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
     with smart_open(stdout_file, "wb") as dumpfile:
         # PGPASSWORD is used by pg_dump
         os.environ["PGPASSWORD"] = config_dict["password"]
+        # Unit test sets DB_SCHEMA to avoid affecting the real DB
+        schema = os.environ.get("DB_SCHEMA", "public")
         command = [
             "pg_dump",
             "--data-only",
@@ -162,20 +165,11 @@ def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
             config_dict["user"],
             "-h",
             config_dict["host"],
+            "--schema",
+            schema,
             config_dict["dbname"],
         ]
         return _run_command(command, dumpfile)
-
-
-TRUNCATE_SQL = """DO $$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public')
-    LOOP
-        EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' CASCADE';
-    END LOOP;
-END $$;"""
 
 
 def _truncate_db_tables(config_dict: dict[str, str], delay_seconds: int) -> bool:
@@ -188,6 +182,19 @@ def _truncate_db_tables(config_dict: dict[str, str], delay_seconds: int) -> bool
     logger.info("Clearing out tables")
     # PGPASSWORD is used by psql
     os.environ["PGPASSWORD"] = config_dict["password"]
+    # Unit test sets DB_SCHEMA to avoid affecting the real DB
+    schema = os.environ.get("DB_SCHEMA", "public")
+    sql_str = dedent(
+        f"""DO $$
+        DECLARE
+            r RECORD;
+        BEGIN
+            FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = '{schema}')
+            LOOP
+                EXECUTE 'TRUNCATE TABLE {schema}.' || quote_ident(r.tablename) || ' CASCADE';
+            END LOOP;
+        END $$;"""
+    )
     command = [
         "psql",
         "-U",
@@ -197,7 +204,7 @@ def _truncate_db_tables(config_dict: dict[str, str], delay_seconds: int) -> bool
         "-d",
         config_dict["dbname"],
         "-c",
-        TRUNCATE_SQL,
+        sql_str,
     ]
     return _run_command(command)
 
@@ -205,6 +212,8 @@ def _truncate_db_tables(config_dict: dict[str, str], delay_seconds: int) -> bool
 def _pg_restore(config_dict: dict[str, str], dumpfilename: str) -> bool:
     # PGPASSWORD is used by pg_restore
     os.environ["PGPASSWORD"] = config_dict["password"]
+    # Unit test sets DB_SCHEMA to avoid affecting the real DB
+    schema = os.environ.get("DB_SCHEMA", "public")
     command = [
         "pg_restore",
         "-U",
@@ -213,6 +222,8 @@ def _pg_restore(config_dict: dict[str, str], dumpfilename: str) -> bool:
         config_dict["host"],
         "-d",
         config_dict["dbname"],
+        "--schema",
+        schema,
         dumpfilename,
     ]
     return _run_command(command)
