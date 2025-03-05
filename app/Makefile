@@ -26,7 +26,6 @@ ifdef CI
  MYPY_FLAGS := --no-pretty
  MYPY_POSTPROC := | perl -pe "s/^(.+):(\d+):(\d+): error: (.*)/::warning file=$(APP_DIR)\/\1,line=\2,col=\3::\4/"
 else
- DOCKER_EXEC_ARGS := -e PG_DUMP_FILE -e TRUNCATE_TABLES
  FLAKE8_FORMAT := default
 endif
 
@@ -129,10 +128,8 @@ start-db: ## Start only the database container
 ## Destroy current DB, setup new one
 db-recreate: clean-volumes init-db
 
-backup-db:
-	$(PY_RUN_CMD) backup-db
-restore-db:
-	$(PY_RUN_CMD) restore-db
+pg-dump:
+	$(PY_RUN_CMD) pg-dump $(args)
 
 #########################
 # DB Migrations

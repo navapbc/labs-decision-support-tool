@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import subprocess
@@ -95,6 +96,29 @@ def restore_db() -> None:
         logger.info("DB data restored from %r", dumpfilename)
 
     _print_row_counts()
+
+
+def main() -> None:
+    env = os.environ.get("ENVIRONMENT", "local")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dumpfile", default=f"{env}_db.dump", help="dump file containing DB contents")
+    parser.add_argument("--skip_truncate", action="store_true", help="don't truncate tables before restoring (default: false)")
+    parser.add_argument("action", choices=["backup", "restore"], help="backup or restore DB")
+    args = parser.parse_args(sys.argv[1:])
+
+    logger.info("Running %r with args %r", args.action, args)
+    if args.dumpfile:
+        os.environ["PG_DUMP_FILE"] = args.dumpfile
+    if args.skip_truncate:
+        os.environ["TRUNCATE_TABLES"] = "false"
+    sys.exit(111)
+
+    if args.action == "backup":
+        backup_db(args.dumpfile)
+    elif args.action == "restore":
+        restore_db(args.dumpfile)
+    else:
+        logger.fatal("Unknown action %r", args.action)
 
 
 def _run_command(
