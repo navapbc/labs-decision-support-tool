@@ -14,10 +14,10 @@ from botocore.exceptions import ClientError
 from src.adapters.db.clients import postgres_client, postgres_config
 from src.app_config import app_config
 from src.db.models import conversation, document
-from src.util.file_util import get_s3_client
+from src.util.file_util import get_s3_client, replace_file_extension
 
 logger = logging.getLogger(__name__)
-# Print INFO messages since this file is run directly
+# Configure logging since this file is run directly
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
@@ -57,7 +57,7 @@ def backup_db() -> None:
 
         s3_client = get_s3_client()
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
-        dated_filename = _replace_extension(
+        dated_filename = replace_file_extension(
             dumpfilename, f"-{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}.dump"
         )
         dest_path = f"pg_dumps/{dated_filename}"
@@ -66,11 +66,6 @@ def backup_db() -> None:
             logger.info("DB dump uploaded to s3://%s/%s", bucket, dest_path)
         except ClientError as e:
             logging.error(e)
-
-
-def _replace_extension(filename: str, new_extension: str) -> str:
-    base_name, _ = os.path.splitext(filename)
-    return base_name + new_extension
 
 
 TRUE_STRINGS = ["true", "1", "t", "y", "yes"]
