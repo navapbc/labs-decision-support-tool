@@ -3,6 +3,7 @@ import os
 import re
 import tempfile
 
+import pytest
 from sqlalchemy import delete, select
 
 from src.db import pg_util
@@ -92,7 +93,16 @@ def test_backup_db__dump_failure(caplog, monkeypatch):
         assert f"Failed to dump DB data to '{tmpdirname}/db.dump'" in caplog.messages
 
 
-def test_backup_db_for_dev(enable_factory_create, db_session, caplog, monkeypatch):
+@pytest.fixture
+def mock_s3_dev_bucket(mock_s3):
+    bucket = mock_s3.Bucket("decision-support-tool-app-dev")
+    bucket.create()
+    yield bucket
+
+
+def test_backup_db_for_dev(
+    enable_factory_create, db_session, caplog, monkeypatch, mock_s3_dev_bucket
+):
     os.environ["ENVIRONMENT"] = "dev"
 
     _prep_test(monkeypatch, db_session=db_session)
