@@ -24,26 +24,23 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def backup_db(dumpfilename: str, env) -> None:
-    if os.path.exists(dumpfilename):
-        logger.fatal(
-            "File %r already exists; delete or move it first or specify a different file using --dumpfile",
-            dumpfilename,
-        )
-        return
-
-    config_dict = _get_db_config()
     _print_row_counts()
 
     # In local environments, write to the current directory
     if env == "local":
-        ...
+        if os.path.exists(dumpfilename):
+            logger.fatal(
+                "File %r already exists; delete or move it first or specify a different file using --dumpfile",
+                dumpfilename,
+            )
+            return
     else:
         # In deployed environments, write to S3
         # tmpdirname = tempfile.TemporaryDirectory()
         # logger.info("Created temporary directory: %r", tmpdirname)
         # dumpfilename = f"{tmpdirname}/{dumpfilename}"
         # In case dumpfilename is a path, create the parent directories
-        os.makedirs(os.path.dirname(dumpfilename), exist_ok=True)
+        # os.makedirs(os.path.dirname(dumpfilename), exist_ok=True)
 
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
         dated_filename = replace_file_extension(
@@ -52,6 +49,7 @@ def backup_db(dumpfilename: str, env) -> None:
         dumpfilename = f"s3://{bucket}/pg_dumps/{dated_filename}"
 
     logger.info("Writing DB dump to %r", dumpfilename)
+    config_dict = _get_db_config()
     if not _pg_dump(config_dict, dumpfilename):
         logger.fatal("Failed to dump DB data to %r", dumpfilename)
         return
