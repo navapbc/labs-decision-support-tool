@@ -22,9 +22,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def backup_db() -> None:
-    env = os.environ.get("ENVIRONMENT", "local")
-    dumpfilename = os.environ.get("PG_DUMP_FILE", f"{env}_db.dump")
+def backup_db(dumpfilename: str, env) -> None:
     if os.path.exists(dumpfilename):
         logger.fatal(
             "File %r already exists; please delete it first or set PG_DUMP_FILE to a nonexistent file",
@@ -69,8 +67,7 @@ def backup_db() -> None:
             logging.error(e)
 
 
-def restore_db() -> None:
-    dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
+def restore_db(dumpfilename: str, skip_truncate: bool, truncate_delay: int) -> None:
     if not os.path.exists(dumpfilename):
         logger.fatal("File %r not found; please set PG_DUMP_FILE to a valid file", dumpfilename)
         return
@@ -78,17 +75,15 @@ def restore_db() -> None:
     config_dict = _get_db_config()
     _print_row_counts()
 
-    truncate_tables = os.environ.get("TRUNCATE_TABLES", "true").strip().lower() == "true"
-    if truncate_tables:
-        delay = "TRUNCATE_TABLES" not in os.environ
-        if _truncate_db_tables(config_dict, delay):
+    if skip_truncate:
+        logger.info("Skipping truncating tables; will attempt to append to existing data")
+    else:
+        if _truncate_db_tables(config_dict, truncate_delay):
             logger.info("Tables truncated")
         else:
             logger.fatal("Failed to truncate tables")
             return
         _print_row_counts()
-    else:
-        logger.info("Skipping truncating tables; will attempt to append to existing data")
 
     if not _pg_restore(config_dict, dumpfilename):
         logger.fatal("Failed to completely restore DB data from %r", dumpfilename)
@@ -101,22 +96,30 @@ def restore_db() -> None:
 def main() -> None:
     env = os.environ.get("ENVIRONMENT", "local")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dumpfile", default=f"{env}_db.dump", help="dump file containing DB contents")
-    parser.add_argument("--skip_truncate", action="store_true", help="don't truncate tables before restoring (default: false)")
+    parser.add_argument(
+        "--dumpfile", default=f"{env}_db.dump", help="dump file containing DB contents"
+    )
+    parser.add_argument(
+        "--skip_truncate",
+        action="store_true",
+        help="don't truncate tables before restoring (default: false)",
+    )
+    parser.add_argument(
+        "--truncate_delay",
+        type=int,
+        default=10,
+        help="seconds to pause before truncating tables (default: 10)",
+    )
     parser.add_argument("action", choices=["backup", "restore"], help="backup or restore DB")
     args = parser.parse_args(sys.argv[1:])
 
-    logger.info("Running %r with args %r", args.action, args)
-    if args.dumpfile:
-        os.environ["PG_DUMP_FILE"] = args.dumpfile
-    if args.skip_truncate:
-        os.environ["TRUNCATE_TABLES"] = "false"
+    logger.info("Running with args %r", args)
     sys.exit(111)
 
     if args.action == "backup":
-        backup_db(args.dumpfile)
+        backup_db(args.dumpfile, env)
     elif args.action == "restore":
-        restore_db(args.dumpfile)
+        restore_db(args.dumpfile, args.skip_truncate, args.truncate_delay)
     else:
         logger.fatal("Unknown action %r", args.action)
 
@@ -183,12 +186,13 @@ BEGIN
 END $$;"""
 
 
-def _truncate_db_tables(config_dict: dict[str, str], delay: bool) -> bool:
-    if delay:  # pragma: no cover
+def _truncate_db_tables(config_dict: dict[str, str], delay_seconds: int) -> bool:
+    if delay_seconds:  # pragma: no cover
         logger.info(
-            "Will clear out tables in 10 seconds! Press Ctrl+C to cancel. (Use backup-db to backup data)"
+            "Will clear out tables in %i seconds! Press Ctrl+C to cancel. (Use backup-db to backup data)",
+            delay_seconds,
         )
-        time.sleep(10)
+        time.sleep(delay_seconds)
     logger.info("Clearing out tables")
     # PGPASSWORD is used by psql
     os.environ["PGPASSWORD"] = config_dict["password"]
