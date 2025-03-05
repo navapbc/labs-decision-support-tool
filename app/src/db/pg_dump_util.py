@@ -68,9 +68,6 @@ def backup_db() -> None:
             logging.error(e)
 
 
-TRUE_STRINGS = ["true", "1", "t", "y", "yes"]
-
-
 def restore_db() -> None:
     dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
     if not os.path.exists(dumpfilename):
@@ -80,7 +77,7 @@ def restore_db() -> None:
     config_dict = _get_db_config()
     _print_row_counts()
 
-    truncate_tables = os.environ.get("TRUNCATE_TABLES", "True").strip().lower() in TRUE_STRINGS
+    truncate_tables = os.environ.get("TRUNCATE_TABLES", "true").strip().lower() == "true"
     if truncate_tables:
         delay = "TRUNCATE_TABLES" not in os.environ
         if _truncate_db_tables(config_dict, delay):
