@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import tempfile
 
@@ -19,9 +18,6 @@ def _prep_test(monkeypatch, run_command_return_value=True, db_session=None):
 
     monkeypatch.setattr(pg_dump_util, "_run_command", _mock_run_command)
 
-    # For testing restore_db(), avoid sleep() by explicitly setting TRUNCATE_TABLES
-    os.environ["TRUNCATE_TABLES"] = "true"
-
     if db_session:
         db_session.execute(delete(Document))
         db_session.execute(delete(ChatMessage))
@@ -39,8 +35,8 @@ def test_backup_and_restore_db(enable_factory_create, db_session, caplog, monkey
     _prep_test(monkeypatch, db_session=db_session)
 
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
-        os.environ["PG_DUMP_FILE"] = f"{tmpdirname}/db.dump"
-        pg_dump_util.backup_db()
+        dumpfile = f"{tmpdirname}/db.dump"
+        pg_dump_util.backup_db(dumpfile, "local")
 
         assert "Table 'document' has 1 rows" in caplog.messages
         assert "Table 'chunk' has 5 rows" in caplog.messages
@@ -49,21 +45,20 @@ def test_backup_and_restore_db(enable_factory_create, db_session, caplog, monkey
         assert f"DB data dumped to '{tmpdirname}/db.dump'" in caplog.messages
         assert "Skipping S3 upload since running in local environment" in caplog.messages
 
-        pg_dump_util.restore_db()
+        pg_dump_util.restore_db(dumpfile, False, 0)
         assert "Clearing out tables" in caplog.messages
         assert "Tables truncated" in caplog.messages
-        assert f"DB data restored from {os.environ["PG_DUMP_FILE"]!r}" in caplog.messages
+        assert f"DB data restored from {dumpfile!r}" in caplog.messages
 
 
 def test_restore_db_without_truncating(caplog, monkeypatch):
     _prep_test(monkeypatch)
-    os.environ["TRUNCATE_TABLES"] = "false"
 
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
-        os.environ["PG_DUMP_FILE"] = f"{tmpdirname}/db.dump"
-        with open(os.environ["PG_DUMP_FILE"], "w", encoding="utf-8"):
+        dumpfile = f"{tmpdirname}/db.dump"
+        with open(dumpfile, "wb"):
             pass
-        pg_dump_util.restore_db()
+        pg_dump_util.restore_db(dumpfile, True, 0)
         assert (
             "Skipping truncating tables; will attempt to append to existing data" in caplog.messages
         )
@@ -71,13 +66,13 @@ def test_restore_db_without_truncating(caplog, monkeypatch):
 
 def test_backup_db__file_exists(caplog):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
-        os.environ["PG_DUMP_FILE"] = f"{tmpdirname}/db.dump"
-        with open(os.environ["PG_DUMP_FILE"], "w", encoding="utf-8"):
+        dumpfile = f"{tmpdirname}/db.dump"
+        with open(dumpfile, "wb"):
             pass
-        pg_dump_util.backup_db()
+        pg_dump_util.backup_db(dumpfile, "local")
 
         assert (
-            f"File '{tmpdirname}/db.dump' already exists; please delete it first or set PG_DUMP_FILE to a nonexistent file"
+            f"File '{tmpdirname}/db.dump' already exists; delete or move it first or specify a different file using --dumpfile"
             in caplog.messages
         )
         assert f"DB data dumped to '{tmpdirname}/db.dump'" not in caplog.messages
@@ -87,8 +82,8 @@ def test_backup_db__dump_failure(caplog, monkeypatch):
     _prep_test(monkeypatch, run_command_return_value=False)
 
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
-        os.environ["PG_DUMP_FILE"] = f"{tmpdirname}/db.dump"
-        pg_dump_util.backup_db()
+        dumpfile = f"{tmpdirname}/db.dump"
+        pg_dump_util.backup_db(dumpfile, "local")
 
         assert f"Failed to dump DB data to '{tmpdirname}/db.dump'" in caplog.messages
 
@@ -103,32 +98,26 @@ def mock_s3_dev_bucket(mock_s3):
 def test_backup_db_for_dev(
     enable_factory_create, db_session, caplog, monkeypatch, mock_s3_dev_bucket
 ):
-    os.environ["ENVIRONMENT"] = "dev"
-
     _prep_test(monkeypatch, db_session=db_session)
 
-    with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
-        os.environ["PG_DUMP_FILE"] = f"{tmpdirname}/db.dump"
-        pg_dump_util.backup_db()
+    dumpfile = "dev_db.dump"
+    pg_dump_util.backup_db(dumpfile, "dev")
 
-        assert any(
-            re.match(
-                f"DB dump uploaded to s3://decision-support-tool-app-dev/pg_dumps/{tmpdirname}/db-.*.dump",
-                msg,
-            )
-            for msg in caplog.messages
+    assert any(
+        re.match(
+            "Writing DB dump to 's3://decision-support-tool-app-dev/pg_dumps/dev_db-.*.dump'",
+            msg,
         )
+        for msg in caplog.messages
+    )
 
 
 def test_restore_db_failure(caplog, monkeypatch):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
-        os.environ["PG_DUMP_FILE"] = f"{tmpdirname}/db.dump"
+        dumpfile = f"{tmpdirname}/db.dump"
 
-        pg_dump_util.restore_db()
-        assert (
-            f"File '{tmpdirname}/db.dump' not found; please set PG_DUMP_FILE to a valid file"
-            in caplog.messages
-        )
+        pg_dump_util.restore_db(dumpfile, False, 0)
+        assert f"File '{tmpdirname}/db.dump' not found" in caplog.messages
 
         assert "Tables truncated" not in caplog.messages
-        assert f"DB data restored from {os.environ["PG_DUMP_FILE"]}" not in caplog.messages
+        assert f"DB data restored from {dumpfile}" not in caplog.messages

@@ -5,9 +5,10 @@ import subprocess
 import sys
 import time
 from datetime import datetime
-from smart_open import open as smart_open
 from subprocess import CalledProcessError
 from typing import Any, Optional, Sequence
+
+from smart_open import open as smart_open
 
 from src.adapters.db.clients import postgres_client, postgres_config
 from src.app_config import app_config
@@ -19,9 +20,11 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def backup_db(dumpfilename: str, env) -> None:
-    # In not local environment, write to a specific S3 directory
-    if env != "local":
+def backup_db(dumpfilename: str, env: str) -> None:
+    if env == "local":
+        logger.info("Skipping S3 upload since running in local environment")
+    else:
+        # In not local environment, write to a specific S3 bucket and folder
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
         dated_filename = replace_file_extension(
             dumpfilename, f"-{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}.dump"
@@ -46,7 +49,7 @@ def backup_db(dumpfilename: str, env) -> None:
 
 def restore_db(dumpfilename: str, skip_truncate: bool, truncate_delay: int) -> None:
     if not os.path.exists(dumpfilename):
-        logger.fatal("File %r not found; please set PG_DUMP_FILE to a valid file", dumpfilename)
+        logger.fatal("File %r not found", dumpfilename)
         return
 
     config_dict = _get_db_config()
@@ -70,7 +73,7 @@ def restore_db(dumpfilename: str, skip_truncate: bool, truncate_delay: int) -> N
     _print_row_counts()
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     env = os.environ.get("ENVIRONMENT", "local")
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -91,11 +94,6 @@ def main() -> None:
     args = parser.parse_args(sys.argv[1:])
 
     logger.info("Running with args %r", args)
-    if args.dumpfile:
-        os.environ["PG_DUMP_FILE"] = args.dumpfile
-    if args.skip_truncate:
-        os.environ["TRUNCATE_TABLES"] = "false"
-
     if args.action == "backup":
         backup_db(args.dumpfile, env)
     elif args.action == "restore":
@@ -106,10 +104,11 @@ def main() -> None:
 
 def file_exists(uri):
     try:
-        with smart_open(uri, 'rb'):
+        with smart_open(uri, "rb"):
             return True
     except Exception:
         return False
+
 
 def _run_command(
     command: Sequence[str], stdout_file: Optional[Any] = None
