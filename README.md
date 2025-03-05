@@ -48,26 +48,6 @@ CONTENTHUB_PASSWORD="your_password_here" ./refresh-ingestion.sh imagine_la
 
 Available datasets include: imagine_la, ca_ftb, ca_public_charge, ca_wic, covered_ca, irs, edd, la_policy, and ssa.
 
-### Loading documents locally
-
-For manual ingestion, you can use the make commands directly:
-
-```bash
-make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California FILEPATH=src/ingestion/imagine_la/scrape/pages
-```
-
-```bash
-make ingest-runner args="edd --json_input=src/ingestion/edd_scrapings.json"
-```
-
-Note that the DATASET_ID will be used in the chatbot web UI to prefix each citation, so use a user-friendly identifier like "CA EDD".
-
-- The same `DATASET_ID` identifier can be used for multiple documents to represent that they belong in the same dataset.
-- Example `BENEFIT_PROGRAM` values include `housing`, `utilities`, `food`, `medical`, `employment`, `SNAP`, `Medicaid`, etc.
-- `BENEFIT_REGION` can correspond to a town, city, state, country, or any geographic area.
-
-The Docker container mounts the `/app` folder, so FILEPATH should be relative to `/app`. `/app/documents` is ignored by git, so is a good place for files you want to load but not commit.
-
 ### Web scraping
 
 The refresh-ingestion.sh script handles both scraping and ingestion. For manual scraping:
@@ -88,6 +68,26 @@ For la_policy, which requires dynamic content scraping:
 make scrape-la-county-policy
 make scrapy-runner args="la_policy --debug"
 ```
+
+### Loading documents locally
+
+For manual ingestion, you can use the make commands directly:
+
+```bash
+make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California FILEPATH=src/ingestion/imagine_la/scrape/pages
+```
+
+```bash
+make ingest-runner args="edd --json_input=src/ingestion/edd_scrapings.json"
+```
+
+Note that the DATASET_ID will be used in the chatbot web UI to prefix each citation, so use a user-friendly identifier like "CA EDD".
+
+- The same `DATASET_ID` identifier can be used for multiple documents to represent that they belong in the same dataset.
+- Example `BENEFIT_PROGRAM` values include `housing`, `utilities`, `food`, `medical`, `employment`, `SNAP`, `Medicaid`, etc.
+- `BENEFIT_REGION` can correspond to a town, city, state, country, or any geographic area.
+
+The Docker container mounts the `/app` folder, so FILEPATH should be relative to `/app`. `/app/documents` is ignored by git, so is a good place for files you want to load but not commit.
 
 ### Loading documents in a deployed environment
 
