@@ -13,7 +13,7 @@ The `engine_id` determines the endpoint of the chatbot, while the `datasets` lis
 
 ## Loading documents
 
-The application supports loading data from various sources including web scraping, JSON files, and PDFs. We have automated scripts for scraping and ingesting data from several sources.
+The application supports using data from various sources including web scraping, JSON files, and PDFs. We have automated scripts for scraping and ingesting data from several sources.
 
 ### Refreshing all data sources
 
@@ -23,7 +23,9 @@ To refresh all data sources at once, use the refresh-ingestion.sh script from wi
 ./refresh-ingestion.sh all
 ```
 
-This will scrape and ingest data from all supported sources except for 'ssa' (which requires manual scraping). Note that for the imagine_la dataset, you'll need to set the CONTENTHUB_PASSWORD environment variable:
+This will scrape and ingest data from all supported sources except for 'ssa' (which requires manual scraping). The script only modifies the local database. To update the database in the respective deployment environments, the script generates 2 other scripts in the top-level directory: `refresh-dev-*.sh` and `refresh-prod-*.sh`, which should be reviewed before running.
+
+Note that for the imagine_la dataset, you'll need to set the CONTENTHUB_PASSWORD environment variable:
 
 ```bash
 export CONTENTHUB_PASSWORD="your_password_here"
