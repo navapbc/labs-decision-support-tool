@@ -22,7 +22,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def backup_db() -> None:
-    dumpfilename = os.environ.get("PG_DUMP_FILE", "db.dump")
+    env = os.environ.get("ENVIRONMENT", "local")
+    dumpfilename = os.environ.get("PG_DUMP_FILE", f"{env}_db.dump")
     if os.path.exists(dumpfilename):
         logger.fatal(
             "File %r already exists; please delete it first or set PG_DUMP_FILE to a nonexistent file",
@@ -33,7 +34,6 @@ def backup_db() -> None:
     config_dict = _get_db_config()
     _print_row_counts()
 
-    env = os.environ.get("ENVIRONMENT", "local")
     # In local environments, write to the current directory
     if env == "local":
         if not _pg_dump(config_dict, dumpfilename):
