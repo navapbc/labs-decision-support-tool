@@ -7,6 +7,7 @@ import tempfile
 import time
 from datetime import datetime
 from io import TextIOWrapper
+from smart_open import open as smart_open
 from subprocess import CalledProcessError
 from typing import Optional, Sequence
 
@@ -25,7 +26,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 def backup_db(dumpfilename: str, env) -> None:
     if os.path.exists(dumpfilename):
         logger.fatal(
-            "File %r already exists; please delete it first or set PG_DUMP_FILE to a nonexistent file",
+            "File %r already exists; delete or move it first or specify a different file using --dumpfile",
             dumpfilename,
         )
         return
@@ -35,36 +36,42 @@ def backup_db(dumpfilename: str, env) -> None:
 
     # In local environments, write to the current directory
     if env == "local":
-        if not _pg_dump(config_dict, dumpfilename):
-            logger.fatal("Failed to dump DB data to %r", dumpfilename)
-            return
-
-        logger.info("DB data dumped to %r", dumpfilename)
-        logger.info("Skipping S3 upload since running in local environment")
-        return
-
-    # In deployed environments, write to (writeable) temp directory and upload to S3
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        logger.info("Created temporary directory: %r", tmpdirname)
-        stdout_file = f"{tmpdirname}/{dumpfilename}"
+        ...
+    else:
+        # In deployed environments, write to S3
+        # tmpdirname = tempfile.TemporaryDirectory()
+        # logger.info("Created temporary directory: %r", tmpdirname)
+        # dumpfilename = f"{tmpdirname}/{dumpfilename}"
         # In case dumpfilename is a path, create the parent directories
-        os.makedirs(os.path.dirname(stdout_file), exist_ok=True)
+        os.makedirs(os.path.dirname(dumpfilename), exist_ok=True)
 
-        if not _pg_dump(config_dict, stdout_file):
-            logger.fatal("Failed to dump DB data to %r", stdout_file)
-            return
-
-        s3_client = get_s3_client()
         bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
         dated_filename = replace_file_extension(
             dumpfilename, f"-{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}.dump"
         )
-        dest_path = f"pg_dumps/{dated_filename}"
-        try:
-            s3_client.upload_file(stdout_file, bucket, dest_path)
-            logger.info("DB dump uploaded to s3://%s/%s", bucket, dest_path)
-        except ClientError as e:
-            logging.error(e)
+        dumpfilename = f"s3://{bucket}/pg_dumps/{dated_filename}"
+
+    logger.info("Writing DB dump to %r", dumpfilename)
+    if not _pg_dump(config_dict, dumpfilename):
+        logger.fatal("Failed to dump DB data to %r", dumpfilename)
+        return
+
+    logger.info("DB data dumped to %r", dumpfilename)
+
+    # if env == "local":
+    #     logger.info("Skipping S3 upload since running in local environment")
+    # else:
+        # s3_client = get_s3_client()
+        # bucket = os.environ.get("BUCKET_NAME", f"decision-support-tool-app-{env}")
+        # dated_filename = replace_file_extension(
+        #     dumpfilename, f"-{datetime.now().strftime("%Y-%m-%d-%H_%M_%S")}.dump"
+        # )
+        # dest_path = f"pg_dumps/{dated_filename}"
+        # try:
+        #     s3_client.upload_file(dumpfilename, bucket, dest_path)
+        #     logger.info("DB dump uploaded to s3://%s/%s", bucket, dest_path)
+        # except ClientError as e:
+        #     logging.error(e)
 
 
 def restore_db(dumpfilename: str, skip_truncate: bool, truncate_delay: int) -> None:
@@ -114,7 +121,10 @@ def main() -> None:
     args = parser.parse_args(sys.argv[1:])
 
     logger.info("Running with args %r", args)
-    sys.exit(111)
+    if args.dumpfile:
+        os.environ["PG_DUMP_FILE"] = args.dumpfile
+    if args.skip_truncate:
+        os.environ["TRUNCATE_TABLES"] = "false"
 
     if args.action == "backup":
         backup_db(args.dumpfile, env)
@@ -159,7 +169,7 @@ def _get_db_config() -> dict[str, str]:
 
 
 def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
-    with open(stdout_file, "w", encoding="utf-8") as dumpfile:
+    with smart_open(stdout_file, "w", encoding="utf-8") as dumpfile:
         # PGPASSWORD is used by pg_dump
         os.environ["PGPASSWORD"] = config_dict["password"]
         command = [
