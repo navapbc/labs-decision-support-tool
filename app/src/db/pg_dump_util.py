@@ -151,6 +151,17 @@ def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
         return _run_command(command, dumpfile)
 
 
+TRUNCATE_SQL = """DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public')
+    LOOP
+        EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END $$;"""
+
+
 def _truncate_db_tables(config_dict: dict[str, str], delay: bool) -> bool:
     if delay:  # pragma: no cover
         logger.info(
@@ -169,7 +180,7 @@ def _truncate_db_tables(config_dict: dict[str, str], delay: bool) -> bool:
         "-d",
         config_dict["dbname"],
         "-c",
-        "TRUNCATE TABLE alembic_version, user_session, chat_message, document CASCADE;",
+        TRUNCATE_SQL,
     ]
     return _run_command(command)
 
