@@ -154,8 +154,8 @@ The input file can have additional columns beyond `question`. They will be prese
 
 Since the DB contents will be replaced upon reingestion, new UUIDs will be generated for reingested chunks and documents, which can make diagnosing problems challenging when logs refer to UUIDs that no longer exist in the DB. Before running `refresh-ingestion.sh`, it behooves us to create a backup of DB contents so we can reference the old UUIDs (after restoring the backup to a local DB).
 
-To backup DB contents for the `dev` deployment, run `./bin/run-command app dev '["poetry", "run", "pg-dump", "backup"]'` to create a [PostgreSQL dump file](https://www.postgresql.org/docs/current/backup-dump.html) and upload it to the `pg_dumps` folder in S3. For the `prod` environment, replace `dev` with `prod`.
+To backup DB contents for the `dev` deployment, run `./bin/run-command app dev '["pg-dump", "backup"]'` to create a [PostgreSQL dump file](https://www.postgresql.org/docs/current/backup-dump.html) and upload it to the `pg_dumps` folder in S3. For the `prod` environment, replace `dev` with `prod`.
 
 ### Restoring DB contents locally
 
-To restore the DB contents locally, run `make pg-dump args="backup --dumpfile db.dump"`, replacing `db.dump` with the file downloaded from S3. Run `make pg-dump args="--help"` for more options.
+To restore the DB contents locally, run `make pg-dump args="restore --dumpfile db.dump"`, replacing `db.dump` with the file downloaded from S3. Run `make pg-dump args="--help"` for more options.
