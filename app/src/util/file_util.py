@@ -58,6 +58,11 @@ def get_files(path: str) -> list[str]:
     return [str(file) for file in PosixPath(path).rglob("*") if file.is_file()]
 
 
+def replace_file_extension(filename: str, new_extension: str) -> str:
+    base_name, _ = os.path.splitext(filename)
+    return base_name + new_extension
+
+
 ##################################
 # S3 Utilities
 ##################################

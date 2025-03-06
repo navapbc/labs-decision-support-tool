@@ -68,6 +68,9 @@ build-backend = "poetry.core.masonry.api"
 db-migrate = "src.db.migrations.run:up"
 db-migrate-down = "src.db.migrations.run:down"
 db-migrate-down-all = "src.db.migrations.run:downall"
+
+pg-dump = "src.db.pg_dump_util:main"
+
 scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 ingest-imagine-la = "src.ingestion.imagine_la.ingest:main"
 scrape-la-policy = "src.ingestion.scrape_la_policy:main"
