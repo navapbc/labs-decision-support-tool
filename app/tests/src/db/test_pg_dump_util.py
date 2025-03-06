@@ -11,23 +11,21 @@ from src.db.models.document import Document
 from tests.src.db.models.factories import ChatMessageFactory, ChunkFactory, UserSessionFactory
 
 
-def _prep_test(db_session):
-    if db_session:
-        db_session.execute(delete(Document))
-        db_session.execute(delete(ChatMessage))
-        db_session.execute(delete(UserSession))
+@pytest.fixture
+def populated_db(db_session):
+    db_session.execute(delete(Document))
+    db_session.execute(delete(ChatMessage))
+    db_session.execute(delete(UserSession))
 
-        ChunkFactory.create()
-        document_db_record = db_session.execute(select(Document)).scalar_one()
-        ChunkFactory.create_batch(4, document=document_db_record)
+    ChunkFactory.create()
+    document_db_record = db_session.execute(select(Document)).scalar_one()
+    ChunkFactory.create_batch(4, document=document_db_record)
 
-        user_session = UserSessionFactory.create()
-        ChatMessageFactory.create_batch(4, session=user_session)
+    user_session = UserSessionFactory.create()
+    ChatMessageFactory.create_batch(4, session=user_session)
 
 
-def test_backup_and_restore_db(enable_factory_create, db_session, caplog):
-    _prep_test(db_session)
-
+def test_backup_and_restore_db(enable_factory_create, populated_db, caplog):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         dumpfile = f"{tmpdirname}/db.dump"
         pg_dump_util.backup_db(dumpfile, "local")
@@ -48,7 +46,7 @@ def test_backup_and_restore_db(enable_factory_create, db_session, caplog):
 def test_restore_db_without_truncating(caplog):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         dumpfile = f"{tmpdirname}/db.dump"
-        with open(dumpfile, "wb"):
+        with open(dumpfile, "wb"):  # Create an empty file
             pass
         pg_dump_util.restore_db(dumpfile, True, 0)
         assert (
@@ -59,7 +57,7 @@ def test_restore_db_without_truncating(caplog):
 def test_backup_db__file_exists(caplog):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         dumpfile = f"{tmpdirname}/db.dump"
-        with open(dumpfile, "wb"):
+        with open(dumpfile, "wb"):  # Create an empty file
             pass
         pg_dump_util.backup_db(dumpfile, "local")
 
@@ -97,9 +95,7 @@ def mock_s3_dev_bucket(mock_s3):
     yield bucket
 
 
-def test_backup_db_for_dev(enable_factory_create, db_session, caplog, mock_s3_dev_bucket):
-    _prep_test(db_session)
-
+def test_backup_db_for_dev(enable_factory_create, populated_db, caplog, mock_s3_dev_bucket):
     with caplog.at_level(logging.INFO):
         dumpfile = "dev_db.dump"
         pg_dump_util.backup_db(dumpfile, "dev")
