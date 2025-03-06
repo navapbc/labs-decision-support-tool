@@ -198,3 +198,47 @@ def test_context_manager(temp_log_dir):
 
     # After exiting context, results file should be closed
     assert logger.results_file is None
+
+
+def test_context_manager_error_handling(temp_log_dir, test_batch_config):
+    """Test that files are cleaned up when an error occurs."""
+    logger = None
+    try:
+        with EvaluationLogger(temp_log_dir) as logger:
+            # Start a batch to create some files
+            logger.start_batch(test_batch_config)
+
+            # Verify files were created
+            config_file = os.path.join(logger.log_dir, f"batch_{logger.batch_id}.json")
+            results_file = os.path.join(logger.log_dir, f"results_{logger.batch_id}.jsonl")
+            assert os.path.exists(config_file)
+            assert os.path.exists(results_file)
+
+            # Simulate an error
+            raise ValueError("Test error")
+
+    except ValueError:
+        # Verify files were cleaned up
+        if logger and logger.batch_id:
+            config_file = os.path.join(logger.log_dir, f"batch_{logger.batch_id}.json")
+            results_file = os.path.join(logger.log_dir, f"results_{logger.batch_id}.jsonl")
+            assert not os.path.exists(config_file)
+            assert not os.path.exists(results_file)
+
+
+def test_context_manager_success_case(temp_log_dir, test_batch_config, test_metrics_summary):
+    """Test that files are preserved when no error occurs."""
+    with EvaluationLogger(temp_log_dir) as logger:
+        # Start a batch and finish it normally
+        logger.start_batch(test_batch_config)
+        logger.finish_batch(test_metrics_summary)
+
+        # Remember the files we created
+        config_file = os.path.join(logger.log_dir, f"batch_{logger.batch_id}.json")
+        results_file = os.path.join(logger.log_dir, f"results_{logger.batch_id}.jsonl")
+        metrics_file = os.path.join(logger.log_dir, f"metrics_{logger.batch_id}.json")
+
+    # After context exit, files should still exist
+    assert os.path.exists(config_file)
+    assert os.path.exists(results_file)
+    assert os.path.exists(metrics_file)
