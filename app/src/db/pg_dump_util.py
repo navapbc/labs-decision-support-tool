@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
@@ -156,7 +157,7 @@ def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
         # PGPASSWORD is used by pg_dump
         os.environ["PGPASSWORD"] = config_dict["password"]
         # Unit test sets DB_SCHEMA to avoid affecting the real DB
-        schema = os.environ.get("DB_SCHEMA", "public")
+        schema = _get_schema_name()
         command = [
             "pg_dump",
             "--data-only",
@@ -183,7 +184,7 @@ def _truncate_db_tables(config_dict: dict[str, str], delay_seconds: int) -> bool
     # PGPASSWORD is used by psql
     os.environ["PGPASSWORD"] = config_dict["password"]
     # Unit test sets DB_SCHEMA to avoid affecting the real DB
-    schema = os.environ.get("DB_SCHEMA", "public")
+    schema = _get_schema_name()
     sql_str = dedent(
         f"""DO $$
         DECLARE
@@ -213,7 +214,7 @@ def _pg_restore(config_dict: dict[str, str], dumpfilename: str) -> bool:
     # PGPASSWORD is used by pg_restore
     os.environ["PGPASSWORD"] = config_dict["password"]
     # Unit test sets DB_SCHEMA to avoid affecting the real DB
-    schema = os.environ.get("DB_SCHEMA", "public")
+    schema = _get_schema_name()
     command = [
         "pg_restore",
         "-U",
@@ -239,3 +240,13 @@ def _print_row_counts() -> None:
         ]:
             count = db_session.query(table).count()
             logger.info("Table %r has %d rows", table.__tablename__, count)
+
+
+def _get_schema_name() -> str:
+    schema = os.environ.get("DB_SCHEMA", "public")
+    # This gets passed to subprocess.Popen, so first validate
+    # that it only contains expected characters
+    if not re.match(r"^[a-zA-Z0-9_]+$", schema):
+        logger.fatal("Invalid schema name")
+        sys.exit(2)
+    return schema
