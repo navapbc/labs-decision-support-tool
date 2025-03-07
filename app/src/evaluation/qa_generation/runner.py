@@ -78,6 +78,8 @@ def run_generation(
 
         # Sample documents if requested
         if sample_fraction:
+            if not 0 < sample_fraction <= 1:
+                raise ValueError("Sample fraction must be between 0 and 1")
             documents = get_stratified_sample(
                 documents,
                 sample_fraction=sample_fraction,

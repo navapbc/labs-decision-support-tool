@@ -3,6 +3,7 @@
 import csv
 import json
 import uuid
+from dataclasses import fields
 from datetime import datetime
 from unittest.mock import patch
 
@@ -220,3 +221,110 @@ def test_run_generation_no_documents(tmp_path, enable_factory_create, app_config
     # Run the function and expect ValueError
     with pytest.raises(ValueError, match="No documents found matching filter criteria"):
         run_generation(llm_model=llm_model, output_dir=output_dir, dataset_filter=dataset_filter)
+
+
+def test_save_qa_pairs(qa_pairs, tmp_path):
+    """Test basic save_qa_pairs functionality with directory creation."""
+    from src.evaluation.qa_generation.runner import save_qa_pairs
+
+    # Use a nested directory that doesn't exist yet
+    output_dir = tmp_path / "new_dir" / "nested_dir"
+
+    # Save QA pairs
+    csv_path = save_qa_pairs(output_dir, qa_pairs)
+
+    # Verify directory was created
+    assert output_dir.exists()
+    assert output_dir.is_dir()
+
+    # Verify file exists and has correct content
+    assert csv_path.exists()
+    assert csv_path.name == "qa_pairs.csv"
+
+    # Read and verify CSV content
+    with open(csv_path, "r", newline="") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+        # Check headers are present
+        expected_headers = [field.name for field in fields(QAPair)]
+        assert reader.fieldnames == expected_headers
+
+        # Verify we have the correct number of rows
+        assert len(rows) == len(qa_pairs)
+
+        # Verify content matches
+        for i, row in enumerate(rows):
+            assert row["question"] == qa_pairs[i].question
+            assert row["answer"] == qa_pairs[i].answer
+            assert row["document_name"] == qa_pairs[i].document_name
+
+
+def test_run_generation_with_version(
+    mock_completion_response, tmp_path, enable_factory_create, db_session
+):
+    """Test run_generation with version parameter."""
+    output_dir = tmp_path / "qa_output"
+    llm_model = "gpt-4o-mini"
+
+    # Create a test document with chunks
+    doc = DocumentFactory.create(
+        name="Test Document",
+        content="Test content",
+        dataset="Dataset 1",
+        source="Source 1",
+    )
+    ChunkFactory.create(document=doc, content="Chunk content")
+
+    # Create a specific version
+    version = QAPairVersion(
+        version_id="test_version_1",
+        llm_model=llm_model,
+        timestamp=datetime.utcnow(),
+    )
+
+    # Run generation with version
+    with patch(
+        "src.evaluation.qa_generation.generator.completion",
+        side_effect=mock_completion_response,
+    ):
+        qa_pairs = run_generation(
+            llm_model=llm_model,
+            output_dir=output_dir,
+            version=version,
+        )
+
+        # Verify version information is preserved
+        assert len(qa_pairs) > 0
+        for pair in qa_pairs:
+            assert pair.version.version_id == version.version_id
+            assert pair.version.llm_model == version.llm_model
+
+
+def test_run_generation_invalid_sample_fraction(tmp_path, enable_factory_create, db_session):
+    """Test run_generation with invalid sample fraction values."""
+    output_dir = tmp_path / "qa_output"
+    llm_model = "gpt-4o-mini"
+
+    # Create a test document
+    DocumentFactory.create(
+        name="Test Document",
+        content="Test content",
+        dataset="Dataset 1",
+    )
+
+    # Test negative sample fraction
+    with pytest.raises(ValueError, match="Sample fraction must be between 0 and 1"):
+        run_generation(
+            llm_model=llm_model,
+            output_dir=output_dir,
+            sample_fraction=-0.5,
+        )
+
+    # Test sample fraction > 1
+    with pytest.raises(ValueError, match="Sample fraction must be between 0 and 1"):
+        run_generation(
+            llm_model=llm_model,
+            output_dir=output_dir,
+            sample_fraction=1.5,
+        )
