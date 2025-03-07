@@ -10,48 +10,15 @@ import pytest
 from litellm import completion
 
 from src.db.models.document import Document
-from src.evaluation.data_models import QAPair
-from src.evaluation.qa_generation.runner import run_generation, save_qa_pairs
+from src.evaluation.data_models import QAPair, QAPairVersion
+from src.evaluation.qa_generation.runner import run_generation
+from src.evaluation.utils.storage import QAPairStorage
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
 @pytest.fixture
-def qa_pairs():
-    """Create QA pairs for testing."""
-    qa_pair1 = QAPair(
-        id=uuid.uuid4(),
-        question="Question 1?",
-        answer="Answer 1",
-        document_name="Document 1",
-        document_source="Source 1",
-        document_id=uuid.uuid4(),
-        chunk_id=None,
-        content_hash="hash1",
-        dataset="Dataset 1",
-        llm_model="gpt-4o-mini",
-        created_at=datetime.now(),
-    )
-
-    qa_pair2 = QAPair(
-        id=uuid.uuid4(),
-        question="Question 2?",
-        answer="Answer 2",
-        document_name="Document 2",
-        document_source="Source 2",
-        document_id=uuid.uuid4(),
-        chunk_id=uuid.uuid4(),
-        content_hash="hash2",
-        dataset="Dataset 2",
-        llm_model="gpt-4o-mini",
-        created_at=datetime.now(),
-    )
-
-    return [qa_pair1, qa_pair2]
-
-
-@pytest.fixture
 def mock_completion_response():
-    """Create a mock completion response."""
+    """Create a mock completion response using litellm.completion."""
 
     def mock_completion(model, messages, **kwargs):
         mock_response = {
@@ -60,8 +27,8 @@ def mock_completion_response():
                     "message": {
                         "content": json.dumps(
                             {
-                                "question": "What is this document about?",
-                                "answer": "This is a test document.",
+                                "question": "What is the test content?",
+                                "answer": "The test content is for QA generation.",
                             }
                         )
                     }
@@ -73,20 +40,59 @@ def mock_completion_response():
     return mock_completion
 
 
-def test_save_qa_pairs(qa_pairs, tmp_path):
-    """Test save_qa_pairs function with real file operations."""
-    # Create a temporary directory for output
-    output_dir = tmp_path / "qa_pairs"
+@pytest.fixture
+def qa_pairs():
+    """Create QA pairs for testing."""
+    version = QAPairVersion(
+        version_id="test_v1",
+        llm_model="test-model",
+        timestamp=datetime.utcnow(),
+    )
 
-    # Call the function with real QA pairs
-    result_path = save_qa_pairs(output_dir, qa_pairs)
+    qa_pair1 = QAPair(
+        question="Question 1?",
+        answer="Answer 1",
+        document_name="Document 1",
+        document_source="Source 1",
+        document_id=uuid.uuid4(),
+        chunk_id=None,
+        content_hash="hash1",
+        dataset="Dataset 1",
+        version=version,
+        expected_chunk_content="Test content 1",
+    )
+
+    qa_pair2 = QAPair(
+        question="Question 2?",
+        answer="Answer 2",
+        document_name="Document 2",
+        document_source="Source 2",
+        document_id=uuid.uuid4(),
+        chunk_id=uuid.uuid4(),
+        content_hash="hash2",
+        dataset="Dataset 2",
+        version=version,
+        expected_chunk_content="Test content 2",
+    )
+
+    return [qa_pair1, qa_pair2]
+
+
+def test_qa_storage(qa_pairs, tmp_path):
+    """Test QA pairs storage functionality."""
+    # Create a storage instance with a temporary directory
+    storage = QAPairStorage(tmp_path / "qa_pairs")
+    version_id = "test_v1"
+
+    # Save QA pairs
+    qa_pairs_path = storage.save_qa_pairs(qa_pairs, version_id)
 
     # Verify the file was created
-    assert result_path.exists()
-    assert result_path == output_dir / "qa_pairs.csv"
+    assert qa_pairs_path.exists()
+    assert qa_pairs_path.name == "qa_pairs.csv"
 
     # Read the CSV file and verify its contents
-    with open(result_path, "r", newline="") as f:
+    with open(qa_pairs_path, "r", newline="") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
 
@@ -99,6 +105,7 @@ def test_save_qa_pairs(qa_pairs, tmp_path):
             assert row["answer"] == qa_pairs[i].answer
             assert row["document_name"] == qa_pairs[i].document_name
             assert row["dataset"] == qa_pairs[i].dataset
+            assert row["expected_chunk_content"] == qa_pairs[i].expected_chunk_content
 
 
 def test_run_generation_basic(
@@ -127,21 +134,15 @@ def test_run_generation_basic(
         "src.evaluation.qa_generation.generator.completion", side_effect=mock_completion_response
     ):
         # Run the function
-        result = run_generation(llm_model=llm_model, output_dir=output_dir)
+        qa_pairs = run_generation(llm_model=llm_model, output_dir=output_dir)
 
         # Verify results
-        assert result.exists()
-        assert "qa_pairs" in str(result)
-
-        # Read generated QA pairs
-        with open(result, "r", newline="") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-            # Should have one QA pair per chunk
-            assert len(rows) == 4  # 2 documents * 2 chunks each
-            for row in rows:
-                assert row["question"] == "What is this document about?"
-                assert row["answer"] == "This is a test document."
+        assert len(qa_pairs) == 4  # 2 documents * 2 chunks each
+        for pair in qa_pairs:
+            assert isinstance(pair, QAPair)
+            assert pair.question == "What is the test content?"
+            assert pair.answer == "The test content is for QA generation."
+            assert pair.version.llm_model == llm_model
 
 
 def test_run_generation_with_dataset_filter(
@@ -196,23 +197,18 @@ def test_run_generation_with_dataset_filter(
         assert len(filtered_docs[0].chunks) == 2
 
         # Run the generation
-        result = run_generation(
+        qa_pairs = run_generation(
             llm_model=llm_model,
             output_dir=output_dir,
             dataset_filter=dataset_filter,
         )
 
         # Verify results
-        assert result.exists()
-        assert "qa_pairs" in str(result)
-
-        # Read generated QA pairs
-        with open(result, "r", newline="") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-            # Should only have QA pairs from Dataset 1's document
-            assert len(rows) == 2  # 1 document * 2 chunks
-            assert all(row["dataset"] == "Dataset 1" for row in rows)
+        assert len(qa_pairs) == 2  # 1 document * 2 chunks
+        for pair in qa_pairs:
+            assert isinstance(pair, QAPair)
+            assert pair.dataset == "Dataset 1"
+            assert pair.version.llm_model == llm_model
 
 
 def test_run_generation_no_documents(tmp_path, enable_factory_create, app_config):

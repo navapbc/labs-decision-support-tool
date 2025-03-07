@@ -103,8 +103,17 @@ class MetricsSummary:
 
 # QA Generation Models
 @dataclass
+class QAPairVersion:
+    """Version information for a QA pair set."""
+
+    version_id: str
+    llm_model: str  # Model used for generation
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
 class QAPair:
-    """A question-answer pair."""
+    """A question-answer pair with versioning."""
 
     question: str
     answer: str
@@ -114,7 +123,7 @@ class QAPair:
     chunk_id: Optional[UUID]
     content_hash: str
     dataset: str
-    llm_model: str  # Model used for generation
+    version: QAPairVersion
     expected_chunk_content: str = ""  # Content of the chunk that contains the answer
     id: Optional[UUID] = None  # Stable ID generated at creation time
     created_at: datetime = field(default_factory=datetime.utcnow)

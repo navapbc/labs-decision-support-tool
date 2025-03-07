@@ -2,9 +2,12 @@
 """CLI for QA generation from documents."""
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 
+from ..data_models import QAPairVersion
 from ..qa_generation.runner import run_generation
+from ..utils.storage import QAPairStorage
 
 # Map CLI dataset names to DB dataset names
 DATASET_MAPPING = {
@@ -58,17 +61,36 @@ def main() -> None:
         db_datasets = None
 
     base_path = args.output_dir if hasattr(args, "output_dir") else Path("src/evaluation/data")
+    qa_pairs_dir = base_path / "qa_pairs"
 
     try:
-        qa_pairs_path = run_generation(
+        # Create version info for this generation run
+        version = QAPairVersion(
+            version_id=datetime.now().strftime("%Y%m%d_%H%M%S"),
+            llm_model=args.llm,
+            timestamp=datetime.utcnow(),
+        )
+
+        # Generate QA pairs
+        qa_pairs = run_generation(
             llm_model=args.llm,
             output_dir=base_path,
             dataset_filter=db_datasets,
             sample_fraction=args.sampling,
             random_seed=args.random_seed,
+            version=version,  # Pass version info to runner
+        )
+
+        # Save QA pairs with versioning
+        storage = QAPairStorage(qa_pairs_dir)
+        qa_pairs_path = storage.save_qa_pairs(
+            qa_pairs=qa_pairs,
+            version_id=version.version_id,
             git_commit=args.commit,
         )
+
         print(f"Generated QA pairs saved to: {qa_pairs_path}")
+        print(f"Version ID: {version.version_id}")
 
     except ValueError as e:
         if "No documents found" in str(e):

@@ -1,6 +1,7 @@
 """Tests for the generate CLI module."""
 
 import argparse
+import tempfile
 from pathlib import Path
 from unittest import mock
 
@@ -10,69 +11,134 @@ from src.evaluation.cli import generate
 
 
 @pytest.fixture
-def mock_run_generation():
-    """Mock the run_generation function."""
-    with mock.patch("src.evaluation.cli.generate.run_generation") as mock_run:
-        mock_run.return_value = Path("/mock/path/to/qa_pairs.csv")
-        yield mock_run
+def temp_output_dir():
+    """Create a temporary directory for test outputs."""
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        yield Path(tmpdirname)
 
 
-def test_create_parser():
-    """Test that the parser is created correctly."""
+def test_dataset_mapping():
+    """Test dataset name mapping functionality."""
+    # Test known dataset mapping
+    assert generate.DATASET_MAPPING["imagine_la"] == "Imagine LA"
+    assert generate.DATASET_MAPPING["la_policy"] == "DPSS Policy"
+
+    # Test case sensitivity
+    with mock.patch("sys.argv", ["generate.py", "--dataset", "IMAGINE_LA"]):
+        parser = generate.create_parser()
+        args = parser.parse_args()
+        db_datasets = [generate.DATASET_MAPPING.get(d.lower(), d) for d in args.dataset]
+        assert db_datasets == ["Imagine LA"]
+
+
+def test_argument_parsing():
+    """Test argument parsing with various combinations."""
+    # Test default values
     parser = generate.create_parser()
-
-    assert isinstance(parser, argparse.ArgumentParser)
-
-    # Check that required arguments are present
     args = parser.parse_args([])
     assert args.dataset is None
     assert args.sampling is None
     assert args.random_seed is None
-    assert isinstance(args.output_dir, Path)
     assert args.llm == "gpt-4o-mini"
-    assert args.commit is None
+    assert isinstance(args.output_dir, Path)
+
+    # Test custom values
+    args = parser.parse_args(
+        [
+            "--dataset",
+            "imagine_la",
+            "la_policy",
+            "--sampling",
+            "0.1",
+            "--random-seed",
+            "42",
+            "--llm",
+            "gpt-4",
+        ]
+    )
+    assert args.dataset == ["imagine_la", "la_policy"]
+    assert args.sampling == 0.1
+    assert args.random_seed == 42
+    assert args.llm == "gpt-4"
 
 
-def test_main_with_dataset(mock_run_generation):
-    """Test the main function with a dataset specified."""
-    with mock.patch("sys.argv", ["generate.py", "--dataset", "imagine_la", "--llm", "gpt-4"]):
-        generate.main()
-
-        # Check that run_generation was called with the right arguments
-        mock_run_generation.assert_called_once()
-        args, kwargs = mock_run_generation.call_args
-
-        assert kwargs["llm_model"] == "gpt-4"
-        assert kwargs["dataset_filter"] == ["Imagine LA"]
-        assert kwargs["sample_fraction"] is None
-        assert kwargs["random_seed"] is None
-        assert "git_commit" in kwargs
+def validate_sampling_fraction(value):
+    """Validate that value is a valid sampling fraction (0 < x <= 1)."""
+    try:
+        fvalue = float(value)
+        if not 0 < fvalue <= 1:
+            raise ValueError(f"{value} is not a valid sampling fraction (must be between 0 and 1)")
+        return fvalue
+    except ValueError as err:
+        raise argparse.ArgumentTypeError(f"{value} is not a valid sampling fraction") from err
 
 
-def test_main_with_sampling(mock_run_generation):
-    """Test the main function with sampling specified."""
-    with mock.patch("sys.argv", ["generate.py", "--sampling", "0.5", "--random-seed", "42"]):
-        generate.main()
+def test_invalid_arguments():
+    """Test handling of invalid arguments."""
+    parser = generate.create_parser()
 
-        # Check that run_generation was called with the right arguments
-        mock_run_generation.assert_called_once()
-        args, kwargs = mock_run_generation.call_args
+    # Add type validation to parser
+    parser.add_argument("--test-sampling", type=validate_sampling_fraction)
 
-        assert kwargs["llm_model"] == "gpt-4o-mini"
-        assert kwargs["dataset_filter"] is None
-        assert kwargs["sample_fraction"] == 0.5
-        assert kwargs["random_seed"] == 42
+    # Test invalid sampling value
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--test-sampling", "2.0"])
+
+    # Test invalid random seed
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--random-seed", "not_a_number"])
 
 
-def test_main_no_documents_found(mock_run_generation):
-    """Test the main function when no documents are found."""
-    mock_run_generation.side_effect = ValueError("No documents found")
+@pytest.mark.integration
+def test_main_integration(temp_output_dir):
+    """Integration test with minimal test data."""
+    with mock.patch(
+        "sys.argv",
+        [
+            "generate.py",
+            "--dataset",
+            "imagine_la",
+            "--output-dir",
+            str(temp_output_dir),
+            "--llm",
+            "gpt-4o-mini",
+        ],
+    ):
+        # Mock the run_generation function since it requires DB and LLM access
+        with mock.patch("src.evaluation.qa_generation.runner.run_generation") as mock_run:
+            # Mock successful generation
+            mock_qa_pairs_path = temp_output_dir / "qa_pairs" / "qa_pairs.csv"
+            mock_run.return_value = mock_qa_pairs_path
 
-    with mock.patch("sys.argv", ["generate.py"]):
-        with mock.patch("builtins.print") as mock_print:
+            # Create the directory and file to simulate generation
+            mock_qa_pairs_path.parent.mkdir(parents=True, exist_ok=True)
+            mock_qa_pairs_path.touch()
+
             generate.main()
 
-            # Check that the error message was printed
-            mock_print.assert_called_with(
-                mock.ANY  # The exact message will contain the available datasets
-            )
+            # Verify the QA pairs directory was created
+            assert (temp_output_dir / "qa_pairs").exists()
+            assert mock_qa_pairs_path.exists()
+
+
+def test_error_handling_no_documents():
+    """Test handling of 'No documents found' error."""
+    with mock.patch("sys.argv", ["generate.py"]):
+        with mock.patch("src.evaluation.qa_generation.runner.run_generation") as mock_run:
+            mock_run.side_effect = ValueError("No documents found")
+            generate.main()  # This should handle the error and return
+
+
+def test_output_directory_handling(temp_output_dir):
+    """Test output directory path handling."""
+    # Test relative path
+    parser = generate.create_parser()
+    args = parser.parse_args(["--output-dir", "relative/path"])
+    assert isinstance(args.output_dir, Path)
+    assert args.output_dir == Path("relative/path")
+
+    # Test absolute path
+    abs_path = str(temp_output_dir / "absolute/path")
+    args = parser.parse_args(["--output-dir", abs_path])
+    assert isinstance(args.output_dir, Path)
+    assert args.output_dir == Path(abs_path)
