@@ -74,3 +74,19 @@ class EvaluationLogger:
         if self.results_file:
             self.results_file.close()
             self.results_file = None
+
+        # If there was an error, clean up all files
+        if exc_type is not None:
+            # Get all files in the log directory for this batch
+            if self.batch_id:
+                batch_files = [
+                    os.path.join(self.log_dir, f)
+                    for f in os.listdir(self.log_dir)
+                    if f.endswith(f"_{self.batch_id}.json") or f.endswith(f"_{self.batch_id}.jsonl")
+                ]
+                # Delete each file
+                for f in batch_files:
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        pass  # Ignore errors during cleanup
