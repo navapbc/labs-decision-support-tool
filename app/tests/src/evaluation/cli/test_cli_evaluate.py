@@ -3,7 +3,9 @@
 import argparse
 import csv
 import json
+import shutil
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest import mock
 
@@ -11,6 +13,7 @@ import pytest
 
 from src.db.models.document import ChunkWithScore
 from src.evaluation.cli import evaluate
+from src.evaluation.data_models import QAPair, QAPairVersion
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
@@ -51,35 +54,96 @@ def test_document():
 @pytest.fixture
 def test_questions_csv(tmp_path, test_document):
     """Create a temporary CSV file with test questions."""
+    version = QAPairVersion(
+        version_id="20250307_011423",
+        timestamp=datetime.now(UTC).isoformat(),
+        llm_model="test-model",
+    )
+
     questions = [
-        {
-            "id": "1",
-            "question": "test question 1?",
-            "answer": "test answer 1",
-            "dataset": "Imagine LA",  # Match the dataset mapping
-            "document_name": test_document.name,
-            "chunk_id": str(test_document.chunks[0].id),
-            "expected_chunk_content": test_document.chunks[0].content,
-            "content_hash": "hash1",  # Add required fields
-        },
-        {
-            "id": "2",
-            "question": "test question 2?",
-            "answer": "test answer 2",
-            "dataset": "DPSS Policy",  # Match another known dataset
-            "document_name": "other_doc",
-            "chunk_id": "chunk2",
-            "expected_chunk_content": "other content",
-            "content_hash": "hash2",  # Add required fields
-        },
+        QAPair(
+            id="1",
+            question="test question 1?",
+            answer="test answer 1",
+            dataset="Imagine LA",  # Match the dataset mapping
+            document_name=test_document.name,
+            document_source="test_dataset",
+            document_id="doc1",
+            chunk_id=str(test_document.chunks[0].id),
+            expected_chunk_content=test_document.chunks[0].content,
+            content_hash="hash1",
+            created_at=datetime.now(UTC).isoformat(),
+            version=version,
+        ),
+        QAPair(
+            id="2",
+            question="test question 2?",
+            answer="test answer 2",
+            dataset="DPSS Policy",  # Match another known dataset
+            document_name="other_doc",
+            document_source="other_dataset",
+            document_id="doc2",
+            chunk_id="chunk2",
+            expected_chunk_content="other content",
+            content_hash="hash2",
+            created_at=datetime.now(UTC).isoformat(),
+            version=version,
+        ),
     ]
 
-    # Create CSV file
-    csv_path = tmp_path / "test_questions.csv"
+    # Create versioned directory structure
+    version_dir = tmp_path / "qa_pairs" / version.version_id
+    version_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save metadata
+    metadata = {
+        "version_id": version.version_id,
+        "timestamp": version.timestamp,
+        "llm_model": version.llm_model,
+        "total_pairs": len(questions),
+        "datasets": ["test_dataset", "other_dataset"],
+        "git_commit": "test123",
+    }
+
+    with open(version_dir / "metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    # Save QA pairs CSV
+    csv_path = version_dir / "qa_pairs.csv"
     with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=questions[0].keys())
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "id",
+                "question",
+                "answer",
+                "document_name",
+                "document_source",
+                "document_id",
+                "chunk_id",
+                "content_hash",
+                "dataset",
+                "created_at",
+                "version_id",
+                "version_timestamp",
+                "version_llm_model",
+                "expected_chunk_content",
+            ],
+        )
         writer.writeheader()
-        writer.writerows(questions)
+        for pair in questions:
+            row = pair.__dict__.copy()
+            row["version_id"] = pair.version.version_id
+            row["version_timestamp"] = pair.version.timestamp
+            row["version_llm_model"] = pair.version.llm_model
+            del row["version"]
+            writer.writerow(row)
+
+    # Create latest symlink
+    latest_link = tmp_path / "qa_pairs" / "latest"
+    if latest_link.exists():
+        latest_link.unlink()
+    latest_link.symlink_to(version_dir, target_is_directory=True)
 
     return str(csv_path)
 
@@ -123,6 +187,11 @@ def test_main_with_dataset(
     test_document, test_questions_csv, temp_output_dir, mock_git_commit, mock_retrieval_func
 ):
     """Test the main function with a dataset specified."""
+    # Copy QA pairs directory structure to output directory
+    qa_pairs_dir = Path(test_questions_csv).parent.parent
+    output_qa_pairs_dir = temp_output_dir / "qa_pairs"
+    shutil.copytree(qa_pairs_dir, output_qa_pairs_dir)
+
     with mock.patch(
         "sys.argv",
         [
@@ -135,12 +204,6 @@ def test_main_with_dataset(
             str(temp_output_dir),
         ],
     ):
-        # Copy test questions to expected location
-        qa_pairs_dir = temp_output_dir / "qa_pairs"
-        qa_pairs_dir.mkdir(parents=True)
-        qa_pairs_path = qa_pairs_dir / "qa_pairs.csv"
-        qa_pairs_path.write_text(Path(test_questions_csv).read_text())
-
         # Run main with real retrieval function
         evaluate.main()
 
@@ -167,6 +230,11 @@ def test_main_with_sampling(
     test_document, test_questions_csv, temp_output_dir, mock_git_commit, mock_retrieval_func
 ):
     """Test the main function with sampling specified."""
+    # Copy QA pairs directory structure to output directory
+    qa_pairs_dir = Path(test_questions_csv).parent.parent
+    output_qa_pairs_dir = temp_output_dir / "qa_pairs"
+    shutil.copytree(qa_pairs_dir, output_qa_pairs_dir)
+
     with mock.patch(
         "sys.argv",
         [
@@ -181,12 +249,6 @@ def test_main_with_sampling(
             str(temp_output_dir),
         ],
     ):
-        # Copy test questions to expected location
-        qa_pairs_dir = temp_output_dir / "qa_pairs"
-        qa_pairs_dir.mkdir(parents=True)
-        qa_pairs_path = qa_pairs_dir / "qa_pairs.csv"
-        qa_pairs_path.write_text(Path(test_questions_csv).read_text())
-
         # Run main
         evaluate.main()
 
@@ -207,14 +269,40 @@ def test_main_with_sampling(
 def test_error_handling(temp_output_dir, mock_git_commit, mock_retrieval_func):
     """Test error handling scenarios."""
     with mock.patch("sys.argv", ["evaluate.py", "--output-dir", str(temp_output_dir)]):
-        # Test file not found error
-        with pytest.raises(RuntimeError, match="Error loading questions"):
+        # Test no QA pairs directory error
+        with pytest.raises(ValueError, match="No QA pairs found - run generation first"):
             evaluate.main()
 
-        # Create empty questions file
+        # Create empty QA pairs directory
         qa_pairs_dir = temp_output_dir / "qa_pairs"
-        qa_pairs_dir.mkdir(parents=True)
-        qa_pairs_path = qa_pairs_dir / "qa_pairs.csv"
+        qa_pairs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Test no QA pairs version error
+        with pytest.raises(ValueError, match="No QA pairs found - run generation first"):
+            evaluate.main()
+
+        # Create empty version directory
+        version_dir = qa_pairs_dir / "20250307_011423"
+        version_dir.mkdir(parents=True, exist_ok=True)
+
+        # Test missing metadata error
+        with pytest.raises(ValueError, match="Metadata not found for version"):
+            evaluate.main()
+
+        # Create empty metadata file
+        metadata = {
+            "version_id": "20250307_011423",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "llm_model": "test-model",
+            "total_pairs": 0,
+            "datasets": [],
+            "git_commit": "test123",
+        }
+        with open(version_dir / "metadata.json", "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        # Create empty QA pairs CSV
+        qa_pairs_path = version_dir / "qa_pairs.csv"
         qa_pairs_path.write_text("id,question,answer,dataset\n")  # Empty CSV with header
 
         # Test no questions after filtering
@@ -312,11 +400,10 @@ def test_main_integration(
     test_document, test_questions_csv, temp_output_dir, mock_git_commit, mock_retrieval_func
 ):
     """Integration test with minimal test data."""
-    # Set up test environment
-    qa_pairs_dir = temp_output_dir / "qa_pairs"
-    qa_pairs_dir.mkdir(parents=True)
-    qa_pairs_path = qa_pairs_dir / "qa_pairs.csv"
-    qa_pairs_path.write_text(Path(test_questions_csv).read_text())
+    # Copy QA pairs directory structure to output directory
+    qa_pairs_dir = Path(test_questions_csv).parent.parent
+    output_qa_pairs_dir = temp_output_dir / "qa_pairs"
+    shutil.copytree(qa_pairs_dir, output_qa_pairs_dir)
 
     with mock.patch(
         "sys.argv",

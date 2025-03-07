@@ -1,6 +1,5 @@
 import csv
 from dataclasses import asdict, fields
-from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -8,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from src.app_config import app_config
 from src.db.models.document import Document
-from src.evaluation.data_models import QAPair
+from src.evaluation.data_models import QAPair, QAPairVersion
 from src.util.sampling import get_stratified_sample
 
 from .generator import generate_from_documents
@@ -44,8 +43,8 @@ def run_generation(
     dataset_filter: Optional[List[str]] = None,
     sample_fraction: Optional[float] = None,
     random_seed: Optional[int] = None,
-    git_commit: Optional[str] = None,
-) -> Path:
+    version: Optional[QAPairVersion] = None,
+) -> List[QAPair]:
     """Run QA pair generation with given parameters.
 
     Args:
@@ -54,15 +53,11 @@ def run_generation(
         dataset_filter: List of dataset names to include
         sample_fraction: Fraction of documents to sample
         random_seed: Random seed for reproducible sampling
-        git_commit: Git commit hash for tracking generation runs (not used in this simplified version)
+        version: Version information for generated QA pairs
 
     Returns:
-        Path to generated QA pairs CSV
+        List of generated QA pairs
     """
-    # Generate version ID using timestamp for unique identification
-    version_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    qa_pairs_dir = output_dir / "qa_pairs" / version_id
-
     # Load documents from DB
     with app_config.db_session() as session:
         # Start with base query
@@ -83,6 +78,8 @@ def run_generation(
 
         # Sample documents if requested
         if sample_fraction:
+            if not 0 < sample_fraction <= 1:
+                raise ValueError("Sample fraction must be between 0 and 1")
             documents = get_stratified_sample(
                 documents,
                 sample_fraction=sample_fraction,
@@ -96,11 +93,10 @@ def run_generation(
             _ = doc.dataset  # Force load dataset
 
         # Generate QA pairs
-        qa_pairs = list(generate_from_documents(llm_model=llm_model, documents=documents))
-
-        # Save QA pairs
-        qa_pairs_path = save_qa_pairs(qa_pairs_dir, qa_pairs)
+        qa_pairs = list(
+            generate_from_documents(llm_model=llm_model, documents=documents, version=version)
+        )
 
         print(f"Generated {len(qa_pairs)} QA pairs")
 
-        return qa_pairs_path
+        return qa_pairs

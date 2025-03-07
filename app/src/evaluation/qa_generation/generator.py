@@ -2,8 +2,9 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 from hashlib import md5
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 from litellm import completion
 from pydantic import BaseModel, Field
@@ -12,7 +13,7 @@ from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.generate import completion_args
 
-from ..data_models import QAPair
+from ..data_models import QAPair, QAPairVersion
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,11 @@ Respond with a single question-answer pair based on the content in JSON format w
 MAX_WORKERS = 5  # Limit concurrent API calls
 
 
-def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-mini") -> List[QAPair]:
+def generate_qa_pair(
+    document_or_chunk: Document | Chunk,
+    llm: str = "gpt-4o-mini",
+    version: Optional[QAPairVersion] = None,
+) -> List[QAPair]:
     """Generate QA pair from a document or chunk."""
     # Get document and chunk info
     if isinstance(document_or_chunk, Document):
@@ -89,7 +94,12 @@ def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-min
                 document_or_chunk.content.encode("utf-8"), usedforsecurity=False
             ).hexdigest(),
             dataset=document.dataset,
-            llm_model=llm,
+            version=version
+            or QAPairVersion(
+                version_id=datetime.now().strftime("%Y%m%d_%H%M%S"),
+                llm_model=llm,
+                timestamp=datetime.utcnow(),
+            ),
             expected_chunk_content=document_or_chunk.content,
             created_at=document.created_at,
         )
@@ -103,12 +113,17 @@ def generate_qa_pair(document_or_chunk: Document | Chunk, llm: str = "gpt-4o-min
         return []
 
 
-def generate_from_documents(llm_model: str, documents: List[Document]) -> Iterator[QAPair]:
+def generate_from_documents(
+    llm_model: str,
+    documents: List[Document],
+    version: Optional[QAPairVersion] = None,
+) -> Iterator[QAPair]:
     """Generate QA pairs from document chunks.
 
     Args:
         llm_model: The LLM model to use for generation
         documents: List of documents to generate QA pairs from
+        version: Version information for generated QA pairs
 
     Returns:
         Iterator of generated QA pairs
@@ -121,7 +136,9 @@ def generate_from_documents(llm_model: str, documents: List[Document]) -> Iterat
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         # Submit all generation tasks
-        futures = {executor.submit(generate_qa_pair, item, llm_model): item for item in items}
+        futures = {
+            executor.submit(generate_qa_pair, item, llm_model, version): item for item in items
+        }
 
         # Process results as they complete
         for future in as_completed(futures):

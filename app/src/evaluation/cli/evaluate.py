@@ -5,6 +5,7 @@ import argparse
 from pathlib import Path
 
 from ..metrics.runner import create_retrieval_function, run_evaluation
+from ..utils.storage import QAPairStorage
 
 # Map CLI dataset names to DB dataset names
 DATASET_MAPPING = {
@@ -73,10 +74,23 @@ def main() -> None:
     qa_pairs_dir = base_path / "qa_pairs"
 
     try:
-        # Use the qa_pairs.csv file
-        qa_pairs_path = qa_pairs_dir / "qa_pairs.csv"
+        # Get QA pairs version using storage system
+        storage = QAPairStorage(qa_pairs_dir)
+        try:
+            version_id = args.qa_pairs_version or storage.get_latest_version()
+        except ValueError as e:
+            print(f"Error getting QA pairs version: {str(e)}")
+            raise
 
-        print(f"Using QA pairs from: {qa_pairs_path}")
+        version_dir = storage.get_version_path(version_id)
+        qa_pairs_path = version_dir / "qa_pairs.csv"
+
+        # Get metadata for logging
+        metadata = storage.get_version_metadata(version_id)
+        print(f"Using QA pairs from version {version_id}")
+        print(f"Generated with model: {metadata['llm_model']}")
+        print(f"Total pairs available: {metadata['total_pairs']}")
+        print(f"Available datasets: {metadata['datasets']}")
 
         # Create retrieval function with min_score
         retrieval_func = create_retrieval_function(args.min_score)
