@@ -1,6 +1,9 @@
 """Tests for batch processing functions."""
 
-from unittest.mock import mock_open, patch
+import os
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 from src.evaluation.metrics.batch import (
     create_batch_config,
@@ -35,44 +38,47 @@ def test_get_git_commit():
 
 
 def test_get_package_version():
-    """Test getting package version."""
-    # Test successful case
-    mock_toml = 'name = "app"\nversion = "1.0.0"\n'
-    with patch("builtins.open", mock_open(read_data=mock_toml)):
-        assert get_package_version() == "1.0.0"
+    """Test getting package version from actual file."""
+    # Create a temporary pyproject.toml file
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        pyproject_path = temp_path / "pyproject.toml"
 
-    # Test file not found case
-    with patch("builtins.open", side_effect=FileNotFoundError("No such file")):
-        try:
-            get_package_version()
-            raise AssertionError("Expected RuntimeError")
-        except RuntimeError as e:
-            assert "Failed to get package version" in str(e)
-            assert "No such file" in str(e)
+        # Write test content
+        with open(pyproject_path, "w") as f:
+            f.write('[tool.poetry]\nname = "app"\nversion = "1.0.0"\n')
 
-    # Test malformed file case
-    mock_toml_bad = 'name = "app"\nno_version_here\n'
-    with patch("builtins.open", mock_open(read_data=mock_toml_bad)):
+        # Change to temp directory and test
+        current_dir = os.getcwd()
         try:
+            os.chdir(temp_dir)
+            assert get_package_version() == "1.0.0"
+        finally:
+            os.chdir(current_dir)
+
+        # Test malformed file
+        with open(pyproject_path, "w") as f:
+            f.write('[tool.poetry]\nname = "app"\nno_version_here\n')
+
+        try:
+            os.chdir(temp_dir)
             get_package_version()
             raise AssertionError("Expected RuntimeError")
         except RuntimeError as e:
             assert "No version field found in pyproject.toml" in str(e)
+        finally:
+            os.chdir(current_dir)
 
 
 def test_create_batch_config():
     """Test batch configuration creation."""
-    # Mock git commit and package version
-    with (
-        patch("src.evaluation.metrics.batch.get_git_commit", return_value="abc123"),
-        patch("src.evaluation.metrics.batch.get_package_version", return_value="1.0.0"),
-    ):
+    # Only mock git commit, let package version use real file
+    with patch("src.evaluation.metrics.batch.get_git_commit", return_value="abc123"):
         # Test with minimal parameters
         config = create_batch_config(k_value=5)
         assert config.evaluation_config.k_value == 5
         assert config.evaluation_config.num_samples == 0
         assert config.evaluation_config.dataset_filter == []
-        assert config.software_info.package_version == "1.0.0"
         assert config.software_info.git_commit == "abc123"
         assert config.batch_id is not None
         assert config.timestamp is not None

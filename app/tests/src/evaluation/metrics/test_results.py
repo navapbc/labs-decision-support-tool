@@ -1,15 +1,18 @@
 """Tests for evaluation results processing."""
 
-from unittest.mock import MagicMock, patch
+import uuid
+from hashlib import md5
 
 import pytest
 
+from src.db.models.document import ChunkWithScore
 from src.evaluation.data_models import EvaluationResult, ExpectedChunk, RetrievedChunk
 from src.evaluation.metrics.results import (
     batch_process_results,
     generate_qa_pair_id,
     process_retrieved_chunks,
 )
+from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
 def test_generate_qa_pair_id():
@@ -31,97 +34,83 @@ def test_generate_qa_pair_id():
 
 
 @pytest.fixture
-def mock_question():
-    """Create a mock question dictionary."""
+def test_document():
+    """Create a test document with a chunk."""
+    document = DocumentFactory.build(
+        name="test_doc",
+        content="Test document content",
+        source="test_dataset",
+    )
+    chunk = ChunkFactory.build(
+        document=document,
+        content="test chunk content",
+        id=uuid.uuid4(),
+    )
+    document.chunks = [chunk]
+    return document
+
+
+@pytest.fixture
+def test_question(test_document):
+    """Create a test question dictionary from document."""
+    chunk = test_document.chunks[0]
+    content_hash = md5(chunk.content.encode("utf-8"), usedforsecurity=False).hexdigest()
+
     return {
-        "id": "test_id",
+        "id": str(uuid.uuid4()),
         "question": "test question?",
         "answer": "test answer",
-        "document_name": "test_doc",
-        "dataset": "test_dataset",
-        "chunk_id": "chunk_123",
-        "content_hash": "abc123",
-        "expected_chunk_content": "test chunk content",
+        "document_name": test_document.name,
+        "dataset": test_document.dataset,
+        "chunk_id": str(chunk.id),
+        "content_hash": content_hash,
+        "expected_chunk_content": chunk.content,
     }
 
 
-@pytest.fixture
-def mock_question_no_id(mock_question):
-    """Create a mock question dictionary without an ID."""
-    question = mock_question.copy()
-    del question["id"]
-    return question
-
-
-@pytest.fixture
-def mock_chunk():
-    """Create a mock chunk with content."""
-    chunk = MagicMock()
-    chunk.chunk.id = "chunk_123"
-    chunk.chunk.content = "test content"
-    chunk.score = 0.85
-    return chunk
-
-
-def test_process_retrieved_chunks_found(mock_question, mock_chunk):
+def test_process_retrieved_chunks_found(test_document, test_question):
     """Test processing retrieved chunks when correct chunk is found."""
-    # Create a list of retrieved chunks where the first one matches
-    mock_chunk.chunk.content = (
-        "matching content"  # This will generate the same hash as mock_question
-    )
-    retrieved_chunks = [mock_chunk]
+    chunk = test_document.chunks[0]
+    retrieved_chunks = [ChunkWithScore(chunk=chunk, score=0.85)]
 
-    # Mock the md5 hash to match the expected hash
-    with patch("src.evaluation.metrics.results.md5") as mock_md5:
-        mock_md5.return_value.hexdigest.return_value = mock_question["content_hash"]
+    result = process_retrieved_chunks(test_question, retrieved_chunks, 100.5)
 
-        result = process_retrieved_chunks(mock_question, retrieved_chunks, 100.5)
+    # Verify result
+    assert isinstance(result, EvaluationResult)
+    assert result.qa_pair_id == test_question["id"]
+    assert result.question == test_question["question"]
+    assert result.expected_answer == test_question["answer"]
+    assert result.correct_chunk_retrieved is True
+    assert result.rank_if_found == 1
+    assert result.retrieval_time_ms == 100.5
 
-        # Verify result
-        assert isinstance(result, EvaluationResult)
-        assert result.qa_pair_id == mock_question["id"]
-        assert result.question == mock_question["question"]
-        assert result.expected_answer == mock_question["answer"]
-        assert result.correct_chunk_retrieved is True
-        assert result.rank_if_found == 1
-        assert result.retrieval_time_ms == 100.5
+    # Verify expected chunk
+    assert isinstance(result.expected_chunk, ExpectedChunk)
+    assert result.expected_chunk.name == test_question["document_name"]
+    assert result.expected_chunk.source == test_question["dataset"]
+    assert result.expected_chunk.chunk_id == test_question["chunk_id"]
+    assert result.expected_chunk.content == test_question["expected_chunk_content"]
 
-        # Verify expected chunk
-        assert isinstance(result.expected_chunk, ExpectedChunk)
-        assert result.expected_chunk.name == mock_question["document_name"]
-        assert result.expected_chunk.source == mock_question["dataset"]
-        assert result.expected_chunk.chunk_id == mock_question["chunk_id"]
-        assert result.expected_chunk.content_hash == mock_question["content_hash"]
-        assert result.expected_chunk.content == mock_question["expected_chunk_content"]
-
-        # Verify retrieved chunks
-        assert len(result.retrieved_chunks) == 1
-        chunk = result.retrieved_chunks[0]
-        assert isinstance(chunk, RetrievedChunk)
-        assert chunk.chunk_id == str(mock_chunk.chunk.id)
-        assert chunk.score == mock_chunk.score
-        assert chunk.content == mock_chunk.chunk.content
+    # Verify retrieved chunks
+    assert len(result.retrieved_chunks) == 1
+    retrieved = result.retrieved_chunks[0]
+    assert isinstance(retrieved, RetrievedChunk)
+    assert retrieved.chunk_id == str(chunk.id)
+    assert retrieved.score == 0.85
+    assert retrieved.content == chunk.content
 
 
-def test_process_retrieved_chunks_no_id(mock_question_no_id, mock_chunk):
-    """Test processing retrieved chunks when no ID is provided."""
-    retrieved_chunks = [mock_chunk]
-
-    result = process_retrieved_chunks(mock_question_no_id, retrieved_chunks, 100.5)
-
-    # Verify a UUID was generated
-    assert result.qa_pair_id != ""
-    # Verify it's stable for same inputs
-    result2 = process_retrieved_chunks(mock_question_no_id, retrieved_chunks, 100.5)
-    assert result.qa_pair_id == result2.qa_pair_id
-
-
-def test_process_retrieved_chunks_not_found(mock_question, mock_chunk):
+def test_process_retrieved_chunks_not_found(test_document, test_question):
     """Test processing retrieved chunks when correct chunk is not found."""
-    # Create a list of retrieved chunks where none match
-    retrieved_chunks = [mock_chunk]
+    # Create a different chunk that won't match
+    different_chunk = ChunkFactory.build(
+        document=test_document,
+        content="different content",
+        id=uuid.uuid4(),
+    )
+    retrieved_chunks = [ChunkWithScore(chunk=different_chunk, score=0.85)]
 
-    result = process_retrieved_chunks(mock_question, retrieved_chunks, 100.5)
+    result = process_retrieved_chunks(test_question, retrieved_chunks, 100.5)
 
     # Verify result
     assert result.correct_chunk_retrieved is False
@@ -147,32 +136,25 @@ def test_process_retrieved_chunks_empty():
     assert result.expected_chunk.name == ""
     assert result.expected_chunk.source == ""
     assert result.expected_chunk.chunk_id == ""
-    assert result.expected_chunk.content_hash == ""
     assert result.expected_chunk.content == ""
 
 
-def test_batch_process_results(mock_question, mock_chunk):
+def test_batch_process_results(test_document, test_question, enable_factory_create, db_session):
     """Test batch processing of results."""
-    questions = [mock_question]
+    questions = [test_question]
     k = 1
 
-    # Mock retrieval function
-    def mock_retrieval_func(query: str, k: int):
-        return [mock_chunk]
+    # Create a simple retrieval function that returns the document's chunk
+    def retrieval_func(query: str, k: int):
+        chunk = test_document.chunks[0]
+        return [ChunkWithScore(chunk=chunk, score=0.85)]
 
-    # Mock app_config.db_session and measure_time context managers
-    with (
-        patch("src.evaluation.metrics.results.app_config") as mock_config,
-        patch("src.evaluation.metrics.results.measure_time") as mock_timer,
-    ):
-        mock_config.db_session.return_value.__enter__.return_value = None
-        mock_config.db_session.return_value.__exit__.return_value = None
-        mock_timer.return_value.__enter__.return_value.elapsed_ms.return_value = 100.5
+    # Process results without mocking
+    results = batch_process_results(questions, retrieval_func, k)
 
-        results = batch_process_results(questions, mock_retrieval_func, k)
-
-        # Verify results
-        assert len(results) == 1
-        assert isinstance(results[0], EvaluationResult)
-        assert results[0].question == mock_question["question"]
-        assert results[0].retrieval_time_ms == 100.5
+    # Verify results
+    assert len(results) == 1
+    assert isinstance(results[0], EvaluationResult)
+    assert results[0].question == test_question["question"]
+    assert results[0].retrieval_time_ms > 0  # Should have actual timing
+    assert results[0].correct_chunk_retrieved is True

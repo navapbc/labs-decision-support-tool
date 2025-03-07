@@ -116,6 +116,7 @@ class EvaluationRunner:
         commit: Optional[str] = None,
     ) -> None:
         """Run evaluation for a single k value."""
+        logger = None
         try:
             # Create batch config
             config = create_batch_config(
@@ -126,31 +127,30 @@ class EvaluationRunner:
             # Initialize logger
             logger = EvaluationLogger(self.log_dir)
 
-            try:
-                # Start batch
-                logger.start_batch(config)
+            # Start batch
+            logger.start_batch(config)
 
-                # Process results
-                results = batch_process_results(questions, self.retrieval_func, k)
+            # Process results
+            results = batch_process_results(questions, self.retrieval_func, k)
 
-                # Log individual results
-                for result in results:
-                    logger.log_result(result)
+            # Log individual results
+            for result in results:
+                logger.log_result(result)
 
-                # Compute and log summary metrics
-                metrics = compute_metrics_summary(results, config.batch_id)
-                logger.finish_batch(metrics)
+            # Compute and log summary metrics
+            metrics = compute_metrics_summary(results, config.batch_id)
+            logger.finish_batch(metrics)
 
-            except Exception as e:
-                print(f"Error running evaluation batch: {e}")
-                raise
-            finally:
-                # Ensure logger is cleaned up
+        except Exception as e:
+            print(f"Error running evaluation batch: {e}")
+            if logger:
+                # Pass error information to logger.__exit__
+                logger.__exit__(type(e), e, e.__traceback__)
+            raise
+        else:
+            if logger:
+                # No error occurred, clean up normally
                 logger.__exit__(None, None, None)
-        except RuntimeError as e:
-            error_msg = f"Failed to initialize batch configuration: {e}"
-            print(error_msg)
-            raise RuntimeError(error_msg) from e
 
 
 def run_evaluation(
