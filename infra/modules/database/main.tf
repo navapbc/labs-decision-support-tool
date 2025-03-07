@@ -49,8 +49,8 @@ resource "aws_rds_cluster" "db" {
   deletion_protection = true
 
   serverlessv2_scaling_configuration {
-    max_capacity = 1.0
-    min_capacity = 0.5
+    max_capacity = 2.0
+    min_capacity = 1.0
   }
 
   db_subnet_group_name   = var.database_subnet_group_name
