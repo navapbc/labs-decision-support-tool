@@ -299,3 +299,6 @@ generate-qa: ## Generate QA pairs from documents
 		$(if $(sampling),--sampling=$(sampling),) \
 		$(if $(random_seed),--random-seed=$(random_seed),) \
 		--commit=$(shell git rev-parse HEAD)
+
+literalai-exporter:
+	$(PY_RUN_CMD) literalai-exporter $(args)
