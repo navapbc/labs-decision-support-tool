@@ -8,7 +8,7 @@ import functools
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -308,7 +308,7 @@ async def query(request: QueryRequest) -> QueryResponse:
                 db_session.merge(session.user_session)
 
         engine = get_chat_engine(session)
-        response: QueryResponse = await run_query(engine, request.message, chat_history)
+        response, metadata = await run_query(engine, request.message, chat_history)
 
         # Example of using parent_id to have a hierarchy of messages in Literal AI
         response_msg = literalai().message(
@@ -318,7 +318,8 @@ async def query(request: QueryRequest) -> QueryResponse:
             metadata={
                 "citations": [c.__dict__ for c in response.citations],
                 "chat_history": chat_history,
-            },
+            }
+            | metadata,
         )
         # id needed to later provide feedback on this message in LiteralAI
         response.response_id = response_msg.id
@@ -394,7 +395,7 @@ INCLUDE_ALERT_IN_RESPONSE = True
 
 async def run_query(
     engine: ChatEngineInterface, question: str, chat_history: Optional[ChatHistory] = None
-) -> QueryResponse:
+) -> tuple[QueryResponse, dict[str, Any]]:
     logger.info("Received: '%s' with history: %s", question, chat_history)
     result = await asyncify(lambda: engine.on_message(question, chat_history))()
     logger.info("Response: %s", result.response)
@@ -408,7 +409,14 @@ async def run_query(
         response_msg = f"{alert_msg}\n\n{final_result.response}"
     else:
         response_msg = final_result.response
-    return QueryResponse(response_text=response_msg, alert_message=alert_msg, citations=citations)
+    return (
+        QueryResponse(
+            response_text=response_msg,
+            alert_message=alert_msg,
+            citations=citations,
+        ),
+        {"attributes": result.attributes.model_dump()},
+    )
 
 
 # endregion

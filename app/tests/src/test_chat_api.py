@@ -86,9 +86,12 @@ def test_api_engines(client, db_session):
 
 def test_api_query(monkeypatch, client, db_session):
     async def mock_run_query(engine, question, chat_history):
-        return QueryResponse(
-            response_text=f"Response from LLM: {chat_history}",
-            citations=[],
+        return (
+            QueryResponse(
+                response_text=f"Response from LLM: {chat_history}",
+                citations=[],
+            ),
+            {},
         )
 
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
@@ -210,10 +213,12 @@ async def test_run_query__1_citation(subsections):
                 subsections=subsections,
             )
 
-    query_response = await run_query(MockChatEngine(), "My question")
+    query_response, metadata = await run_query(MockChatEngine(), "My question")
     assert query_response.response_text == "Response from LLM (citation-1)"
     assert len(query_response.citations) == 1
     assert query_response.citations[0].citation_id == "citation-1"
+
+    assert metadata["attributes"]["needs_context"] is True
 
 
 @pytest.mark.asyncio
@@ -234,7 +239,7 @@ async def test_run_query__2_citations(subsections):
                 subsections=subsections,
             )
 
-    query_response = await run_query(MockChatEngine(), "My question")
+    query_response, _metadata = await run_query(MockChatEngine(), "My question")
     assert (
         query_response.alert_message
         == "**Policy update**: Some alert message.\n\nThe rest of this answer may be outdated."
@@ -261,7 +266,7 @@ async def test_run_query__unknown_citation(subsections, caplog):
             )
 
     with caplog.at_level(logging.ERROR):
-        query_response = await run_query(MockChatEngine(), "My question")
+        query_response, _metadata = await run_query(MockChatEngine(), "My question")
         assert any(
             text == "LLM generated a citation for a reference (citation-44) that doesn't exist."
             for text in caplog.messages
