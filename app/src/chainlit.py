@@ -279,7 +279,7 @@ async def special_command(msg_text: str) -> bool:
     elif msg_text == "export literalai":
         try:
             step_dict = await cl.AskUserMessage(
-                content="Specify the start and end timestamps (e.g., '2025-03-04 2025-03-06') for the data export.",
+                content="Specify the start timestamp and (exclusive) end timestamp for the data export (such as '2025-03-04 2025-03-06' to get 2 days of data starting on March 4th).",
                 timeout=180,
             ).send()
             if step_dict:
