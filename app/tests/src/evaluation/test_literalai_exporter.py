@@ -110,7 +110,6 @@ def test_convert_to_qa_rows_and_save_csv(caplog):
     save_csv(qa_rows, mock_csv_file)
     mock_csv_file.seek(0)
     csv_lines = mock_csv_file.readlines()
-    print("".join(csv_lines))
     assert len(csv_lines) == 4
 
     # Roughly check the contents of the CSV file
