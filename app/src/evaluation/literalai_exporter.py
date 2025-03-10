@@ -132,7 +132,9 @@ class QARow(NamedTuple):
 def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
     qa_pairs = []
     for th in threads:
-        assert th.steps
+        if not th.steps:
+            logger.warning("Thread %r has no steps", th.id)
+            continue
         logger.info("Thread %r has %r steps", th.id, len(th.steps))
         steps = {step.id: step for step in th.steps}
         pairs = [
