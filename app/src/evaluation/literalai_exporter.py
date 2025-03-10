@@ -26,9 +26,7 @@ def literalai() -> LiteralClient:  # pragma: no cover
 
 def get_project_id() -> str:
     client = literalai()
-    proj_id = client.api.get_my_project_id()
-    logger.info("Project ID: %r", proj_id)
-    return proj_id
+    return client.api.get_my_project_id()
 
 
 def query_threads(start_date: datetime, end_date: datetime) -> list[Thread]:
@@ -142,7 +140,7 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
             QARow.from_lai_thread(
                 project_id=project_id,
                 thread=th,
-                # Pop out used steps to check for remaining steps later
+                # Pop out referenced steps to later check for remaining steps
                 question_step=steps.pop(step.parent_id),
                 answer_step=steps.pop(step.id),
             )
@@ -164,9 +162,6 @@ def save_csv(qa_pairs: list[QARow], csv_file: TextIOWrapper) -> None:
         writer.writerow({k: getattr(pair, k, "") for k in fields})
 
 
-RESP_FILE = "response"
-
-
 def main() -> None:  # pragma: no cover
     parser = argparse.ArgumentParser()
     parser.add_argument("start", help="(inclusive) beginning datetime of threads to export")
@@ -174,15 +169,12 @@ def main() -> None:  # pragma: no cover
     args = parser.parse_args(sys.argv[1:])
     logger.info("Running with args %r", args)
 
-    project_id = get_project_id()
-    start_date = datetime.fromisoformat(args.start)  # ("2025-03-05T00:00:00.000Z")
+    start_date = datetime.fromisoformat(args.start)
     end_date = datetime.fromisoformat(args.end)
 
+    project_id = get_project_id()
+    logger.info("Project ID: %r", project_id)
     threads = query_threads(start_date, end_date)
     qa_rows = convert_to_qa_rows(project_id, threads)
     with open("lai_pairs.csv", "w", encoding="utf-8") as f:
         save_csv(qa_rows, f)
-
-
-if __name__ == "__main__":
-    main()

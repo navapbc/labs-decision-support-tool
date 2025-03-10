@@ -26,7 +26,7 @@ class MockLiteralAIApi:
     def get_my_project_id(self):
         return "Test_Project_1234ABC"
 
-    def get_threads(self, filters=None, **kwargs):
+    def get_threads(self, *args, **kwargs):
         threads = self.responses[self.get_threads_counter]
         self.get_threads_counter += 1
 
