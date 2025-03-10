@@ -1,14 +1,14 @@
 import argparse
 import csv
 import functools
-import logging
 import json
+import logging
 import pickle
 import sys
-
-from typing import NamedTuple, Optional
 from datetime import datetime
-from literalai import LiteralClient, Thread, Step
+from typing import NamedTuple, Optional, SupportsWrite
+
+from literalai import LiteralClient, Step, Thread
 from literalai.filter import Filter, OrderBy
 
 from src.app_config import app_config
@@ -19,14 +19,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 @functools.cache
-def literalai() -> LiteralClient:
+def literalai() -> LiteralClient:  # pragma: no cover
     if app_config.literal_api_key_for_api:
         return LiteralClient(api_key=app_config.literal_api_key_for_api)
     return LiteralClient()
 
 
-# @functools.cache
-# @property
 def get_project_id() -> str:
     client = literalai()
     proj_id = client.api.get_my_project_id()
@@ -34,11 +32,10 @@ def get_project_id() -> str:
     return proj_id
 
 
-def query_threads_since(start_date: datetime, end_date: datetime) -> list[Thread]:
-    start_date = start_date.isoformat()
+def query_threads(start_date: datetime, end_date: datetime) -> list[Thread]:
     filters: list[Filter] = [
-        Filter(field="createdAt", operator="gte", value=start_date),
-        Filter(field="createdAt", operator="lt", value=end_date),
+        Filter(field="createdAt", operator="gte", value=start_date.isoformat()),
+        Filter(field="createdAt", operator="lt", value=end_date.isoformat()),
     ]
     logger.info("Query filter: %r", filters)
     order_by: OrderBy = OrderBy(column="createdAt", direction="ASC")
@@ -57,10 +54,9 @@ def query_threads_since(start_date: datetime, end_date: datetime) -> list[Thread
             ), f"Expected {response.totalCount} threads, but got only {len(threads)}"
             return threads
 
-    raise RuntimeError("Didn't get last page of responses")
-
 
 class QARow(NamedTuple):
+    project_id: str
     # uniquely identifies the thread in Literal AI; can have several associated questions
     thread_id: str
     # uniquely identifies the question in Literal AI
@@ -85,14 +81,16 @@ class QARow(NamedTuple):
     has_chat_history: bool
 
     @property
-    def lai_link(self):
+    def lai_link(self) -> str:
         return (
-            f"https://cloud.getliteral.ai/projects/{project_id}/logs/"
-            "threads/{self.thread_id}?currentStepId={self.question_id}"
+            f"https://cloud.getliteral.ai/projects/{self.project_id}/logs/"
+            f"threads/{self.thread_id}?currentStepId={self.question_id}"
         )
 
     @classmethod
-    def from_lai_thread(cls, thread: Thread, question_step: Step, answer_step: Step):
+    def from_lai_thread(
+        cls, project_id: str, thread: Thread, question_step: Step, answer_step: Step
+    ) -> "QARow":
         assert question_step, "Question step must not be None"
         # question_step.id is used to create the link to Literal AI
         assert question_step.id, "Question step id must not be None"
@@ -115,6 +113,7 @@ class QARow(NamedTuple):
         citations = answer_step.metadata.get("citations", None)
 
         return QARow(
+            project_id=project_id,
             thread_id=thread.id,
             question_id=question_step.id,
             timestamp=question_step.start_time,
@@ -134,53 +133,53 @@ class QARow(NamedTuple):
         )
 
 
-def to_csv(threads: list[Thread]):
+def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
     qa_pairs = []
     for th in threads:
         assert th.steps
+        logger.info("Thread %r has %r steps", th.id, len(th.steps))
         steps = {step.id: step for step in th.steps}
         pairs = [
-            # assert th.steps[step.parentId], f"Parent step {step.parentId} not found"
             QARow.from_lai_thread(
-                thread=th, question_step=steps.pop(step.parent_id), answer_step=steps.pop(step.id)
+                project_id=project_id,
+                thread=th,
+                # Pop out used steps to check for remaining steps later
+                question_step=steps.pop(step.parent_id),
+                answer_step=steps.pop(step.id),
             )
             for step in th.steps
             if step.parent_id
         ]
-        for remaining in steps:
-            logger.info("Step %r has no parent", remaining)
-            # print(json.dumps(pair, indent=2))
         qa_pairs += pairs
 
-    # import pdb; pdb.set_trace()
-    fields = QARow._fields  # ["thread_id", "question", "answer", "lai_link"]
-    with open("lai_pairs.csv", "w", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader()
-        for pair in qa_pairs:
-            writer.writerow({k: getattr(pair, k, "") for k in fields})
+        for remaining in steps.keys():
+            logger.info("Ignoring dangling step %r", remaining)
+    return qa_pairs
 
 
-def _save_threads(threads: list[Thread]):
-    with open("response.json", "w", encoding="utf-8") as f:
+def save_csv(qa_pairs: list[QARow], csv_file: SupportsWrite[str]):
+    fields = QARow._fields
+    writer = csv.DictWriter(csv_file, fieldnames=fields)
+    writer.writeheader()
+    for pair in qa_pairs:
+        writer.writerow({k: getattr(pair, k, "") for k in fields})
+
+
+def _save_threads(threads: list[Thread]):  # pragma: no cover
+    with open(f"{RESP_FILE}.json", "w", encoding="utf-8") as f:
         thread_dicts = [thread.to_dict() for thread in threads]
         f.write(json.dumps(thread_dicts, indent=2))
-    with open("response.pickle", "wb") as file:
+    with open(f"{RESP_FILE}.pickle", "wb") as file:
         pickle.dump(threads, file)
 
 
-def _load_response() -> list[Thread]:
-    print("Loading from pickle")
-    with open("response.pickle", "rb") as file:
+def _load_response() -> list[Thread]:  # pragma: no cover
+    print(f"Loading from {RESP_FILE}.pickle")
+    with open(f"{RESP_FILE}.pickle", "rb") as file:
         return pickle.load(file)
 
 
-QUERY = False
-if QUERY:
-    project_id = get_project_id()
-else:
-    project_id = "Decision-Support-Tool---Imagine-LA-FEcqNEkhUJ71"
-    # project_id="PROD-Decision-Support-Tool---Imagine-LA-Zu5f2WjplboI"
+RESP_FILE = "response"
 
 
 def main() -> None:  # pragma: no cover
@@ -190,13 +189,21 @@ def main() -> None:  # pragma: no cover
     args = parser.parse_args(sys.argv[1:])
     logger.info("Running with args %r", args)
 
-    if QUERY:
+    if False:
+        project_id = get_project_id()
         start_date = datetime.fromisoformat(args.start)  # ("2025-03-05T00:00:00.000Z")
         end_date = datetime.fromisoformat(args.end)
-        threads = query_threads_since(start_date, end_date)
-        _save_threads(threads)
+        threads = query_threads(start_date, end_date)
 
-    to_csv(_load_response())
+        _save_threads(threads)
+    else:
+        project_id = "Decision-Support-Tool---Imagine-LA-FEcqNEkhUJ71"
+        # project_id="PROD-Decision-Support-Tool---Imagine-LA-Zu5f2WjplboI"
+        threads = _load_response()
+
+    qa_rows = convert_to_qa_rows(project_id, threads)
+    with open("lai_pairs.csv", "w", encoding="utf-8") as f:
+        save_csv(qa_rows, f)
 
 
 if __name__ == "__main__":
