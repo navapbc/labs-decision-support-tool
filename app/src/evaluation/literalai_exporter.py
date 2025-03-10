@@ -1,12 +1,11 @@
 import argparse
 import csv
 import functools
-import json
 import logging
-import pickle
 import sys
 from datetime import datetime
-from typing import NamedTuple, Optional, SupportsWrite
+from io import TextIOWrapper
+from typing import NamedTuple, Optional
 
 from literalai import LiteralClient, Step, Thread
 from literalai.filter import Filter, OrderBy
@@ -157,26 +156,12 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
     return qa_pairs
 
 
-def save_csv(qa_pairs: list[QARow], csv_file: SupportsWrite[str]):
+def save_csv(qa_pairs: list[QARow], csv_file: TextIOWrapper) -> None:
     fields = QARow._fields
     writer = csv.DictWriter(csv_file, fieldnames=fields)
     writer.writeheader()
     for pair in qa_pairs:
         writer.writerow({k: getattr(pair, k, "") for k in fields})
-
-
-def _save_threads(threads: list[Thread]):  # pragma: no cover
-    with open(f"{RESP_FILE}.json", "w", encoding="utf-8") as f:
-        thread_dicts = [thread.to_dict() for thread in threads]
-        f.write(json.dumps(thread_dicts, indent=2))
-    with open(f"{RESP_FILE}.pickle", "wb") as file:
-        pickle.dump(threads, file)
-
-
-def _load_response() -> list[Thread]:  # pragma: no cover
-    print(f"Loading from {RESP_FILE}.pickle")
-    with open(f"{RESP_FILE}.pickle", "rb") as file:
-        return pickle.load(file)
 
 
 RESP_FILE = "response"
@@ -189,18 +174,11 @@ def main() -> None:  # pragma: no cover
     args = parser.parse_args(sys.argv[1:])
     logger.info("Running with args %r", args)
 
-    if False:
-        project_id = get_project_id()
-        start_date = datetime.fromisoformat(args.start)  # ("2025-03-05T00:00:00.000Z")
-        end_date = datetime.fromisoformat(args.end)
-        threads = query_threads(start_date, end_date)
+    project_id = get_project_id()
+    start_date = datetime.fromisoformat(args.start)  # ("2025-03-05T00:00:00.000Z")
+    end_date = datetime.fromisoformat(args.end)
 
-        _save_threads(threads)
-    else:
-        project_id = "Decision-Support-Tool---Imagine-LA-FEcqNEkhUJ71"
-        # project_id="PROD-Decision-Support-Tool---Imagine-LA-Zu5f2WjplboI"
-        threads = _load_response()
-
+    threads = query_threads(start_date, end_date)
     qa_rows = convert_to_qa_rows(project_id, threads)
     with open("lai_pairs.csv", "w", encoding="utf-8") as f:
         save_csv(qa_rows, f)

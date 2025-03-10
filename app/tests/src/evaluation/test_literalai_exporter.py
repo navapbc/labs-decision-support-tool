@@ -88,6 +88,7 @@ def create_threads(num: int) -> list[Thread]:
 
 
 def append_dangling_step(thread: Thread):
+    "A dangling step is not referenced in a question-answer pair"
     step = Step(type="user_message")
     step.output = {"content": "Q1"}
     step.metadata = {"request": {"user_id": "U1", "agency_id": "Agency1", "session_id": "sesh1"}}
@@ -118,5 +119,6 @@ def test_convert_to_qa_rows_and_save_csv(caplog):
         in csv_lines[0]
     )
     for line in csv_lines[1:]:
-        assert line.startswith("Test_Project_1234ABC,th_")
+        assert line.startswith(f"{project_id},th_")
+        # Check for metadata
         assert ",U1,Agency1,sesh1,Q1,A1,prog1," in line
