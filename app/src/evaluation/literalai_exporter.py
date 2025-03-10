@@ -122,7 +122,7 @@ class QARow(NamedTuple):
             program=attribs["benefit_program"] if attribs else None,
             citation_links=("\n".join(c["uri"] for c in citations) if citations else None),
             citation_sources=(
-                "\n".join(f"{c['source_dataset']}: {['source_name']}" for c in citations)
+                "\n".join(f"{c['source_dataset']}: {c['source_name']}" for c in citations)
                 if citations
                 else None
             ),
