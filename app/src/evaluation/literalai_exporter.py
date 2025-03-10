@@ -155,7 +155,7 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
 
 
 def save_csv(qa_pairs: list[QARow], csv_file: TextIOWrapper) -> None:
-    fields = QARow._fields
+    fields = [field for field in QARow._fields if field != "project_id"]
     writer = csv.DictWriter(csv_file, fieldnames=fields)
     writer.writeheader()
     for pair in qa_pairs:
@@ -176,5 +176,5 @@ def main() -> None:  # pragma: no cover
     logger.info("Project ID: %r", project_id)
     threads = query_threads(start_date, end_date)
     qa_rows = convert_to_qa_rows(project_id, threads)
-    with open("lai_pairs.csv", "w", encoding="utf-8") as f:
+    with open(f"{project_id}-lai_pairs.csv", "w", encoding="utf-8") as f:
         save_csv(qa_rows, f)

@@ -119,6 +119,6 @@ def test_convert_to_qa_rows_and_save_csv(caplog):
         in csv_lines[0]
     )
     for line in csv_lines[1:]:
-        assert line.startswith(f"{project_id},th_")
+        assert line.startswith("th_")
         # Check for metadata
         assert ",U1,Agency1,sesh1,Q1,A1,prog1," in line
