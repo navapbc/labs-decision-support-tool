@@ -4,8 +4,7 @@ import functools
 import logging
 import sys
 from datetime import datetime
-from io import TextIOWrapper
-from typing import NamedTuple, Optional
+from typing import IO, NamedTuple, Optional
 
 from literalai import LiteralClient, Step, Thread
 from literalai.filter import Filter, OrderBy
@@ -133,7 +132,9 @@ class QARow(NamedTuple):
 def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
     qa_pairs = []
     for th in threads:
-        assert th.steps
+        if not th.steps:
+            logger.warning("Thread %r has no steps", th.id)
+            continue
         logger.info("Thread %r has %r steps", th.id, len(th.steps))
         steps = {step.id: step for step in th.steps}
         pairs = [
@@ -154,7 +155,7 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
     return qa_pairs
 
 
-def save_csv(qa_pairs: list[QARow], csv_file: TextIOWrapper) -> None:
+def save_csv(qa_pairs: list[QARow], csv_file: IO) -> None:
     fields = [field for field in QARow._fields if field != "project_id"]
     writer = csv.DictWriter(csv_file, fieldnames=fields)
     writer.writeheader()

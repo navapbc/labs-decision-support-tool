@@ -1,5 +1,7 @@
 import logging
 import pprint
+import tempfile
+from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -12,6 +14,7 @@ from src import chat_engine
 from src.app_config import app_config
 from src.batch_process import batch_process
 from src.chat_engine import ChatEngineInterface, OnMessageResult
+from src.evaluation import literalai_exporter
 from src.format import format_response
 from src.generate import ChatHistory, MessageAttributesT, get_models
 from src.login import require_login
@@ -195,19 +198,7 @@ async def on_message(message: cl.Message) -> None:
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
 
-    if message.content.lower() == "batch processing":
-        # The AskFileMessage cannot be called inside code run by asyncio.create_task,
-        # or the Chainlit UI will freeze indefinitely
-        files = await cl.AskFileMessage(
-            content="Please upload a CSV file with a `question` column.",
-            accept=["text/csv"],
-            max_size_mb=20,
-            timeout=180,
-        ).send()
-
-        if files:
-            # await so that the step UI shows that BP is in progress
-            await _batch_proccessing(files[0])
+    if await special_command(message.content.lower()):
         return
 
     try:
@@ -270,6 +261,49 @@ async def _msg_attributes(attributes: MessageAttributesT) -> None:
     ).send()
 
 
+async def special_command(msg_text: str) -> bool:
+    if msg_text == "batch processing":
+        # The AskFileMessage cannot be called inside code run by asyncio.create_task,
+        # or the Chainlit UI will freeze indefinitely
+        files = await cl.AskFileMessage(
+            content="Please upload a CSV file with a `question` column.",
+            accept=["text/csv"],
+            max_size_mb=20,
+            timeout=180,
+        ).send()
+
+        if files:
+            # await so that the step UI shows that BP is in progress
+            await _batch_proccessing(files[0])
+        return True
+    elif msg_text == "export literalai":
+        try:
+            step_dict = await cl.AskUserMessage(
+                content="Specify the start timestamp and (exclusive) end timestamp for the data export (such as '2025-03-04 2025-03-06' to get 2 days of data starting on March 4th).",
+                timeout=180,
+            ).send()
+            if step_dict:
+                dates = step_dict["output"].strip().split()
+                start_date = datetime.fromisoformat(dates[0])
+                end_date = datetime.fromisoformat(dates[1])
+                # await so that the step UI shows that task is in progress
+                await _export_lai(start_date, end_date)
+        except ValueError as e:
+            await cl.Message(
+                author="backend",
+                content=f"Date parsing error: {e}",
+                disable_feedback=True,
+            ).send()
+        except IndexError as e:
+            await cl.Message(
+                author="backend",
+                content=f"Error: {e}.  Specify both start and end timestamps.",
+                disable_feedback=True,
+            ).send()
+        return True
+    return False
+
+
 @cl.step(name="batch processing", type="tool")
 async def _batch_proccessing(file: AskFileResponse) -> None:
     await cl.Message(
@@ -297,3 +331,41 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
             content=f"batch_process: {err.__class__.__name__}: {err}",
         ).send()
         logger.exception("batch_process error", stack_info=True)
+
+
+@cl.step(name="export Literal AI question-answer pairs", type="tool")
+async def _export_lai(start_date: datetime, end_date: datetime) -> None:
+    await cl.Message(
+        author="backend",
+        content=f"Exporting QA pairs from {start_date} up to {end_date} ...",
+    ).send()
+
+    try:
+        project_id = literalai_exporter.get_project_id()
+        threads = literalai_exporter.query_threads(start_date, end_date)
+        qa_rows = literalai_exporter.convert_to_qa_rows(project_id, threads)
+
+        filename_suffix = f"{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}.csv"
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            mode="w",
+            encoding="utf-8",
+            prefix=f"literalai_qa_pairs-{project_id}",
+            suffix=filename_suffix,
+        ) as result_file:
+            literalai_exporter.save_csv(qa_rows, result_file)
+
+        filename = f"literalai_qa_pairs_{project_id}_{filename_suffix}"
+        await cl.Message(
+            content="Data exported, results attached.",
+            elements=[cl.File(name=filename, path=result_file.name)],
+            metadata={"result_file_path": result_file.name},
+        ).send()
+
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        await cl.Message(
+            author="backend",
+            metadata={"error_class": err.__class__.__name__, "error": str(err)},
+            content=f"export_lai: {err.__class__.__name__}: {err}",
+        ).send()
+        logger.exception("export_lai error", stack_info=True)
