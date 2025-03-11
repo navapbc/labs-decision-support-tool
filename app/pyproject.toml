@@ -70,6 +70,7 @@ db-migrate = "src.db.migrations.run:up"
 db-migrate-down = "src.db.migrations.run:down"
 db-migrate-down-all = "src.db.migrations.run:downall"
 
+init-schema = "src.db.manage:main"
 pg-dump = "src.db.pg_dump_util:main"
 literalai-exporter = "src.evaluation.literalai_exporter:main"
 

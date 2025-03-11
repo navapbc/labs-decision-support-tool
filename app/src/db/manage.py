@@ -252,7 +252,7 @@ def db_execute(conn: Connection, query: str, print_query: bool = True) -> list:
     return conn.run(query)
 
 
-if __name__ == "__main__":
+def main() -> None:
     # These should be set in local.env
     assert os.environ["DB_USER"]
     assert os.environ.get("DB_SCHEMA")
