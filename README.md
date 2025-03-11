@@ -154,7 +154,14 @@ The input file can have additional columns beyond `question`. They will be prese
 
 Since the DB contents will be replaced upon reingestion, new UUIDs will be generated for reingested chunks and documents, which can make diagnosing problems challenging when logs refer to UUIDs that no longer exist in the DB. Before running `refresh-ingestion.sh`, it behooves us to create a backup of DB contents so we can reference the old UUIDs (after restoring the backup to a local DB).
 
-To backup DB contents for the `dev` deployment, run `./bin/run-command app dev '["pg-dump", "backup"]'` to create a [PostgreSQL dump file](https://www.postgresql.org/docs/current/backup-dump.html) and upload it to the `pg_dumps` folder in S3. For the `prod` environment, replace `dev` with `prod`.
+To backup DB contents for the `dev` deployment, run `./bin/run-command app dev '["poetry", "run", "pg-dump", "backup"]'` to create a [PostgreSQL dump file](https://www.postgresql.org/docs/current/backup-dump.html) and upload it to the `pg_dumps` folder in S3. For the `prod` environment, replace `dev` with `prod` -- remembering to run `./bin/terraform-init infra/app/service prod` first and then verifying the new dump file is in the S3 `pg_dumps/` folder.
+
+```sh
+TARGET_ENV=dev
+./bin/terraform-init infra/app/service $TARGET_ENV
+./bin/run-command app $TARGET_ENV '["poetry", "run", "pg-dump", "backup"]'
+aws s3 ls "s3://decision-support-tool-app-$TARGET_ENV/pg_dumps/"
+```
 
 ### Restoring DB contents locally
 
