@@ -100,6 +100,10 @@ def configure_database(conn: Connection, config: dict) -> None:
     migrator_username = os.environ.get("MIGRATOR_USER")
     schema_name = os.environ.get("DB_SCHEMA")
     database_name = os.environ.get("DB_NAME")
+    assert migrator_username
+    assert app_username
+    assert schema_name
+    assert database_name
 
     # In Postgres 15 and higher, the CREATE privilege on the public
     # schema is already revoked/removed from all users except the
@@ -249,12 +253,9 @@ def db_execute(conn: Connection, query: str, print_query: bool = True) -> list:
 
 if __name__ == "__main__":
     # These should be set in local.env
-    user = os.environ["DB_USER"]
-    schema_name = os.environ.get("DB_SCHEMA")
-    database_name = os.environ.get("DB_NAME")
-    assert user
-    assert schema_name
-    assert database_name
+    assert os.environ["DB_USER"]
+    assert os.environ.get("DB_SCHEMA")
+    assert os.environ.get("DB_NAME")
 
     os.environ["DB_PORT"] = os.environ.get("DB_PORT", "5432")
     os.environ["APP_USER"] = os.environ["DB_USER"]
