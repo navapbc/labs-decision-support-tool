@@ -313,17 +313,31 @@ case "$1" in
         : ${SKIP_LOCAL_EMBEDDING:=true}
         export DEPLOY_ENV=dev
         # Skip 'ssa' dataset since it was manually scraped and hence needs to be refreshed manually
-        for DATASET_ID in ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy; do
+        DATASETS="ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy"
+        for DATASET_ID in $DATASETS; do
             scrape_and_ingest "$DATASET_ID"
         done
         ingest_imagine_la
 
         # Quickly create refresh script for prod
         export DEPLOY_ENV=prod
-        for DATASET_ID in ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy; do
+        for DATASET_ID in $DATASETS; do
             ./refresh-ingestion.sh cmds "$DATASET_ID"
         done
         ingest_imagine_la
+
+        echo "=== Copy the following to Slack ==="
+        for DATASET_ID in $DATASETS; do
+            echo "------ $DATASET_ID ----------------"
+            grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
+            echo_stats "$DATASET_ID"
+            echo "-----------------------------------"
+        done
+        echo "------ imagine_la ----------------"
+        ls -ld src/ingestion/imagine_la/scrape/pages
+        echo "HTML files scraped: "
+        ls src/ingestion/imagine_la/scrape/pages | wc -l
+        echo "-----------------------------------"
 
         echo ""
         echo "REMINDERS:"
@@ -331,6 +345,8 @@ case "$1" in
         echo "- Review and run the refresh scripts (in the top-level folder): refresh-dev-${TODAY} and refresh-prod-${TODAY}."
         echo "- Restore local TF to dev environment: ./bin/terraform-init infra/app/service dev"
         ;;
+
+
     *)
         scrape_and_ingest "$1"
         ;;
