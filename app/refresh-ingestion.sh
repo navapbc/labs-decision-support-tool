@@ -16,6 +16,10 @@ ingest_imagine_la() {
     [ "$CONTENTHUB_PASSWORD" ] || { echo "CONTENTHUB_PASSWORD is not set!"; exit 31; }
     # Scrape the website
     make scrape-imagine-la CONTENTHUB_PASSWORD=$CONTENTHUB_PASSWORD 2>&1 | tee logs/${DATASET_ID}-1scrape.log
+    if grep -E 'make:.*Error|log_count/ERROR' "logs/${DATASET_ID}-1scrape.log"; then
+        echo "ERROR: Scraping failed. Check logs/${DATASET_ID}-1scrape.log"
+        exit 33
+    fi
 
     # Move any previous markdown files
     [ -d "${DATASET_ID}_md" ] && mv -iv "$DATASET_ID"{,-orig}_md
