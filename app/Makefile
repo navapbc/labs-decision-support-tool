@@ -139,7 +139,7 @@ alembic_config := ./src/db/migrations/alembic.ini
 alembic_cmd := $(PY_RUN_CMD) alembic --config $(alembic_config)
 
 init-schema:
-	$(PY_RUN_CMD) python src/db/manage.py
+	$(PY_RUN_CMD) init-schema
 
 db-migrate: ## Apply pending migrations to db
 	$(PY_RUN_CMD) db-migrate
