@@ -62,45 +62,22 @@ for index in range(learn_more_buttons.count()):
 
     # Expand all the accordions on the page
     # so that we can click into the buttons beneath them
-    # accordions = page.locator(".chakra-accordion__button")
-    # for accordion_index in range(accordions.count()):
-    #     accordions.nth(accordion_index).click()
-
     accordions = page.locator(".chakra-accordion__button[aria-expanded='false']")
     while accordions.count()>0:
-        print(f"Expanding accordion {accordions.count()}")
         accordions.first.click()
 
-    # if learn_more_buttons.nth(index).is_hidden():
-    #     print(f"Skipping index={index} {learn_more_buttons.nth(index)}")
-    #     continue
-    try:
-        with page.expect_navigation() as navigation:
-            btn = learn_more_buttons.nth(index)
-            parent = btn.locator("..").first
-            gparent = parent.locator("..").first
-            print(
-                f"index={index} count={learn_more_buttons.count()} visible={btn.is_visible()} parentVis={parent.is_visible()}"
-            )
-            if not gparent.is_visible():
-                print(gparent.inner_text())
-                import pdb; pdb.set_trace()
-
-
-            print(f"clicking {learn_more_buttons.nth(index)}")
-            learn_more_buttons.nth(index).click(force=True)
-            page.wait_for_load_state("networkidle")
-
-        page.wait_for_selector("h2", timeout=10_000)
-        page_path = page.url.removeprefix(root_url_prefix)
-        print(f"Scraped page: {page_path}")
-
-        content_hub_pages[page_path] = page.content()
-
-        page.go_back()
+    with page.expect_navigation() as navigation:
+        learn_more_buttons.nth(index).click()
         page.wait_for_load_state("networkidle")
-    except Exception as e:
-        print(f"Error: {e}")
+
+    page.wait_for_selector("h2", timeout=10_000)
+    page_path = page.url.removeprefix(root_url_prefix)
+    print(f"Scraped page: {page_path}")
+
+    content_hub_pages[page_path] = page.content()
+
+    page.go_back()
+    page.wait_for_load_state("networkidle")
 
 # Write the files to the `pages` directory
 os.makedirs("pages", exist_ok=True)
