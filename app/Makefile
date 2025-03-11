@@ -119,7 +119,7 @@ app-shell: ## Start a shell in a container to quickly run frequent make commands
 
 # Docker starts the image for the DB but it's not quite
 # ready to accept connections so we add a brief wait script
-init-db: start-db db-migrate
+init-db: start-db init-schema db-migrate
 
 start-db: ## Start only the database container
 	docker compose up --detach main-db
@@ -137,6 +137,9 @@ pg-dump:
 
 alembic_config := ./src/db/migrations/alembic.ini
 alembic_cmd := $(PY_RUN_CMD) alembic --config $(alembic_config)
+
+init-schema:
+	$(PY_RUN_CMD) python src/db/manage.py
 
 db-migrate: ## Apply pending migrations to db
 	$(PY_RUN_CMD) db-migrate

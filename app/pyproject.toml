@@ -59,6 +59,7 @@ setuptools = "^68.2.2"
 debugpy = "^1.8.1"
 ollama = "^0.2.1"
 jupyter = "^1.1.1"
+pg8000 = "^1.31.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
