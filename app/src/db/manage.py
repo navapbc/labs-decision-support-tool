@@ -1,13 +1,14 @@
 """
-This script is adapts and combines manage.py and db.py (from infra/modules/database/role_manager)
+This script adapts and combines manage.py and db.py (from infra/modules/database/role_manager)
 into a single file that sets up the DB schema such that (1) it is as close to the deployed DB schema as possible
-and (2) a backup of the deployed DB can be restored locally (via pg_dump_util.py).
+and (2) a backup of the deployed DB can be restored locally (via pg_dump_util.py),
+i.e., the schema names must be the same.
 
 This script is called as part of `make db-recreate`
 Changes from the original manage.py are noted with the "LOCALSETUP" comment prefix -- in summary:
 - Uses DB_USER as both the APP_USER and MIGRATOR_USER
 - Connects to the DB as DB_USER (`db_connect_as_master_user()`)
-- Ignore any setup for the rds_iam role
+- Ignores any setup for the rds_iam role
 - Skips `configure_superuser_extensions()`
 
 This script could be shortened but a decision was made to keep it as close to the original manage.py as possible
