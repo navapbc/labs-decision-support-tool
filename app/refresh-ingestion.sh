@@ -306,7 +306,7 @@ case "$1" in
 
         # Don't need to update embeddings locally when refreshing deployed app
         # Skipping creating local embeddings saves time
-        : {SKIP_LOCAL_EMBEDDING:=true}
+        : ${SKIP_LOCAL_EMBEDDING:=true}
         export DEPLOY_ENV=dev
         # Skip 'ssa' dataset since it was manually scraped and hence needs to be refreshed manually
         for DATASET_ID in ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy; do
