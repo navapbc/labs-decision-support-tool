@@ -100,6 +100,4 @@ def archive_threads() -> None:  # pragma: no cover
         threads,
         f"{project_id}-archive-{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}",
     )
-    logger.info(
-        "REMINDER: Upload the JSON file to https://drive.google.com/drive/folders/1Me71t3HnBWpNGdLF7IXsv-qPTL5ZaSz6"
-    )
+    logger.info("REMINDER: Upload the JSON file to the 'LiteralAI logs' Google Drive folder")
