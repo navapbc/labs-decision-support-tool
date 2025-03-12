@@ -1,0 +1,103 @@
+import argparse
+import functools
+import json
+import logging
+import os
+import pickle
+import sys
+from datetime import datetime
+from typing import Any
+
+from literalai import LiteralClient, Thread
+from literalai.filter import Filter, OrderBy
+
+from src.app_config import app_config
+
+logger = logging.getLogger(__name__)
+
+
+@functools.cache
+def client() -> LiteralClient:  # pragma: no cover
+    if app_config.literal_api_key_for_api:
+        return LiteralClient(api_key=app_config.literal_api_key_for_api)
+    return LiteralClient()
+
+
+def get_project_id() -> str:
+    lai_client = client()
+    return lai_client.api.get_my_project_id()
+
+
+def get_threads(filters: list[Filter]) -> list[Thread]:
+    logger.info("Query filter: %r", filters)
+    order_by: OrderBy = OrderBy(column="createdAt", direction="ASC")
+
+    lai_client = client()
+    threads = []
+    after = None
+    while True:
+        response = lai_client.api.get_threads(filters=filters, order_by=order_by, after=after)
+        after = response.pageInfo.endCursor
+        threads += response.data
+        logger.info("Got %r of %r total threads", len(threads), response.totalCount)
+        if not response.pageInfo.hasNextPage:
+            assert (
+                len(threads) == response.totalCount
+            ), f"Expected {response.totalCount} threads, but got only {len(threads)}"
+            return threads
+
+
+def query_threads_between(start_date: datetime, end_date: datetime) -> list[Thread]:
+    filters: list[Filter] = [
+        Filter(field="createdAt", operator="gte", value=start_date.isoformat()),
+        Filter(field="createdAt", operator="lt", value=end_date.isoformat()),
+    ]
+    return get_threads(filters)
+
+
+def save_threads(threads: list[Thread], basefilename: str) -> None:  # pragma: no cover
+    with open(f"{basefilename}.pickle", "wb") as file:
+        logger.info("Saving to %s.pickle", basefilename)
+        pickle.dump(threads, file)
+    with open(f"{basefilename}.json", "w", encoding="utf-8") as f:
+        logger.info("Saving to %s.json", basefilename)
+        thread_dicts = [thread.to_dict() for thread in threads]
+        f.write(json.dumps(thread_dicts, indent=2))
+
+
+def load_threads(basefilename: str) -> list[Thread] | Any:  # pragma: no cover
+    if os.path.exists(f"{basefilename}.pickle"):
+        logger.info("Loading from %s.pickle", basefilename)
+        with open(f"{basefilename}.pickle", "rb") as file:
+            return pickle.load(file)  # nosec
+    elif os.path.exists(f"{basefilename}.json"):
+        logger.info("Loading from %s.json", basefilename)
+        with open(f"{basefilename}.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    else:
+        raise FileNotFoundError(f"Could not find {basefilename}.json or {basefilename}.pickle")
+
+
+def archive_threads() -> None:  # pragma: no cover
+    # Configure logging since this function is run directly
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("start", help="(inclusive) beginning datetime of threads to export")
+    parser.add_argument("end", help="(exclusive) end datetime of threads to export")
+    args = parser.parse_args(sys.argv[1:])
+    logger.info("Running with args %r", args)
+
+    start_date = datetime.fromisoformat(args.start)
+    end_date = datetime.fromisoformat(args.end)
+
+    project_id = get_project_id()
+    logger.info("Project ID: %r", project_id)
+    threads = query_threads_between(start_date, end_date)
+    save_threads(
+        threads,
+        f"{project_id}-archive-{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}",
+    )
+    logger.info(
+        "REMINDER: Upload the JSON file to https://drive.google.com/drive/folders/1Me71t3HnBWpNGdLF7IXsv-qPTL5ZaSz6"
+    )
