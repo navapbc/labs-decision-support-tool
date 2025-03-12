@@ -16,6 +16,10 @@ ingest_imagine_la() {
     [ "$CONTENTHUB_PASSWORD" ] || { echo "CONTENTHUB_PASSWORD is not set!"; exit 31; }
     # Scrape the website
     make scrape-imagine-la CONTENTHUB_PASSWORD=$CONTENTHUB_PASSWORD 2>&1 | tee logs/${DATASET_ID}-1scrape.log
+    if grep -E 'make:.*Error|log_count/ERROR' "logs/${DATASET_ID}-1scrape.log"; then
+        echo "ERROR: Scraping failed. Check logs/${DATASET_ID}-1scrape.log"
+        exit 33
+    fi
 
     # Move any previous markdown files
     [ -d "${DATASET_ID}_md" ] && mv -iv "$DATASET_ID"{,-orig}_md
@@ -32,13 +36,9 @@ ingest_imagine_la() {
 
     create_md_zip "$DATASET_ID"
 
-    echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
-    ls -ld src/ingestion/imagine_la/scrape/pages
-    echo "HTML files scraped: "
-    ls src/ingestion/imagine_la/scrape/pages | wc -l
     echo_stats "$DATASET_ID"
-    echo "-----------------------------------"
+
     echo "REMINDERS:"
     echo_cmds "$DATASET_ID"
 }
@@ -84,11 +84,9 @@ scrape_and_ingest() {
 
     create_md_zip "$DATASET_ID"
 
-    echo "-----------------------------------"
     echo "=== Copy the following to Slack ==="
-    grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
     echo_stats "$DATASET_ID"
-    echo "-----------------------------------"
+
     echo "REMINDERS:"
     echo_cmds "$DATASET_ID"
 }
@@ -161,9 +159,18 @@ EOF
 
 echo_stats(){
     local DATASET_ID="$1"
+    echo "------ $DATASET_ID ----------------"
+    if [ "$DATASET_ID" == "imagine_la" ]; then
+        ls -ld src/ingestion/imagine_la/scrape/pages
+        echo "HTML files scraped: "
+        ls src/ingestion/imagine_la/scrape/pages | wc -l
+    else
+        grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
+    fi
     grep -E "Running with args|DONE splitting|Finished ingesting" "logs/${DATASET_ID}-2ingest.log"
     ls -ld "${DATASET_ID}-${TODAY}_md"
     echo "Markdown file count: $(find "${DATASET_ID}-${TODAY}_md" -type f -iname '*.md' | wc -l)"
+    echo "-----------------------------------"
 }
 
 echo_cmds(){
@@ -306,20 +313,27 @@ case "$1" in
 
         # Don't need to update embeddings locally when refreshing deployed app
         # Skipping creating local embeddings saves time
-        : {SKIP_LOCAL_EMBEDDING:=true}
+        : ${SKIP_LOCAL_EMBEDDING:=true}
         export DEPLOY_ENV=dev
+
         # Skip 'ssa' dataset since it was manually scraped and hence needs to be refreshed manually
-        for DATASET_ID in ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy; do
+        DATASETS="ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy"
+
+        for DATASET_ID in $DATASETS; do
             scrape_and_ingest "$DATASET_ID"
         done
         ingest_imagine_la
 
         # Quickly create refresh script for prod
         export DEPLOY_ENV=prod
-        for DATASET_ID in ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy; do
-            ./refresh-ingestion.sh cmds "$DATASET_ID"
+        for DATASET_ID in $DATASETS imagine_la; do
+            echo_cmds "$DATASET_ID"
         done
-        ingest_imagine_la
+
+        echo "=== Copy the following to Slack ==="
+        for DATASET_ID in $DATASETS imagine_la; do
+            echo_stats "$DATASET_ID"
+        done
 
         echo ""
         echo "REMINDERS:"
