@@ -60,6 +60,7 @@ def save_threads(threads: list[Thread], basefilename: str) -> None:  # pragma: n
         logger.info("Saving to %s.pickle", basefilename)
         pickle.dump(threads, file)
     with open(f"{basefilename}.json", "w", encoding="utf-8") as f:
+        # Also save as JSON for readability and in case the Thread object changes
         logger.info("Saving to %s.json", basefilename)
         thread_dicts = [thread.to_dict() for thread in threads]
         f.write(json.dumps(thread_dicts, indent=2))
@@ -67,6 +68,7 @@ def save_threads(threads: list[Thread], basefilename: str) -> None:  # pragma: n
 
 def load_threads(basefilename: str) -> list[Thread] | Any:  # pragma: no cover
     if os.path.exists(f"{basefilename}.pickle"):
+        # Prefer to load from pickle file since it loads Thread objects
         logger.info("Loading from %s.pickle", basefilename)
         with open(f"{basefilename}.pickle", "rb") as file:
             return pickle.load(file)  # nosec
