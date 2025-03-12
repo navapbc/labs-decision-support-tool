@@ -305,3 +305,6 @@ generate-qa: ## Generate QA pairs from documents
 
 literalai-exporter:
 	$(PY_RUN_CMD) literalai-exporter $(args)
+
+literalai-archiver:
+	$(PY_RUN_CMD) literalai-archiver $(args)

@@ -1,54 +1,17 @@
 import argparse
 import csv
-import functools
 import logging
 import sys
 from datetime import datetime
 from typing import IO, NamedTuple, Optional
 
-from literalai import LiteralClient, Step, Thread
-from literalai.filter import Filter, OrderBy
+from literalai import Step, Thread
 
-from src.app_config import app_config
+from src.util import literalai_util as lai
 
 logger = logging.getLogger(__name__)
 # Configure logging since this file is run directly
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-
-@functools.cache
-def literalai() -> LiteralClient:  # pragma: no cover
-    if app_config.literal_api_key_for_api:
-        return LiteralClient(api_key=app_config.literal_api_key_for_api)
-    return LiteralClient()
-
-
-def get_project_id() -> str:
-    client = literalai()
-    return client.api.get_my_project_id()
-
-
-def query_threads(start_date: datetime, end_date: datetime) -> list[Thread]:
-    filters: list[Filter] = [
-        Filter(field="createdAt", operator="gte", value=start_date.isoformat()),
-        Filter(field="createdAt", operator="lt", value=end_date.isoformat()),
-    ]
-    logger.info("Query filter: %r", filters)
-    order_by: OrderBy = OrderBy(column="createdAt", direction="ASC")
-
-    client = literalai()
-    threads = []
-    after = None
-    while True:
-        response = client.api.get_threads(filters=filters, order_by=order_by, after=after)
-        after = response.pageInfo.endCursor
-        threads += response.data
-        logger.info("Got %r of %r total threads", len(threads), response.totalCount)
-        if not response.pageInfo.hasNextPage:
-            assert (
-                len(threads) == response.totalCount
-            ), f"Expected {response.totalCount} threads, but got only {len(threads)}"
-            return threads
 
 
 class QARow(NamedTuple):
@@ -175,9 +138,9 @@ def main() -> None:  # pragma: no cover
     start_date = datetime.fromisoformat(args.start)
     end_date = datetime.fromisoformat(args.end)
 
-    project_id = get_project_id()
+    project_id = lai.get_project_id()
     logger.info("Project ID: %r", project_id)
-    threads = query_threads(start_date, end_date)
+    threads = lai.query_threads_between(start_date, end_date)
     qa_rows = convert_to_qa_rows(project_id, threads)
     with open(f"{project_id}-lai_pairs.csv", "w", encoding="utf-8") as f:
         save_csv(qa_rows, f)

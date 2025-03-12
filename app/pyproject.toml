@@ -73,6 +73,7 @@ db-migrate-down-all = "src.db.migrations.run:downall"
 init-schema = "src.db.manage:main"
 pg-dump = "src.db.pg_dump_util:main"
 literalai-exporter = "src.evaluation.literalai_exporter:main"
+literalai-archiver = "src.util.literalai_util:archive_threads"
 
 scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 ingest-imagine-la = "src.ingestion.imagine_la.ingest:main"
