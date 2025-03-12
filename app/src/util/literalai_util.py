@@ -85,8 +85,8 @@ def archive_threads() -> None:  # pragma: no cover
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("start", help="(inclusive) beginning datetime of threads to export")
-    parser.add_argument("end", help="(exclusive) end datetime of threads to export")
+    parser.add_argument("start", help="(inclusive) beginning datetime of threads to download")
+    parser.add_argument("end", help="(exclusive) end datetime of threads to download")
     args = parser.parse_args(sys.argv[1:])
     logger.info("Running with args %r", args)
 
