@@ -1,12 +1,14 @@
 import json
 import logging
 import os
-from typing import Any, TypeVar
+import time
+from typing import Any, TypeVar, Optional
 
 from litellm import completion
 from pydantic import BaseModel
 
 from src.app_config import app_config
+from src.profiling import profile_function, add_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,51 @@ def get_models() -> dict[str, str]:
 ChatHistory = list[dict[str, str]]
 
 
+def track_llm_api_call(func):
+    """Decorator to track LLM API call timing and metadata."""
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        
+        # Track model loading/setup time
+        model_start = time.perf_counter()
+        model = kwargs.get("model", "unknown")
+        model_end = time.perf_counter()
+        add_metadata("model_load_time", model_end - model_start)
+        add_metadata("model_name", model)
+        
+        # Track API request
+        try:
+            api_start = time.perf_counter()
+            result = func(*args, **kwargs)
+            api_end = time.perf_counter()
+            
+            # Track timing
+            api_duration = api_end - api_start
+            total_duration = api_end - start_time
+            add_metadata("api_request_time", api_duration)
+            add_metadata("total_llm_time", total_duration)
+            add_metadata("api_overhead", total_duration - api_duration)
+            
+            # Track rate limits and quotas if available
+            headers = getattr(result, "headers", {})
+            if headers:
+                if "x-ratelimit-remaining" in headers:
+                    add_metadata("rate_limit_remaining", headers["x-ratelimit-remaining"])
+                if "x-ratelimit-reset" in headers:
+                    add_metadata("rate_limit_reset", headers["x-ratelimit-reset"])
+                    
+            return result
+        except Exception as e:
+            # Track API errors
+            add_metadata("api_error", str(e))
+            add_metadata("api_error_type", e.__class__.__name__)
+            raise
+            
+    return wrapper
+
+
+@profile_function("llm_inference")
+@track_llm_api_call
 def generate(
     llm: str,
     system_prompt: str,
@@ -69,11 +116,40 @@ def generate(
 
     messages.append({"content": query, "role": "user"})
     logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
+    
+    # Track token counts
+    total_input_tokens = sum(len(m["content"].split()) for m in messages)
+    add_metadata("input_tokens", total_input_tokens)
+    
+    # Add more detailed profiling
+    add_metadata("system_prompt_length", len(system_prompt))
+    add_metadata("query_length", len(query))
+    add_metadata("context_length", len(context_text) if context_text else 0)
+    add_metadata("chat_history_length", len(chat_history) if chat_history else 0)
+    add_metadata("num_messages", len(messages))
+    
+    # Track system prompt vs context size
+    system_prompt_tokens = len(system_prompt.split())
+    context_tokens = len(context_text.split()) if context_text else 0
+    add_metadata("system_prompt_tokens", system_prompt_tokens)
+    add_metadata("context_tokens", context_tokens)
+    add_metadata("system_prompt_percentage", system_prompt_tokens / total_input_tokens * 100 if total_input_tokens > 0 else 0)
+    add_metadata("context_percentage", context_tokens / total_input_tokens * 100 if total_input_tokens > 0 else 0)
+    
+    # Time the actual API call separately
+    api_call_start = time.perf_counter()
     response = completion(
         model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
     )
-
-    return response["choices"][0]["message"]["content"]
+    api_call_duration = time.perf_counter() - api_call_start
+    add_metadata("api_call_duration", api_call_duration)
+    
+    # Track output tokens
+    output_text = response["choices"][0]["message"]["content"]
+    output_tokens = len(output_text.split())
+    add_metadata("output_tokens", output_tokens)
+    
+    return output_text
 
 
 def completion_args(llm: str) -> dict[str, Any]:
@@ -92,6 +168,8 @@ class MessageAttributes(BaseModel):
 MessageAttributesT = TypeVar("MessageAttributesT", bound=MessageAttributes)
 
 
+@profile_function("analyze_message")
+@track_llm_api_call
 def analyze_message(
     llm: str, system_prompt: str, message: str, response_format: type[MessageAttributesT]
 ) -> MessageAttributesT:

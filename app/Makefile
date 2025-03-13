@@ -308,3 +308,25 @@ literalai-exporter:
 
 literalai-archiver:
 	$(PY_RUN_CMD) literalai-archiver $(args)
+
+
+##################################################
+# Profiling Tools
+##################################################
+
+profile-setup: ## Enable pg_stat_statements extension and set up profiling
+	docker compose exec main-db psql -U app -d app -c 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
+	docker compose exec main-db psql -U app -d app -c 'ALTER SYSTEM SET shared_preload_libraries = "pg_stat_statements";'
+	docker compose exec main-db psql -U app -d app -c 'ALTER SYSTEM SET track_activity_query_size = 2048;'
+	docker compose exec main-db psql -U app -d app -c 'ALTER SYSTEM SET pg_stat_statements.max = 10000;'
+
+profile-reset: ## Reset profiling statistics
+	docker compose exec main-db psql -U app -d app -c 'SELECT pg_stat_statements_reset();'
+	docker compose exec main-db psql -U app -d app -c 'DEALLOCATE ALL;'
+
+
+profile-test: ## Run profiling test queries
+	@make -f Makefile.local profile-setup
+	@sleep 1
+	@make -f Makefile.local profile-reset
+	docker compose exec main-app poetry run python bin/profile_test.py

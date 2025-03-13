@@ -1,9 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
 from chainlit.utils import mount_chainlit
 from src.app_config import app_config
 from src.healthcheck import healthcheck_router
+from src.chat_api import router as chat_router
+from src.profiling import request_context, reset_request_stats
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -19,10 +24,32 @@ app.add_middleware(
 
 app.include_router(healthcheck_router)
 
-if app_config.enable_chat_api:
-    from src import chat_api
+@app.middleware("http")
+async def profiling_middleware(request: Request, call_next):
+    """Middleware to track request timing and add profiling headers"""
+    reset_request_stats()  # Reset stats for new request
+    
+    response = await call_next(request)
+    
+    # Get profiling stats
+    stats = request_context.get().get("stats")
+    if stats:
+        # Add timing headers
+        for timing in stats.timings:
+            response.headers[f"X-Timing-{timing['name']}"] = str(timing['duration'])
+        response.headers["X-Timing-Total"] = str(stats.get_total_duration())
+        
+        # Log detailed stats
+        logger.info("Request profiling stats:\n%s", stats.to_json())
+    
+    return response
 
-    app.include_router(chat_api.router)
+if app_config.enable_chat_api:
+    app.include_router(chat_router)
 
 # Add Chainlit AFTER including routers
 mount_chainlit(app=app, target="src/chainlit.py", path="/chat")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

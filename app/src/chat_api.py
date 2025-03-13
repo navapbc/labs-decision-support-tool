@@ -8,7 +8,7 @@ import functools
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Dict
 
 from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -24,11 +24,14 @@ from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Subsection
 from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
+from src.profiling import profile_function, request_context, ProfilingStats, reset_request_stats, add_metadata, _component_timings, _metadata, get_system_metrics
 from src.util.string_utils import format_highlighted_uri
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Chat API"])
 
+# Note: Middleware moved to app.py
+# Keeping profiling decorators here
 
 @router.get("/healthcheck")
 async def healthcheck(request: Request) -> HealthCheck:
@@ -244,6 +247,7 @@ class QueryResponse(BaseModel):
     response_text: str
     alert_message: Optional[str] = None
     citations: list[Citation]
+    profiling: Optional[Dict[str, Any]] = None  # Add profiling data field
 
     # Populated after instantiation based on LiteralAI message ID
     response_id: Optional[str] = None
@@ -262,6 +266,7 @@ def get_chat_engine(session: ChatSession) -> ChatEngineInterface:
     return engine
 
 
+@profile_function("query_endpoint")
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
     user_meta = {"agency_id": request.agency_id, "beneficiary_id": request.beneficiary_id}
@@ -310,6 +315,11 @@ async def query(request: QueryRequest) -> QueryResponse:
         engine = get_chat_engine(session)
         response, metadata = await run_query(engine, request.message, chat_history)
 
+        # Add query metadata to profiling stats
+        add_metadata("query_length", len(request.message))
+        add_metadata("chat_history_length", len(chat_history) if chat_history else 0)
+        add_metadata("response_length", len(response.response_text))
+
         # Example of using parent_id to have a hierarchy of messages in Literal AI
         response_msg = literalai().message(
             content=response.response_text,
@@ -323,6 +333,13 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
         # id needed to later provide feedback on this message in LiteralAI
         response.response_id = response_msg.id
+
+        # Add profiling data to response
+        response.profiling = {
+            "component_timings": _component_timings.get(),
+            "metadata": _metadata.get(),
+            "system_metrics": get_system_metrics()
+        }
 
     # If successful, update the DB; otherwise the DB will contain questions without responses
     with app_config.db_session() as db_session, db_session.begin():

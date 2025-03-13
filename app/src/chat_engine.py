@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence
+import time
 
 from src.citations import (
     CitationFactory,
@@ -19,6 +20,7 @@ from src.generate import (
 )
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
+from src.profiling import profile_function, add_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +142,11 @@ class BaseEngine(ChatEngineInterface):
     def on_message(
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> OnMessageResult:
+        # Profile system_prompt_1 analysis
+        start_time = time.perf_counter()
         attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
+        duration = time.perf_counter() - start_time
+        add_metadata("system_prompt_1_analysis", duration)
 
         if attributes.needs_context:
             return self._build_response_with_context(question, attributes, chat_history)
@@ -153,6 +159,8 @@ class BaseEngine(ChatEngineInterface):
         attributes: MessageAttributesT,
         chat_history: Optional[ChatHistory] = None,
     ) -> OnMessageResult:
+        # Profile system_prompt_2 generation
+        start_time = time.perf_counter()
         response = generate(
             self.llm,
             self.system_prompt_2,
@@ -160,6 +168,8 @@ class BaseEngine(ChatEngineInterface):
             None,
             chat_history,
         )
+        duration = time.perf_counter() - start_time
+        add_metadata("system_prompt_2_generation", duration)
 
         return OnMessageResult(response, self.system_prompt_2, attributes)
 
@@ -171,18 +181,44 @@ class BaseEngine(ChatEngineInterface):
     ) -> OnMessageResult:
         question_for_retrieval = attributes.translated_message or question
 
+        logger.info("Retrieving chunks for question: %r", question_for_retrieval)
+        start_time = time.perf_counter()
         chunks_with_scores = retrieve_with_scores(
             question_for_retrieval,
             retrieval_k=self.retrieval_k,
             retrieval_k_min_score=self.retrieval_k_min_score,
             datasets=self.datasets,
         )
+        duration = time.perf_counter() - start_time
+        add_metadata("vector_search_and_retrieval", duration)
+
+        # Log detailed chunk information
+        logger.info("Retrieved %d chunks with scores:", len(chunks_with_scores))
+        for i, chunk_with_score in enumerate(chunks_with_scores, 1):
+            logger.info(
+                "Chunk %d/%d:\n  Score: %.4f\n  Document: %r\n  Content Length: %d chars\n  Content Preview: %.200s...",
+                i, len(chunks_with_scores),
+                chunk_with_score.score,
+                chunk_with_score.chunk.document.name,
+                len(chunk_with_score.chunk.content),
+                chunk_with_score.chunk.content[:200]
+            )
 
         chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+        start_time = time.perf_counter()
         # Provide a factory to reset the citation id counter
         subsections = split_into_subsections(chunks, factory=CitationFactory())
         context_text = create_prompt_context(subsections)
+        duration = time.perf_counter() - start_time
+        add_metadata("context_preparation", duration)
 
+        # Log context information
+        logger.info("Created context with %d subsections", len(subsections))
+        logger.info("Total context length: %d chars", len(context_text))
+        logger.info("Context preview: %.200s...", context_text[:200])
+
+        # Profile system_prompt_2 generation with context
+        start_time = time.perf_counter()
         response = generate(
             self.llm,
             self.system_prompt_2,
@@ -190,6 +226,8 @@ class BaseEngine(ChatEngineInterface):
             context_text,
             chat_history,
         )
+        duration = time.perf_counter() - start_time
+        add_metadata("system_prompt_2_generation_with_context", duration)
 
         return OnMessageResult(
             response,
