@@ -18,6 +18,7 @@ from src.evaluation import literalai_exporter
 from src.format import format_response
 from src.generate import ChatHistory, MessageAttributesT, get_models
 from src.login import require_login
+from src.util import literalai_util as lai
 
 logger = logging.getLogger(__name__)
 
@@ -341,8 +342,8 @@ async def _export_lai(start_date: datetime, end_date: datetime) -> None:
     ).send()
 
     try:
-        project_id = literalai_exporter.get_project_id()
-        threads = literalai_exporter.query_threads(start_date, end_date)
+        project_id = lai.get_project_id()
+        threads = lai.query_threads_between(start_date, end_date)
         qa_rows = literalai_exporter.convert_to_qa_rows(project_id, threads)
 
         filename_suffix = f"{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}.csv"

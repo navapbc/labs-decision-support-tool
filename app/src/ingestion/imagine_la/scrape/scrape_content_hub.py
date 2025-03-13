@@ -62,10 +62,9 @@ for index in range(learn_more_buttons.count()):
 
     # Expand all the accordions on the page
     # so that we can click into the buttons beneath them
-    accordions = page.locator(".chakra-accordion__button")
-    for accordion_index in range(accordions.count()):
-        accordions.nth(accordion_index).click()
-    page.wait_for_load_state("networkidle")
+    accordions = page.locator(".chakra-accordion__button[aria-expanded='false']")
+    while accordions.count() > 0:
+        accordions.first.click()
 
     with page.expect_navigation() as navigation:
         learn_more_buttons.nth(index).click()

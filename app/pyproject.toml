@@ -59,6 +59,7 @@ setuptools = "^68.2.2"
 debugpy = "^1.8.1"
 ollama = "^0.2.1"
 jupyter = "^1.1.1"
+pg8000 = "^1.31.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -69,8 +70,10 @@ db-migrate = "src.db.migrations.run:up"
 db-migrate-down = "src.db.migrations.run:down"
 db-migrate-down-all = "src.db.migrations.run:downall"
 
+init-schema = "src.db.manage:main"
 pg-dump = "src.db.pg_dump_util:main"
 literalai-exporter = "src.evaluation.literalai_exporter:main"
+literalai-archiver = "src.util.literalai_util:archive_threads"
 
 scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 ingest-imagine-la = "src.ingestion.imagine_la.ingest:main"
@@ -137,5 +140,5 @@ markers = [
   "audit: mark a test as a security audit log test, to be run isolated from other tests"]
 
 [tool.coverage.run]
-omit = ["src/db/migrations/*.py", "src/db/migrations/versions/*.py", "src/chainlit.py", "src/app.py"]
+omit = ["src/db/manage.py", "src/db/migrations/*.py", "src/db/migrations/versions/*.py", "src/chainlit.py", "src/app.py"]
 
