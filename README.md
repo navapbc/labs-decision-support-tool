@@ -4,7 +4,7 @@ Welcome! You are at the root of the Nava Labs Decision Support Tool pilot repo. 
 
 ## Project description
 
-The chatbot ingests and parses documentation on policy programs, and then searches across this database of documentation to inform its responses. TKTK
+The chatbot ingests and parses documentation on policy programs, and then searches across this database of documentation to inform its responses. In March 2025, Nava began a pilot of this chatbot in partnership with [Imagine LA](https://www.imaginela.org/). Users of Imagine LA's [Benefit Navigator](https://www.imaginela.org/benefit-navigator) were provided access to a chatbot with access to documentation about CalWorks, CalFresh, Med-Cal, various tax credits and housing assistance programs, unemployment insurance, state disability insurance, paid family leave, and more.
 
 ## Project components
 
