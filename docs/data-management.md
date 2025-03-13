@@ -129,21 +129,6 @@ export SKIP_LOCAL_EMBEDDING=true
 ./refresh-ingestion.sh dataset_id
 ```
 
-## Batch processing
-
-To have answers generated for multiple questions at once, create a .csv file with a `question` column, for example:
-
-```
-question
-"What is the base period for SDI?"
-"Where can I find the Spanish version of the claims information?"
-"What types of support does the program offer for individuals recovering from an illness or injury?"
-```
-
-Then, in the chat interface, submit the message `Batch processing` to the chatbot and upload the .csv file when prompted.
-
-The input file can have additional columns beyond `question`. They will be preserved in the output file, in addition to the response columns.
-
 ## Backing up DB contents
 
 Since the DB contents will be replaced upon reingestion, new UUIDs will be generated for reingested chunks and documents, which can make diagnosing problems challenging when logs refer to UUIDs that no longer exist in the DB. Before running `refresh-ingestion.sh`, it behooves us to create a backup of DB contents so we can reference the old UUIDs (after restoring the backup to a local DB).

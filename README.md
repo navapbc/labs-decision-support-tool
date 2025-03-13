@@ -16,8 +16,9 @@ This project is built on Nava's open source [infrastructure template](https://gi
    - LiteLLM provides a vendor-agnostic mechanism for accessing LLMs via an API.
  - The application uses AWS Aurora Serverless v2 as its database in deployed environments and Postgres when run locally. The application uses SQLAlchemy as an ORM, and the schema is controlled with Alembic and Pydantic. Model defintions are located in [app/src/db/models](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/src/db/models).
    - The pgvector extension is used to provide a `vector` type, used for semantic search and document retrieval.
-- Evaluation code for e.g., automatically measuring the performance of the retrieval pipeline can be found in [/app/notebooks/metrics](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/notebooks/metrics).
-- Additional investigative and exploratory code can be found in [/app/notebooks](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/notebooks).
+ - Policy documentation is scraped, parsed, and added to the database via [ingest_runner.py](https://github.com/navapbc/app/src/ingest_runner.py), which uses Scrapy, Playwright, and Beautiful Soup to parse online documentation.
+ - Evaluation code for e.g., automatically measuring the performance of the retrieval pipeline can be found in [/app/notebooks/metrics](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/notebooks/metrics).
+ - Additional investigative and exploratory code can be found in [/app/notebooks](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/notebooks).
 
 ## Set up and run the application
 
@@ -26,3 +27,7 @@ To set up your local development environment, follow the instructions in [Gettin
 ### Managing the chatbot's data
 
 To learn more about how to add additional data (or refresh existing data) in the chatbot, see [Data Management](docs/data-management.md).
+
+### Batch processing and log exports
+
+The chatbot has a few special commands built in to support research and evaluation. To learn more about batch processing and how to export logs, see [Special Commands](docs/special-commands.md).
