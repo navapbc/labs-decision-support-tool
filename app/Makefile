@@ -289,6 +289,7 @@ evaluate: ## Run evaluation with configurable parameters
 		$(if $(k),--k $(k),) \
 		$(if $(qa_pairs_version),--qa-pairs-version=$(qa_pairs_version),) \
 		$(if $(sampling),--sampling=$(sampling),) \
+		$(if $(min_samples),--min-samples=$(min_samples),) \
 		$(if $(min_score),--min-score=$(min_score),) \
 		$(if $(random_seed),--random-seed=$(random_seed),) \
 		$(if $(output_dir),--output-dir=$(output_dir),) \
@@ -300,6 +301,7 @@ generate-qa: ## Generate QA pairs from documents
 		$(if $(output_dir),--output-dir $(output_dir),) \
 		$(if $(llm),--llm $(llm),) \
 		$(if $(sampling),--sampling=$(sampling),) \
+		$(if $(min_samples),--min-samples=$(min_samples),) \
 		$(if $(random_seed),--random-seed=$(random_seed),) \
 		--commit=$(shell git rev-parse HEAD)
 

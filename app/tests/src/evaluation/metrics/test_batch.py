@@ -119,7 +119,7 @@ def test_stratified_sample():
     assert dataset2_count >= 1
 
     # Test with very small sampling but respecting min_per_dataset
-    min_sample = stratified_sample(questions, 0.1, min_per_dataset=1)
+    min_sample = stratified_sample(questions, 0.1, min_samples=1)
     assert len(min_sample) >= 2  # At least 1 per dataset
     assert len([q for q in min_sample if q["dataset"] == "dataset1"]) >= 1
     assert len([q for q in min_sample if q["dataset"] == "dataset2"]) >= 1
