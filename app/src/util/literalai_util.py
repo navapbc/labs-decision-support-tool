@@ -54,6 +54,22 @@ def query_threads_between(start_date: datetime, end_date: datetime) -> list[Thre
     ]
     return get_threads(filters)
 
+def query_untagged_threads(user_ids: list[str]) -> list[Thread]:
+    filters: list[Filter] = [
+        Filter(field="participantIdentifiers", operator="in", value=user_ids),
+        Filter(field="tags", operator="is", value=None),
+    ]
+    return get_threads(filters)
+
+def tag_threads_by_user(threads: list[Thread], user2tag: dict[str, str]) -> None:
+    lai_client = client()
+    for th in threads:
+        assert (
+            th.participant_identifier in user2tag
+        ), f"Missing tag for user {th.participant_identifier}"
+        new_tag = user2tag[th.participant_identifier]
+        lai_client.api.update_thread(th.id, tags=[new_tag])
+        logger.info("Tagged thread %r with %r", th.id, new_tag)
 
 def save_threads(threads: list[Thread], basefilename: str) -> None:  # pragma: no cover
     with open(f"{basefilename}.pickle", "wb") as file:
@@ -101,3 +117,33 @@ def archive_threads() -> None:  # pragma: no cover
         f"{project_id}-archive-{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}",
     )
     logger.info("REMINDER: Upload the JSON file to the 'LiteralAI logs' Google Drive folder")
+
+
+
+def tag_threads() -> None:  # pragma: no cover
+    # Configure logging since this function is run directly
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true", help="Only query; don't update threads")
+    args = parser.parse_args(sys.argv[1:])
+    logger.info("Running with args %r", args)
+
+    input_json = "literalai_user_tags.json"
+    if not os.path.exists(input_json):
+        logger.error("Missing input file %r. Download from the 'LiteralAI logs' Google Drive folder.", input_json)
+        sys.exit(4)
+
+    with open(input_json, "r", encoding="utf-8") as f:
+        user_objs = json.load(f)
+    user2tag = {u["user_id"]: u["tag"] for u in user_objs}
+    logger.info(user2tag)
+
+    project_id = get_project_id()
+    logger.info("Project ID: %r", project_id)
+    if threads := query_untagged_threads(list(user2tag)):
+        for th in threads:
+            logger.info("%s (%s) %s %r", th.id, th.created_at, th.participant_identifier, th.tags)
+        if not args.dry_run:
+            tag_threads_by_user(threads, user2tag)
+
