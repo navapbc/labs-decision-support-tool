@@ -12,7 +12,7 @@ This project is built on Nava's open source [infrastructure template](https://gi
 
  - The application is hosted in AWS, and the infrastructure is defined via Terraform in [/infra](https://github.com/navapbc/labs-decision-support-tool/tree/main/infra).
  - The application code is written in Python and is located in [/app/src](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/src).
-   - Chainlit and FastAPI are used to provide a chatbot interface and an API for third-parties using the chatbot. Chainlit also logs interactions with the chatbot to the Literal evaluation platform.
+   - Chainlit and FastAPI are used to provide a chatbot interface and an API for third-parties using the chatbot. Chainlit also logs interactions with the chatbot to the LiteralAI evaluation platform.
    - LiteLLM provides a vendor-agnostic mechanism for accessing LLMs via an API.
  - The application uses AWS Aurora Serverless v2 as its database in deployed environments and Postgres when run locally. The application uses SQLAlchemy as an ORM, and the schema is controlled with Alembic and Pydantic. Model definitions are located in [app/src/db/models](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/src/db/models).
    - The pgvector extension is used to provide a `vector` type, used for semantic search and document retrieval.
