@@ -19,7 +19,6 @@ This project is built on Nava's open source [infrastructure template](https://gi
 - Evaluation code for e.g., automatically measuring the performance of the retrieval pipeline can be found in [/app/notebooks/metrics](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/notebooks/metrics).
 - Additional investigative and exploratory code can be found in [/app/notebooks](https://github.com/navapbc/labs-decision-support-tool/tree/main/app/notebooks).
 
-
 ## Set up and run the application
 
 To set up your local development environment, follow the instructions in [Getting Started](docs/app/getting-started.md).
