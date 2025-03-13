@@ -19,6 +19,10 @@ Then, in the chat interface, submit the message `Batch processing` to the chatbo
 
 The input file can have additional columns beyond `question`. They will be preserved in the output file, in addition to the response columns.
 
-## Export logs
+## Export user interaction logs
 
-User interactions are stored in LiteralAI. These logs can be exported by submitting the message `Export LiteralAI` and following up with a date range, e.g., `2025-03-04 2025-03-06`. The second date is exclusive; the previous command will export logs from 3/4 and 3/5, but not 3/6.
+User interactions are stored in LiteralAI. These logs can be exported to a CSV file by submitting the message `Export LiteralAI` and following up with a date range, e.g., `2025-03-04 2025-03-06`. The second date is exclusive; the previous command will export logs from 3/4 and 3/5, but not 3/6.
+
+## Export application logs
+
+If you are running the application locally and would like to export the system logs, run `docker compose logs main-app` from within the `app` folder in your terminal. You can also follow along with the system logs live via the `make run-logs` command.
