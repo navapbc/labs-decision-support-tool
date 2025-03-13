@@ -3,7 +3,7 @@ from typing import Iterator, Optional
 
 import html2text
 import scrapy
-from scrapy.http import HtmlResponse
+from scrapy.http import HtmlResponse, Response
 from scrapy.selector import Selector
 
 
@@ -28,7 +28,11 @@ class CoveredCaliforniaSpider(scrapy.Spider):
     # This is used to substitute the base URL in the cache storage
     common_url_prefix = "https://www.coveredca.com/"
 
-    def parse(self, response: HtmlResponse) -> Iterator[scrapy.Request | dict[str, str]]:
+    def parse(self, response: Response) -> Iterator[scrapy.Request | dict[str, str]]:
+        assert isinstance(response, HtmlResponse)
+        return self.parse_html(response)
+
+    def parse_html(self, response: HtmlResponse) -> Iterator[scrapy.Request | dict[str, str]]:
         self.logger.info("Parsing %s", response.url)
         if response.url == "https://www.coveredca.com/support/glossary/":
             yield self.parse_glossary(response)
@@ -44,13 +48,14 @@ class CoveredCaliforniaSpider(scrapy.Spider):
                         self.logger.info("Found sidebar link: %s", link)
                         yield response.follow(link, callback=self.parse_learning_center_page)
                 else:
+                    assert isinstance(col, Selector)
                     yield self.parse_learning_center_body(response.url, col)
         elif response.url.startswith("https://www.coveredca.com/support/"):
             body = response.css("div.gtm-content")
             topic = None
             for item in body.css("h2, a"):
                 if item.root.tag == "h2":
-                    topic = to_markdown(item.get().strip()).removeprefix("## ")
+                    topic = to_markdown(item.get()).removeprefix("## ")
                     self.logger.info("Topic: %r", topic)
                 elif item.root.tag == "a":
                     assert item.attrib["href"]
@@ -63,7 +68,7 @@ class CoveredCaliforniaSpider(scrapy.Spider):
 
             yield self.parse_support_page(response)
         elif response.url == "https://www.coveredca.com/documents-to-confirm-eligibility/":
-            title = to_markdown(response.css("h1").get().strip()).removeprefix("# ").strip()
+            title = to_markdown(response.css("h1").get()).removeprefix("# ")
             assert title
             markdown = to_markdown(response.css("#content").get(), response.url)
             assert markdown
@@ -85,8 +90,9 @@ class CoveredCaliforniaSpider(scrapy.Spider):
             raise ValueError(f"Unexpected URL: {response.url}")
 
     def parse_learning_center_page(
-        self, response: HtmlResponse
+        self, response: Response
     ) -> Iterator[scrapy.Request | dict[str, str]]:
+        assert isinstance(response, HtmlResponse)
         self.logger.info("Parsing under Learning Center: %s ", response.url)
         row_cols = response.css("div#content div.container > div.row > div.col-12")
         assert len(row_cols) == 2
@@ -95,11 +101,12 @@ class CoveredCaliforniaSpider(scrapy.Spider):
                 # Skip the sidebar since it was already processed
                 continue
             else:
+                assert isinstance(col, Selector)
                 extractions = self.parse_learning_center_body(response.url, col)
                 yield extractions
 
     def parse_learning_center_body(self, url: str, col: Selector) -> dict[str, str]:
-        title = to_markdown(col.css("h1").get().strip()).removeprefix("# ").strip()
+        title = to_markdown(col.css("h1").get()).removeprefix("# ").strip()
         assert title
         markdown = to_markdown(col.get(), url)
         assert markdown
@@ -110,16 +117,15 @@ class CoveredCaliforniaSpider(scrapy.Spider):
         }
         return extractions
 
-    def parse_support_page(
-        self, response: HtmlResponse, topic: Optional[str] = None
-    ) -> dict[str, str]:
+    def parse_support_page(self, response: Response, topic: Optional[str] = None) -> dict[str, str]:
+        assert isinstance(response, HtmlResponse)
         self.logger.info("Parsing under topic %r: %s ", topic, response.url)
 
         if (h1_count := len(response.css("h1").getall())) > 1:
             self.logger.warning("Found %i h1 elements for %r", h1_count, response.url)
             raise ValueError("Multiple h1 elements found")
 
-        title = to_markdown(response.css("h1").get().strip()).removeprefix("# ").strip()
+        title = to_markdown(response.css("h1").get()).removeprefix("# ").strip()
         assert title
         title = f"{topic}: {title}" if topic else title
 
@@ -139,7 +145,8 @@ class CoveredCaliforniaSpider(scrapy.Spider):
             "markdown": f"# {title}\n\n{markdown}",
         }
 
-    def parse_glossary(self, response: HtmlResponse, topic: Optional[str] = None) -> dict[str, str]:
+    def parse_glossary(self, response: Response, topic: Optional[str] = None) -> dict[str, str]:
+        assert isinstance(response, HtmlResponse)
         self.logger.info("Parsing glossary: %s ", response.url)
 
         title = "Glossary"
@@ -151,10 +158,10 @@ class CoveredCaliforniaSpider(scrapy.Spider):
         for dl in def_lists:
             for d_tag in dl.css("dt, dd"):
                 if d_tag.root.tag == "dt":
-                    if term := to_markdown(d_tag.get()).strip():
+                    if term := to_markdown(d_tag.get()):
                         markdowns.append(f"## {term}")
                 elif d_tag.root.tag == "dd":
-                    if dd := to_markdown(d_tag.get()).strip():
+                    if dd := to_markdown(d_tag.get()):
                         if not term:
                             self.logger.warning("Empty term for definition: %r", dd)
                         markdowns.append(dd)
@@ -168,13 +175,16 @@ class CoveredCaliforniaSpider(scrapy.Spider):
             "markdown": "\n\n".join(markdowns),
         }
 
-    def parse_eligibility_doc_page(self, response: HtmlResponse) -> dict[str, str]:
+    def parse_eligibility_doc_page(self, response: Response) -> dict[str, str]:
+        assert isinstance(response, HtmlResponse)
         # These pages can be parsed like support pages
         return self.parse_support_page(response)
 
 
-def to_markdown(html: str, base_url: Optional[str] = None) -> str:
-    assert html
+def to_markdown(html: Optional[str], base_url: Optional[str] = None) -> str:
+    if not html:
+        return ""
+
     h2t = html2text.HTML2Text()
 
     # Refer to https://github.com/Alir3z4/html2text/blob/master/docs/usage.md and html2text.config
@@ -189,7 +199,7 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     # Exclude the <sup> and <sub> tags
     h2t.include_sup_sub = False
 
-    markdown = h2t.handle(html)
+    markdown = h2t.handle(html.strip())
 
     # Consolidate newlines
     markdown = re.sub(r"\n\n+", "\n\n", markdown)
