@@ -19,7 +19,7 @@ marshmallow-dataclass = {extras = ["enum", "union"], version = "^8.5.8"}
 marshmallow = "^3.20.1"
 psycopg = {extras = ["binary"], version = "^3.1.10"}
 pydantic-settings = "^2.0.3"
-chainlit = "1.1.306"
+chainlit = "^2.3.0"
 sentence-transformers = "^3.0.1"
 litellm = "^1.51.2"
 pgvector = "^0.2.5"
