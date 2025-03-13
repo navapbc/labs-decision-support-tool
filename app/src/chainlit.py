@@ -25,6 +25,16 @@ logger = logging.getLogger(__name__)
 require_login()
 
 
+@cl.set_chat_profiles
+async def chat_profiles() -> list[cl.ChatProfile]:
+    return [
+        cl.ChatProfile(
+            name="chainlit",
+            markdown_description="Default profile. Threads will be auto-tagged with the profile name.",
+        ),
+    ]
+
+
 @cl.on_chat_start
 async def start() -> None:
     url = cl.user_session.get("http_referer")
@@ -55,10 +65,11 @@ async def start() -> None:
         ).send()
 
     user = cl.user_session.get("user")
+    chat_profile = cl.user_session.get("chat_profile")
     await cl.Message(
         author="backend",
         metadata={"engine": engine_id, "settings": settings},
-        content=f"{engine.name} started {f'for {user}' if user else ''}",
+        content=f"{engine.name} started {f'for {user}' if user else ''} (using {chat_profile!r} profile)",
     ).send()
 
 
@@ -167,6 +178,7 @@ _WIDGET_FACTORIES = {
 }
 
 
+# TODO: Try cl.chat_context.to_openai() to get the conversation in OpenAI format
 def extract_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
     raw_chat_history: ChatHistory = []
     for message in messages:

@@ -308,3 +308,6 @@ literalai-exporter:
 
 literalai-archiver:
 	$(PY_RUN_CMD) literalai-archiver $(args)
+
+literalai-tagger:
+	$(PY_RUN_CMD) literalai-tagger $(args)
