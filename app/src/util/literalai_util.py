@@ -54,12 +54,14 @@ def query_threads_between(start_date: datetime, end_date: datetime) -> list[Thre
     ]
     return get_threads(filters)
 
+
 def query_untagged_threads(user_ids: list[str]) -> list[Thread]:
     filters: list[Filter] = [
         Filter(field="participantIdentifiers", operator="in", value=user_ids),
         Filter(field="tags", operator="is", value=None),
     ]
     return get_threads(filters)
+
 
 def tag_threads_by_user(threads: list[Thread], user2tag: dict[str, str]) -> None:
     lai_client = client()
@@ -70,6 +72,7 @@ def tag_threads_by_user(threads: list[Thread], user2tag: dict[str, str]) -> None
         new_tag = user2tag[th.participant_identifier]
         lai_client.api.update_thread(th.id, tags=[new_tag])
         logger.info("Tagged thread %r with %r", th.id, new_tag)
+
 
 def save_threads(threads: list[Thread], basefilename: str) -> None:  # pragma: no cover
     with open(f"{basefilename}.pickle", "wb") as file:
@@ -119,7 +122,6 @@ def archive_threads() -> None:  # pragma: no cover
     logger.info("REMINDER: Upload the JSON file to the 'LiteralAI logs' Google Drive folder")
 
 
-
 def tag_threads() -> None:  # pragma: no cover
     # Configure logging since this function is run directly
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -131,7 +133,10 @@ def tag_threads() -> None:  # pragma: no cover
 
     input_json = "literalai_user_tags.json"
     if not os.path.exists(input_json):
-        logger.error("Missing input file %r. Download from the 'LiteralAI logs' Google Drive folder.", input_json)
+        logger.error(
+            "Missing input file %r. Download from the 'LiteralAI logs' Google Drive folder.",
+            input_json,
+        )
         sys.exit(4)
 
     with open(input_json, "r", encoding="utf-8") as f:
@@ -146,4 +151,3 @@ def tag_threads() -> None:  # pragma: no cover
             logger.info("%s (%s) %s %r", th.id, th.created_at, th.participant_identifier, th.tags)
         if not args.dry_run:
             tag_threads_by_user(threads, user2tag)
-
