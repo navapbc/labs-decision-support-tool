@@ -28,6 +28,6 @@ To set up your local development environment, follow the instructions in [Gettin
 
 To learn more about how to add additional data (or refresh existing data) in the chatbot, see [Data Management](docs/data-management.md).
 
-### Batch processing and log exports
+## Research and evaluation
 
-The chatbot has a few special commands built in to support research and evaluation. To learn more about batch processing and how to export logs, see [Special Commands](docs/special-commands.md).
+The chatbot has a few special commands built in to support research and evaluation. To learn more about batch processing and how to export user interaction logs, see [Special Commands](docs/special-commands.md).
