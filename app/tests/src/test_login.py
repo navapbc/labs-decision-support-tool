@@ -7,14 +7,14 @@ def test_require_login_no_password(monkeypatch):
     app_config.global_password = None
     require_login()
 
-    assert not chainlit.config.CodeSettings.password_auth_callback
+    assert not chainlit.config.config.code.password_auth_callback
 
 
 def test_require_login_with_password(monkeypatch):
     app_config.global_password = "password"
     require_login()
 
-    assert chainlit.config.CodeSettings.password_auth_callback
+    assert chainlit.config.config.code.password_auth_callback
 
 
 def test_login_callback(monkeypatch):
