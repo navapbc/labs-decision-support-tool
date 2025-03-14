@@ -42,6 +42,7 @@ def run_generation(
     output_dir: Path,
     dataset_filter: Optional[List[str]] = None,
     sample_fraction: Optional[float] = None,
+    min_samples: Optional[int] = None,
     random_seed: Optional[int] = None,
     version: Optional[QAPairVersion] = None,
 ) -> List[QAPair]:
@@ -52,6 +53,7 @@ def run_generation(
         output_dir: Directory to store output files
         dataset_filter: List of dataset names to include
         sample_fraction: Fraction of documents to sample
+        min_samples: Minimum number of samples per dataset
         random_seed: Random seed for reproducible sampling
         version: Version information for generated QA pairs
 
@@ -77,12 +79,13 @@ def run_generation(
             raise ValueError("No documents found matching filter criteria")
 
         # Sample documents if requested
-        if sample_fraction:
-            if not 0 < sample_fraction <= 1:
+        if sample_fraction or min_samples:
+            if sample_fraction and not 0 < sample_fraction <= 1:
                 raise ValueError("Sample fraction must be between 0 and 1")
             documents = get_stratified_sample(
                 documents,
                 sample_fraction=sample_fraction,
+                min_samples=min_samples,
                 random_seed=random_seed,
                 key_func=lambda d: d.dataset,
             )

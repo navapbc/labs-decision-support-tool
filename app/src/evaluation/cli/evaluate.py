@@ -10,8 +10,11 @@ from ..utils.storage import QAPairStorage
 # Map CLI dataset names to DB dataset names
 DATASET_MAPPING = {
     "imagine_la": "Imagine LA",
-    "la_policy": "DPSS Policy",
+    "benefits_hub": "Benefits Information Hub",
+    "ca_edd": "CA EDD",
     "ca_ftb": "CA FTB",
+    "covered_ca": "Covered California",
+    "la_policy": "DPSS Policy",
     "irs": "IRS",
     "kyb": "Keep Your Benefits",
     "wic": "WIC",
@@ -52,6 +55,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--min-score", type=float, default=-1.0, help="Minimum similarity score for retrieval"
     )
     parser.add_argument("--sampling", type=float, help="Fraction of questions to sample (e.g. 0.1)")
+    parser.add_argument("--min-samples", type=int, help="Minimum number of samples per dataset")
     parser.add_argument("--random-seed", type=int, help="Random seed for reproducible sampling")
     parser.add_argument("--commit", type=str, help="Git commit hash for tracking evaluation runs")
 
@@ -103,6 +107,7 @@ def main() -> None:
             k_values=args.k,
             dataset_filter=db_datasets,
             sample_fraction=args.sampling,
+            min_samples=args.min_samples,
             random_seed=args.random_seed,
             min_score=args.min_score,
             retrieval_func=retrieval_func,
