@@ -48,14 +48,7 @@ module "database" {
   source = "../../modules/database/resources"
   name   = "${local.prefix}${local.database_config.cluster_name}"
 
-<<<<<<< before updating
-  vpc_id                         = data.aws_vpc.network.id
-  database_subnet_group_name     = local.network_config.database_subnet_group_name
-  private_subnet_ids             = data.aws_subnets.database.ids
-  aws_services_security_group_id = data.aws_security_groups.aws_services.ids[0]
-=======
   network_name = local.environment_config.network_name
   project_name = module.project_config.project_name
   is_temporary = local.is_temporary
->>>>>>> after updating
 }

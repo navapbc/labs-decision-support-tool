@@ -94,8 +94,8 @@ module "service" {
   extra_environment_variables = merge(
     {
       BUCKET_NAME = local.bucket_name
-      ENVIRONMENT           = var.environment_name
-      BUILD_DATE            = timestamp()
+      ENVIRONMENT = var.environment_name
+      BUILD_DATE  = timestamp()
     },
     local.identity_provider_environment_variables,
     local.notifications_environment_variables,
