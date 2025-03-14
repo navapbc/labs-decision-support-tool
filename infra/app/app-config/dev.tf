@@ -11,6 +11,7 @@ module "dev_config" {
   has_incident_management_service = local.has_incident_management_service
   service_cpu                     = 2048
   service_memory                  = 8192
+  enable_notifications            = local.enable_notifications
 
   # Enable and configure identity provider.
   enable_identity_provider = local.enable_identity_provider
@@ -23,4 +24,9 @@ module "dev_config" {
   # See https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html
   # Defaults to `false`. Uncomment the next line to enable.
   enable_command_execution = true
+
+  # Uncomment to override default feature flag values
+  # feature_flag_overrides = {
+  #   BAR = true
+  # }
 }
