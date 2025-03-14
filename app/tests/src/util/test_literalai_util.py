@@ -25,11 +25,11 @@ class MockLiteralAIApi:
 
         response = MagicMock()
         response.data = threads
-        response.totalCount = len(THREADS)
-        response.pageInfo = PageInfo(
-            hasNextPage=threads != self.responses[-1],
-            startCursor=threads[0].id,
-            endCursor=threads[-1].id,
+        response.total_count = len(THREADS)
+        response.page_info = PageInfo(
+            has_next_page=(threads != self.responses[-1]),
+            start_cursor=threads[0].id,
+            end_cursor=threads[-1].id,
         )
         return response
 

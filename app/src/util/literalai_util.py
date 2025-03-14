@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from literalai import LiteralClient, Thread
-from literalai.filter import Filter, OrderBy
+from literalai.observability.filter import Filter, OrderBy
 
 from src.app_config import app_config
 
@@ -37,13 +37,13 @@ def get_threads(filters: list[Filter]) -> list[Thread]:
     after = None
     while True:
         response = lai_client.api.get_threads(filters=filters, order_by=order_by, after=after)
-        after = response.pageInfo.endCursor
+        after = response.page_info.end_cursor
         threads += response.data
-        logger.info("Got %r of %r total threads", len(threads), response.totalCount)
-        if not response.pageInfo.hasNextPage:
+        logger.info("Got %r of %r total threads", len(threads), response.total_count)
+        if not response.page_info.has_next_page:
             assert (
-                len(threads) == response.totalCount
-            ), f"Expected {response.totalCount} threads, but got only {len(threads)}"
+                len(threads) == response.total_count
+            ), f"Expected {response.total_count} threads, but got only {len(threads)}"
             return threads
 
 

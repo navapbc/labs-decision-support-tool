@@ -39,7 +39,7 @@ class CaPublicChargeSpider(CrawlSpider):
     def parse_page(self, response: HtmlResponse) -> dict[str, str]:
         self.logger.info("Parsing %s", response.url)
         extractions = {"url": response.url}
-        title = response.css("title::text").get().removesuffix("| Keep Your Benefits")
+        title = response.css("title::text").get("").removesuffix("| Keep Your Benefits")
         extractions["title"] = title.strip()
 
         # remove icon text
@@ -59,7 +59,10 @@ class CaPublicChargeSpider(CrawlSpider):
             absolute_href = response.urljoin(anchor.attrib["href"])
             anchor.root.attrib.update({"href": absolute_href})
 
-    def to_markdown(self, html: str) -> str:
+    def to_markdown(self, html: str | None) -> str:
+        if not html:
+            return ""
+
         # convert larger text to header
         larger_font_pattern = (
             r'<p class="title fontsize-30 weightier colored text-center"([^>]*?)>(.*?)<\/p>'
