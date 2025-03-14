@@ -22,6 +22,12 @@ from src.util import literalai_util as lai
 
 logger = logging.getLogger(__name__)
 
+from src.chainlit_data import MyChainlitDataLayer
+
+@cl.data_layer
+def get_data_layer():
+    return MyChainlitDataLayer()
+
 require_login()
 
 
@@ -274,6 +280,7 @@ async def _msg_attributes(attributes: MessageAttributesT) -> None:
     ).send()
 
 
+# TODO: Replace with https://docs.chainlit.io/concepts/command
 async def special_command(msg_text: str) -> bool:
     if msg_text == "batch processing":
         # The AskFileMessage cannot be called inside code run by asyncio.create_task,
