@@ -14,7 +14,6 @@ locals {
     "elasticbeanstalk",
     "elasticloadbalancing",
     "events",
-    "evidently",
     "iam",
     "kms",
     "lambda",
@@ -30,6 +29,7 @@ locals {
     "servicediscovery",
     "sns",
     "ssm",
+    "states",
     "waf-regional",
     "wafv2",
   ]

@@ -20,8 +20,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   // Opt out of parallel tests on CI.
   workers: process.env.CI ? 1 : undefined,
-  // Reporter to use. See https://playwright.dev/docs/test-reporters
-  reporter: "html",
+  // Use 'blob' for CI to allow merging of reports. See https://playwright.dev/docs/test-reporters
+  reporter: process.env.CI
+  ? [['blob']]  :
+    // Don't open the HTML report since it hangs when running inside a container.
+    // Use make e2e-show-report for opening the HTML report
+    [['html', { open: 'never' }]],
   // Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions.
   use: {
     // Base URL to use in actions like `await page.goto('/')`.
@@ -31,6 +35,13 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "on",
     video: "on-first-retry",
+  },
+  // Splits tests into chunks for distributed parallel execution
+  shard: {
+    // Total number of shards
+    total: parseInt(process.env.TOTAL_SHARDS || '1'),
+    // Specifies which shard this job should execute
+    current: parseInt(process.env.CURRENT_SHARD || '1'),
   },
 
   // Configure projects for major browsers
