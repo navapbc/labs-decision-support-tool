@@ -10,6 +10,8 @@ locals {
     description = "Database resources for the ${var.environment_name} environment"
   })
 
+  is_temporary = terraform.workspace != "default"
+
   environment_config = module.app_config.environment_configs[var.environment_name]
   database_config    = local.environment_config.database_config
 }
