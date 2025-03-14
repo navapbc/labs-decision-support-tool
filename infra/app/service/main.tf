@@ -176,21 +176,12 @@ module "service" {
     }
   } : null
 
-<<<<<<< before updating
-  extra_environment_variables = merge({
-    FEATURE_FLAGS_PROJECT = module.feature_flags.evidently_project_name
-    BUCKET_NAME           = local.storage_config.bucket_name
-    ENVIRONMENT           = var.environment_name
-    BUILD_DATE            = timestamp()
-  }, local.service_config.extra_environment_variables)
-
-  secrets = [
-    for secret_name in keys(local.service_config.secrets) : {
-=======
   extra_environment_variables = merge(
     {
       FEATURE_FLAGS_PROJECT = module.feature_flags.evidently_project_name
       BUCKET_NAME           = local.storage_config.bucket_name
+      ENVIRONMENT           = var.environment_name
+      BUILD_DATE            = timestamp()
     },
     local.identity_provider_environment_variables,
     local.service_config.extra_environment_variables
@@ -198,7 +189,6 @@ module "service" {
 
   secrets = concat(
     [for secret_name in keys(local.service_config.secrets) : {
->>>>>>> after updating
       name      = secret_name
       valueFrom = module.secrets[secret_name].secret_arn
     }],
