@@ -38,7 +38,7 @@ Now that you're up and running, read the [application docs](README.md) to famili
 
 ### Installing Ollama
 
-You can install ollama on macOSX by calling `brew install ollama`, for other operating systems or the desktop app see the [Ollama repository](https://github.com/ollama/ollama).
+The application supports using Ollama to use local and/or open source LLMs for inference. You can install ollama on macOSX by calling `brew install ollama`, for other operating systems or the desktop app see the [Ollama repository](https://github.com/ollama/ollama).
 
 To download a model run `ollama pull <model_name>`
 
