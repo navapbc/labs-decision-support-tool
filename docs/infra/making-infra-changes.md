@@ -39,18 +39,26 @@ TF_CLI_ARGS_apply='-var=image_tag=abcdef1' make infra-update-app-service APP_NAM
 An alternative to using the Makefile is to directly use the terraform wrapper scripts that the Makefile uses:
 
 ```bash
-project-root$ ./bin/terraform-init app/service dev
-project-root$ ./bin/terraform-apply app/service dev
-project-root$ ./bin/terraform-init-and-apply app/service dev  # calls init and apply in the same script
+project-root$ ./bin/terraform-init infra/<APP_NAME>/service dev
+project-root$ ./bin/terraform-apply infra/<APP_NAME>/service dev
+project-root$ ./bin/terraform-init-and-apply infra/<APP_NAME>/service dev  # calls init and apply in the same script
 ```
 
 Look in the script files for more details on usage.
 
 ## Using Terraform CLI directly
 
-Finally, if the wrapper scripts don't meet your needs, you can always run `terraform` directly from the root module directory. You may need to do this if you are running terraform commands other than `terraform plan` and `terraform apply`, such as `terraform import`, `terraform taint`, etc. To do this, you'll need to pass in the appropriate `tfvars` and `tfbackend` files to `terraform init` and `terraform apply`. For example, to make changes to the application's service resources in the dev environment, cd to the `infra/app/service` directory and run:
+Finally, if the wrapper scripts don't meet your needs, you can always run `terraform` directly. You may need to do this if you are running terraform commands other than `terraform plan` and `terraform apply`, such as `terraform import`, `terraform taint`, etc. To do this, you'll need to remember to run `terraform init` with the appropriate `tfbackend` file since the root modules are shared across multiple backends. For example, to make changes to the application's service resources in the dev environment:
 
 ```bash
-infra/app/service$ terraform init -backend-config=dev.s3.tfbackend
-infra/app/service$ terraform apply -var-file=dev.tfvars
+project-root$ cd infra/<APP_NAME>/service
+infra/<APP_NAME>/service$ terraform init -backend-config=dev.s3.tfbackend
+infra/<APP_NAME>/service$ terraform apply -var-file=dev.tfvars
+```
+
+or you can run the commands from the project root by using the `-chdir` flag.
+
+```bash
+project-root$ terraform init -chdir=infra/<APP_NAME>/service -backend-config=dev.s3.tfbackend
+project-root$ terraform apply -chdir=infra/<APP_NAME>/service -var="environment_name=dev"
 ```
