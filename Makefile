@@ -42,6 +42,7 @@ __check_defined = \
 	infra-lint-scripts \
 	infra-lint-terraform \
 	infra-lint-workflows \
+	infra-module-database-role-manager \
 	infra-set-up-account \
 	infra-test-service \
 	infra-update-app-build-repository \
@@ -57,9 +58,9 @@ __check_defined = \
 	release-image-name \
 	release-image-tag \
 	release-publish \
-	release-run-database-migrations
-
-
+	release-run-database-migrations \
+	e2e-setup \
+	e2e-test
 
 infra-set-up-account: ## Configure and create resources for current AWS profile and save tfbackend file to infra/accounts/$ACCOUNT_NAME.ACCOUNT_ID.s3.tfbackend
 	@:$(call check_defined, ACCOUNT_NAME, human readable name for account e.g. "prod" or the AWS account alias)
@@ -106,6 +107,10 @@ infra-update-app-database: ## Create or update $APP_NAME's database module for $
 	@:$(call check_defined, ENVIRONMENT, the name of the application environment e.g. "prod" or "staging")
 	terraform -chdir="infra/$(APP_NAME)/database" init -input=false -reconfigure -backend-config="$(ENVIRONMENT).s3.tfbackend"
 	terraform -chdir="infra/$(APP_NAME)/database" apply -var="environment_name=$(ENVIRONMENT)"
+
+infra-module-database-role-manager-archive: ## Build/rebuild role manager code package for Lambda deploys
+	pip3 install -r infra/modules/database/role_manager/requirements.txt -t infra/modules/database/role_manager/vendor --upgrade
+	zip -r infra/modules/database/role_manager.zip infra/modules/database/role_manager
 
 infra-update-app-database-roles: ## Create or update database roles and schemas for $APP_NAME's database in $ENVIRONMENT
 	@:$(call check_defined, APP_NAME, the name of subdirectory of /infra that holds the application's infrastructure code)
@@ -210,6 +215,28 @@ release-image-name: ## Prints the image name of the release image
 
 release-image-tag: ## Prints the image tag of the release image
 	@echo $(IMAGE_TAG)
+
+##############################
+## End-to-end (E2E) Testing ##
+##############################
+
+e2e-setup: ## Setup end-to-end tests
+	@cd e2e && npm install
+	@cd e2e && npx playwright install --with-deps
+
+e2e-setup-ci: ## Install system dependencies, Node dependencies, and Playwright browsers
+	sudo apt-get update
+	sudo apt-get install -y libwoff1 libopus0 libvpx7 libevent-2.1-7 libopus0 libgstreamer1.0-0 \
+	libgstreamer-plugins-base1.0-0 libgstreamer-plugins-good1.0-0 libharfbuzz-icu0 libhyphen0 \
+	libenchant-2-2 libflite1 libgles2 libx264-dev
+	cd e2e && npm ci
+	cd e2e && npx playwright install --with-deps
+
+
+e2e-test: ## Run end-to-end tests
+	@:$(call check_defined, APP_NAME, You must pass in a specific APP_NAME)
+	@:$(call check_defined, BASE_URL, You must pass in a BASE_URL)
+	@cd e2e/$(APP_NAME) && APP_NAME=$(APP_NAME) BASE_URL=$(BASE_URL) npx playwright test $(E2E_ARGS)
 
 ########################
 ## Scripts and Helper ##

@@ -1,4 +1,4 @@
 # Changes here will be overwritten by Copier
-_commit: platform-cli-migration/v0.11.0
+_commit: platform-cli-migration/v0.12.1
 _src_path: https://github.com/navapbc/template-infra
 template: base
