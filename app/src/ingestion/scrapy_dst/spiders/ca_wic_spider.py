@@ -3,7 +3,7 @@ from typing import Optional
 
 import html2text
 import scrapy
-from scrapy.http import HtmlResponse
+from scrapy.http import HtmlResponse, Response
 
 
 class CaWicSpider(scrapy.Spider):
@@ -18,14 +18,15 @@ class CaWicSpider(scrapy.Spider):
     # This is used to substitute the base URL in the cache storage
     common_url_prefix = "https://www.phfewic.org/en/"
 
-    def parse(self, response: HtmlResponse) -> dict[str, str]:
+    def parse(self, response: Response) -> dict[str, str]:
+        assert isinstance(response, HtmlResponse)
         self.logger.info("Parsing %s", response.url)
 
         if (h1_count := len(response.css("h1").getall())) > 1:
             self.logger.warning("Found %i h1 elements for %r", h1_count, response.url)
             raise ValueError("Multiple h1 elements found")
 
-        title = to_markdown(response.css("h1").get().strip()).removeprefix("# ")
+        title = to_markdown(response.css("h1").get()).removeprefix("# ")
         assert title
 
         markdowns = []
@@ -44,7 +45,10 @@ class CaWicSpider(scrapy.Spider):
         return extractions
 
 
-def to_markdown(html: str, base_url: Optional[str] = None) -> str:
+def to_markdown(html: Optional[str], base_url: Optional[str] = None) -> str:
+    if not html:
+        return ""
+
     h2t = html2text.HTML2Text()
 
     # Refer to https://github.com/Alir3z4/html2text/blob/master/docs/usage.md and html2text.config
@@ -59,7 +63,7 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     # Exclude the <sup> and <sub> tags
     h2t.include_sup_sub = False
 
-    markdown = h2t.handle(html)
+    markdown = h2t.handle(html.strip())
 
     # Consolidate newlines
     markdown = re.sub(r"\n\n+", "\n\n", markdown)

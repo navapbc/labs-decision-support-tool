@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from literalai import Score
-from literalai.my_types import ScoreType
+from literalai.observability.step import ScoreType
 
 from src import chat_api
 from src.chat_api import (
@@ -65,7 +65,6 @@ class MockLiteralAIApi:
             value=value,
             step_id=step_id,
             comment=comment,
-            generation_id=None,
             dataset_experiment_item_id=None,
             tags=None,
         )

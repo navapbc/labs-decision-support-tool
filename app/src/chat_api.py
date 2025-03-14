@@ -62,13 +62,13 @@ class ChatEngineSettings:
 class ChatSession:
     user_session: UserSession
     # This user ID is always retrieved from LiteralAI so it doesn't need to be stored in the DB
-    literalai_user_id: str
+    literalai_user_id: str | None
     chat_engine_settings: ChatEngineSettings
     allowed_engines: list[str]
 
 
 def __get_or_create_chat_session(
-    user_id: str, session_id: str | None, literalai_user_id: str
+    user_id: str, session_id: str | None, literalai_user_id: str | None
 ) -> ChatSession:
     "Creating/retrieving user's session from the DB"
     if user_session := _load_user_session(session_id):

@@ -212,7 +212,7 @@ def load_or_save_doc_markdown(file_path: str, content: str) -> str:
 
 def save_json(file_path: str, chunks: list[Chunk]) -> None:
     chunks_as_json = [chunk.to_json() for chunk in chunks]
-    with smart_open(file_path, "w") as file:
+    with smart_open(file_path, "w", encoding="utf-8") as file:
         file.write(json.dumps(chunks_as_json))
 
     # Save prettified chunks to a markdown file for manual inspection

@@ -220,7 +220,7 @@ def test__save_json(file_location, mock_s3_bucket_resource):
     )
     json_file = f"{file_path}.json"
     save_json(json_file, chunks)
-    saved_json = json.loads(open(json_file, "r").read())
+    saved_json = json.loads(open(json_file, "r", encoding="utf-8").read())
     assert saved_json == [
         {
             "id": str(chunks[0].id),

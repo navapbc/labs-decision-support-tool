@@ -305,13 +305,11 @@ async def special_command(msg_text: str) -> bool:
             await cl.Message(
                 author="backend",
                 content=f"Date parsing error: {e}",
-                disable_feedback=True,
             ).send()
         except IndexError as e:
             await cl.Message(
                 author="backend",
                 content=f"Error: {e}.  Specify both start and end timestamps.",
-                disable_feedback=True,
             ).send()
         return True
     return False
