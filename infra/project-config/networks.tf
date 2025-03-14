@@ -44,7 +44,7 @@ locals {
     }
 
     prod = {
-      account_name               = "prod"
+      account_name               = "dev" # This is the AWS account name; prod lives in the same AWS account as dev in our set up
       database_subnet_group_name = "prod"
 
       domain_config = {
