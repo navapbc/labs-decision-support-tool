@@ -50,9 +50,9 @@ class IrsSpider(CrawlSpider):
             raise ValueError("Multiple h1 elements found")
 
         if title_elem := response.css("h1.pup-page-node-type-article-page__title"):
-            extractions["title"] = title_elem.css("::text").get().strip()
+            extractions["title"] = title_elem.css("::text").get("").strip()
         elif title_elem := response.css("h1.pup-page-node-type-landing-page__title"):
-            extractions["title"] = title_elem.css("::text").get().strip()
+            extractions["title"] = title_elem.css("::text").get("").strip()
         else:
             self.logger.warning("No title for %r", response.url)
             raise ValueError("No title found")
@@ -62,8 +62,7 @@ class IrsSpider(CrawlSpider):
             # Remove elements to declutter desired content
             response.css("div.sidebar-left").drop()
 
-            pup_html = pup.get()
-            markdown = to_markdown(pup_html, base_url)
+            markdown = to_markdown(pup.get("").strip(), base_url)
             extractions["markdown"] = markdown
         else:
             raise ValueError(f"No pup-main-container found in {response.url}")

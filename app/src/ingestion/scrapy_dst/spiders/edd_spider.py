@@ -1,7 +1,7 @@
 import re
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag
+from bs4.element import PageElement, Tag
 from markdownify import markdownify
 from scrapy.http import HtmlResponse
 from scrapy.linkextractors import LinkExtractor
@@ -58,11 +58,11 @@ class EddSpider(CrawlSpider):
     )
 
     def parse_page(self, response: HtmlResponse) -> dict[str, str | AccordionSections]:
-        extractions = {"url": response.url}
+        extractions: dict[str, str | AccordionSections] = {"url": response.url}
 
         title = response.css("div.full-width-title h1::text").get()
         if len(response.css("h1::text").getall()) == 1:
-            title = response.css("h1::text").get()
+            title = response.css("h1::text").get("")
             extractions["title"] = title.strip()
         else:
             titles = ";".join(response.css("h1::text").getall())
@@ -100,7 +100,10 @@ class EddSpider(CrawlSpider):
 
         return extractions
 
-    def to_markdown(self, base_url: str, html: str) -> str:
+    def to_markdown(self, base_url: str, html: str | None) -> str:
+        if not html:
+            return ""
+
         markdown = markdownify(
             html,
             heading_style="ATX",
@@ -111,7 +114,7 @@ class EddSpider(CrawlSpider):
             sub_symbol="<sub>",
         )
         # Clean up markdown text: consolidate newlines; replace non-breaking spaces
-        markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00A0", " ")
+        markdown = re.sub(r"\n\n+", "\n\n", markdown).replace("\u00a0", " ")
 
         # Replace non-absolute URLs with absolute URLs
         markdown = string_utils.resolve_urls(base_url, markdown)
@@ -131,7 +134,7 @@ class EddSpider(CrawlSpider):
             assert len(table_sel) == 1, "Expected one table in two-thirds content"
 
             # Use soup to convert the table cell into a div
-            soup = BeautifulSoup(table_sel.get(), "html.parser")
+            soup = BeautifulSoup(table_sel.get(""), "html.parser")
             self.__table_to_subsections(soup, soup.find("table"))
             table_md = self.to_markdown(base_url, str(soup))
 
@@ -149,20 +152,25 @@ class EddSpider(CrawlSpider):
         cleaned_markdown = re.sub(r"\[(.*?)\]\(#pane-(.*?)\)", r"\1", cleaned_markdown)
         return {"main_content": cleaned_markdown}
 
-    def __table_to_subsections(self, soup: BeautifulSoup, table: Tag) -> None:
+    def __table_to_subsections(self, soup: BeautifulSoup, table: PageElement | None) -> None:
+        assert isinstance(table, Tag), f"Expected a tag element but got a {type(table)}"
         table.name = "div"
         del table.attrs["style"]
         headings = [th.get_text() for th in table.find_all("th")]
 
         assert len(headings) == 3, "Expected one table header"
-        table.find_next("tr").decompose()  # Remove the header row
+        first_row = table.find_next("tr")
+        assert first_row
+        first_row.decompose()  # Remove the header row
 
         for tr in table.find_all("tr"):
+            assert isinstance(tr, Tag), f"Expected a tag element but got a {type(tr)}"
             tr.name = "div"
             del tr.attrs["style"]
             tds = tr.find_all("td", recursive=False)
             assert len(tds) == 3, "Expected three columns in table row"
             for heading, td in zip(headings, tds, strict=True):
+                assert isinstance(td, Tag), f"Expected a tag element but got a {type(td)}"
                 # Convert the td element to a paragraph
                 td.name = "p"
                 del td.attrs["style"]
@@ -182,7 +190,7 @@ class EddSpider(CrawlSpider):
     ) -> dict[str, AccordionSections]:
         sections: AccordionSections = {}
         for p in main_content.css("div.panel.panel-default"):
-            heading = p.css("div.panel-heading :is(h2, h3, h4, h5, h6) a::text").get().strip()
+            heading = p.css("div.panel-heading :is(h2, h3, h4, h5, h6) a::text").get("").strip()
             paragraphs = p.css("div.panel-body")
             sections[heading] = [self.to_markdown(base_url, para.get()) for para in paragraphs]
 
