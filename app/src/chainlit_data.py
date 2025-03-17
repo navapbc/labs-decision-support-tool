@@ -30,7 +30,6 @@ def get_default_data_layers() -> List[BaseDataLayer]:
         data_layers.append(get_postgres_data_layer(database_url))
     if api_key := os.environ.get("LITERAL_API_KEY"):
         data_layers.append(get_literal_data_layer(api_key))
-    logger.info("Data layers initialized: %s", data_layers)
     return data_layers
 
 
@@ -40,8 +39,8 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         The first data layer is the primary one, and returned values will be from that layer.
         Failures in other data layers are ignored.
         """
-        logger.info("Custom Chainlit data layers: %s", data_layers)
         self.data_layers = data_layers or get_default_data_layers()
+        logger.info("Custom Chainlit data layers: %s", self.data_layers)
         assert self.data_layers, "No data layers initialized"
 
     async def _call_method(self, call_dl_func: Callable) -> List[Any]:
