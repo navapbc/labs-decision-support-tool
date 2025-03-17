@@ -2,8 +2,9 @@ import logging
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Column, ForeignKey, String
-from sqlalchemy.dialects.postgresql import UUID
+import sqlalchemy as sa
+from sqlalchemy import ARRAY, Boolean, Column, ForeignKey, Text, sql
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.models.base import Base, IdMixin, TimestampMixin
@@ -46,48 +47,61 @@ class UserSession(Base, TimestampMixin):
 # (which is slightly different from the SQLAlchemy Data Layer -- https://docs.chainlit.io/data-layers/sqlalchemy)
 # The table and column names must be what Chainlit expects.
 # The expected `metadata` column conflicts with Base(DeclarativeBase)'s metadata field, so use `metadata_col` attribute name instead.
+# Also column names are expected to be camelcase (e.g., stepId, threadId, createdAt, startTime).
 # -------------------------------
 
+
 class StepType(str, Enum):
-    ASSISTANT_MESSAGE = "assistant_message"
-    EMBEDDING = "embedding"
-    LLM = "llm"
-    RETRIEVAL = "retrieval"
-    RERANK = "rerank"
-    RUN = "run"
-    SYSTEM_MESSAGE = "system_message"
-    TOOL = "tool"
-    UNDEFINED = "undefined"
-    USER_MESSAGE = "user_message"
+    assistant_message = "assistant_message"
+    embedding = "embedding"
+    llm = "llm"
+    retrieval = "retrieval"
+    rerank = "rerank"
+    run = "run"
+    system_message = "system_message"
+    tool = "tool"
+    undefined = "undefined"
+    user_message = "user_message"
 
 
-class Element(Base, IdMixin, TimestampMixin):
+class Element(Base, IdMixin):
     __tablename__ = "Element"
 
-    thread_id: Mapped[UUID | None] = mapped_column(ForeignKey("Thread.id", ondelete="CASCADE"))
-    step_id: Mapped[UUID] = mapped_column(ForeignKey("Step.id", ondelete="CASCADE"))
-    metadata_col = Column(JSON, name="metadata", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(name="createdAt", server_default=sa.text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(name="updatedAt", server_default=sa.text("now()"))
+
+    thread_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("Thread.id", ondelete="CASCADE"), name="threadId"
+    )
+    step_id: Mapped[UUID] = mapped_column(ForeignKey("Step.id", ondelete="CASCADE"), name="stepId")
+    metadata_col = Column(JSONB, name="metadata", nullable=False)
     mime: Mapped[str | None]
     name: Mapped[str]
-    object_key: Mapped[str | None]
+    object_key: Mapped[str | None] = mapped_column(name="objectKey")
     url: Mapped[str | None]
-    chainlit_key: Mapped[str | None]
+    chainlit_key: Mapped[str | None] = mapped_column(name="chainlitKey")
     display: Mapped[str | None]
     size: Mapped[str | None]
     language: Mapped[str | None]
     page: Mapped[int | None]
-    props = Column(JSON)
+    props = Column(JSONB)
 
 
-class User(Base, IdMixin, TimestampMixin):
+class User(Base, IdMixin):
     __tablename__ = "User"
 
-    metadata_col = Column(JSON, name="metadata", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(name="createdAt", server_default=sa.text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(name="updatedAt", server_default=sa.text("now()"))
+
+    metadata_col = Column(JSONB, name="metadata", nullable=False)
     identifier: Mapped[str] = mapped_column(unique=True)
 
 
-class Feedback(Base, IdMixin, TimestampMixin):
+class Feedback(Base, IdMixin):
     __tablename__ = "Feedback"
+
+    created_at: Mapped[datetime] = mapped_column(name="createdAt", server_default=sa.text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(name="updatedAt", server_default=sa.text("now()"))
 
     step_id: Mapped[UUID | None] = mapped_column(ForeignKey("Step.id", ondelete="SET NULL"))
     name: Mapped[str]
@@ -95,28 +109,39 @@ class Feedback(Base, IdMixin, TimestampMixin):
     comment: Mapped[str | None]
 
 
-class Step(Base, IdMixin, TimestampMixin):
+class Step(Base, IdMixin):
     __tablename__ = "Step"
 
-    parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("Step.id", ondelete="CASCADE"))
-    thread_id: Mapped[UUID | None] = mapped_column(ForeignKey("Thread.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(name="createdAt", server_default=sa.text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(name="updatedAt", server_default=sa.text("now()"))
+
+    parent_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("Step.id", ondelete="CASCADE"), name="parentId"
+    )
+    thread_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("Thread.id", ondelete="CASCADE"), name="threadId"
+    )
 
     input: Mapped[str | None]
-    metadata_col = Column(JSON, name="metadata", nullable=False)
+    metadata_col = Column(JSONB, name="metadata", nullable=False)
     name: Mapped[str | None]
     output: Mapped[str | None]
     type: Mapped[StepType]  # = Column(SQLEnum(StepType), nullable=False)
-    show_input: Mapped[str] = mapped_column(default="json")
-    is_error: Mapped[bool] = mapped_column(default=False)
-    start_time: Mapped[datetime]
-    end_time: Mapped[datetime]
+    show_input: Mapped[str] = mapped_column(server_default="json", name="showInput")
+    is_error: Mapped[bool] = mapped_column(Boolean, server_default=sql.false(), name="isError")
+    start_time: Mapped[datetime] = mapped_column(name="startTime")
+    end_time: Mapped[datetime] = mapped_column(name="endTime")
 
 
-class Thread(Base, IdMixin, TimestampMixin):
+class Thread(Base, IdMixin):
     __tablename__ = "Thread"
 
-    deleted_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(name="createdAt", server_default=sa.text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(name="updatedAt", server_default=sa.text("now()"))
+    deleted_at: Mapped[datetime | None] = mapped_column(name="deletedAt")
     name: Mapped[str | None]
-    metadata_col = Column(JSON, name="metadata", nullable=False)
-    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("User.id", ondelete="SET NULL"))
-    tags: Mapped[list[str]] = mapped_column(default=[])
+    metadata_col = Column(JSONB, name="metadata", nullable=False)
+    user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("User.id", ondelete="SET NULL"), name="userId"
+    )
+    tags: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
