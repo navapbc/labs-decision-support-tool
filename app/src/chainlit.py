@@ -24,12 +24,10 @@ from src.util import literalai_util as lai
 logger = logging.getLogger(__name__)
 
 
+# TODO: Update chat_api.py to use ChainlitPolyDataLayer
 @cl.data_layer
 def get_data_layer() -> ChainlitPolyDataLayer:
     return ChainlitPolyDataLayer()
-
-
-require_login()
 
 
 @cl.set_chat_profiles
@@ -44,6 +42,8 @@ async def chat_profiles() -> list[cl.ChatProfile]:
 
 @cl.on_chat_start
 async def start() -> None:
+    require_login()
+
     url = cl.user_session.get("http_referer")
     logger.debug("Referer URL: %s", url)
     query_values = url_query_values(url)
