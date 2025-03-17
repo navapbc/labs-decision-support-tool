@@ -1,0 +1,47 @@
+name: CI Infra Service Checks - app
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - infra/app/service/**
+      - infra/modules/**
+      - infra/test/**
+      - .github/workflows/ci-app-infra-service.yml
+  pull_request:
+    paths:
+      - infra/app/service/**
+      - infra/modules/**
+      - infra/test/**
+      - .github/workflows/ci-app-infra-service.yml
+  workflow_dispatch:
+
+jobs:
+  infra-test-e2e:
+    name: Test service
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ">=1.19.0"
+
+      - name: Configure AWS credentials
+        uses: ./.github/actions/configure-aws-credentials
+        with:
+          app_name: app
+          # Run infra CI on dev environment
+          environment: dev
+
+      - name: Run Terratest
+        run: make infra-test-service APP_NAME=app

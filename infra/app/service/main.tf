@@ -22,19 +22,32 @@ data "aws_subnets" "private" {
 }
 
 locals {
+  # The prefix is used to create uniquely named resources per terraform workspace, which
+  # are needed in CI/CD for preview environments and tests.
+  #
+  # To isolate changes during infrastructure development by using manually created
+  # terraform workspaces, see: /docs/infra/develop-and-test-infrastructure-in-isolation-using-workspaces.md
+  prefix = terraform.workspace == "default" ? "" : "${terraform.workspace}-"
+
   # Add environment specific tags
   tags = merge(module.project_config.default_tags, {
     environment = var.environment_name
     description = "Application resources created in ${var.environment_name} environment"
   })
 
+  # All non-default terraform workspaces are considered temporary.
+  # Temporary environments do not have deletion protection enabled.
+  # Examples: pull request preview environments are temporary.
   is_temporary = terraform.workspace != "default"
 
+  build_repository_config                        = module.app_config.build_repository_config
   environment_config                             = module.app_config.environment_configs[var.environment_name]
   service_config                                 = local.environment_config.service_config
   database_config                                = local.environment_config.database_config
   storage_config                                 = local.environment_config.storage_config
   incident_management_service_integration_config = local.environment_config.incident_management_service_integration
+  identity_provider_config                       = local.environment_config.identity_provider_config
+  notifications_config                           = local.environment_config.notifications_config
 
   network_config = module.project_config.network_configs[local.environment_config.network_name]
 }
@@ -45,7 +58,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 4.56.0, < 5.0.0"
+      version = ">= 5.81.0, < 6.0.0"
     }
   }
 
@@ -117,8 +130,10 @@ module "service" {
   source       = "../../modules/service"
   service_name = local.service_config.service_name
 
-  image_repository_name = module.app_config.image_repository_name
-  image_tag             = local.image_tag
+  image_repository_arn = local.build_repository_config.repository_arn
+  image_repository_url = local.build_repository_config.repository_url
+
+  image_tag = local.image_tag
 
   vpc_id             = data.aws_vpc.network.id
   public_subnet_ids  = data.aws_subnets.public.ids
@@ -136,6 +151,7 @@ module "service" {
   aws_services_security_group_id = data.aws_security_groups.aws_services.ids[0]
 
   file_upload_jobs = local.service_config.file_upload_jobs
+  scheduled_jobs   = local.environment_config.scheduled_jobs
 
   db_vars = module.app_config.has_database ? {
     security_group_ids         = data.aws_rds_cluster.db_cluster[0].vpc_security_group_ids
@@ -150,24 +166,36 @@ module "service" {
     }
   } : null
 
-  extra_environment_variables = merge({
-    FEATURE_FLAGS_PROJECT = module.feature_flags.evidently_project_name
-    BUCKET_NAME           = local.storage_config.bucket_name
-    ENVIRONMENT           = var.environment_name
-    BUILD_DATE            = timestamp()
-  }, local.service_config.extra_environment_variables)
+  extra_environment_variables = merge(
+    {
+      BUCKET_NAME = local.storage_config.bucket_name
+      ENVIRONMENT           = var.environment_name
+      BUILD_DATE            = timestamp()
+    },
+    local.identity_provider_environment_variables,
+    local.notifications_environment_variables,
+    local.service_config.extra_environment_variables
+  )
 
-  secrets = [
-    for secret_name in keys(local.service_config.secrets) : {
+  secrets = concat(
+    [for secret_name in keys(local.service_config.secrets) : {
       name      = secret_name
       valueFrom = module.secrets[secret_name].secret_arn
-    }
-  ]
+    }],
+    module.app_config.enable_identity_provider ? [{
+      name      = "COGNITO_CLIENT_SECRET"
+      valueFrom = module.identity_provider_client[0].client_secret_arn
+    }] : []
+  )
 
-  extra_policies = {
-    feature_flags_access = module.feature_flags.access_policy_arn,
-    storage_access       = module.storage.access_policy_arn
-  }
+  extra_policies = merge(
+    {
+      storage_access = module.storage.access_policy_arn
+    },
+    module.app_config.enable_identity_provider ? {
+      identity_provider_access = module.identity_provider_client[0].access_policy_arn,
+    } : {}
+  )
 
   is_temporary = local.is_temporary
 }
@@ -181,12 +209,6 @@ module "monitoring" {
   service_name                                = local.service_config.service_name
   load_balancer_arn_suffix                    = module.service.load_balancer_arn_suffix
   incident_management_service_integration_url = module.app_config.has_incident_management_service && !local.is_temporary ? data.aws_ssm_parameter.incident_management_service_integration_url[0].value : null
-}
-
-module "feature_flags" {
-  source        = "../../modules/feature-flags"
-  service_name  = local.service_config.service_name
-  feature_flags = module.app_config.feature_flags
 }
 
 module "storage" {
