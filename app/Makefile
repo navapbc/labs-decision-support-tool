@@ -60,6 +60,9 @@ endif
 export RUN_USER
 export RUN_UID
 
+.PHONY: \
+	release-build
+
 release-build:
 	docker buildx build \
 		--target release \

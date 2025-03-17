@@ -36,10 +36,13 @@ locals {
       for environment_config in app.environment_configs : true if environment_config.service_config.enable_command_execution == true && environment_config.network_name == var.network_name
     ])
   ])
+
+  # Whether any of the applications in the network has enabled notifications
+  enable_notifications = anytrue([for app in local.apps_in_network : app.enable_notifications])
 }
 
 terraform {
-  required_version = "~>1.8.0"
+  required_version = "~>1.10.0"
 
   required_providers {
     aws = {
@@ -69,17 +72,16 @@ module "app_config" {
 }
 
 module "network" {
-  source                                  = "../modules/network"
-  name                                    = var.network_name
-  aws_services_security_group_name_prefix = module.project_config.aws_services_security_group_name_prefix
-  database_subnet_group_name              = local.network_config.database_subnet_group_name
-  has_database                            = local.has_database
-  has_external_non_aws_service            = local.has_external_non_aws_service
-  enable_command_execution                = local.enable_command_execution
+  source                       = "../modules/network/resources"
+  name                         = var.network_name
+  has_database                 = local.has_database
+  has_external_non_aws_service = local.has_external_non_aws_service
+  enable_command_execution     = local.enable_command_execution
+  enable_notifications         = local.enable_notifications
 }
 
 module "domain" {
-  source              = "../modules/domain"
+  source              = "../modules/domain/resources"
   name                = local.domain_config.hosted_zone
   manage_dns          = local.domain_config.manage_dns
   certificate_configs = local.domain_config.certificate_configs

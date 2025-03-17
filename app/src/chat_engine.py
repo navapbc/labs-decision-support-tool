@@ -323,7 +323,6 @@ Referral links:
 - Applying for a green card: [https://www.uscis.gov/green-card/how-to-apply-for-a-green-card](https://www.uscis.gov/green-card/how-to-apply-for-a-green-card)
 - Transit cards (TAP cards): [https://www.metro.net/riding/fares/life/](https://www.metro.net/riding/fares/life/)
 - DPSS contact info or office locations: [https://dpss.lacounty.gov/en/resources/offices.html](https://dpss.lacounty.gov/en/resources/offices.html)
-- Tax prep: [https://www.freetaxprepla.org/help](https://www.freetaxprepla.org/help)
 - DPSS appeals: [https://dpss.lacounty.gov/en/rights/ash/request-hearing.html](https://dpss.lacounty.gov/en/rights/ash/request-hearing.html)
 - Transportation for people with disabilities: [https://accessla.org/](https://accessla.org/)
 - Food banks: [https://www.lafoodbank.org/find-food/pantry-locator/](https://www.lafoodbank.org/find-food/pantry-locator/)
