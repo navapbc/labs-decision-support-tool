@@ -21,17 +21,15 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write # Needed to comment on PR
+      repository-projects: read # Workaround for GitHub CLI bug https://github.com/cli/cli/issues/6274
 
     concurrency: pr-environment-${{ inputs.pr_number }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.8.3
-          terraform_wrapper: false
+      - name: Set up Terraform
+        uses: ./.github/actions/setup-terraform
 
       - name: Configure AWS credentials
         uses: ./.github/actions/configure-aws-credentials

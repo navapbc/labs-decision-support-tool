@@ -27,6 +27,17 @@ __check_defined = \
 
 
 .PHONY : \
+	e2e-build \
+	e2e-clean \
+	e2e-clean-image \
+	e2e-clean-report \
+	e2e-merge-reports \
+	e2e-setup-ci \
+	e2e-setup-native \
+	e2e-show-report \
+	e2e-test \
+	e2e-test-native \
+	e2e-test-native-ui \
 	help \
 	infra-check-app-database-roles \
 	infra-check-compliance-checkov \
@@ -42,6 +53,7 @@ __check_defined = \
 	infra-lint-scripts \
 	infra-lint-terraform \
 	infra-lint-workflows \
+	infra-module-database-role-manager \
 	infra-set-up-account \
 	infra-test-service \
 	infra-update-app-build-repository \
@@ -59,7 +71,72 @@ __check_defined = \
 	release-publish \
 	release-run-database-migrations
 
+##############################
+## End-to-end (E2E) Testing ##
+##############################
 
+# Include project name in image name so that image name
+# does not conflict with other images during local development.
+# The e2e test image includes the test suite for all apps and therefore isn't specific to each app.
+E2E_IMAGE_NAME := $(PROJECT_ROOT)-e2e
+
+e2e-build: ## Build the e2e Docker image, if not already built, using ./e2e/Dockerfile
+	docker build -t $(E2E_IMAGE_NAME) -f ./e2e/Dockerfile .
+
+e2e-clean: ## Clean both the e2e reports and e2e Docker image
+e2e-clean: e2e-clean-report e2e-clean-image
+
+e2e-clean-image: ## Clean the Docker image for e2e tests
+	docker rmi -f $(E2E_IMAGE_NAME) 2>/dev/null || echo "Docker image $(E2E_IMAGE_NAME) does not exist, skipping."
+
+e2e-clean-report: ## Remove the local e2e report folders and content
+	rm -rf ./e2e/playwright-report
+	rm -rf ./e2e/blob-report
+	rm -rf ./e2e/test-results
+
+e2e-merge-reports: ## Merge E2E blob reports from multiple shards into an HTML report
+	cd e2e && npm run e2e-merge-reports
+
+e2e-setup-ci: ## Setup end-to-end tests for CI
+	cd e2e && npm run e2e-setup
+
+e2e-setup-native: ## Setup end-to-end tests
+	cd e2e && npm install
+	cd e2e && npm run e2e-setup
+
+e2e-show-report: ## Show the E2E report
+	cd e2e && npm run e2e-show-report
+
+e2e-test: ## Run E2E tests in a Docker container and copy the report locally
+e2e-test: e2e-build
+	@:$(call check_defined, APP_NAME, You must pass in a specific APP_NAME)
+	@:$(call check_defined, BASE_URL, You must pass in a BASE_URL)
+	docker run --rm\
+		--name $(E2E_IMAGE_NAME)-container \
+		-e APP_NAME=$(APP_NAME) \
+		-e BASE_URL=$(BASE_URL) \
+		-e CURRENT_SHARD=$(CURRENT_SHARD) \
+		-e TOTAL_SHARDS=$(TOTAL_SHARDS) \
+		-e CI=$(CI) \
+		-v $(PWD)/e2e/playwright-report:/e2e/playwright-report \
+		-v $(PWD)/e2e/blob-report:/e2e/blob-report \
+		$(E2E_IMAGE_NAME) \
+		$(E2E_ARGS)
+	@echo "Run 'make e2e-show-report' to view the test report"
+
+e2e-test-native: ## Run end-to-end tests natively
+	@:$(call check_defined, APP_NAME, You must pass in a specific APP_NAME)
+	@echo "Running e2e tests with CI=${CI}, APP_NAME=${APP_NAME}, BASE_URL=${BASE_URL}"
+	cd e2e && APP_NAME=$(APP_NAME) BASE_URL=$(BASE_URL) npm run e2e-test -- $(E2E_ARGS)
+
+e2e-test-native-ui: ## Run end-to-end tests natively in UI mode
+	@:$(call check_defined, APP_NAME, You must pass in a specific APP_NAME)
+	@echo "Running e2e UI tests natively with APP_NAME=$(APP_NAME), BASE_URL=$(BASE_URL)"
+	cd e2e && APP_NAME=$(APP_NAME) BASE_URL=$(BASE_URL) npm run e2e-test:ui -- $(E2E_ARGS)
+
+###########
+## Infra ##
+###########
 
 infra-set-up-account: ## Configure and create resources for current AWS profile and save tfbackend file to infra/accounts/$ACCOUNT_NAME.ACCOUNT_ID.s3.tfbackend
 	@:$(call check_defined, ACCOUNT_NAME, human readable name for account e.g. "prod" or the AWS account alias)
@@ -106,6 +183,10 @@ infra-update-app-database: ## Create or update $APP_NAME's database module for $
 	@:$(call check_defined, ENVIRONMENT, the name of the application environment e.g. "prod" or "staging")
 	terraform -chdir="infra/$(APP_NAME)/database" init -input=false -reconfigure -backend-config="$(ENVIRONMENT).s3.tfbackend"
 	terraform -chdir="infra/$(APP_NAME)/database" apply -var="environment_name=$(ENVIRONMENT)"
+
+infra-module-database-role-manager-archive: ## Build/rebuild role manager code package for Lambda deploys
+	pip3 install -r infra/modules/database/role_manager/requirements.txt -t infra/modules/database/role_manager/vendor --upgrade
+	zip -r infra/modules/database/role_manager.zip infra/modules/database/role_manager
 
 infra-update-app-database-roles: ## Create or update database roles and schemas for $APP_NAME's database in $ENVIRONMENT
 	@:$(call check_defined, APP_NAME, the name of subdirectory of /infra that holds the application's infrastructure code)
@@ -158,7 +239,12 @@ infra-format: ## Format infra code
 	terraform fmt -recursive infra
 
 infra-test-service: ## Run service layer infra test suite
-	cd infra/test && go test -run TestService -v -timeout 30m
+	@:$(call check_defined, APP_NAME, "the name of subdirectory of /infra that holds the application's infrastructure code")
+	cd infra/test && APP_NAME=$(APP_NAME) go test -run TestService -v -timeout 30m
+
+#############
+## Linting ##
+#############
 
 lint-markdown: ## Lint Markdown docs for broken links
 	./bin/lint-markdown
@@ -171,6 +257,10 @@ lint-markdown: ## Lint Markdown docs for broken links
 # does not conflict with other images during local development
 IMAGE_NAME := $(PROJECT_ROOT)-$(APP_NAME)
 
+# Generate an informational tag so we can see where every image comes from.
+DATE := $(shell date -u '+%Y%m%d.%H%M%S')
+INFO_TAG := $(DATE).$(USER)
+
 GIT_REPO_AVAILABLE := $(shell git rev-parse --is-inside-work-tree 2>/dev/null)
 
 # Generate a unique tag based solely on the git hash.
@@ -180,10 +270,6 @@ IMAGE_TAG := $(shell git rev-parse HEAD)
 else
 IMAGE_TAG := "unknown-dev.$(DATE)"
 endif
-
-# Generate an informational tag so we can see where every image comes from.
-DATE := $(shell date -u '+%Y%m%d.%H%M%S')
-INFO_TAG := $(DATE).$(USER)
 
 release-build: ## Build release for $APP_NAME and tag it with current git hash
 	@:$(call check_defined, APP_NAME, the name of subdirectory of /infra that holds the application's infrastructure code)

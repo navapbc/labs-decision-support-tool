@@ -102,7 +102,12 @@ variable "hosted_zone_id" {
   default     = null
 }
 
-variable "image_repository_name" {
+variable "image_repository_arn" {
+  type        = string
+  description = "The name of the container image repository"
+}
+
+variable "image_repository_url" {
   type        = string
   description = "The name of the container image repository"
 }
@@ -131,6 +136,15 @@ variable "private_subnet_ids" {
 variable "public_subnet_ids" {
   type        = list(any)
   description = "Public subnet ids in VPC"
+}
+
+variable "scheduled_jobs" {
+  description = "Variable for configuration of the step functions scheduled job"
+  type = map(object({
+    task_command        = list(string)
+    schedule_expression = string
+  }))
+  default = {}
 }
 
 variable "secrets" {
