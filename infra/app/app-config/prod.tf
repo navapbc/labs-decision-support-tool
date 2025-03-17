@@ -4,7 +4,6 @@ module "prod_config" {
   app_name                        = local.app_name
   default_region                  = module.project_config.default_region
   environment                     = "prod"
-  account_name                    = "dev" # This is hosted in the same AWS account as dev
   network_name                    = "prod"
   domain_name                     = "decision-support-tool-prod.navateam.com"
   enable_https                    = true
