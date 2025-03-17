@@ -8,6 +8,7 @@ from unittest import mock
 import pytest
 
 from src.evaluation.cli import generate
+from src.evaluation.utils.dataset_mapping import map_dataset_name
 
 
 @pytest.fixture
@@ -20,15 +21,15 @@ def temp_output_dir():
 def test_dataset_mapping():
     """Test dataset name mapping functionality."""
     # Test known dataset mapping
-    assert generate.DATASET_MAPPING["imagine_la"] == "Imagine LA"
-    assert generate.DATASET_MAPPING["la_policy"] == "DPSS Policy"
+    assert map_dataset_name("ca_ftb") == "CA FTB"
+    assert map_dataset_name("la_policy") == "DPSS Policy"
 
     # Test case sensitivity
-    with mock.patch("sys.argv", ["generate.py", "--dataset", "IMAGINE_LA"]):
-        parser = generate.create_parser()
-        args = parser.parse_args()
-        db_datasets = [generate.DATASET_MAPPING.get(d.lower(), d) for d in args.dataset]
-        assert db_datasets == ["Imagine LA"]
+    assert map_dataset_name("CA_FTB") == "CA FTB"
+    assert map_dataset_name("LA_POLICY") == "DPSS Policy"
+
+    # Test unknown dataset (should return original name)
+    assert map_dataset_name("unknown_dataset") == "unknown_dataset"
 
 
 def test_argument_parsing():
@@ -46,7 +47,7 @@ def test_argument_parsing():
     args = parser.parse_args(
         [
             "--dataset",
-            "imagine_la",
+            "ca_ftb",
             "la_policy",
             "--sampling",
             "0.1",
@@ -56,7 +57,7 @@ def test_argument_parsing():
             "gpt-4",
         ]
     )
-    assert args.dataset == ["imagine_la", "la_policy"]
+    assert args.dataset == ["ca_ftb", "la_policy"]
     assert args.sampling == 0.1
     assert args.random_seed == 42
     assert args.llm == "gpt-4"
@@ -97,7 +98,7 @@ def test_main_integration(temp_output_dir):
         [
             "generate.py",
             "--dataset",
-            "imagine_la",
+            "ca_ftb",
             "--output-dir",
             str(temp_output_dir),
             "--llm",

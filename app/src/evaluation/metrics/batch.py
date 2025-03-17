@@ -6,6 +6,7 @@ import subprocess
 from typing import Dict, List, Optional
 
 from src.evaluation.data_models import BatchConfig, EvaluationConfig, SoftwareInfo
+from src.evaluation.utils.dataset_mapping import map_dataset_name
 
 
 def get_git_commit() -> str:
@@ -75,14 +76,8 @@ def filter_questions(
     if not dataset_filter:
         return questions
 
-    # Map CLI dataset names to actual dataset names in CSV
-    dataset_mapping = {
-        "imagine_la": "Benefits Information Hub",
-        "la_policy": "LA County Policy",
-    }
-
     # Convert input to lowercase for case-insensitive matching
-    mapped_datasets = [dataset_mapping.get(d.lower(), d) for d in dataset_filter]
+    mapped_datasets = [map_dataset_name(d) for d in dataset_filter]
     print(f"Filtering for datasets (after mapping): {mapped_datasets}")
 
     filtered = [q for q in questions if q["dataset"] in mapped_datasets]

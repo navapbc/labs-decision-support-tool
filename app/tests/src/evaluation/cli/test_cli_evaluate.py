@@ -14,6 +14,7 @@ import pytest
 from src.db.models.document import ChunkWithScore
 from src.evaluation.cli import evaluate
 from src.evaluation.data_models import QAPair, QAPairVersion
+from src.evaluation.utils.dataset_mapping import map_dataset_name
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
@@ -41,7 +42,7 @@ def test_document():
         name="test_doc",
         content="Test document content",
         source="test_dataset",
-        dataset="Imagine LA",  # Match the dataset mapping
+        dataset="CA FTB",  # Use a valid dataset from our mapping
     )
     chunk = ChunkFactory.build(
         document=document,
@@ -65,7 +66,7 @@ def test_questions_csv(tmp_path, test_document):
             id="1",
             question="test question 1?",
             answer="test answer 1",
-            dataset="Imagine LA",  # Match the dataset mapping
+            dataset="CA FTB",
             document_name=test_document.name,
             document_source="test_dataset",
             document_id="doc1",
@@ -79,7 +80,7 @@ def test_questions_csv(tmp_path, test_document):
             id="2",
             question="test question 2?",
             answer="test answer 2",
-            dataset="DPSS Policy",  # Match another known dataset
+            dataset="DPSS Policy",
             document_name="other_doc",
             document_source="other_dataset",
             document_id="doc2",
@@ -197,7 +198,7 @@ def test_main_with_dataset(
         [
             "evaluate.py",
             "--dataset",
-            "imagine_la",  # This will map to "Imagine LA"
+            "ca_ftb",  # Use a valid dataset from our mapping
             "--k",
             "5",  # Only test with one k value
             "--output-dir",
@@ -313,15 +314,15 @@ def test_error_handling(temp_output_dir, mock_git_commit, mock_retrieval_func):
 def test_dataset_mapping():
     """Test dataset name mapping functionality."""
     # Test known dataset mapping
-    assert evaluate.DATASET_MAPPING["imagine_la"] == "Imagine LA"
-    assert evaluate.DATASET_MAPPING["la_policy"] == "DPSS Policy"
+    assert map_dataset_name("ca_ftb") == "CA FTB"
+    assert map_dataset_name("la_policy") == "DPSS Policy"
 
     # Test case sensitivity
-    with mock.patch("sys.argv", ["evaluate.py", "--dataset", "IMAGINE_LA"]):
-        parser = evaluate.create_parser()
-        args = parser.parse_args()
-        db_datasets = [evaluate.DATASET_MAPPING.get(d.lower(), d) for d in args.dataset]
-        assert db_datasets == ["Imagine LA"]
+    assert map_dataset_name("CA_FTB") == "CA FTB"
+    assert map_dataset_name("LA_POLICY") == "DPSS Policy"
+
+    # Test unknown dataset (should return original name)
+    assert map_dataset_name("unknown_dataset") == "unknown_dataset"
 
 
 def test_argument_parsing():
@@ -340,7 +341,7 @@ def test_argument_parsing():
     args = parser.parse_args(
         [
             "--dataset",
-            "imagine_la",
+            "ca_ftb",
             "la_policy",
             "--k",
             "3",
@@ -353,7 +354,7 @@ def test_argument_parsing():
             "42",
         ]
     )
-    assert args.dataset == ["imagine_la", "la_policy"]
+    assert args.dataset == ["ca_ftb", "la_policy"]
     assert args.k == [3, 7]
     assert args.min_score == 0.5
     assert args.sampling == 0.1
@@ -410,7 +411,7 @@ def test_main_integration(
         [
             "evaluate.py",
             "--dataset",
-            "imagine_la",  # This will map to "Imagine LA"
+            "ca_ftb",  # Use a valid dataset from our mapping
             "--k",
             "1",
             "--output-dir",
@@ -432,7 +433,7 @@ def test_main_integration(
         assert len(results_files) > 0
         assert len(metrics_files) > 0
 
-        # Verify results contain only Imagine LA questions
+        # Verify results contain only CA FTB questions
         with open(results_files[0]) as f:
             results = [json.loads(line) for line in f if line.strip()]
-            assert all(r["dataset"] == "Imagine LA" for r in results)
+            assert all(r["dataset"] == "CA FTB" for r in results)

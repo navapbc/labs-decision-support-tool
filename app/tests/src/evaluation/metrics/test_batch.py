@@ -96,8 +96,8 @@ def test_create_batch_config():
 def test_filter_questions():
     """Test question filtering by dataset."""
     questions = [
-        {"dataset": "Benefits Information Hub", "question": "q1"},
-        {"dataset": "LA County Policy", "question": "q2"},
+        {"dataset": "CA FTB", "question": "q1"},
+        {"dataset": "DPSS Policy", "question": "q2"},
         {"dataset": "Other Dataset", "question": "q3"},
     ]
 
@@ -105,12 +105,12 @@ def test_filter_questions():
     assert len(filter_questions(questions, None)) == 3
 
     # Test filtering single dataset
-    filtered = filter_questions(questions, ["imagine_la"])
+    filtered = filter_questions(questions, ["ca_ftb"])
     assert len(filtered) == 1
     assert filtered[0]["question"] == "q1"
 
     # Test filtering multiple datasets
-    filtered = filter_questions(questions, ["imagine_la", "la_policy"])
+    filtered = filter_questions(questions, ["ca_ftb", "la_policy"])
     assert len(filtered) == 2
     assert {q["question"] for q in filtered} == {"q1", "q2"}
 
@@ -119,7 +119,7 @@ def test_filter_questions():
     assert len(filtered) == 0
 
     # Test case sensitivity and mapping
-    filtered = filter_questions(questions, ["IMAGINE_LA"])
+    filtered = filter_questions(questions, ["CA_FTB"])
     assert len(filtered) == 1
     assert filtered[0]["question"] == "q1"
 

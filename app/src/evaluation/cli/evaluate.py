@@ -5,20 +5,8 @@ import argparse
 from pathlib import Path
 
 from ..metrics.runner import create_retrieval_function, run_evaluation
+from ..utils.dataset_mapping import map_dataset_name
 from ..utils.storage import QAPairStorage
-
-# Map CLI dataset names to DB dataset names
-DATASET_MAPPING = {
-    "imagine_la": "Imagine LA",
-    "benefits_hub": "Benefits Information Hub",
-    "ca_edd": "CA EDD",
-    "ca_ftb": "CA FTB",
-    "covered_ca": "Covered California",
-    "la_policy": "DPSS Policy",
-    "irs": "IRS",
-    "kyb": "Keep Your Benefits",
-    "wic": "WIC",
-}
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -69,7 +57,7 @@ def main() -> None:
 
     # Map CLI dataset names to DB names if specified
     if args.dataset:
-        db_datasets = [DATASET_MAPPING.get(d.lower(), d) for d in args.dataset]
+        db_datasets = [map_dataset_name(d) for d in args.dataset]
         print(f"Using datasets (after mapping): {db_datasets}")
     else:
         db_datasets = None
