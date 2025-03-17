@@ -24,9 +24,11 @@ logger = logging.getLogger(__name__)
 
 from src.chainlit_data import MyChainlitDataLayer
 
+
 @cl.data_layer
 def get_data_layer():
     return MyChainlitDataLayer()
+
 
 require_login()
 

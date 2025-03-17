@@ -2,21 +2,14 @@ import asyncio
 import os
 from typing import Dict, List, Optional
 
-from chainlit.data.literalai import LiteralDataLayer
-from chainlit.data.chainlit_data_layer import ChainlitDataLayer
-
 from chainlit.data.base import BaseDataLayer
+from chainlit.data.chainlit_data_layer import ChainlitDataLayer
+from chainlit.data.literalai import LiteralDataLayer
 from chainlit.data.utils import queue_until_user_message
 from chainlit.element import Element, ElementDict
 from chainlit.logger import logger
 from chainlit.step import StepDict
-from chainlit.types import (
-    Feedback,
-    PaginatedResponse,
-    Pagination,
-    ThreadDict,
-    ThreadFilter,
-)
+from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, ThreadFilter
 from chainlit.user import PersistedUser, User
 
 
