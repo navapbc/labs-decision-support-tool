@@ -5,8 +5,9 @@ import os
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from src.retrieve import retrieve_with_scores
+from src.util.sampling import get_stratified_sample
 
-from .batch import create_batch_config, filter_questions, stratified_sample
+from .batch import create_batch_config, filter_questions
 from .logging import EvaluationLogger
 from .metric_computation import compute_metrics_summary
 from .results import batch_process_results
@@ -89,18 +90,16 @@ class EvaluationRunner:
             questions = filter_questions(questions, dataset_filter)
             print(f"After filtering: {len(questions)} questions")
 
-        # Sample questions if requested
-        if sample_fraction is not None or min_samples is not None:
-            print(f"Sampling {sample_fraction * 100 if sample_fraction else 0}% of questions")
-            if min_samples:
-                print(f"With minimum {min_samples} samples per dataset")
-            if random_seed is not None:
-                print(f"Using random seed: {random_seed}")
-            questions = stratified_sample(
-                questions,
+        # Sample questions if needed
+        if sample_fraction or min_samples:
+            if sample_fraction and not 0 < sample_fraction <= 1:
+                raise ValueError("Sample fraction must be between 0 and 1")
+            questions = get_stratified_sample(
+                items=questions,
                 sample_fraction=sample_fraction,
                 min_samples=min_samples,
                 random_seed=random_seed,
+                key_func=lambda q: q["dataset"],
             )
             print(f"After sampling: {len(questions)} questions")
 

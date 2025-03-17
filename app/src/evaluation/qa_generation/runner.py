@@ -89,6 +89,7 @@ def run_generation(
                 random_seed=random_seed,
                 key_func=lambda d: d.dataset,
             )
+            print(f"After sampling: {len(documents)} documents")
 
         # Ensure we have all the data loaded before closing session
         for doc in documents:

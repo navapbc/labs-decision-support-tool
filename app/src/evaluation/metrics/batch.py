@@ -1,11 +1,8 @@
 """
 Batch processing for evaluation runs.
-Not to be confused with batch_process.py (used via the API).
 """
 
-import random
 import subprocess
-from collections import defaultdict
 from typing import Dict, List, Optional
 
 from src.evaluation.data_models import BatchConfig, EvaluationConfig, SoftwareInfo
@@ -61,67 +58,6 @@ def create_batch_config(
         evaluation_config=eval_config,
         software_info=software_info,
     )
-
-
-def stratified_sample(
-    questions: List[Dict],
-    sample_fraction: Optional[float] = None,
-    min_samples: Optional[int] = None,
-    random_seed: Optional[int] = None,
-) -> List[Dict]:
-    """Take a stratified sample of questions based on dataset.
-
-    Args:
-        questions: List of questions to sample from
-        sample_fraction: Optional fraction of questions to sample (0-1)
-        min_samples: Optional minimum number of questions per dataset
-        random_seed: Optional seed for random sampling to make runs reproducible
-
-    Returns:
-        Sampled questions maintaining dataset proportions. The sampling is stratified,
-        meaning it maintains the relative proportions of questions from each dataset
-        while ensuring at least min_samples questions from each dataset (if specified).
-    """
-    if not sample_fraction and not min_samples:
-        return questions
-
-    # Set random seed if provided
-    if random_seed is not None:
-        random.seed(random_seed)
-
-    # Group questions by dataset
-    dataset_groups = defaultdict(list)
-    for q in questions:
-        dataset_groups[q["dataset"]].append(q)
-
-    # Sample from each dataset
-    sampled_questions = []
-    for _, group in dataset_groups.items():
-        if min_samples is not None:
-            # Take all items if group size is less than or equal to min_samples
-            if len(group) <= min_samples:
-                sampled_questions.extend(group)
-                continue
-
-            # Otherwise, take max of min_samples and fraction-based size
-            fraction_based_size = int(len(group) * (sample_fraction or 0))
-            sample_size = max(min_samples, fraction_based_size)
-            # Ensure we don't try to sample more items than available
-            sample_size = min(sample_size, len(group))
-        else:
-            # Original behavior when no min_samples specified
-            sample_size = max(1, int(len(group) * (sample_fraction or 1.0)))
-
-        sampled_questions.extend(random.sample(group, sample_size))
-
-    # Shuffle the combined sample
-    random.shuffle(sampled_questions)
-
-    # Reset random seed
-    if random_seed is not None:
-        random.seed()
-
-    return sampled_questions
 
 
 def filter_questions(

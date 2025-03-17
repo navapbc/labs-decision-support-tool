@@ -45,7 +45,7 @@ def get_stratified_sample(
         if min_samples is not None:
             # Take all items if group size is less than or equal to min_samples
             if len(group) <= min_samples:
-                sampled_items.extend(group)
+                sampled_items.extend(random.sample(group, len(group)))
                 continue
 
             # Otherwise, take max of min_samples and fraction-based sample size
