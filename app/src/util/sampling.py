@@ -42,21 +42,11 @@ def get_stratified_sample(
     # Sample from each group
     sampled_items = []
     for group in groups.values():
-        if min_samples is not None:
-            # Take all items if group size is less than or equal to min_samples
-            if len(group) <= min_samples:
-                sampled_items.extend(random.sample(group, len(group)))
-                continue
-
-            # Otherwise, take max of min_samples and fraction-based sample size
-            fraction_based_size = int(len(group) * (sample_fraction or 0))
-            sample_size = max(min_samples, fraction_based_size)
-            # Ensure we don't try to sample more items than available
-            sample_size = min(sample_size, len(group))
-        else:
-            # Original behavior when no min_samples specified
-            sample_size = max(1, int(len(group) * (sample_fraction or 1.0)))
-
+        group_size = len(group)
+        sample_size = max(
+            min_samples if min_samples is not None else 1, int(group_size * (sample_fraction or 0))
+        )
+        sample_size = min(sample_size, group_size)
         sampled_items.extend(random.sample(group, sample_size))
 
     # Reset random seed
