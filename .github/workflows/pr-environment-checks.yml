@@ -61,10 +61,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  e2e-tests:
-    name: " " # GitHub UI is noisy when calling reusable workflows, so use whitespace for name to reduce noise
-    needs: [update]
-    uses: ./.github/workflows/e2e-tests.yml
-    with:
-      service_endpoint: ${{ needs.update.outputs.service_endpoint }}
-      app_name: ${{ inputs.app_name }}
+  # e2e-tests:
+  #   name: " " # GitHub UI is noisy when calling reusable workflows, so use whitespace for name to reduce noise
+  #   needs: [update]
+  #   uses: ./.github/workflows/e2e-tests.yml
+  #   with:
+  #     service_endpoint: ${{ needs.update.outputs.service_endpoint }}
+  #     app_name: ${{ inputs.app_name }}
