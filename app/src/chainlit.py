@@ -13,6 +13,7 @@ from chainlit.types import AskFileResponse
 from src import chat_engine
 from src.app_config import app_config
 from src.batch_process import batch_process
+from src.chainlit_data import ChainlitPolyDataLayer
 from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.evaluation import literalai_exporter
 from src.format import format_response
@@ -22,12 +23,10 @@ from src.util import literalai_util as lai
 
 logger = logging.getLogger(__name__)
 
-from src.chainlit_data import MyChainlitDataLayer
-
 
 @cl.data_layer
 def get_data_layer():
-    return MyChainlitDataLayer()
+    return ChainlitPolyDataLayer()
 
 
 require_login()

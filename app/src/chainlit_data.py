@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Sequence
 
 from chainlit.data.base import BaseDataLayer
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
@@ -13,18 +13,18 @@ from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, 
 from chainlit.user import PersistedUser, User
 
 
-def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
-    server = os.environ.get("LITERAL_API_URL")
-    return LiteralDataLayer(api_key=api_key, server=server)
-
-
 def get_postgres_data_layer(database_url: str) -> ChainlitDataLayer:
     # See chainlit/data/__init__.py for storage_client options like S3
     storage_client = None
     return ChainlitDataLayer(database_url=database_url, storage_client=storage_client)
 
 
-def get_data_layers() -> List[BaseDataLayer]:
+def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
+    server = os.environ.get("LITERAL_API_URL")
+    return LiteralDataLayer(api_key=api_key, server=server)
+
+
+def get_default_data_layers() -> List[BaseDataLayer]:
     data_layers: List[BaseDataLayer] = []
     if database_url := os.environ.get("DATABASE_URL"):
         data_layers.append(get_postgres_data_layer(database_url))
@@ -34,14 +34,19 @@ def get_data_layers() -> List[BaseDataLayer]:
     return data_layers
 
 
-class MyChainlitDataLayer(BaseDataLayer):
-    def __init__(self):
+class ChainlitPolyDataLayer(BaseDataLayer):
+    def __init__(self, data_layers: Optional[Sequence[BaseDataLayer]]) -> None:
+        """
+        The first data layer is the primary one, and returned values will be from that layer.
+        Failures in other data layers are ignored.
+        """
         logger.info("Custom Chainlit data layer initialized")
-        self.data_layers = get_data_layers()
+        self.data_layers = data_layers or get_default_data_layers()
+        assert self.data_layers, "No data layers initialized"
 
-    async def _call_method(self, call_dl_func):
+    async def _call_method(self, call_dl_func: Callable, dls_to_skip: Sequence[BaseDataLayer] = []) -> List[Optional]:
         # Create a list of tasks
-        tasks = [asyncio.create_task(call_dl_func(dl)) for dl in self.data_layers]
+        tasks = [asyncio.create_task(call_dl_func(dl)) for dl in self.data_layers if dl not in dls_to_skip]
 
         # Gather results from all tasks
         return await asyncio.gather(*tasks)
@@ -51,7 +56,6 @@ class MyChainlitDataLayer(BaseDataLayer):
         return results[0]
 
     async def create_user(self, user: "User") -> Optional["PersistedUser"]:
-        # TODO: use same user.identifier for all data layers
         results = await self._call_method(lambda dl: dl.create_user(user))
         return results[0]
 
@@ -60,7 +64,7 @@ class MyChainlitDataLayer(BaseDataLayer):
         feedback_id: str,
     ) -> bool:
         results = await self._call_method(lambda dl: dl.delete_feedback(feedback_id))
-        return all(results)
+        return results[0]
 
     async def upsert_feedback(
         self,
@@ -70,9 +74,11 @@ class MyChainlitDataLayer(BaseDataLayer):
         return results[0]
 
     @queue_until_user_message()
-    async def create_element(self, element: "Element"):
-        results = await self._call_method(lambda dl: dl.create_element(element))
-        return results[0]
+    async def create_element(self, element: "Element") -> Optional["ElementDict"]:
+        elem_dict = self.data_layers[0].create_element(element)
+        created_elem = Element.from_dict(elem_dict)
+        await self._call_method(lambda dl: dl.create_element(created_elem), dls_to_skip=[self.data_layers[0]])
+        return elem_dict
 
     async def get_element(self, thread_id: str, element_id: str) -> Optional["ElementDict"]:
         results = await self._call_method(lambda dl: dl.get_element(thread_id, element_id))
@@ -131,4 +137,5 @@ class MyChainlitDataLayer(BaseDataLayer):
 
     async def build_debug_url(self) -> str:
         results = await self._call_method(lambda dl: dl.build_debug_url())
-        return results[0]
+        # ChainlitDataLayer.build_debug_url() returns "" which isn't useful
+        return next(res for res in results if res)
