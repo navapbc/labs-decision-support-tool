@@ -1,7 +1,4 @@
-_commit: platform-cli-migration/v0.10.0
+# Changes here will be overwritten by Copier
+_commit: platform-cli-migration/v0.11.0
 _src_path: https://github.com/navapbc/template-infra
-base_code_repository_url: https://github.com/navapbc/labs-decision-support-tool
-base_default_region: us-east-1
-base_owner: navalabs
-base_project_name: decision-support-tool
 template: base

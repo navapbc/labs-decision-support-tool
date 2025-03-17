@@ -1,6 +1,7 @@
 locals {
   network_configs = {
     dev = {
+      account_name               = "dev"
       database_subnet_group_name = "dev"
 
       domain_config = {
@@ -31,6 +32,7 @@ locals {
     }
 
     staging = {
+      account_name               = "staging"
       database_subnet_group_name = "staging"
 
       domain_config = {
@@ -42,6 +44,7 @@ locals {
     }
 
     prod = {
+      account_name               = "prod"
       database_subnet_group_name = "prod"
 
       domain_config = {
