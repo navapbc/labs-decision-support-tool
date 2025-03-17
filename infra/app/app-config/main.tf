@@ -3,9 +3,8 @@ locals {
   # the folder under /infra that corresponds to the application
   app_name = regex("/infra/([^/]+)/app-config$", abspath(path.module))[0]
 
-  environments          = ["dev", "staging", "prod"]
-  project_name          = module.project_config.project_name
-  image_repository_name = "${local.project_name}-${local.app_name}"
+  environments = ["dev", "staging", "prod"]
+  project_name = module.project_config.project_name
 
   # Whether or not the application has a database
   # If enabled:
@@ -24,14 +23,30 @@ locals {
 
   has_incident_management_service = false
 
+  # Whether or not the application should deploy an identity provider
+  # If enabled:
+  # 1. Creates a Cognito user pool
+  # 2. Creates a Cognito user pool app client
+  # 3. Adds environment variables for the app client to the service
+  enable_identity_provider = false
+
+  # Whether or not the application should deploy a notification service.
+  #
+  # To use this in a particular environment, domain_name must also be set.
+  # The domain name is set in infra/<APP_NAME>/app-config/<ENVIRONMENT>.tf
+  # The domain name is the same domain as, or a subdomain of, the hosted zone in that environment.
+  # The hosted zone is set in infra/project-config/networks.tf
+  # If either (domain name or hosted zone) is not set in an environment, notifications will not actually be enabled.
+  #
+  # If enabled:
+  # 1. Creates an AWS Pinpoint application
+  # 2. Configures email notifications using AWS SES
+  enable_notifications = false
+
   environment_configs = {
     dev     = module.dev_config
     staging = module.staging_config
     prod    = module.prod_config
-  }
-
-  build_repository_config = {
-    region = module.project_config.default_region
   }
 
   # The name of the network that contains the resources shared across all

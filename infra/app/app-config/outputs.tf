@@ -2,12 +2,16 @@ output "app_name" {
   value = local.app_name
 }
 
-output "environments" {
-  value = local.environments
+output "build_repository_config" {
+  value = local.build_repository_config
 }
 
-output "feature_flags" {
-  value = local.feature_flags
+output "environment_configs" {
+  value = local.environment_configs
+}
+
+output "environments" {
+  value = local.environments
 }
 
 output "has_database" {
@@ -22,16 +26,12 @@ output "has_incident_management_service" {
   value = local.has_incident_management_service
 }
 
-output "image_repository_name" {
-  value = local.image_repository_name
+output "enable_identity_provider" {
+  value = local.enable_identity_provider
 }
 
-output "build_repository_config" {
-  value = local.build_repository_config
-}
-
-output "environment_configs" {
-  value = local.environment_configs
+output "enable_notifications" {
+  value = local.enable_notifications
 }
 
 output "shared_network_name" {

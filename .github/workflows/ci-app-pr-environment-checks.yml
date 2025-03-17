@@ -1,4 +1,4 @@
-name: CI App PR Environment Update
+name: CI app PR Environment Checks
 on:
   workflow_dispatch:
     inputs:
@@ -8,12 +8,13 @@ on:
       commit_hash:
         required: true
         type: string
-  # !! Uncomment the following lines once you've set up the dev environment and are ready to enable PR environments
-  # pull_request:
+  pull_request:
+
 jobs:
   update:
     name: " " # GitHub UI is noisy when calling reusable workflows, so use whitespace for name to reduce noise
-    uses: ./.github/workflows/pr-environment-update.yml
+    uses: ./.github/workflows/pr-environment-checks.yml
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.state == 'open'
     with:
       app_name: "app"
       environment: "dev"
