@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 @cl.data_layer
-def get_data_layer():
+def get_data_layer() -> ChainlitPolyDataLayer:
     return ChainlitPolyDataLayer()
 
 

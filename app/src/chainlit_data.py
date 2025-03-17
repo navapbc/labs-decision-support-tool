@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from chainlit.data.base import BaseDataLayer
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
@@ -35,7 +35,7 @@ def get_default_data_layers() -> List[BaseDataLayer]:
 
 
 class ChainlitPolyDataLayer(BaseDataLayer):
-    def __init__(self, data_layers: Optional[Sequence[BaseDataLayer]]) -> None:
+    def __init__(self, data_layers: Optional[Sequence[BaseDataLayer]] = None) -> None:
         """
         The first data layer is the primary one, and returned values will be from that layer.
         Failures in other data layers are ignored.
@@ -44,18 +44,34 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         self.data_layers = data_layers or get_default_data_layers()
         assert self.data_layers, "No data layers initialized"
 
-    async def _call_method(self, call_dl_func: Callable, dls_to_skip: Sequence[BaseDataLayer] = []) -> List[Optional]:
+    async def _call_method(self, call_dl_func: Callable) -> List[Any]:
         # Create a list of tasks
-        tasks = [asyncio.create_task(call_dl_func(dl)) for dl in self.data_layers if dl not in dls_to_skip]
+        tasks = [asyncio.create_task(call_dl_func(dl)) for dl in self.data_layers]
 
         # Gather results from all tasks
-        return await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def get_user(self, identifier: str) -> Optional["PersistedUser"]:
+        # Check for exceptions
+        if isinstance(results[0], Exception):
+            raise results[0]
+
+        for i, result in enumerate(results[1:], start=1):
+            if isinstance(result, Exception):
+                logger.warning("Error in non-primary data layer %r: %s", i, result)
+        return results
+
+    async def get_user(self, identifier: str) -> Optional[PersistedUser]:
         results = await self._call_method(lambda dl: dl.get_user(identifier))
         return results[0]
 
-    async def create_user(self, user: "User") -> Optional["PersistedUser"]:
+    async def create_user(self, user: "User") -> Optional[PersistedUser]:
+        # Upon chainlit startup, a PersistedUser is created with a UUID.
+        # There's a discrepancy in the LiteralAI data layer where a user's identifier
+        # is being set to the user.id (a UUID) rather than user.identifier.
+        # Plus, LiteralAI's participant.id is a newly generated UUID.
+        # Looking at LiteralDataLayer.create_user(), it doesn't pass a UUID.
+        # So rely on user.identifier and NOT the DB's User.id.
+        assert user.identifier, "User identifier is required"
         results = await self._call_method(lambda dl: dl.create_user(user))
         return results[0]
 
@@ -74,33 +90,34 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         return results[0]
 
     @queue_until_user_message()
-    async def create_element(self, element: "Element") -> Optional["ElementDict"]:
-        elem_dict = self.data_layers[0].create_element(element)
-        created_elem = Element.from_dict(elem_dict)
-        await self._call_method(lambda dl: dl.create_element(created_elem), dls_to_skip=[self.data_layers[0]])
-        return elem_dict
+    async def create_element(self, element: Element) -> Optional[ElementDict]:
+        # Ensures that the uuid value is the same across data layers so that
+        # Thread, Step, and Element records can be cross-referenced across data layers.
+        assert element.id, f"element.id is required for {element}"
+        results = await self._call_method(lambda dl: dl.create_element(element))
+        return results[0]
 
-    async def get_element(self, thread_id: str, element_id: str) -> Optional["ElementDict"]:
+    async def get_element(self, thread_id: str, element_id: str) -> Optional[ElementDict]:
         results = await self._call_method(lambda dl: dl.get_element(thread_id, element_id))
         return results[0]
 
     @queue_until_user_message()
-    async def delete_element(self, element_id: str, thread_id: Optional[str] = None):
+    async def delete_element(self, element_id: str, thread_id: Optional[str] = None) -> bool:
         results = await self._call_method(lambda dl: dl.delete_element(element_id, thread_id))
         return results[0]
 
     @queue_until_user_message()
-    async def create_step(self, step_dict: "StepDict"):
+    async def create_step(self, step_dict: StepDict) -> Optional[StepDict]:
         results = await self._call_method(lambda dl: dl.create_step(step_dict))
         return results[0]
 
     @queue_until_user_message()
-    async def update_step(self, step_dict: "StepDict"):
+    async def update_step(self, step_dict: StepDict) -> Optional[StepDict]:
         results = await self._call_method(lambda dl: dl.update_step(step_dict))
         return results[0]
 
     @queue_until_user_message()
-    async def delete_step(self, step_id: str):
+    async def delete_step(self, step_id: str) -> bool:
         results = await self._call_method(lambda dl: dl.delete_step(step_id))
         return results[0]
 
@@ -108,17 +125,17 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         results = await self._call_method(lambda dl: dl.get_thread_author(thread_id))
         return results[0]
 
-    async def delete_thread(self, thread_id: str):
+    async def delete_thread(self, thread_id: str) -> bool:
         results = await self._call_method(lambda dl: dl.delete_thread(thread_id))
         return results[0]
 
     async def list_threads(
-        self, pagination: "Pagination", filters: "ThreadFilter"
-    ) -> "PaginatedResponse[ThreadDict]":
+        self, pagination: Pagination, filters: ThreadFilter
+    ) -> PaginatedResponse[ThreadDict]:
         results = await self._call_method(lambda dl: dl.list_threads(pagination, filters))
         return results[0]
 
-    async def get_thread(self, thread_id: str) -> "Optional[ThreadDict]":
+    async def get_thread(self, thread_id: str) -> Optional[ThreadDict]:
         results = await self._call_method(lambda dl: dl.get_thread(thread_id))
         return results[0]
 
@@ -129,7 +146,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         user_id: Optional[str] = None,
         metadata: Optional[Dict] = None,
         tags: Optional[List[str]] = None,
-    ):
+    ) -> ThreadDict:
         results = await self._call_method(
             lambda dl: dl.update_thread(thread_id, name, user_id, metadata, tags)
         )
