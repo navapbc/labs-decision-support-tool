@@ -31,6 +31,23 @@ locals {
       { name : name, value : value }
     ],
   )
+
+  ephemeral_write_volumes_with_name = [for container_path in var.ephemeral_write_volumes : {
+    container_path : container_path,
+    # Derive the volume name from the destination path for simplicity, though
+    # note the name does have a limit of 255 characters.
+    #
+    # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/specify-bind-mount-config.html
+    volume_name : replace(trim(container_path, "/"), "/", "_"),
+  }]
+  ephemeral_write_volume_configs = [for e in local.ephemeral_write_volumes_with_name : {
+    mount_point : {
+      "sourceVolume" : e.volume_name
+      "containerPath" : e.container_path,
+      "readOnly" : false
+    },
+    volume : { "name" : e.volume_name }
+  }]
 }
 
 #-------------------
@@ -53,7 +70,7 @@ resource "aws_ecs_service" "app" {
 
   network_configuration {
     assign_public_ip = false
-    subnets          = var.private_subnet_ids
+    subnets          = module.network.private_subnet_ids
     security_groups  = [aws_security_group.app.id]
   }
 
@@ -87,8 +104,11 @@ resource "aws_ecs_task_definition" "app" {
         interval = 30,
         retries  = 3,
         timeout  = 5,
+        # If a `healthcheck` executable is available in the container's $PATH,
+        # use that, otherwise fall back the first available of: wget, curl, or
+        # bash.
         command = ["CMD-SHELL",
-          "wget --no-verbose --tries=1 --spider http://localhost:${var.container_port}/health || exit 1"
+          "([ -x \"$(command -v healthcheck)\" ] && healthcheck) || ([ -x \"$(command -v wget)\" ] && wget --quiet --output-document=/dev/null http://127.0.0.1:$PORT/health) || ([ -x \"$(command -v curl)\" ] && curl --fail --silent http://localhost:$PORT/health > /dev/null) || ([ -x \"$(command -v bash)\" ] && bash -c \"exec 3<>/dev/tcp/127.0.0.1/$PORT;echo -e 'GET /health HTTP/1.1\\r\\nHost: http://localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3;grep -q '^HTTP/.* 200 OK' <&3\") || exit 1"
         ]
       },
       environment = local.environment_variables,
@@ -114,12 +134,19 @@ resource "aws_ecs_task_definition" "app" {
           "awslogs-region"        = data.aws_region.current.name,
           "awslogs-stream-prefix" = local.log_stream_prefix
         }
-      }
-      mountPoints    = []
+      },
+      mountPoints    = local.ephemeral_write_volume_configs[*].mount_point
       systemControls = []
       volumesFrom    = []
     }
   ])
+
+  dynamic "volume" {
+    for_each = local.ephemeral_write_volume_configs[*].volume
+    content {
+      name = volume.value["name"]
+    }
+  }
 
   cpu    = var.cpu
   memory = var.memory

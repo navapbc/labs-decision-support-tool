@@ -1,8 +1,3 @@
-variable "aws_services_security_group_id" {
-  type        = string
-  description = "Security group ID for VPC endpoints that access AWS Services"
-}
-
 variable "certificate_arn" {
   type        = string
   description = "The ARN of the certificate to use for the application"
@@ -88,7 +83,7 @@ variable "file_upload_jobs" {
 
       ["python", "etl.py", "<object_key>"]
 
-    Then if an object was uploaded tos3://somebucket/path/to/file.txt, the
+    Then if an object was uploaded to s3://somebucket/path/to/file.txt, the
     task will execute the command:
 
       python etl.py path/to/file.txt
@@ -128,14 +123,15 @@ variable "memory" {
   description = "Amount (in MiB) of memory used by the task. e.g. 2048"
 }
 
-variable "private_subnet_ids" {
-  type        = list(any)
-  description = "Private subnet ids in VPC"
+variable "network_name" {
+  type        = string
+  description = "The name of the network within which the service will run"
+
 }
 
-variable "public_subnet_ids" {
-  type        = list(any)
-  description = "Public subnet ids in VPC"
+variable "project_name" {
+  type        = string
+  description = "The name of the project"
 }
 
 variable "scheduled_jobs" {
@@ -164,7 +160,8 @@ variable "service_name" {
   }
 }
 
-variable "vpc_id" {
-  type        = string
-  description = "Uniquely identifies the VPC."
+variable "ephemeral_write_volumes" {
+  type        = set(string)
+  description = "A set of absolute paths in the container to be mounted as writable for the life of the task. These need to be declared with `VOLUME` instructions in the container build file."
+  default     = []
 }
