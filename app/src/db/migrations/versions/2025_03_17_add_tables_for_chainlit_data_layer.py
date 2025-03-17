@@ -1,8 +1,8 @@
 """add tables for chainlit data layer
 
-Revision ID: a7cb40f2e792
+Revision ID: 86bc6d1f2e5a
 Revises: 7f0939973891
-Create Date: 2025-03-17 18:31:28.054040
+Create Date: 2025-03-17 19:54:35.621853
 
 """
 
@@ -11,7 +11,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "a7cb40f2e792"
+revision = "86bc6d1f2e5a"
 down_revision = "7f0939973891"
 branch_labels = None
 depends_on = None
@@ -167,13 +167,13 @@ def upgrade():
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.Column("step_id", sa.UUID(), nullable=True),
+        sa.Column("stepId", sa.UUID(), nullable=True),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("value", sa.Integer(), nullable=False),
         sa.Column("comment", sa.Text(), nullable=True),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["step_id"], ["Step.id"], name=op.f("Feedback_step_id_Step_fkey"), ondelete="SET NULL"
+            ["stepId"], ["Step.id"], name=op.f("Feedback_stepId_Step_fkey"), ondelete="SET NULL"
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("Feedback_pkey")),
     )
@@ -188,6 +188,3 @@ def downgrade():
     op.drop_table("Thread")
     op.drop_table("User")
     # ### end Alembic commands ###
-
-    # remove steptype datatype
-    op.execute("DROP TYPE IF EXISTS steptype")

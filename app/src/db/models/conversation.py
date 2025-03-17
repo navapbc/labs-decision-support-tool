@@ -103,7 +103,7 @@ class Feedback(Base, IdMixin):
     created_at: Mapped[datetime] = mapped_column(name="createdAt", server_default=sa.text("now()"))
     updated_at: Mapped[datetime] = mapped_column(name="updatedAt", server_default=sa.text("now()"))
 
-    step_id: Mapped[UUID | None] = mapped_column(ForeignKey("Step.id", ondelete="SET NULL"))
+    step_id: Mapped[UUID | None] = mapped_column(ForeignKey("Step.id", ondelete="SET NULL"), name="stepId")
     name: Mapped[str]
     value: Mapped[int]
     comment: Mapped[str | None]
