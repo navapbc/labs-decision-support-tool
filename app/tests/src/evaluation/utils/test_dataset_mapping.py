@@ -1,5 +1,7 @@
 """Tests for dataset name mapping utility."""
 
+import pytest
+
 from src.evaluation.utils.dataset_mapping import (
     DATASET_MAPPING,
     get_dataset_mapping,
@@ -31,9 +33,11 @@ def test_get_dataset_mapping():
     # Test that the returned mapping matches the constant
     assert mapping == DATASET_MAPPING
 
-    # Test that the mapping is not modified
-    mapping["test"] = "TEST"
-    assert "test" not in get_dataset_mapping()
+    # Test mapping is immutable
+    with pytest.raises(TypeError):
+        mapping["test"] = "TEST"
+    with pytest.raises(TypeError):
+        del mapping["ca_ftb"]
 
 
 def test_map_dataset_name():
