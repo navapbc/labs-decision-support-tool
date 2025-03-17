@@ -6,9 +6,10 @@ This creates API endpoints using FastAPI, which is compatible with Chainlit.
 
 import functools
 import logging
+import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Tuple
 
 from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -264,6 +265,8 @@ def get_chat_engine(session: ChatSession) -> ChatEngineInterface:
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
+    start_time = time.perf_counter()
+    
     user_meta = {"agency_id": request.agency_id, "beneficiary_id": request.beneficiary_id}
     session = await _get_chat_session(request.user_id, request.session_id, user_meta)
     _validate_session_against_literalai(request, session)
@@ -324,6 +327,9 @@ async def query(request: QueryRequest) -> QueryResponse:
         # id needed to later provide feedback on this message in LiteralAI
         response.response_id = response_msg.id
 
+    duration = time.perf_counter() - start_time
+    logger.info(f"Total /query endpoint execution took {duration:.2f} seconds")
+    
     # If successful, update the DB; otherwise the DB will contain questions without responses
     with app_config.db_session() as db_session, db_session.begin():
         # Now, add request and response messages to DB
@@ -337,6 +343,7 @@ async def query(request: QueryRequest) -> QueryResponse:
                 content=response.response_text,
             )
         )
+    
     return response
 
 
