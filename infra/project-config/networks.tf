@@ -42,7 +42,7 @@ locals {
     }
 
     prod = {
-      account_name = "prod"
+      account_name = "dev" # Prod is hosted in the same AWS account as dev
 
       domain_config = {
         manage_dns  = true
