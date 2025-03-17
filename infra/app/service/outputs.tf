@@ -10,6 +10,10 @@ output "migrator_role_arn" {
   value = module.service.migrator_role_arn
 }
 
+output "migrator_username" {
+  value = module.app_config.has_database ? module.database[0].migrator_username : null
+}
+
 output "service_cluster_name" {
   value = module.service.cluster_name
 }
@@ -20,5 +24,5 @@ output "service_endpoint" {
 }
 
 output "service_name" {
-  value = local.service_config.service_name
+  value = local.service_name
 }
