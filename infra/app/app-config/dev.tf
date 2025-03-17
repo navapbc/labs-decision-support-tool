@@ -25,4 +25,9 @@ module "dev_config" {
 
   service_cpu                     = 2048
   service_memory                  = 8192
+
+  # Uncomment to override default feature flag values
+  # feature_flag_overrides = {
+  #   BAR = true
+  # }
 }
