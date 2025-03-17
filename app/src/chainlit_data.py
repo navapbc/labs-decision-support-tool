@@ -11,12 +11,18 @@ from chainlit.logger import logger
 from chainlit.step import StepDict
 from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, ThreadFilter
 from chainlit.user import PersistedUser, User
+from src.adapters.db.clients.postgres_config import PostgresDBConfig
 
 
 def get_postgres_data_layer(database_url: str) -> ChainlitDataLayer:
     # See chainlit/data/__init__.py for storage_client options like S3
     storage_client = None
     return ChainlitDataLayer(database_url=database_url, storage_client=storage_client)
+
+
+def get_database_url() -> str:
+    conf = PostgresDBConfig()
+    return f"postgresql://{conf.username}:{conf.password}@{conf.host}:{conf.port}/{conf.name}?search_path={conf.db_schema}"
 
 
 def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
@@ -26,7 +32,7 @@ def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
 
 def get_default_data_layers() -> List[BaseDataLayer]:
     data_layers: List[BaseDataLayer] = []
-    if database_url := os.environ.get("DATABASE_URL"):
+    if database_url := os.environ.get("DATABASE_URL", get_database_url()):
         data_layers.append(get_postgres_data_layer(database_url))
     if api_key := os.environ.get("LITERAL_API_KEY"):
         data_layers.append(get_literal_data_layer(api_key))
@@ -40,7 +46,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         Failures in other data layers are ignored.
         """
         self.data_layers = data_layers or get_default_data_layers()
-        logger.info("Custom Chainlit data layers: %s", self.data_layers)
+        logger.info("Custom Chainlit data layers: %s", [type(dl).__name__ for dl in self.data_layers])
         assert self.data_layers, "No data layers initialized"
 
     async def _call_method(self, call_dl_func: Callable) -> List[Any]:
