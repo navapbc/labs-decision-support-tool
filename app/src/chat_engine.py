@@ -1,4 +1,5 @@
 import logging
+import time
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence
 
@@ -140,7 +141,13 @@ class BaseEngine(ChatEngineInterface):
     def on_message(
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> OnMessageResult:
+        # Start timing system_prompt_1
+        start_time = time.perf_counter()
         attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
+        system_prompt_1_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
+        )
 
         if attributes.needs_context:
             return self._build_response_with_context(question, attributes, chat_history)
@@ -153,12 +160,18 @@ class BaseEngine(ChatEngineInterface):
         attributes: MessageAttributesT,
         chat_history: Optional[ChatHistory] = None,
     ) -> OnMessageResult:
+        # Start timing system_prompt_2
+        start_time = time.perf_counter()
         response = generate(
             self.llm,
             self.system_prompt_2,
             question,
             None,
             chat_history,
+        )
+        system_prompt_2_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 2 (generate without context) took {system_prompt_2_duration:.2f} seconds"
         )
 
         return OnMessageResult(response, self.system_prompt_2, attributes)
@@ -171,24 +184,34 @@ class BaseEngine(ChatEngineInterface):
     ) -> OnMessageResult:
         question_for_retrieval = attributes.translated_message or question
 
+        # Time the retrieval separately since we know it's fast
+        retrieval_start = time.perf_counter()
         chunks_with_scores = retrieve_with_scores(
             question_for_retrieval,
             retrieval_k=self.retrieval_k,
             retrieval_k_min_score=self.retrieval_k_min_score,
             datasets=self.datasets,
         )
+        retrieval_duration = time.perf_counter() - retrieval_start
+        logger.info(f"Vector retrieval took {retrieval_duration:.2f} seconds")
 
         chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
         # Provide a factory to reset the citation id counter
         subsections = split_into_subsections(chunks, factory=CitationFactory())
         context_text = create_prompt_context(subsections)
 
+        # Start timing system_prompt_2
+        start_time = time.perf_counter()
         response = generate(
             self.llm,
             self.system_prompt_2,
             question,
             context_text,
             chat_history,
+        )
+        system_prompt_2_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 2 (generate with context) took {system_prompt_2_duration:.2f} seconds"
         )
 
         return OnMessageResult(
@@ -395,8 +418,15 @@ they can apply for both, and their eligibility for each will be reviewed. (citat
     def on_message(
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> OnMessageResult:
+        # Keep timing code from BaseEngine for consistent profiling across all engines
+        # Start timing system_prompt_1
+        start_time = time.perf_counter()
         attributes = analyze_message(
             self.llm, self.system_prompt_1, question, response_format=ImagineLA_MessageAttributes
+        )
+        system_prompt_1_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
         )
 
         if attributes.alert_message:
