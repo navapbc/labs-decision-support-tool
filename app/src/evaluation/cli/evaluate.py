@@ -5,17 +5,8 @@ import argparse
 from pathlib import Path
 
 from ..metrics.runner import create_retrieval_function, run_evaluation
+from ..utils.dataset_mapping import map_dataset_name
 from ..utils.storage import QAPairStorage
-
-# Map CLI dataset names to DB dataset names
-DATASET_MAPPING = {
-    "imagine_la": "Imagine LA",
-    "la_policy": "DPSS Policy",
-    "ca_ftb": "CA FTB",
-    "irs": "IRS",
-    "kyb": "Keep Your Benefits",
-    "wic": "WIC",
-}
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -52,6 +43,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--min-score", type=float, default=-1.0, help="Minimum similarity score for retrieval"
     )
     parser.add_argument("--sampling", type=float, help="Fraction of questions to sample (e.g. 0.1)")
+    parser.add_argument("--min-samples", type=int, help="Minimum number of samples per dataset")
     parser.add_argument("--random-seed", type=int, help="Random seed for reproducible sampling")
     parser.add_argument("--commit", type=str, help="Git commit hash for tracking evaluation runs")
 
@@ -65,7 +57,7 @@ def main() -> None:
 
     # Map CLI dataset names to DB names if specified
     if args.dataset:
-        db_datasets = [DATASET_MAPPING.get(d.lower(), d) for d in args.dataset]
+        db_datasets = [map_dataset_name(d) for d in args.dataset]
         print(f"Using datasets (after mapping): {db_datasets}")
     else:
         db_datasets = None
@@ -103,6 +95,7 @@ def main() -> None:
             k_values=args.k,
             dataset_filter=db_datasets,
             sample_fraction=args.sampling,
+            min_samples=args.min_samples,
             random_seed=args.random_seed,
             min_score=args.min_score,
             retrieval_func=retrieval_func,

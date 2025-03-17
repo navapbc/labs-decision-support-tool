@@ -7,17 +7,8 @@ from pathlib import Path
 
 from ..data_models import QAPairVersion
 from ..qa_generation.runner import run_generation
+from ..utils.dataset_mapping import get_dataset_mapping, map_dataset_name
 from ..utils.storage import QAPairStorage
-
-# Map CLI dataset names to DB dataset names
-DATASET_MAPPING = {
-    "imagine_la": "Imagine LA",
-    "la_policy": "DPSS Policy",
-    "ca_ftb": "CA FTB",
-    "irs": "IRS",
-    "kyb": "Keep Your Benefits",
-    "wic": "WIC",
-}
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -33,6 +24,7 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
     )
     parser.add_argument("--sampling", type=float, help="Fraction of documents to sample (e.g. 0.1)")
+    parser.add_argument("--min-samples", type=int, help="Minimum number of samples per dataset")
     parser.add_argument("--random-seed", type=int, help="Random seed for reproducible sampling")
     parser.add_argument(
         "--output-dir",
@@ -55,7 +47,7 @@ def main() -> None:
 
     # Map CLI dataset names to DB names if specified
     if args.dataset:
-        db_datasets = [DATASET_MAPPING.get(d.lower(), d) for d in args.dataset]
+        db_datasets = [map_dataset_name(d) for d in args.dataset]
         print(f"Using datasets (after mapping): {db_datasets}")
     else:
         db_datasets = None
@@ -77,6 +69,7 @@ def main() -> None:
             output_dir=base_path,
             dataset_filter=db_datasets,
             sample_fraction=args.sampling,
+            min_samples=args.min_samples,
             random_seed=args.random_seed,
             version=version,  # Pass version info to runner
         )
@@ -95,7 +88,7 @@ def main() -> None:
     except ValueError as e:
         if "No documents found" in str(e):
             print(
-                f"No documents found matching criteria. Available datasets: {list(DATASET_MAPPING.keys())}"
+                f"No documents found matching criteria. Available datasets: {list(get_dataset_mapping().keys())}"
             )
             return
         raise

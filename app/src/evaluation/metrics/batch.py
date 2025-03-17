@@ -1,14 +1,12 @@
 """
 Batch processing for evaluation runs.
-Not to be confused with batch_process.py (used via the API).
 """
 
-import random
 import subprocess
-from collections import defaultdict
 from typing import Dict, List, Optional
 
 from src.evaluation.data_models import BatchConfig, EvaluationConfig, SoftwareInfo
+from src.evaluation.utils.dataset_mapping import map_dataset_name
 
 
 def get_git_commit() -> str:
@@ -63,53 +61,6 @@ def create_batch_config(
     )
 
 
-def stratified_sample(
-    questions: List[Dict],
-    sample_fraction: float,
-    min_per_dataset: int = 1,
-    random_seed: Optional[int] = None,
-) -> List[Dict]:
-    """Take a stratified sample of questions based on dataset.
-
-    Args:
-        questions: List of questions to sample from
-        sample_fraction: Fraction of questions to sample (0-1)
-        min_per_dataset: Minimum number of questions per dataset
-        random_seed: Optional seed for random sampling to make runs reproducible
-
-    Returns:
-        Sampled questions maintaining dataset proportions. The sampling is stratified,
-        meaning it maintains the relative proportions of questions from each dataset
-        while ensuring at least min_per_dataset (default: 1) questions from each.
-    """
-    if sample_fraction >= 1.0:
-        return questions
-
-    # Set random seed if provided
-    if random_seed is not None:
-        random.seed(random_seed)
-
-    # Group questions by dataset
-    dataset_groups = defaultdict(list)
-    for q in questions:
-        dataset_groups[q["dataset"]].append(q)
-
-    # Sample from each dataset
-    sampled_questions = []
-    for _, group in dataset_groups.items():
-        sample_size = max(min_per_dataset, int(len(group) * sample_fraction))
-        sampled_questions.extend(random.sample(group, sample_size))
-
-    # Shuffle the combined sample
-    random.shuffle(sampled_questions)
-
-    # Reset random seed
-    if random_seed is not None:
-        random.seed()
-
-    return sampled_questions
-
-
 def filter_questions(
     questions: List[Dict], dataset_filter: Optional[List[str]] = None
 ) -> List[Dict]:
@@ -125,14 +76,8 @@ def filter_questions(
     if not dataset_filter:
         return questions
 
-    # Map CLI dataset names to actual dataset names in CSV
-    dataset_mapping = {
-        "imagine_la": "Benefits Information Hub",
-        "la_policy": "LA County Policy",
-    }
-
     # Convert input to lowercase for case-insensitive matching
-    mapped_datasets = [dataset_mapping.get(d.lower(), d) for d in dataset_filter]
+    mapped_datasets = [map_dataset_name(d) for d in dataset_filter]
     print(f"Filtering for datasets (after mapping): {mapped_datasets}")
 
     filtered = [q for q in questions if q["dataset"] in mapped_datasets]
