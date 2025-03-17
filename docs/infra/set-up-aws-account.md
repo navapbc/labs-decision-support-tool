@@ -9,6 +9,7 @@ The AWS account setup process will:
 ## Prerequisites
 
 * You'll need to have [set up infrastructure tools](./set-up-infrastructure-tools.md), like Terraform, AWS CLI, and AWS authentication.
+<!-- markdown-link-check-disable-next-line -->
 * You'll also need to make sure the [project is configured](/infra/project-config/main.tf).
 
 ## Instructions
@@ -36,6 +37,14 @@ make infra-set-up-account ACCOUNT_NAME=<ACCOUNT_NAME>
 ```
 
 This command will create the S3 tfstate bucket and the GitHub OIDC provider. It will also create a `[account name].[account id].s3.tfbackend` file in the `infra/accounts` directory.
+
+### 3. Check that GitHub actions can authenticate into the AWS account
+
+This step requires [GitHub CLI](https://cli.github.com/) to be installed and [configured to authenticate with your GitHub account](https://cli.github.com/manual/). If you don't have it, you can install on Mac via `brew install gh`
+
+```bash
+make infra-check-github-actions-auth ACCOUNT_NAME=<ACCOUNT_NAME>
+```
 
 ## Making changes to the account
 

@@ -1,4 +1,7 @@
-_commit: platform-cli-migration/v0.10.0
+# Changes here will be overwritten by Copier
+_commit: v0.15.4
 _src_path: https://github.com/navapbc/template-infra
+app_has_dev_env_setup: true
+app_local_port: 8000
 app_name: app
 template: app
