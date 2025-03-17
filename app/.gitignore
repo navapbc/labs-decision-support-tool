@@ -40,8 +40,10 @@ documents/
 .ipynb_checkpoints
 
 # Chainlit translation files
-.chainlit/translations/*.json
-!.chainlit/translations/en-US.json
+# Temporarily commit these until we enable writing to /app
+# (or have a better approach) by Chainlit
+#.chainlit/translations/*.json
+#!.chainlit/translations/en-US.json
 
 /src/ingestion/imagine_la/scrape/pages/*
 
