@@ -60,6 +60,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
 
         # Check for exceptions
         if isinstance(results[0], BaseException):
+            logger.error("Error in primary data layer: %s", results[0])
             raise results[0]
 
         for i, result in enumerate(results[1:], start=1):

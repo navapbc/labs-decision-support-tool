@@ -141,9 +141,9 @@ async def test_1_data_layer(db_session, monkeypatch):
 
 @pytest.fixture
 def literalai_data_layer(monkeypatch):
-    mockLiteralDataLayer = AsyncMock()
-    mockLiteralDataLayer.get_user.side_effect = ValueError("mock error")
-    monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: mockLiteralDataLayer)
+    mock_literalai_dl = AsyncMock()
+    mock_literalai_dl.get_user.side_effect = ValueError("mock error")
+    monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: mock_literalai_dl)
 
 
 @pytest.mark.asyncio
@@ -165,10 +165,12 @@ async def test_exception_in_secondary_layer(db_session, monkeypatch, literalai_d
 
 
 @pytest.mark.asyncio
-async def test_exception_in_primary_layer(db_session, monkeypatch, literalai_data_layer, caplog):
+async def test_exception_in_primary_layer(db_session, monkeypatch, caplog):
     clear_data_layer_data(db_session)
 
     monkeypatch.setenv("LITERAL_API_KEY", "dummy_key")
+    monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: AsyncMock())
+
     data_layer = ChainlitPolyDataLayer()
 
     assert len(data_layer.data_layers) == 2
@@ -176,11 +178,16 @@ async def test_exception_in_primary_layer(db_session, monkeypatch, literalai_dat
     assert isinstance(data_layer.data_layers[0], ChainlitDataLayer)
     assert isinstance(data_layer.data_layers[1], AsyncMock)
 
-    monkeypatch.setattr(data_layer.data_layers[0], "get_user", lambda _key: 1 / 0)
+    async def mock_get_user(_key):
+        raise ZeroDivisionError("mock error")
 
-    try:
-        # Expect error to be raised
-        await data_layer.get_user("test_user")
-        raise AssertionError("Expected ZeroDivisionError")
-    except ZeroDivisionError:
-        pass
+    monkeypatch.setattr(data_layer.data_layers[0], "get_user", mock_get_user)
+
+    with caplog.at_level(logging.WARNING):
+        try:
+            # Expect error to be raised
+            await data_layer.get_user("test_user")
+            raise AssertionError("Expected ZeroDivisionError")
+        except ZeroDivisionError:
+            pass
+        assert "Error in primary data layer: mock error" in caplog.messages
