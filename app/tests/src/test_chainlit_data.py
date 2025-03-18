@@ -10,7 +10,7 @@ import chainlit as cl
 from chainlit.context import init_http_context
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
 from src import chainlit_data
-from src.chainlit_data import ChainlitPolyDataLayer
+from src.chainlit_data import ChainlitPolyDataLayer, get_database_url, get_postgres_data_layer
 from src.db.models.conversation import Element, Feedback, Step, Thread, User
 
 
@@ -30,8 +30,8 @@ def init_chainlit_context():
 async def test_1_data_layer(db_session, monkeypatch):
     clear_data_layer_data(db_session)
 
-    monkeypatch.setenv("LITERAL_API_KEY", "")
-    data_layer = ChainlitPolyDataLayer()
+    postgres_data_layer = get_postgres_data_layer(get_database_url())
+    data_layer = ChainlitPolyDataLayer(data_layers=[postgres_data_layer])
 
     assert len(data_layer.data_layers) == 1
     assert isinstance(data_layer.data_layers[0], ChainlitDataLayer)
@@ -49,6 +49,7 @@ async def test_1_data_layer(db_session, monkeypatch):
 
     init_chainlit_context()
 
+    # Create a step
     thread_id = str(uuid.uuid4())
     step_dict = {
         "name": user.identifier,
@@ -60,12 +61,11 @@ async def test_1_data_layer(db_session, monkeypatch):
         "end_time": datetime.datetime.now(),
         "output": "Tell me a joke",
     }
-
     # create_step() will create a thread if it doesn't exist
     await data_layer.create_step(step_dict)
 
     # Update thread attributes
-    # update_thread() could be called before create_step()
+    # update_thread() could also be called before create_step()
     await data_layer.update_thread(thread_id, name="test thread", user_id=stored_user.id)
     paginated_resp = await data_layer.list_threads(pagination, filters)
     assert len(paginated_resp.data) == 1
@@ -89,6 +89,7 @@ async def test_1_data_layer(db_session, monkeypatch):
     author = await data_layer.get_thread_author(thread_id)
     assert author == user.identifier
 
+    # Add feedback
     feedback = cl.types.Feedback(
         forId=thread_step["id"],
         value=0,
@@ -113,53 +114,57 @@ async def test_1_data_layer(db_session, monkeypatch):
     )
     assert feedback_count == 1
 
+    # Update step
     step_dict["isError"] = True
     await data_layer.update_step(step_dict)
-
     thread_dict = await data_layer.get_thread(thread_id)
     thread_step = thread_dict["steps"][0]
     assert thread_step["isError"] is True
 
-    # Doesn't work; "feedback" is not present
-    # feedback_dict = thread_step["feedback"]
+    # Check feedback
+    # feedback_dict = thread_step["feedback"]  # Doesn't work; "feedback" is not present
     # So query DB directly
     feedback_record = db_session.query(Feedback).filter(Feedback.id == feedback_id).scalar()
     assert str(feedback_record.step_id) == thread_step["id"]
     assert feedback_record.comment == "test comment"
 
+    # Delete step
     await data_layer.delete_step(thread_step["id"])
-    # Deleting the step deletes the feedback
+    # Deleting the step also deletes associated feedback
     feedback_record = db_session.query(Feedback).filter(Feedback.id == feedback_id).scalar()
     assert feedback_record is None
     thread_dict = await data_layer.get_thread(thread_id)
     assert len(thread_dict["steps"]) == 0
 
+    # Delete thread
     await data_layer.delete_thread(thread_id)
     thread_dict = await data_layer.get_thread(thread_id)
     assert thread_dict is None
 
 
 @pytest.fixture
-def literalai_data_layer(monkeypatch):
+def erroroneous_literalai_data_layer(monkeypatch):
     mock_literalai_dl = AsyncMock()
     mock_literalai_dl.get_user.side_effect = ValueError("mock error")
     monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: mock_literalai_dl)
 
 
 @pytest.mark.asyncio
-async def test_exception_in_secondary_layer(db_session, monkeypatch, literalai_data_layer, caplog):
+async def test_exception_in_secondary_layer(
+    db_session, monkeypatch, erroroneous_literalai_data_layer, caplog
+):
     clear_data_layer_data(db_session)
 
+    # Set LITERAL_API_KEY so that get_literal_data_layer() is called for the secondary data layer
     monkeypatch.setenv("LITERAL_API_KEY", "dummy_key")
+
     data_layer = ChainlitPolyDataLayer()
-
     assert len(data_layer.data_layers) == 2
-
     assert isinstance(data_layer.data_layers[0], ChainlitDataLayer)
     assert isinstance(data_layer.data_layers[1], AsyncMock)
 
     with caplog.at_level(logging.WARNING):
-        # Expect no raised errork, only a warning message
+        # Expect no raised error, only a warning message
         assert await data_layer.get_user("test_user") is None
         assert "Error in non-primary data layer 1: mock error" in caplog.messages
 
@@ -168,16 +173,15 @@ async def test_exception_in_secondary_layer(db_session, monkeypatch, literalai_d
 async def test_exception_in_primary_layer(db_session, monkeypatch, caplog):
     clear_data_layer_data(db_session)
 
+    # Set LITERAL_API_KEY to create a secondary data layer
     monkeypatch.setenv("LITERAL_API_KEY", "dummy_key")
+    # Create a no-op mock for the secondary data layer
     monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: AsyncMock())
 
     data_layer = ChainlitPolyDataLayer()
-
     assert len(data_layer.data_layers) == 2
 
-    assert isinstance(data_layer.data_layers[0], ChainlitDataLayer)
-    assert isinstance(data_layer.data_layers[1], AsyncMock)
-
+    # Mock the get_user method to raise an exception in the primary data layer
     async def mock_get_user(_key):
         raise ZeroDivisionError("mock error")
 
