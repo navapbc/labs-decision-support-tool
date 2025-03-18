@@ -56,7 +56,9 @@ class QARow(NamedTuple):
         # start_time can also be used to distinguish question-answer pairs
         assert question_step.start_time, "Question step start_time must not be None"
 
-        assert question_step.type == "user_message", f"Question step must be a user_message, not {question_step.type!r}"
+        assert (
+            question_step.type == "user_message"
+        ), f"Question step must be a user_message, not {question_step.type!r}"
         assert answer_step.type == "assistant_message", "Answer step must be an assistant_message"
 
         # output["content"] is the text shown in the chatbot UI
