@@ -46,7 +46,9 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         Failures in other data layers are ignored.
         """
         self.data_layers = data_layers or get_default_data_layers()
-        logger.info("Custom Chainlit data layers: %s", [type(dl).__name__ for dl in self.data_layers])
+        logger.info(
+            "Custom Chainlit data layers: %s", [type(dl).__name__ for dl in self.data_layers]
+        )
         assert self.data_layers, "No data layers initialized"
 
     async def _call_method(self, call_dl_func: Callable) -> List[Any]:
@@ -69,7 +71,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         results = await self._call_method(lambda dl: dl.get_user(identifier))
         return results[0]
 
-    async def create_user(self, user: "User") -> Optional[PersistedUser]:
+    async def create_user(self, user: User) -> Optional[PersistedUser]:
         # Upon chainlit startup, a PersistedUser is created with a UUID.
         # There's a discrepancy in the LiteralAI data layer where a user's identifier
         # is being set to the user.id (a UUID) rather than user.identifier.
@@ -95,19 +97,23 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         return results[0]
 
     @queue_until_user_message()
-    async def create_element(self, element: Element) -> Optional[ElementDict]:
+    async def create_element(self, element: Element) -> Optional[ElementDict]:  # pragma: no cover
         # Ensures that the uuid value is the same across data layers so that
         # Thread, Step, and Element records can be cross-referenced across data layers.
         assert element.id, f"element.id is required for {element}"
         results = await self._call_method(lambda dl: dl.create_element(element))
         return results[0]
 
-    async def get_element(self, thread_id: str, element_id: str) -> Optional[ElementDict]:
+    async def get_element(
+        self, thread_id: str, element_id: str
+    ) -> Optional[ElementDict]:  # pragma: no cover
         results = await self._call_method(lambda dl: dl.get_element(thread_id, element_id))
         return results[0]
 
     @queue_until_user_message()
-    async def delete_element(self, element_id: str, thread_id: Optional[str] = None) -> bool:
+    async def delete_element(
+        self, element_id: str, thread_id: Optional[str] = None
+    ) -> bool:  # pragma: no cover
         results = await self._call_method(lambda dl: dl.delete_element(element_id, thread_id))
         return results[0]
 
@@ -157,7 +163,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         )
         return results[0]
 
-    async def build_debug_url(self) -> str:
+    async def build_debug_url(self) -> str:  # pragma: no cover
         results = await self._call_method(lambda dl: dl.build_debug_url())
         # ChainlitDataLayer.build_debug_url() returns "" which isn't useful
         return next(res for res in results if res)
