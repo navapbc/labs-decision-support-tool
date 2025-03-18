@@ -56,7 +56,7 @@ class QARow(NamedTuple):
         # start_time can also be used to distinguish question-answer pairs
         assert question_step.start_time, "Question step start_time must not be None"
 
-        assert question_step.type == "user_message", "Question step must be a user_message"
+        assert question_step.type == "user_message", f"Question step must be a user_message, not {question_step.type!r}"
         assert answer_step.type == "assistant_message", "Answer step must be an assistant_message"
 
         # output["content"] is the text shown in the chatbot UI
@@ -99,6 +99,9 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
     for th in threads:
         if not th.steps:
             logger.warning("Thread %r has no steps", th.id)
+            continue
+        if th.tags and "chainlit" in th.tags:
+            logger.info("Skipping thread %r with chainlit tag", th.id)
             continue
         logger.info("Thread %r has %r steps", th.id, len(th.steps))
         steps = {step.id: step for step in th.steps}
