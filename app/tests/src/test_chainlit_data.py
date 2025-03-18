@@ -1,4 +1,5 @@
 import datetime
+import logging
 import uuid
 from unittest.mock import AsyncMock
 
@@ -8,29 +9,32 @@ from sqlalchemy import delete
 import chainlit as cl
 from chainlit.context import init_http_context
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
-from chainlit.data.literalai import LiteralDataLayer
 from src import chainlit_data
 from src.chainlit_data import ChainlitPolyDataLayer
 from src.db.models.conversation import Element, Feedback, Step, Thread, User
 
 
-@pytest.fixture
-def literalai_client(monkeypatch):
-    mockLiteralDataLayer = AsyncMock()
-    monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda: mockLiteralDataLayer)
+def clear_data_layer_data(db_session):
+    for table in [Element, Feedback, Step, Thread, User]:
+        db_session.execute(delete(table))
+    db_session.commit()
+
+
+def init_chainlit_context():
+    # https://github.com/Chainlit/chainlit/issues/1450#issuecomment-2441715453
+    # Set up Chainlit context to enable calling methods like create_step()
+    init_http_context()
 
 
 @pytest.mark.asyncio
-async def test_chainlit_poly_data_layer(db_session):
-    for table in [Element, Feedback, Step, Thread, User]:
-        db_session.execute(delete(table))
+async def test_1_data_layer(db_session, monkeypatch):
+    clear_data_layer_data(db_session)
 
+    monkeypatch.setenv("LITERAL_API_KEY", "")
     data_layer = ChainlitPolyDataLayer()
 
-    assert len(data_layer.data_layers) == 2
-
+    assert len(data_layer.data_layers) == 1
     assert isinstance(data_layer.data_layers[0], ChainlitDataLayer)
-    assert isinstance(data_layer.data_layers[1], LiteralDataLayer)
 
     assert await data_layer.get_user("test_user") is None
     user = cl.User(identifier="test_user", metadata={"test": True})
@@ -39,23 +43,16 @@ async def test_chainlit_poly_data_layer(db_session):
     assert stored_user.metadata == {"test": True}
 
     pagination = cl.types.Pagination(first=10)  # Get first 10 threads
-    filters = cl.types.ThreadFilter(userId=stored_user.id)  # LiteralAI requires userId
+    filters = cl.types.ThreadFilter(userId=stored_user.id)  # LiteralDataLayer requires userId
     paginated_resp = await data_layer.list_threads(pagination, filters)
     assert len(paginated_resp.data) == 0
+
+    init_chainlit_context()
 
     thread_id = str(uuid.uuid4())
     step_dict = {
         "name": user.identifier,
-        # yoom
-        # backend
-        # on_chat_start
-        # on_message
-        # Decision support tool
         "type": "user_message",
-        # user_message
-        # assistant_message
-        # run
-        # run
         "id": str(uuid.uuid4()),
         "threadId": thread_id,
         "metadata": {"test_step": True},
@@ -63,10 +60,6 @@ async def test_chainlit_poly_data_layer(db_session):
         "end_time": datetime.datetime.now(),
         "output": "Tell me a joke",
     }
-
-    # https://github.com/Chainlit/chainlit/issues/1450#issuecomment-2441715453
-    # Needed to create_step
-    init_http_context()
 
     # create_step() will create a thread if it doesn't exist
     await data_layer.create_step(step_dict)
@@ -103,6 +96,23 @@ async def test_chainlit_poly_data_layer(db_session):
     )
     feedback_id = await data_layer.upsert_feedback(feedback)
 
+    # Add another feedback
+    feedback = cl.types.Feedback(
+        forId=thread_step["id"],
+        value=0,
+        comment="test comment 2",
+    )
+    feedback2_id = await data_layer.upsert_feedback(feedback)
+    feedback_count = (
+        db_session.query(Feedback).filter(Feedback.step_id == thread_step["id"]).count()
+    )
+    assert feedback_count == 2
+    await data_layer.delete_feedback(feedback2_id)
+    feedback_count = (
+        db_session.query(Feedback).filter(Feedback.step_id == thread_step["id"]).count()
+    )
+    assert feedback_count == 1
+
     step_dict["isError"] = True
     await data_layer.update_step(step_dict)
 
@@ -115,6 +125,7 @@ async def test_chainlit_poly_data_layer(db_session):
     # So query DB directly
     feedback_record = db_session.query(Feedback).filter(Feedback.id == feedback_id).scalar()
     assert str(feedback_record.step_id) == thread_step["id"]
+    assert feedback_record.comment == "test comment"
 
     await data_layer.delete_step(thread_step["id"])
     # Deleting the step deletes the feedback
@@ -127,4 +138,49 @@ async def test_chainlit_poly_data_layer(db_session):
     thread_dict = await data_layer.get_thread(thread_id)
     assert thread_dict is None
 
-    # import pdb; pdb.set_trace()
+
+@pytest.fixture
+def literalai_data_layer(monkeypatch):
+    mockLiteralDataLayer = AsyncMock()
+    mockLiteralDataLayer.get_user.side_effect = ValueError("mock error")
+    monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: mockLiteralDataLayer)
+
+
+@pytest.mark.asyncio
+async def test_exception_in_secondary_layer(db_session, monkeypatch, literalai_data_layer, caplog):
+    clear_data_layer_data(db_session)
+
+    monkeypatch.setenv("LITERAL_API_KEY", "dummy_key")
+    data_layer = ChainlitPolyDataLayer()
+
+    assert len(data_layer.data_layers) == 2
+
+    assert isinstance(data_layer.data_layers[0], ChainlitDataLayer)
+    assert isinstance(data_layer.data_layers[1], AsyncMock)
+
+    with caplog.at_level(logging.WARNING):
+        # Expect no raised errork, only a warning message
+        assert await data_layer.get_user("test_user") is None
+        assert "Error in non-primary data layer 1: mock error" in caplog.messages
+
+
+@pytest.mark.asyncio
+async def test_exception_in_primary_layer(db_session, monkeypatch, literalai_data_layer, caplog):
+    clear_data_layer_data(db_session)
+
+    monkeypatch.setenv("LITERAL_API_KEY", "dummy_key")
+    data_layer = ChainlitPolyDataLayer()
+
+    assert len(data_layer.data_layers) == 2
+
+    assert isinstance(data_layer.data_layers[0], ChainlitDataLayer)
+    assert isinstance(data_layer.data_layers[1], AsyncMock)
+
+    monkeypatch.setattr(data_layer.data_layers[0], "get_user", lambda _key: 1 / 0)
+
+    try:
+        # Expect error to be raised
+        await data_layer.get_user("test_user")
+        raise AssertionError("Expected ZeroDivisionError")
+    except ZeroDivisionError:
+        pass

@@ -59,7 +59,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Check for exceptions
-        if isinstance(results[0], Exception):
+        if isinstance(results[0], BaseException):
             raise results[0]
 
         for i, result in enumerate(results[1:], start=1):
