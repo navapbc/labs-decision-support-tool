@@ -5,8 +5,9 @@ import os
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from src.retrieve import retrieve_with_scores
+from src.util.sampling import get_stratified_sample
 
-from .batch import create_batch_config, filter_questions, stratified_sample
+from .batch import create_batch_config, filter_questions
 from .logging import EvaluationLogger
 from .metric_computation import compute_metrics_summary
 from .results import batch_process_results
@@ -66,6 +67,7 @@ class EvaluationRunner:
         dataset_filter: Optional[List[str]] = None,
         min_score: Optional[float] = None,
         sample_fraction: Optional[float] = None,
+        min_samples: Optional[int] = None,
         random_seed: Optional[int] = None,
         commit: Optional[str] = None,
     ) -> None:
@@ -77,6 +79,7 @@ class EvaluationRunner:
             dataset_filter: Optional list of datasets to filter questions by
             min_score: Optional minimum similarity score for retrieval
             sample_fraction: Optional fraction of questions to sample
+            min_samples: Optional minimum number of samples per dataset
             random_seed: Optional seed for reproducible sampling
             commit: Optional git commit hash
         """
@@ -87,16 +90,16 @@ class EvaluationRunner:
             questions = filter_questions(questions, dataset_filter)
             print(f"After filtering: {len(questions)} questions")
 
-        # Sample questions if requested
-        if sample_fraction is not None:
-            print(f"Sampling {sample_fraction * 100}% of questions")
-            if random_seed is not None:
-                print(f"Using random seed: {random_seed}")
-            questions = stratified_sample(
-                questions,
+        # Sample questions if needed
+        if sample_fraction or min_samples:
+            if sample_fraction and not 0 < sample_fraction <= 1:
+                raise ValueError("Sample fraction must be between 0 and 1")
+            questions = get_stratified_sample(
+                items=questions,
                 sample_fraction=sample_fraction,
-                min_per_dataset=1,
+                min_samples=min_samples,
                 random_seed=random_seed,
+                key_func=lambda q: q["dataset"],
             )
             print(f"After sampling: {len(questions)} questions")
 
@@ -160,11 +163,25 @@ def run_evaluation(
     dataset_filter: Optional[List[str]] = None,
     min_score: Optional[float] = None,
     sample_fraction: Optional[float] = None,
+    min_samples: Optional[int] = None,
     random_seed: Optional[int] = None,
     log_dir: str = "logs/evaluations",
     commit: Optional[str] = None,
 ) -> None:
-    """Convenience function to run evaluation."""
+    """Convenience function to run evaluation.
+
+    Args:
+        questions_file: Path to questions CSV file
+        k_values: List of k values to evaluate
+        retrieval_func: Function to retrieve chunks for questions
+        dataset_filter: Optional list of datasets to filter questions by
+        min_score: Optional minimum similarity score for retrieval
+        sample_fraction: Optional fraction of questions to sample
+        min_samples: Optional minimum number of samples per dataset
+        random_seed: Optional seed for reproducible sampling
+        log_dir: Directory for log files
+        commit: Optional git commit hash
+    """
     runner = EvaluationRunner(retrieval_func=retrieval_func, log_dir=log_dir)
     runner.run_evaluation(
         questions_file=questions_file,
@@ -172,6 +189,7 @@ def run_evaluation(
         dataset_filter=dataset_filter,
         min_score=min_score,
         sample_fraction=sample_fraction,
+        min_samples=min_samples,
         random_seed=random_seed,
         commit=commit,
     )

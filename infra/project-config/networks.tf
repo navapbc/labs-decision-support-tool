@@ -1,7 +1,7 @@
 locals {
   network_configs = {
     dev = {
-      database_subnet_group_name = "dev"
+      account_name = "dev"
 
       domain_config = {
         manage_dns = true
@@ -31,7 +31,7 @@ locals {
     }
 
     staging = {
-      database_subnet_group_name = "staging"
+      account_name = "staging"
 
       domain_config = {
         manage_dns  = true
@@ -42,7 +42,7 @@ locals {
     }
 
     prod = {
-      database_subnet_group_name = "prod"
+      account_name = "dev" # Prod is hosted in the same AWS account as dev
 
       domain_config = {
         manage_dns  = true
