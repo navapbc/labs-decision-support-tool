@@ -13,6 +13,7 @@ from chainlit.types import AskFileResponse
 from src import chat_engine
 from src.app_config import app_config
 from src.batch_process import batch_process
+from src.chainlit_data import ChainlitPolyDataLayer
 from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.evaluation import literalai_exporter
 from src.format import format_response
@@ -22,7 +23,11 @@ from src.util import literalai_util as lai
 
 logger = logging.getLogger(__name__)
 
-require_login()
+
+# TODO: Update chat_api.py to use ChainlitPolyDataLayer
+@cl.data_layer
+def get_data_layer() -> ChainlitPolyDataLayer:
+    return ChainlitPolyDataLayer()
 
 
 @cl.set_chat_profiles
@@ -37,6 +42,8 @@ async def chat_profiles() -> list[cl.ChatProfile]:
 
 @cl.on_chat_start
 async def start() -> None:
+    require_login()
+
     url = cl.user_session.get("http_referer")
     logger.debug("Referer URL: %s", url)
     query_values = url_query_values(url)
@@ -274,6 +281,7 @@ async def _msg_attributes(attributes: MessageAttributesT) -> None:
     ).send()
 
 
+# TODO: Replace with https://docs.chainlit.io/concepts/command
 async def special_command(msg_text: str) -> bool:
     if msg_text == "batch processing":
         # The AskFileMessage cannot be called inside code run by asyncio.create_task,
