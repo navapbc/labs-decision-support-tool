@@ -22,8 +22,6 @@ from sqlalchemy import select
 import chainlit as cl
 from chainlit.context import init_http_context
 from chainlit.data import get_data_layer
-
-# from chainlit.step import Step
 from src import chat_engine
 from src.adapters import db
 from src.app_config import app_config

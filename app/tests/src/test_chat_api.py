@@ -121,8 +121,11 @@ def reset_cl_data_layer():
     TLDR: chat_api uses chainlit_data_layer, which uses asyncpg, which is tied to the event loop.
     Since tests can run in different event loops, we need to reset the chainlit_data_layer between tests.
 
-    An alternative solution is to create a new FastAPI router for each test
-    but router is referenced in many places (including API endpoints setup) so some references may point to the original router.
+    Alternative 1: to create a new FastAPI router for each test but router is referenced in many places 
+        (including API endpoints setup) so some references may point to the original router.
+    Alternative 2: use one event loop for all tests -- https://github.com/pytest-dev/pytest-asyncio/issues/924#issuecomment-2328433273.
+    Alternative 3: Create a asyncio.new_event_loop(), asyncio.set_event_loop(new_loop), 
+        new_loop.run_until_complete(_cause_asyncpg_create_pool()), and new_loop.run_until_complete(_my_test())
     """
     cl_data._data_layer = None
     cl_data._data_layer_initialized = False
