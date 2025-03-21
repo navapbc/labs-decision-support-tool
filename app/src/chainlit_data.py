@@ -2,12 +2,16 @@ import asyncio
 import os
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from chainlit.chat_context import chat_context
+from chainlit.context import context
+from chainlit.data import get_data_layer
 from chainlit.data.base import BaseDataLayer
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
 from chainlit.data.literalai import LiteralDataLayer
 from chainlit.data.utils import queue_until_user_message
 from chainlit.element import Element, ElementDict
 from chainlit.logger import logger
+from chainlit.message import Message
 from chainlit.step import StepDict
 from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, ThreadFilter
 from chainlit.user import PersistedUser, User
@@ -39,10 +43,6 @@ def get_default_data_layers() -> List[BaseDataLayer]:
     return data_layers
 
 
-import traceback
-from io import StringIO
-
-
 class ChainlitPolyDataLayer(BaseDataLayer):
     def __init__(self, data_layers: Optional[Sequence[BaseDataLayer]] = None) -> None:
         """
@@ -55,9 +55,6 @@ class ChainlitPolyDataLayer(BaseDataLayer):
             self,
             [type(dl).__name__ for dl in self.data_layers],
         )
-        sio = StringIO()
-        traceback.print_stack(file=sio)
-        # logger.info("Stack trace:%r %r\n%s", "asyncio.current_task()", "asyncio.get_event_loop()", sio.getvalue())
         assert self.data_layers, "No data layers initialized"
 
     async def _call_method(self, call_dl_func: Callable) -> List[Any]:
@@ -179,22 +176,18 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         return next(res for res in results if res)
 
 
-from chainlit.chat_context import chat_context
-from chainlit.context import context
-from chainlit.data import get_data_layer
-from chainlit.message import Message
-from chainlit.telemetry import trace_event
-
-
 class Cl_Message(Message):
+    """
+    Workaround to fix bug: https://github.com/Chainlit/chainlit/issues/2029
+    by simply adding `await` for data_layer calls
+    """
+
     async def update(
         self,
     ):
         """
         Update a message already sent to the UI.
         """
-        trace_event("update_message")
-
         if self.streaming:
             self.streaming = False
 
@@ -204,7 +197,7 @@ class Cl_Message(Message):
         data_layer = get_data_layer()
         if data_layer:
             try:
-                await asyncio.create_task(data_layer.update_step(step_dict))
+                await data_layer.update_step(step_dict)
             except Exception as e:
                 if self.fail_on_persist_error:
                     raise e
@@ -218,13 +211,12 @@ class Cl_Message(Message):
         """
         Remove a message already sent to the UI.
         """
-        trace_event("remove_message")
         chat_context.remove(self)
         step_dict = self.to_dict()
         data_layer = get_data_layer()
         if data_layer:
             try:
-                await asyncio.create_task(data_layer.delete_step(step_dict["id"]))
+                await data_layer.delete_step(step_dict["id"])
             except Exception as e:
                 if self.fail_on_persist_error:
                     raise e
@@ -239,7 +231,7 @@ class Cl_Message(Message):
         data_layer = get_data_layer()
         if data_layer and not self.persisted:
             try:
-                await asyncio.create_task(data_layer.create_step(step_dict))
+                await data_layer.create_step(step_dict)
                 self.persisted = True
             except Exception as e:
                 if self.fail_on_persist_error:
