@@ -3,7 +3,7 @@ import logging
 import threading
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -13,7 +13,8 @@ from httpx import ASGITransport, AsyncClient
 from literalai import Score
 from literalai.observability.step import ScoreType
 
-from src import chat_api
+from chainlit import data as cl_data
+from src import chainlit_data, chat_api
 from src.chat_api import (
     ChatEngineSettings,
     ChatSession,
@@ -77,6 +78,11 @@ class MockLiteralAIApi:
 
 @pytest.fixture
 def mock_lai(monkeypatch):
+    # Set LITERAL_API_KEY to create a secondary data layer
+    monkeypatch.setenv("LITERAL_API_KEY", "")
+    # Create a no-op mock for the secondary data layer
+    monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: AsyncMock())
+
     monkeypatch.setattr(chat_api, "literalai", lambda: MockLiteralAI())
 
 
@@ -87,7 +93,42 @@ def client(mock_lai, db_session):  # mock LiteralAI when testing API
 
 @pytest.fixture
 def async_client(mock_lai, db_session):  # mock LiteralAI when testing API
+    """
+    The typical FastAPI TestClient creates its own event loop to handle requests,
+    which led to issues when testing code that relies on asynchronous operations
+    or resources tied to an event loop (i.e., ContextVars).
+    To address errors like "RuntimeError: Task attached to a different loop",
+    make tests asynchronous and directly use httpx.AsyncClient to work within the same event loop context.
+    """
+    reset_cl_data_layer()
     return AsyncClient(transport=ASGITransport(app=router), base_url="http://test")
+
+
+def reset_cl_data_layer():
+    """
+    Async unit tests can run in different event loops.
+    There is one FastAPI router used for all tests in this file.
+    In chat_api.py when the router calls get_data_layer(), the data layer is created in a test's event loop.
+    When get_data_layer() is called again in a different event loop (in a different async unit test), it raises an error:
+    'asyncpg.exceptions._base.InterfaceError: cannot perform operation: another operation is in progress'
+    because chainlit.data.chainlit_data_layer initializes using asyncpg.create_pool() in the first event loop,
+    and that connection pool is available only in the same event loop.
+    "This is by design and cannot be changed. If you change your loop between tests, make sure you do not reuse any pools or connections."
+    https://github.com/MagicStack/asyncpg/issues/293#issuecomment-391157754
+    Running a single test passes, but running all tests in this file fails.
+    This only affects tests, where the router functions are called by the test client, as opposed to sending HTTP requests.
+
+    TLDR: chat_api uses chainlit_data_layer, which uses asyncpg, which is tied to the event loop.
+    Since tests can run in different event loops, we need to reset the chainlit_data_layer between tests.
+
+    Alternative 1: to create a new FastAPI router for each test but router is referenced in many places
+        (including API endpoints setup) so some references may point to the original router.
+    Alternative 2: use one event loop for all tests -- https://github.com/pytest-dev/pytest-asyncio/issues/924#issuecomment-2328433273.
+    Alternative 3: Create a asyncio.new_event_loop(), asyncio.set_event_loop(new_loop),
+        new_loop.run_until_complete(_cause_asyncpg_create_pool()), and new_loop.run_until_complete(_my_test())
+    """
+    cl_data._data_layer = None
+    cl_data._data_layer_initialized = False
 
 
 def test_api_engines(client):
@@ -99,11 +140,12 @@ def test_api_engines(client):
 @pytest.mark.asyncio
 async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
     event = threading.Event()
-    db_sessions = set()
+    db_sessions = []
 
     async def waiting_get_or_create_user(_self, identifier, _metadata):
         db_session = chat_api.dbsession.get()
-        db_sessions.add(db_session)
+        db_sessions.append(db_session)
+        print("Waiting for event.set() ...", db_session)
         # Run the blocking wait in a separate thread to avoid blocking the event loop
         await asyncio.to_thread(event.wait)
 
@@ -114,10 +156,11 @@ async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
     monkeypatch.setattr(MockLiteralAIApi, "get_or_create_user", waiting_get_or_create_user)
 
     async def checker_coroutine():
-        # Allow the event loop to run other tasks
-        await asyncio.sleep(0)
-        # chat_api.dbsession.get() should be distinct for each thread
-        assert len(db_sessions) == 2
+        while len(db_sessions) < 2:
+            print("Checker coroutine waiting for other tasks to add to dbsessions")
+            # Allow the event loop to run other tasks
+            await asyncio.sleep(0.1)
+        print("Checker coroutine event.set()")
         # Wake up the waiting threads to let the API resume responding
         event.set()
 
@@ -129,6 +172,9 @@ async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
         tasks = [asyncio.create_task(call) for call in [call1, call2, checker]]
         results = await asyncio.gather(*tasks)
         assert [r.status_code for r in results if r] == [200, 200]
+
+    # chat_api.dbsession.get() should be distinct for each thread
+    assert len(set(db_sessions)) == 2
 
     # Ensure all other asyncio tasks are done
     pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]

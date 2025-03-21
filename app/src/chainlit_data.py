@@ -2,12 +2,16 @@ import asyncio
 import os
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from chainlit.chat_context import chat_context
+from chainlit.context import context
+from chainlit.data import get_data_layer
 from chainlit.data.base import BaseDataLayer
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
 from chainlit.data.literalai import LiteralDataLayer
 from chainlit.data.utils import queue_until_user_message
 from chainlit.element import Element, ElementDict
 from chainlit.logger import logger
+from chainlit.message import Message
 from chainlit.step import StepDict
 from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, ThreadFilter
 from chainlit.user import PersistedUser, User
@@ -47,7 +51,9 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         """
         self.data_layers = data_layers or get_default_data_layers()
         logger.info(
-            "Custom Chainlit data layers: %s", [type(dl).__name__ for dl in self.data_layers]
+            "%r Custom Chainlit data layers: %s",
+            self,
+            [type(dl).__name__ for dl in self.data_layers],
         )
         assert self.data_layers, "No data layers initialized"
 
@@ -168,3 +174,68 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         results = await self._call_method(lambda dl: dl.build_debug_url())
         # ChainlitDataLayer.build_debug_url() returns "" which isn't useful
         return next(res for res in results if res)
+
+
+class Cl_Message(Message):  # pragma: no cover
+    """
+    Workaround to fix bug: https://github.com/Chainlit/chainlit/issues/2029
+    by simply adding `await` for data_layer calls
+    """
+
+    async def update(
+        self,
+    ) -> bool:
+        """
+        Update a message already sent to the UI.
+        """
+        if self.streaming:
+            self.streaming = False
+
+        step_dict = self.to_dict()
+        chat_context.add(self)
+
+        data_layer = get_data_layer()
+        if data_layer:
+            try:
+                await data_layer.update_step(step_dict)
+            except Exception as e:
+                if self.fail_on_persist_error:
+                    raise e
+                logger.error(f"Failed to persist message update: {e!s}")
+
+        await context.emitter.update_step(step_dict)
+
+        return True
+
+    async def remove(self) -> bool:
+        """
+        Remove a message already sent to the UI.
+        """
+        chat_context.remove(self)
+        step_dict = self.to_dict()
+        data_layer = get_data_layer()
+        if data_layer:
+            try:
+                await data_layer.delete_step(step_dict["id"])
+            except Exception as e:
+                if self.fail_on_persist_error:
+                    raise e
+                logger.error(f"Failed to persist message deletion: {e!s}")
+
+        await context.emitter.delete_step(step_dict)
+
+        return True
+
+    async def _create(self) -> StepDict:
+        step_dict = self.to_dict()
+        data_layer = get_data_layer()
+        if data_layer and not self.persisted:
+            try:
+                await data_layer.create_step(step_dict)
+                self.persisted = True
+            except Exception as e:
+                if self.fail_on_persist_error:
+                    raise e
+                logger.error(f"Failed to persist message creation: {e!s}")
+
+        return step_dict

@@ -19,9 +19,13 @@ from literalai import AsyncLiteralClient, Message
 from pydantic import BaseModel
 from sqlalchemy import select
 
+import chainlit as cl
+from chainlit.context import init_http_context
+from chainlit.data import get_data_layer
 from src import chat_engine
 from src.adapters import db
 from src.app_config import app_config
+from src.chainlit_data import ChainlitPolyDataLayer, Cl_Message
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 from src.db.models.conversation import ChatMessage, UserSession
@@ -33,9 +37,19 @@ from src.util.string_utils import format_highlighted_uri
 logger = logging.getLogger(__name__)
 
 
+@cl.data_layer
+def chainlit_data_layer() -> ChainlitPolyDataLayer:
+    print("chainlit_data_layer: ChainlitPolyDataLayer()")
+    logger.info("chainlit_data_layer: ChainlitPolyDataLayer()")
+    return ChainlitPolyDataLayer()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
+    # init_http_context() calls get_data_layer(), which creates a asyncpg connection pool,
+    # which is available only in a single event loop used by FastAPI to respond to requests.
+    init_http_context()
     yield
     logger.info("Cleaning up API")
     # Clean up
@@ -129,7 +143,7 @@ async def _get_chat_session(
     literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
     chat_session = __get_or_create_chat_session(
-        user_id, session_id, literalai_user_id=literalai_user.id
+        user_id, session_id, literalai_user_id=literalai_user.id  # str(uuid.uuid4())  # FIXME
     )
     logger.info(
         "Session %r (user %r): LiteralAI thread_id=%s",
@@ -187,24 +201,57 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
         session = await _get_chat_session(user_id, session_id)
         thread_name = "API:/engines" if not session.user_session.lai_thread_id else None
 
-        # Example of using Literal AI to log the request and response
-        with literalai().thread(name=thread_name, participant_id=session.literalai_user_id):
-            request_msg = literalai().message(
-                content="List chat engines", type="user_message", name=user_id
-            )
-            assert request_msg.thread_id
-            store_thread_id(session, request_msg.thread_id)
-            # This will show up as a separate step in LiteralAI, showing input and output
-            with literalai().step(type="tool"):
-                response = [
-                    engine
-                    for engine in chat_engine.available_engines()
-                    if engine in session.allowed_engines
-                ]
-            # Example of using parent_id to have a hierarchy of messages in Literal AI
-            literalai().message(
-                content=str(response), type="system_message", parent_id=request_msg.id
-            )
+        user_meta = {"engines": True}
+        # init_http_context() uses user.id as the thread.user_id
+        cl_user = cl.User(identifier=user_id, metadata=user_meta)
+
+        # Set the thread ID in the http_context so new cl.Message will be associated with the thread
+        # when cl.MessageBase.__post_init__() accesses cl.context.session.thread_id.
+        # The context uses ContextVars to avoid concurrency issues.
+        # (There's also an init_ws_context() if we enable websocket support
+        # see chainlit.socket.py for how it's used)
+        init_http_context(thread_id=session.user_session.lai_thread_id, user=cl_user)
+
+        # FIXME: move to _get_chat_session?
+        # Use get_data_layer() like in chainlit.server
+        data_layer = get_data_layer()
+        await data_layer.create_user(cl_user)
+
+        # a session is persisted in Thread and user_session tables
+        # a Message is persisted in Step and chat_message tables
+        request_msg = Cl_Message(
+            # with literalai().thread(name=thread_name, participant_id=session.literalai_user_id):
+            author=session.literalai_user_id,  # FIXME: Does this become the thread.participant_id?
+            content="List chat engines",
+            type="user_message",
+            metadata={
+                "user_id": session.user_session.user_id,
+            },
+        )
+        await data_layer.create_step(request_msg.to_dict())
+
+        assert request_msg.thread_id
+        store_thread_id(session, request_msg.thread_id)
+
+        if thread_name:
+            await data_layer.update_thread(thread_id=request_msg.thread_id, name=thread_name)
+
+        response = [
+            engine
+            for engine in chat_engine.available_engines()
+            if engine in session.allowed_engines
+        ]
+
+        # literalai().message(content=str(response), type="system_message", parent_id=request_msg.id)
+        await Cl_Message(
+            # author="api_response",  # This becomes the Step.name
+            content=str(response),
+            type="system_message",
+            parent_id=request_msg.id,
+            metadata={
+                "user_id": session.user_session.user_id,
+            },
+        ).send()
         return response
 
 
