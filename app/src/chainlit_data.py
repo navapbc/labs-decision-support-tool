@@ -184,7 +184,7 @@ class Cl_Message(Message):  # pragma: no cover
 
     async def update(
         self,
-    ):
+    ) -> bool:
         """
         Update a message already sent to the UI.
         """
@@ -207,7 +207,7 @@ class Cl_Message(Message):  # pragma: no cover
 
         return True
 
-    async def remove(self):
+    async def remove(self) -> bool:
         """
         Remove a message already sent to the UI.
         """
@@ -226,7 +226,7 @@ class Cl_Message(Message):  # pragma: no cover
 
         return True
 
-    async def _create(self):
+    async def _create(self) -> StepDict:
         step_dict = self.to_dict()
         data_layer = get_data_layer()
         if data_layer and not self.persisted:
