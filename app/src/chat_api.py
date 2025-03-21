@@ -23,12 +23,11 @@ import chainlit as cl
 from chainlit.context import init_http_context
 from chainlit.data import get_data_layer
 from chainlit.step import Step
-
 from src import chat_engine
 from src.adapters import db
 from src.app_config import app_config
+from src.chainlit_data import ChainlitPolyDataLayer, Cl_Message
 from src.chat_engine import ChatEngineInterface
-from src.chainlit_data import Cl_Message
 from src.citations import simplify_citation_numbers
 from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Subsection
@@ -37,6 +36,12 @@ from src.healthcheck import HealthCheck, health
 from src.util.string_utils import format_highlighted_uri
 
 logger = logging.getLogger(__name__)
+
+
+@cl.data_layer
+def chainlit_data_layer() -> ChainlitPolyDataLayer:
+    logger.info("chainlit_data_layer: ChainlitPolyDataLayer()")
+    return ChainlitPolyDataLayer()
 
 
 @asynccontextmanager
@@ -135,10 +140,10 @@ async def _get_chat_session(
         user_id = "EMPTY_USER_ID"  # temporary fix for empty user_id
         # raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
     # Ensure user exists in Literal AI
-    # literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
+    literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
     chat_session = __get_or_create_chat_session(
-        user_id, session_id, literalai_user_id=str(uuid.uuid4())  # FIXME
+        user_id, session_id, literalai_user_id=literalai_user.id  # str(uuid.uuid4())  # FIXME
     )
     logger.info(
         "Session %r (user %r): LiteralAI thread_id=%s",
@@ -340,26 +345,6 @@ def get_chat_engine(session: ChatSession) -> ChatEngineInterface:
             setattr(engine, setting_name, setting_value)
     return engine
 
-from src.chainlit_data import ChainlitPolyDataLayer
-_data_layer = None
-
-# @functools.cache
-@cl.data_layer
-def poly_data_layer() -> ChainlitPolyDataLayer:
-    print("poly_data_layer()")
-    return ChainlitPolyDataLayer()
-    global _data_layer
-    if not _data_layer:
-        _data_layer = ChainlitPolyDataLayer()
-    return _data_layer
-
-from chainlit.data import get_data_layer
-
-
-def wait_for_event():
-    pass
-
-import asyncio
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:

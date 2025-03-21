@@ -38,8 +38,11 @@ def get_default_data_layers() -> List[BaseDataLayer]:
         data_layers.append(get_literal_data_layer(api_key))
     return data_layers
 
+
 import traceback
 from io import StringIO
+
+
 class ChainlitPolyDataLayer(BaseDataLayer):
     def __init__(self, data_layers: Optional[Sequence[BaseDataLayer]] = None) -> None:
         """
@@ -48,7 +51,9 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         """
         self.data_layers = data_layers or get_default_data_layers()
         logger.info(
-            "%r Custom Chainlit data layers: %s", self, [type(dl).__name__ for dl in self.data_layers]
+            "%r Custom Chainlit data layers: %s",
+            self,
+            [type(dl).__name__ for dl in self.data_layers],
         )
         sio = StringIO()
         traceback.print_stack(file=sio)
@@ -173,11 +178,13 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         # ChainlitDataLayer.build_debug_url() returns "" which isn't useful
         return next(res for res in results if res)
 
+
+from chainlit.chat_context import chat_context
+from chainlit.context import context
+from chainlit.data import get_data_layer
 from chainlit.message import Message
 from chainlit.telemetry import trace_event
-from chainlit.chat_context import chat_context
-from chainlit.data import get_data_layer
-from chainlit.context import context
+
 
 class Cl_Message(Message):
     async def update(
@@ -205,7 +212,8 @@ class Cl_Message(Message):
 
         await context.emitter.update_step(step_dict)
 
-        return True    
+        return True
+
     async def remove(self):
         """
         Remove a message already sent to the UI.
@@ -225,6 +233,7 @@ class Cl_Message(Message):
         await context.emitter.delete_step(step_dict)
 
         return True
+
     async def _create(self):
         step_dict = self.to_dict()
         data_layer = get_data_layer()
@@ -237,4 +246,4 @@ class Cl_Message(Message):
                     raise e
                 logger.error(f"Failed to persist message creation: {e!s}")
 
-        return step_dict    
+        return step_dict
