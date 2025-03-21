@@ -178,17 +178,15 @@ def db_session_context_var():
             dbsession.reset(token)
 
 
-def wait_for_event(_db_session):
+async def wait_for_event(_db_session):
     pass
 
-
+import asyncio
 # Make sure to use async functions for faster responses
 @router.get("/engines")
 async def engines(user_id: str, session_id: str | None = None) -> list[str]:
     # async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
     with db_session_context_var():
-        wait_for_event(dbsession.get())
-
         session = await _get_chat_session(user_id, session_id)
         thread_name = "API:/engines" if not session.user_session.lai_thread_id else None
 
@@ -210,6 +208,9 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
             literalai().message(
                 content=str(response), type="system_message", parent_id=request_msg.id
             )
+        logger.info("waiting: %r", dbsession.get())
+        await asyncio.create_task(wait_for_event(dbsession.get()))
+        # logger.info("waiting done")
         return response
 
 
