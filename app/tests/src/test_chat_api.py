@@ -3,7 +3,7 @@ import logging
 import threading
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 from fastapi import HTTPException
@@ -13,6 +13,7 @@ from httpx import ASGITransport, AsyncClient
 from literalai import Score
 from literalai.observability.step import ScoreType
 
+from src import chainlit_data
 from src import chat_api
 from src.chat_api import (
     ChatEngineSettings,
@@ -77,6 +78,11 @@ class MockLiteralAIApi:
 
 @pytest.fixture
 def mock_lai(monkeypatch):
+    # Set LITERAL_API_KEY to create a secondary data layer
+    monkeypatch.setenv("LITERAL_API_KEY", "")
+    # Create a no-op mock for the secondary data layer
+    monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: AsyncMock())
+
     monkeypatch.setattr(chat_api, "literalai", lambda: MockLiteralAI())
 
 
@@ -87,6 +93,11 @@ def client(mock_lai, db_session):  # mock LiteralAI when testing API
 
 @pytest.fixture
 def async_client(mock_lai, db_session):  # mock LiteralAI when testing API
+    """
+    The TestClient in FastAPI, which is based on Starlette's TestClient, creates its own event loop to handle requests. This can lead to issues when testing code that relies on a specific event loop, especially when dealing with asynchronous resources or libraries that are bound to a particular loop.
+    If your tests involve asynchronous operations or resources tied to an event loop, you might encounter errors like "RuntimeError: Task attached to a different loop." To address this, you can make your tests asynchronous and use an asynchronous client like httpx.AsyncClient. This allows you to work within the same event loop context.
+    For example, if you are using a database connection or other asynchronous resources, ensure they are instantiated within an async function or setup to avoid conflicts with different event loops.
+    """
     return AsyncClient(transport=ASGITransport(app=router), base_url="http://test")
 
 
