@@ -11,7 +11,7 @@ import uuid
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, AsyncGenerator, Generator, Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_app: APIRouter):
+async def lifespan(_app: APIRouter) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
     yield
     logger.info("Cleaning up API")
@@ -165,7 +165,7 @@ dbsession: ContextVar[db.Session] = ContextVar("db_session", default=app_config.
 
 
 @contextmanager
-def db_session_context_var():
+def db_session_context_var() -> Generator[db.Session, None, None]:
     with app_config.db_session() as db_session:
         token = dbsession.set(db_session)
         try:
@@ -373,7 +373,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
-def store_thread_id(session, thread_id):
+def store_thread_id(session: ChatSession, thread_id: str | None) -> None:
     # Update the DB with the LiteralAI thread ID, regardless of other DB updates,
     # so do this is its own DB transaction.
     # lai_thread_id is None when request.new_session=True
