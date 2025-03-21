@@ -128,8 +128,7 @@ async def _get_chat_session(
     # Ensure user exists in Literal AI
     literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
-    user_uuid = literalai_user.id  # str(uuid.uuid4())  # FIXME
-    chat_session = __get_or_create_chat_session(user_id, session_id, literalai_user_id=user_uuid)
+    chat_session = __get_or_create_chat_session(user_id, session_id, literalai_user_id=literalai_user.id)
     logger.info(
         "Session %r (user %r): LiteralAI thread_id=%s",
         session_id,
@@ -143,7 +142,6 @@ def _load_user_session(session_id: str | None) -> Optional[UserSession]:
     if not session_id:
         return None
     with dbsession.get().begin():
-        logger.info("Loading user session %r", session_id)
         return (
             dbsession.get()
             .scalars(select(UserSession).where(UserSession.session_id == session_id))
@@ -172,16 +170,13 @@ def db_session_context_var():
             # Use dbsession.get() to get the session without having to pass it to nested functions.
             # Use `with dbsession.get().begin():` to auto-committed or rolled back upon exception.
             yield db_session
+            # Auto-commit
             db_session.commit()
         finally:
             db_session.close()
             dbsession.reset(token)
 
 
-async def wait_for_event(_db_session):
-    pass
-
-import asyncio
 # Make sure to use async functions for faster responses
 @router.get("/engines")
 async def engines(user_id: str, session_id: str | None = None) -> list[str]:
@@ -208,9 +203,6 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
             literalai().message(
                 content=str(response), type="system_message", parent_id=request_msg.id
             )
-        logger.info("waiting: %r", dbsession.get())
-        await asyncio.create_task(wait_for_event(dbsession.get()))
-        # logger.info("waiting done")
         return response
 
 

@@ -1,10 +1,11 @@
+import asyncio
 import logging
-import pytest
-
+import threading
 from contextlib import contextmanager
 from typing import Optional
 from unittest.mock import MagicMock
 
+import pytest
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
@@ -51,6 +52,8 @@ class MockLiteralAI:
 class MockLiteralAIApi:
     async def get_or_create_user(self, identifier, metadata):
         self.id = f"litai_uuid_for_{identifier}"
+        # include await call to yield control back to the event loop
+        await asyncio.sleep(0)
         return self
 
     async def create_score(
@@ -75,7 +78,6 @@ class MockLiteralAIApi:
 @pytest.fixture
 def mock_lai(monkeypatch):
     monkeypatch.setattr(chat_api, "literalai", lambda: MockLiteralAI())
-    logger.info("Mocked literalai")
 
 
 @pytest.fixture
@@ -94,110 +96,43 @@ def test_api_engines(client):
     assert response.json() == ["imagine-la"]
 
 
-import asyncio
-import concurrent.futures
-import threading
-import time
-
-from asyncer import asyncify
-
-logger = logging.getLogger(__name__)
-
-# from unittest.mock import AsyncMock
-
-
-def print_tasks(sleep=0):
-    print("Sleeping")
-    time.sleep(sleep)
-    print("Awake")
-    all_tasks = asyncio.all_tasks()
-    # print("All tasks:", len(all_tasks))
-    pending_tasks = [task for task in all_tasks if not task.done()]
-    if True or len(pending_tasks) > 1:
-        print("== Pending tasks:", len(pending_tasks))
-        for i, task in enumerate(pending_tasks):
-            print("-- Pending task", i, task.get_loop())
-            print("  Coro: ", task.get_coro())
-            # task.print_stack()
-        # time.sleep(20)
-
-
 @pytest.mark.asyncio
-async def test_contextvar_dbsession(async_client, monkeypatch):
+async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
     event = threading.Event()
+    db_sessions = set()
 
-    async def wait_until_tested(db_session):
-        # print("--")
-        # logger.info("waiting: %r", db_session)
-        event.wait()
-        logger.info("waiting done")
+    async def waiting_get_or_create_user(_self, identifier, _metadata):
+        db_session = chat_api.dbsession.get()
+        db_sessions.add(db_session)
+        # Run the blocking wait in a separate thread to avoid blocking the event loop
+        await asyncio.to_thread(event.wait)
 
-    monkeypatch.setattr(chat_api, "wait_for_event", wait_until_tested)
-    monkeypatch.setattr("src.chat_api.wait_for_event", wait_until_tested)
+        mock_user = MagicMock()
+        mock_user.id = f"litai_uuid_for_{identifier}"
+        return mock_user
+
+    monkeypatch.setattr(MockLiteralAIApi, "get_or_create_user", waiting_get_or_create_user)
 
     async def checker_coroutine():
-        logger.info("checker_coroutine waiting for 5 seconds")
-        # await asyncio.sleep(5)
-        time.sleep(3)
-        logger.info("event.set()")
+        # Allow the event loop to run other tasks
+        await asyncio.sleep(0)
+        # chat_api.dbsession.get() should be distinct for each thread
+        assert len(db_sessions) == 2
+        # Wake up the waiting threads to let the API resume responding
         event.set()
 
     async with async_client:
-    # async with AsyncClient(transport=ASGITransport(app=router), base_url="http://test") as async_client1:
         call1 = async_client.get("/api/engines?user_id=TestUser1")
         call2 = async_client.get("/api/engines?user_id=TestUser2")
         checker = checker_coroutine()
 
         tasks = [asyncio.create_task(call) for call in [call1, call2, checker]]
-        # asyncio.create_task(asyncify(print_tasks)(8))
-
         results = await asyncio.gather(*tasks)
-        logger.info(results)
+        assert [r.status_code for r in results if r] == [200, 200]
 
-    assert "Forced" is False
-    # assert response.status_code == 200
-
-    # async with AsyncClient(transport=ASGITransport(app=router), base_url="http://test") as client:
-    #     results = await asyncio.gather(
-    #         client.get("/api/engines?user_id=TestUserA"),
-    #         client.get("/api/engines?user_id=TestUserB"),
-    #         # make_request(client, "/api/engines?user_id=TestUserA"),
-    #         # make_request(client, "/api/engines?user_id=TestUserB"),
-    #     )
-    #     print(f"Request results: {results}")
-
-
-@pytest.mark.asyncio
-async def Atest_contextvar_db_oldclient(client, monkeypatch):
-    event = threading.Event()
-
-    async def wait_until_tested(db_session):
-        logger.info("waiting: %r", db_session)
-        event.wait()
-        logger.info("waiting done")
-
-    monkeypatch.setattr(chat_api, "wait_for_event", wait_until_tested)
-
-    async def checker_coroutine():
-        logger.info("asyncio waiting for 5 seconds")
-        # await asyncio.sleep(5)
-        time.sleep(3)
-        logger.info("event.set()")
-        event.set()
-
-    # ensure that the TestClient and the application share the same event loop
-    # with client:
-    call1 = asyncify(lambda: client.get("/api/engines?user_id=TestUser1"))
-    call2 = asyncify(lambda: client.get("/api/engines?user_id=TestUser2"))
-    checker = checker_coroutine  # asyncify(check_vars)
-
-    tasks = [asyncio.create_task(call()) for call in [call1, call2, checker]]
-    results = await asyncio.gather(*tasks)
-    logger.info(results)
-
-    assert "Forced" is False
-    # assert response.status_code == 200
-    # assert response.json() == ["imagine-la"]
+    # Ensure all other asyncio tasks are done
+    pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]
+    assert len(pending_tasks) == 1
 
 
 def test_api_query(monkeypatch, client):
