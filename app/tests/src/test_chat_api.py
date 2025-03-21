@@ -116,12 +116,13 @@ def reset_cl_data_layer():
     "This is by design and cannot be changed. If you change your loop between tests, make sure you do not reuse any pools or connections."
     https://github.com/MagicStack/asyncpg/issues/293#issuecomment-391157754
     Running a single test passes, but running all tests in this file fails.
+    This only affects tests, where the router functions are called by the test client, as opposed to sending HTTP requests.
 
     TLDR: chat_api uses chainlit_data_layer, which uses asyncpg, which is tied to the event loop.
     Since tests can run in different event loops, we need to reset the chainlit_data_layer between tests.
 
     An alternative solution is to create a new FastAPI router for each test
-    but router is referenced in many places so some references may point to the original router.
+    but router is referenced in many places (including API endpoints setup) so some references may point to the original router.
     """
     cl_data._data_layer = None
     cl_data._data_layer_initialized = False

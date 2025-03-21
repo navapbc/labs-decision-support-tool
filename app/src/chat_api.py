@@ -49,7 +49,9 @@ def chainlit_data_layer() -> ChainlitPolyDataLayer:
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
-    init_http_context()  # calls get_data_layer()
+    # init_http_context() calls get_data_layer(), which creates a asyncpg connection pool,
+    # which is available only in a single event loop used by FastAPI to respond to requests.
+    init_http_context()
     yield
     logger.info("Cleaning up API")
     # Clean up

@@ -176,7 +176,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         return next(res for res in results if res)
 
 
-class Cl_Message(Message):
+class Cl_Message(Message):  # pragma: no cover
     """
     Workaround to fix bug: https://github.com/Chainlit/chainlit/issues/2029
     by simply adding `await` for data_layer calls
