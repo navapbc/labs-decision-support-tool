@@ -128,7 +128,9 @@ async def _get_chat_session(
     # Ensure user exists in Literal AI
     literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
     # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
-    chat_session = __get_or_create_chat_session(user_id, session_id, literalai_user_id=literalai_user.id)
+    chat_session = __get_or_create_chat_session(
+        user_id, session_id, literalai_user_id=literalai_user.id
+    )
     logger.info(
         "Session %r (user %r): LiteralAI thread_id=%s",
         session_id,
