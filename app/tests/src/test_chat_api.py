@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import threading
 from contextlib import contextmanager
 from typing import Optional
 from unittest.mock import MagicMock
@@ -7,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 from literalai import Score
 from literalai.observability.step import ScoreType
 
@@ -49,6 +52,8 @@ class MockLiteralAI:
 class MockLiteralAIApi:
     async def get_or_create_user(self, identifier, metadata):
         self.id = f"litai_uuid_for_{identifier}"
+        # include await call to yield control back to the event loop
+        await asyncio.sleep(0)
         return self
 
     async def create_score(
@@ -71,19 +76,66 @@ class MockLiteralAIApi:
 
 
 @pytest.fixture
-def client(monkeypatch):
-    lai_mock = MockLiteralAI()
-    monkeypatch.setattr(chat_api, "literalai", lambda: lai_mock)
+def mock_lai(monkeypatch):
+    monkeypatch.setattr(chat_api, "literalai", lambda: MockLiteralAI())
+
+
+@pytest.fixture
+def client(mock_lai, db_session):  # mock LiteralAI when testing API
     return TestClient(router)
 
 
-def test_api_engines(client, db_session):
+@pytest.fixture
+def async_client(mock_lai, db_session):  # mock LiteralAI when testing API
+    return AsyncClient(transport=ASGITransport(app=router), base_url="http://test")
+
+
+def test_api_engines(client):
     response = client.get("/api/engines?user_id=TestUser")
     assert response.status_code == 200
     assert response.json() == ["imagine-la"]
 
 
-def test_api_query(monkeypatch, client, db_session):
+@pytest.mark.asyncio
+async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
+    event = threading.Event()
+    db_sessions = set()
+
+    async def waiting_get_or_create_user(_self, identifier, _metadata):
+        db_session = chat_api.dbsession.get()
+        db_sessions.add(db_session)
+        # Run the blocking wait in a separate thread to avoid blocking the event loop
+        await asyncio.to_thread(event.wait)
+
+        mock_user = MagicMock()
+        mock_user.id = f"litai_uuid_for_{identifier}"
+        return mock_user
+
+    monkeypatch.setattr(MockLiteralAIApi, "get_or_create_user", waiting_get_or_create_user)
+
+    async def checker_coroutine():
+        # Allow the event loop to run other tasks
+        await asyncio.sleep(0)
+        # chat_api.dbsession.get() should be distinct for each thread
+        assert len(db_sessions) == 2
+        # Wake up the waiting threads to let the API resume responding
+        event.set()
+
+    async with async_client:
+        call1 = async_client.get("/api/engines?user_id=TestUser1")
+        call2 = async_client.get("/api/engines?user_id=TestUser2")
+        checker = checker_coroutine()
+
+        tasks = [asyncio.create_task(call) for call in [call1, call2, checker]]
+        results = await asyncio.gather(*tasks)
+        assert [r.status_code for r in results if r] == [200, 200]
+
+    # Ensure all other asyncio tasks are done
+    pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]
+    assert len(pending_tasks) == 1
+
+
+def test_api_query(monkeypatch, client):
     async def mock_run_query(engine, question, chat_history):
         return (
             QueryResponse(
@@ -144,7 +196,7 @@ def test_api_query(monkeypatch, client, db_session):
 
 
 """
-def test_api_query__empty_user_id(monkeypatch, client, db_session):
+def test_api_query__empty_user_id(monkeypatch, client):
     try:
         client.post(
             "/api/query",
@@ -164,7 +216,7 @@ def test_api_query__empty_user_id(monkeypatch, client, db_session):
 """
 
 
-def test_api_query__nonexistent_session_id(monkeypatch, client, db_session):
+def test_api_query__nonexistent_session_id(monkeypatch, client):
     try:
         client.post(
             "/api/query",
@@ -181,7 +233,7 @@ def test_api_query__nonexistent_session_id(monkeypatch, client, db_session):
         assert e.detail == "LiteralAI thread ID for existing session 'NewSession999' not found"
 
 
-def test_api_query__bad_request(client, db_session):
+def test_api_query__bad_request(client):
     try:
         client.post(
             "/api/query", json={"user_id": "user7", "session_id": "Session0", "new_session": True}
@@ -309,7 +361,7 @@ def test_get_chat_engine_not_allowed():
         get_chat_engine(session)
 
 
-def test_post_feedback_success(client, db_session):
+def test_post_feedback_success(client):
     response = client.post(
         "/api/feedback",
         json={
@@ -324,7 +376,7 @@ def test_post_feedback_success(client, db_session):
     assert response.status_code == 200
 
 
-def test_post_feedback_fail(monkeypatch, client, db_session):
+def test_post_feedback_fail(monkeypatch, client):
     try:
         client.post(
             "/api/feedback",
