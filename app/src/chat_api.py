@@ -22,7 +22,8 @@ from sqlalchemy import select
 import chainlit as cl
 from chainlit.context import init_http_context
 from chainlit.data import get_data_layer
-from chainlit.step import Step
+
+# from chainlit.step import Step
 from src import chat_engine
 from src.adapters import db
 from src.app_config import app_config
@@ -40,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 @cl.data_layer
 def chainlit_data_layer() -> ChainlitPolyDataLayer:
+    print("chainlit_data_layer: ChainlitPolyDataLayer()")
     logger.info("chainlit_data_layer: ChainlitPolyDataLayer()")
     return ChainlitPolyDataLayer()
 
@@ -47,9 +49,7 @@ def chainlit_data_layer() -> ChainlitPolyDataLayer:
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
-    init_http_context()
-    # Creates or updates the user
-    get_data_layer()
+    init_http_context()  # calls get_data_layer()
     yield
     logger.info("Cleaning up API")
     # Clean up
@@ -215,7 +215,7 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
         # FIXME: move to _get_chat_session?
         # Use get_data_layer() like in chainlit.server
         data_layer = get_data_layer()
-        stored_user = await data_layer.create_user(cl_user)
+        await data_layer.create_user(cl_user)
 
         # a session is persisted in Thread and user_session tables
         # a Message is persisted in Step and chat_message tables
