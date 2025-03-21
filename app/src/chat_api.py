@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Generator, Optional, Sequence
 
 from asyncer import asyncify
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 from literalai import AsyncLiteralClient, Message
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_app: APIRouter) -> AsyncGenerator[Any, None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
     yield
     logger.info("Cleaning up API")
