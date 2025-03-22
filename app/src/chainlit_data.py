@@ -1,5 +1,7 @@
 import asyncio
+import json
 import os
+import uuid
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from chainlit.chat_context import chat_context
@@ -8,6 +10,7 @@ from chainlit.data import get_data_layer
 from chainlit.data.base import BaseDataLayer
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
 from chainlit.data.literalai import LiteralDataLayer
+from chainlit.data.storage_clients.base import BaseStorageClient
 from chainlit.data.utils import queue_until_user_message
 from chainlit.element import Element, ElementDict
 from chainlit.logger import logger
@@ -18,10 +21,10 @@ from chainlit.user import PersistedUser, User
 from src.adapters.db.clients.postgres_config import PostgresDBConfig
 
 
-def get_postgres_data_layer(database_url: str) -> ChainlitDataLayer:
+def get_postgres_data_layer(database_url: str) -> "PostgresDataLayer":
     # See chainlit/data/__init__.py for storage_client options like S3
     storage_client = None
-    return ChainlitDataLayer(database_url=database_url, storage_client=storage_client)
+    return PostgresDataLayer(database_url=database_url, storage_client=storage_client)
 
 
 def get_database_url() -> str:
@@ -79,13 +82,28 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         return results[0]
 
     async def create_user(self, user: User) -> Optional[PersistedUser]:
-        # Upon chainlit startup, a PersistedUser is created with a UUID.
-        # There's a discrepancy in the LiteralAI data layer where a user's identifier
-        # is being set to the user.id (a UUID) rather than user.identifier.
-        # Plus, LiteralAI's participant.id is a newly generated UUID.
-        # Looking at LiteralDataLayer.create_user(), it doesn't pass a UUID.
-        # So rely on user.identifier and NOT the DB's User.id.
+        """
+        Upon chainlit startup, a PersistedUser is created with a UUID.
+        There's a discrepancy in the LiteralAI data layer where a user's identifier
+        is being set to the user.id (a UUID) rather than user.identifier.
+        Plus, LiteralAI's participant.id is a newly generated UUID.
+        Looking at LiteralDataLayer.create_user(), it doesn't pass in a UUID.
+        So rely on user.identifier and NOT the DB's User.id.
+
+        When given an identifier, LiteralAI creates a new user.id (UUID) that is different
+        from the one in the Postgres database. This causes issues since the Thread has a foreign
+        key to the Postgres user.id.
+        When a thread is created LiteralAI createa a new user with identifier=Postgres user.id
+        and a new UUID user.id.
+
+        Cannot set UUID via LiteralDataLayer.create_user(), but can set it via
+        ChainlitDataLayer.create_user(). So call LiteralDataLayer.create_user() and
+        use the UUID to call ChainlitDataLayer.create_user().
+        """
         assert user.identifier, "User identifier is required"
+
+        lai_dl = self.data_layers[1]
+        assert isinstance(lai_dl, LiteralDataLayer)
         results = await self._call_method(lambda dl: dl.create_user(user))
         return results[0]
 
@@ -174,6 +192,49 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         results = await self._call_method(lambda dl: dl.build_debug_url())
         # ChainlitDataLayer.build_debug_url() returns "" which isn't useful
         return next(res for res in results if res)
+
+
+class PostgresDataLayer(ChainlitDataLayer):
+    def __init__(
+        self,
+        database_url: str,
+        storage_client: Optional[BaseStorageClient] = None,
+        show_logger: bool = False,
+    ):
+        super().__init__(
+            database_url=database_url, storage_client=storage_client, show_logger=show_logger
+        )
+
+    def _get_uuid_metadata(self, user: User) -> str | None:
+        if "uuid" in user.metadata:
+            return user.metadata["uuid"]
+        return None
+
+    async def create_user(self, user: User) -> Optional[PersistedUser]:
+        query = """
+        INSERT INTO "User" (id, identifier, metadata, "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (identifier) DO UPDATE
+        SET metadata = $3
+        RETURNING *
+        """
+        now = await self.get_current_timestamp()
+        params = {
+            "id": self._get_uuid_metadata(user) or str(uuid.uuid4()),
+            "identifier": user.identifier,
+            "metadata": json.dumps(user.metadata),
+            "created_at": now,
+            "updated_at": now,
+        }
+        result = await self.execute_query(query, params)
+        row = result[0]
+
+        return PersistedUser(
+            id=str(row.get("id")),
+            identifier=str(row.get("identifier")),
+            createdAt=row.get("createdAt").isoformat(),  # type: ignore
+            metadata=json.loads(row.get("metadata", "{}")),
+        )
 
 
 class Cl_Message(Message):  # pragma: no cover

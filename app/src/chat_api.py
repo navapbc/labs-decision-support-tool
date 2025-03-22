@@ -25,7 +25,7 @@ from chainlit.data import get_data_layer
 from src import chat_engine
 from src.adapters import db
 from src.app_config import app_config
-from src.chainlit_data import ChainlitPolyDataLayer, Cl_Message
+from src.chainlit_data import ChainlitPolyDataLayer
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 from src.db.models.conversation import ChatMessage, UserSession
@@ -89,14 +89,14 @@ class ChatEngineSettings:
 @dataclass
 class ChatSession:
     user_session: UserSession
-    # This user ID is always retrieved from LiteralAI so it doesn't need to be stored in the DB
-    literalai_user_id: str | None
+    # This user uuid is always retrieved from chainlit data layer so it doesn't need to be stored in the DB
+    user_uuid: str | None
     chat_engine_settings: ChatEngineSettings
     allowed_engines: list[str]
 
 
 def __get_or_create_chat_session(
-    user_id: str, session_id: str | None, literalai_user_id: str | None
+    user_id: str, session_id: str | None, user_uuid: str | None
 ) -> ChatSession:
     "Creating/retrieving user's session from the DB"
     if user_session := _load_user_session(session_id):
@@ -106,29 +106,23 @@ def __get_or_create_chat_session(
                 status_code=400,
                 detail=f"Session {session_id} is not associated with user {user_id}",
             )
-        return ChatSession(
-            user_session=user_session,
-            literalai_user_id=literalai_user_id,
-            chat_engine_settings=ChatEngineSettings(user_session.chat_engine_id),
-            allowed_engines=["imagine-la"],
-        )
-    with dbsession.get().begin():  # session is auto-committed or rolled back upon exception
-        user_session = UserSession(
-            session_id=session_id or str(uuid.uuid4()),
-            user_id=user_id,
-            chat_engine_id="imagine-la",
-            lai_thread_id=None,
-        )
-        dbsession.get().add(user_session)
+    else:
+        with dbsession.get().begin():  # session is auto-committed or rolled back upon exception
+            logger.info("Creating new user session %r for: %s", session_id, user_id)
+            user_session = UserSession(
+                session_id=session_id or str(uuid.uuid4()),
+                user_id=user_id,
+                chat_engine_id="imagine-la",
+                lai_thread_id=None,
+            )
+            dbsession.get().add(user_session)
 
-    session = ChatSession(
+    return ChatSession(
         user_session=user_session,
-        literalai_user_id=literalai_user_id,
+        user_uuid=user_uuid,
         chat_engine_settings=ChatEngineSettings(user_session.chat_engine_id),
         allowed_engines=["imagine-la"],
     )
-    logger.info("Found user session for: %s", user_id)
-    return session
 
 
 async def _get_chat_session(
@@ -139,12 +133,29 @@ async def _get_chat_session(
     if user_id == "":
         user_id = "EMPTY_USER_ID"  # temporary fix for empty user_id
         # raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
+
     # Ensure user exists in Literal AI
     literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
-    # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
-    chat_session = __get_or_create_chat_session(
-        user_id, session_id, literalai_user_id=literalai_user.id  # str(uuid.uuid4())  # FIXME
+    # Ensure user exists in storage
+    # init_http_context() will use stored_user.id as the thread.user_id
+    user_meta = user_meta or {}
+    user_meta |= {"uuid": literalai_user.id}
+    stored_user = await get_data_layer().create_user(
+        cl.User(identifier=user_id, display_name=user_id, metadata=user_meta)
     )
+    # display_name isn't persisted in Chainlit data layer
+
+    # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
+    chat_session = __get_or_create_chat_session(user_id, session_id, user_uuid=stored_user.id)
+    thread_id = chat_session.user_session.lai_thread_id
+
+    # Set the thread ID in the http_context so new cl.Message instances will be associated with the thread
+    # when cl.MessageBase.__post_init__() accesses cl.context.session.thread_id.
+    # The http_context uses ContextVars to avoid concurrency issues.
+    # (There's also an init_ws_context() if we enable websocket support
+    # see chainlit.socket.py for how it's used)
+    init_http_context(thread_id=thread_id, user=stored_user)
+
     logger.info(
         "Session %r (user %r): LiteralAI thread_id=%s",
         session_id,
@@ -198,43 +209,34 @@ def db_session_context_var() -> Generator[db.Session, None, None]:
 async def engines(user_id: str, session_id: str | None = None) -> list[str]:
     # async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
     with db_session_context_var():
-        session = await _get_chat_session(user_id, session_id)
+        user_meta = {"engines": True}
+        session = await _get_chat_session(user_id, session_id, user_meta)
         thread_name = "API:/engines" if not session.user_session.lai_thread_id else None
 
-        user_meta = {"engines": True}
-        # init_http_context() uses user.id as the thread.user_id
-        cl_user = cl.User(identifier=user_id, metadata=user_meta)
-
-        # Set the thread ID in the http_context so new cl.Message will be associated with the thread
-        # when cl.MessageBase.__post_init__() accesses cl.context.session.thread_id.
-        # The context uses ContextVars to avoid concurrency issues.
-        # (There's also an init_ws_context() if we enable websocket support
-        # see chainlit.socket.py for how it's used)
-        init_http_context(thread_id=session.user_session.lai_thread_id, user=cl_user)
-
-        # FIXME: move to _get_chat_session?
         # Use get_data_layer() like in chainlit.server
         data_layer = get_data_layer()
-        await data_layer.create_user(cl_user)
 
-        # a session is persisted in Thread and user_session tables
-        # a Message is persisted in Step and chat_message tables
-        request_msg = Cl_Message(
+        # A ChatSession is persisted in Thread and user_session tables
+        # - A session/thread is associated with only 1 user
+        # A Message is persisted in Step and chat_message tables
+        # - A message/step can have an author/name
+        request_step = cl.Message(
             # with literalai().thread(name=thread_name, participant_id=session.literalai_user_id):
-            author=session.literalai_user_id,  # FIXME: Does this become the thread.participant_id?
-            content="List chat engines",
+            author=session.user_uuid,  # author become the step.name
+            content="List chat engines",  # content becomes the step.output
             type="user_message",
             metadata={
                 "user_id": session.user_session.user_id,
             },
-        )
-        await data_layer.create_step(request_msg.to_dict())
+        ).to_dict()
+        await data_layer.create_step(request_step)
 
-        assert request_msg.thread_id
-        store_thread_id(session, request_msg.thread_id)
+        thread_id = request_step["threadId"]
+        assert thread_id
+        await store_thread_id(session, thread_id)
 
         if thread_name:
-            await data_layer.update_thread(thread_id=request_msg.thread_id, name=thread_name)
+            await data_layer.update_thread(thread_id=thread_id, name=thread_name)
 
         response = [
             engine
@@ -242,16 +244,16 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
             if engine in session.allowed_engines
         ]
 
-        # literalai().message(content=str(response), type="system_message", parent_id=request_msg.id)
-        await Cl_Message(
-            # author="api_response",  # This becomes the Step.name
+        response_step = cl.Message(
+            # author="api_response",
             content=str(response),
             type="system_message",
-            parent_id=request_msg.id,
+            parent_id=request_step["id"],
             metadata={
                 "user_id": session.user_session.user_id,
             },
-        ).send()
+        ).to_dict()
+        await data_layer.create_step(response_step)
         return response
 
 
@@ -366,7 +368,7 @@ async def query(request: QueryRequest) -> QueryResponse:
 
         with literalai().thread(
             name=thread_name,
-            participant_id=session.literalai_user_id,
+            participant_id=session.user_uuid,
             thread_id=session.user_session.lai_thread_id,
         ):
             # Log the message to LiteralAI
@@ -381,7 +383,7 @@ async def query(request: QueryRequest) -> QueryResponse:
             )
             _validate_literalai_message(session, request_msg)
 
-            store_thread_id(session, request_msg.thread_id)
+            await store_thread_id(session, request_msg.thread_id)
 
             engine = get_chat_engine(session)
             response, metadata = await run_query(engine, request.message, chat_history)
@@ -420,7 +422,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
-def store_thread_id(session: ChatSession, thread_id: str | None) -> None:
+async def store_thread_id(session: ChatSession, thread_id: str | None) -> None:
     # Update the DB with the LiteralAI thread ID, regardless of other DB updates,
     # so do this is its own DB transaction.
     # lai_thread_id is None when request.new_session=True
@@ -433,6 +435,26 @@ def store_thread_id(session: ChatSession, thread_id: str | None) -> None:
                 session.user_session.lai_thread_id,
             )
             dbsession.get().merge(session.user_session)
+
+        lai_dl = get_data_layer().data_layers[1]
+        assert isinstance(lai_dl.client, AsyncLiteralClient)
+        # Workaround/fix: When using the chainlit_data_layer, the participant_id is not set. LiteralAI shows
+        """
+        When calling client.api.update_thread(id=thread_id, participant_id=session.user_session.user_id),
+        we get "Thread violates foreign key constraint Thread_participantId_fkey" b/c need to pass in
+        the UUID from the Postgres database.
+        In LiteralAI thread export, identifier comes from the Postgres database user.id:
+            "participant": {
+            "id": "b939dbdc-7cfe-4b74-b7a8-7fb1c87e5793",
+            "identifier": "9dec2129-b70c-4a49-9cff-d1f8d366b951"
+            },
+
+        This works but it creates a new user in LiteralAI with the user.identifier = Postgres user.id
+        with no associated threads.
+        """
+        # lai_user = await lai_dl.client.api.get_user(session.user_session.user_id)
+        # await lai_dl.client.api.update_thread(id=thread_id, participant_id=session.user_uuid)
+        # assert lai_user.id == session.user_uuid
 
 
 def _validate_session_against_literalai(request: QueryRequest, session: ChatSession) -> None:

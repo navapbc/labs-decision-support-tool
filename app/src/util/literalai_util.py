@@ -8,7 +8,7 @@ import sys
 from datetime import datetime
 from typing import Any
 
-from literalai import LiteralClient, Thread
+from literalai import LiteralClient, Thread, User
 from literalai.observability.filter import Filter, OrderBy
 
 from src.app_config import app_config
@@ -47,6 +47,22 @@ def get_threads(filters: list[Filter]) -> list[Thread]:
             return threads
 
 
+def get_users() -> list[User]:
+    lai_client = client()
+    entities = []
+    after = None
+    while True:
+        response = lai_client.api.get_users(after=after)
+        after = response.page_info.end_cursor
+        entities += response.data
+        logger.info("Got %r of %r total entities", len(entities), response.total_count)
+        if not response.page_info.has_next_page:
+            assert (
+                len(entities) == response.total_count
+            ), f"Expected {response.total_count} entities, but got only {len(entities)}"
+            return entities
+
+
 def query_threads_between(start_date: datetime, end_date: datetime) -> list[Thread]:
     filters: list[Filter] = [
         Filter(field="createdAt", operator="gte", value=start_date.isoformat()),
@@ -74,15 +90,17 @@ def tag_threads_by_user(threads: list[Thread], user2tag: dict[str, str]) -> None
         logger.info("Tagged thread %r with %r", th.id, new_tag)
 
 
-def save_threads(threads: list[Thread], basefilename: str) -> None:  # pragma: no cover
+def save_entities(
+    entities: list[Thread] | list[User], basefilename: str
+) -> None:  # pragma: no cover
     with open(f"{basefilename}.pickle", "wb") as file:
         logger.info("Saving to %s.pickle", basefilename)
-        pickle.dump(threads, file)
+        pickle.dump(entities, file)
     with open(f"{basefilename}.json", "w", encoding="utf-8") as f:
         # Also save as JSON for readability and in case the Thread object changes
         logger.info("Saving to %s.json", basefilename)
-        thread_dicts = [thread.to_dict() for thread in threads]
-        f.write(json.dumps(thread_dicts, indent=2))
+        dicts = [e.to_dict() for e in entities]
+        f.write(json.dumps(dicts, indent=2))
 
 
 def load_threads(basefilename: str) -> list[Thread] | Any:  # pragma: no cover
@@ -115,10 +133,13 @@ def archive_threads() -> None:  # pragma: no cover
     project_id = get_project_id()
     logger.info("Project ID: %r", project_id)
     threads = query_threads_between(start_date, end_date)
-    save_threads(
+    save_entities(
         threads,
         f"{project_id}-archive-{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}",
     )
+
+    users = get_users()
+    save_entities(users, f"{project_id}-users")
     logger.info("REMINDER: Upload the JSON file to the 'LiteralAI logs' Google Drive folder")
 
 

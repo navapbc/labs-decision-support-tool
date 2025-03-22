@@ -377,7 +377,7 @@ async def test_run_query__unknown_citation(subsections, caplog):
 def test_get_chat_engine():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
-        literalai_user_id="some_literalai_user_id",
+        user_uuid="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("ca-edd-web", retrieval_k=6),
         allowed_engines=["ca-edd-web"],
     )
@@ -388,7 +388,7 @@ def test_get_chat_engine():
 def test_get_chat_engine__unknown():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
-        literalai_user_id="some_literalai_user_id",
+        user_uuid="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("engine_y"),
         allowed_engines=["ca-edd-web"],
     )
@@ -399,7 +399,7 @@ def test_get_chat_engine__unknown():
 def test_get_chat_engine_not_allowed():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
-        literalai_user_id="some_literalai_user_id",
+        user_uuid="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("bridges-eligibility-manual"),
         allowed_engines=["ca-edd-web"],
     )
