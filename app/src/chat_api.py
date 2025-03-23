@@ -8,10 +8,10 @@ import functools
 import logging
 import time
 import uuid
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Generator, Optional, Sequence
+from typing import Any, AsyncGenerator, Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
@@ -189,8 +189,8 @@ def _load_chat_history(user_session: UserSession) -> ChatHistory:
 dbsession: ContextVar[db.Session] = ContextVar("db_session", default=app_config.db_session())
 
 
-@contextmanager
-def db_session_context_var() -> Generator[db.Session, None, None]:
+@asynccontextmanager
+async def db_session_context_var() -> AsyncGenerator[db.Session, None]:
     with app_config.db_session() as db_session:
         token = dbsession.set(db_session)
         try:
@@ -208,7 +208,7 @@ def db_session_context_var() -> Generator[db.Session, None, None]:
 @router.get("/engines")
 async def engines(user_id: str, session_id: str | None = None) -> list[str]:
     # async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
-    with db_session_context_var():
+    async with db_session_context_var():
         user_meta = {"engines": True}
         session = await _get_chat_session(user_id, session_id, user_meta)
         thread_name = "API:/engines" if not session.user_session.lai_thread_id else None
@@ -350,7 +350,7 @@ def get_chat_engine(session: ChatSession) -> ChatEngineInterface:
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
-    with db_session_context_var() as db_session:
+    async with db_session_context_var() as db_session:
         start_time = time.perf_counter()
 
         user_meta = {"agency_id": request.agency_id, "beneficiary_id": request.beneficiary_id}
@@ -436,9 +436,9 @@ async def store_thread_id(session: ChatSession, thread_id: str | None) -> None:
             )
             dbsession.get().merge(session.user_session)
 
-        lai_dl = get_data_layer().data_layers[1]
-        assert isinstance(lai_dl.client, AsyncLiteralClient)
-        # Workaround/fix: When using the chainlit_data_layer, the participant_id is not set. LiteralAI shows
+        # lai_dl = get_data_layer().data_layers[1]
+        # assert isinstance(lai_dl.client, AsyncLiteralClient)
+        # Workaround/fix: When using the chainlit_data_layer, the participant_id is not set.
         """
         When calling client.api.update_thread(id=thread_id, participant_id=session.user_session.user_id),
         we get "Thread violates foreign key constraint Thread_participantId_fkey" b/c need to pass in

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import threading
+import uuid
 from contextlib import contextmanager
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
@@ -52,7 +53,8 @@ class MockLiteralAI:
 
 class MockLiteralAIApi:
     async def get_or_create_user(self, identifier, metadata):
-        self.id = f"litai_uuid_for_{identifier}"
+        # Only the id is needed for tests
+        self.id = str(uuid.uuid4())
         # include await call to yield control back to the event loop
         await asyncio.sleep(0)
         return self
@@ -150,7 +152,7 @@ async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
         await asyncio.to_thread(event.wait)
 
         mock_user = MagicMock()
-        mock_user.id = f"litai_uuid_for_{identifier}"
+        mock_user.id = str(uuid.uuid4())
         return mock_user
 
     monkeypatch.setattr(MockLiteralAIApi, "get_or_create_user", waiting_get_or_create_user)
