@@ -237,66 +237,66 @@ class PostgresDataLayer(ChainlitDataLayer):
         )
 
 
-class Cl_Message(Message):  # pragma: no cover
-    """
-    Workaround to fix bug: https://github.com/Chainlit/chainlit/issues/2029
-    by simply adding `await` for data_layer calls
-    """
+# class Cl_Message(Message):  # pragma: no cover
+#     """
+#     Workaround to fix bug: https://github.com/Chainlit/chainlit/issues/2029
+#     by simply adding `await` for data_layer calls
+#     """
 
-    async def update(
-        self,
-    ) -> bool:
-        """
-        Update a message already sent to the UI.
-        """
-        if self.streaming:
-            self.streaming = False
+#     async def update(
+#         self,
+#     ) -> bool:
+#         """
+#         Update a message already sent to the UI.
+#         """
+#         if self.streaming:
+#             self.streaming = False
 
-        step_dict = self.to_dict()
-        chat_context.add(self)
+#         step_dict = self.to_dict()
+#         chat_context.add(self)
 
-        data_layer = get_data_layer()
-        if data_layer:
-            try:
-                await data_layer.update_step(step_dict)
-            except Exception as e:
-                if self.fail_on_persist_error:
-                    raise e
-                logger.error(f"Failed to persist message update: {e!s}")
+#         data_layer = get_data_layer()
+#         if data_layer:
+#             try:
+#                 await data_layer.update_step(step_dict)
+#             except Exception as e:
+#                 if self.fail_on_persist_error:
+#                     raise e
+#                 logger.error(f"Failed to persist message update: {e!s}")
 
-        await context.emitter.update_step(step_dict)
+#         await context.emitter.update_step(step_dict)
 
-        return True
+#         return True
 
-    async def remove(self) -> bool:
-        """
-        Remove a message already sent to the UI.
-        """
-        chat_context.remove(self)
-        step_dict = self.to_dict()
-        data_layer = get_data_layer()
-        if data_layer:
-            try:
-                await data_layer.delete_step(step_dict["id"])
-            except Exception as e:
-                if self.fail_on_persist_error:
-                    raise e
-                logger.error(f"Failed to persist message deletion: {e!s}")
+#     async def remove(self) -> bool:
+#         """
+#         Remove a message already sent to the UI.
+#         """
+#         chat_context.remove(self)
+#         step_dict = self.to_dict()
+#         data_layer = get_data_layer()
+#         if data_layer:
+#             try:
+#                 await data_layer.delete_step(step_dict["id"])
+#             except Exception as e:
+#                 if self.fail_on_persist_error:
+#                     raise e
+#                 logger.error(f"Failed to persist message deletion: {e!s}")
 
-        await context.emitter.delete_step(step_dict)
+#         await context.emitter.delete_step(step_dict)
 
-        return True
+#         return True
 
-    async def _create(self) -> StepDict:
-        step_dict = self.to_dict()
-        data_layer = get_data_layer()
-        if data_layer and not self.persisted:
-            try:
-                await data_layer.create_step(step_dict)
-                self.persisted = True
-            except Exception as e:
-                if self.fail_on_persist_error:
-                    raise e
-                logger.error(f"Failed to persist message creation: {e!s}")
+#     async def _create(self) -> StepDict:
+#         step_dict = self.to_dict()
+#         data_layer = get_data_layer()
+#         if data_layer and not self.persisted:
+#             try:
+#                 await data_layer.create_step(step_dict)
+#                 self.persisted = True
+#             except Exception as e:
+#                 if self.fail_on_persist_error:
+#                     raise e
+#                 logger.error(f"Failed to persist message creation: {e!s}")
 
-        return step_dict
+#         return step_dict
