@@ -6,9 +6,10 @@ import os
 import pickle
 import sys
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from literalai import LiteralClient, Thread, User
+from literalai.my_types import PaginatedResponse
 from literalai.observability.filter import Filter, OrderBy
 
 from src.app_config import app_config
@@ -24,27 +25,39 @@ def client() -> LiteralClient:  # pragma: no cover
 
 
 def get_project_id() -> str:
-    lai_client = client()
-    return lai_client.api.get_my_project_id()
+    return client().api.get_my_project_id()
 
 
 def get_threads(filters: list[Filter]) -> list[Thread]:
     logger.info("Query filter: %r", filters)
     order_by: OrderBy = OrderBy(column="createdAt", direction="ASC")
+    return get_all_entities(
+        lambda client, after: client.api.get_threads(
+            filters=filters, order_by=order_by, after=after
+        )
+    )
 
+
+def get_users(filters: list[Filter]) -> list[User]:
+    return get_all_entities(
+        lambda lai_client, after: lai_client.api.get_users(filters=filters, after=after)
+    )
+
+
+def get_all_entities[T](api_call: Callable[[LiteralClient, Any], PaginatedResponse[T]]) -> list[T]:
     lai_client = client()
-    threads = []
+    entities = []
     after = None
     while True:
-        response = lai_client.api.get_threads(filters=filters, order_by=order_by, after=after)
+        response = api_call(lai_client, after)
         after = response.page_info.end_cursor
-        threads += response.data
-        logger.info("Got %r of %r total threads", len(threads), response.total_count)
+        entities += response.data
+        logger.info("Got %r of %r total entities", len(entities), response.total_count)
         if not response.page_info.has_next_page:
             assert (
-                len(threads) == response.total_count
-            ), f"Expected {response.total_count} threads, but got only {len(threads)}"
-            return threads
+                len(entities) == response.total_count
+            ), f"Expected {response.total_count} entities, but got only {len(entities)}"
+            return entities
 
 
 def get_users() -> list[User]:
@@ -64,11 +77,14 @@ def get_users() -> list[User]:
 
 
 def query_threads_between(start_date: datetime, end_date: datetime) -> list[Thread]:
-    filters: list[Filter] = [
+    return get_threads(filter_between(start_date, end_date))
+
+
+def filter_between(start_date: datetime, end_date: datetime) -> list[Filter]:
+    return [
         Filter(field="createdAt", operator="gte", value=start_date.isoformat()),
         Filter(field="createdAt", operator="lt", value=end_date.isoformat()),
     ]
-    return get_threads(filters)
 
 
 def query_untagged_threads(user_ids: list[str]) -> list[Thread]:
@@ -132,14 +148,15 @@ def archive_threads() -> None:  # pragma: no cover
 
     project_id = get_project_id()
     logger.info("Project ID: %r", project_id)
-    threads = query_threads_between(start_date, end_date)
-    save_entities(
-        threads,
-        f"{project_id}-archive-{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}",
-    )
 
-    users = get_users()
-    save_entities(users, f"{project_id}-users")
+    prefix = f"{project_id}-{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}"
+
+    filters = filter_between(start_date, end_date)
+    threads = get_threads(filters)
+    save_entities(threads, f"{prefix}-threads-archive")
+    users = get_users(filters)
+    save_entities(users, f"{prefix}-users-archive")
+
     logger.info("REMINDER: Upload the JSON file to the 'LiteralAI logs' Google Drive folder")
 
 

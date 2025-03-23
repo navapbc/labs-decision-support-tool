@@ -60,9 +60,13 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         )
         assert self.data_layers, "No data layers initialized"
 
-    async def _call_method(self, call_dl_func: Callable) -> List[Any]:
+    async def _call_method(
+        self, call_dl_func: Callable, excluded_dl: Optional[BaseDataLayer] = None
+    ) -> List[Any]:
         # Create a list of tasks
-        tasks = [asyncio.create_task(call_dl_func(dl)) for dl in self.data_layers]
+        tasks = [
+            asyncio.create_task(call_dl_func(dl)) for dl in self.data_layers if dl != excluded_dl
+        ]
 
         # Gather results from all tasks
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -81,30 +85,38 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         results = await self._call_method(lambda dl: dl.get_user(identifier))
         return results[0]
 
+    @property
+    def literalai_layer(self) -> Optional[BaseDataLayer]:
+        return next((dl for dl in self.data_layers if isinstance(dl, LiteralDataLayer)), None)
+
     async def create_user(self, user: User) -> Optional[PersistedUser]:
         """
-        Upon chainlit startup, a PersistedUser is created with a UUID.
-        There's a discrepancy in the LiteralAI data layer where a user's identifier
-        is being set to the user.id (a UUID) rather than user.identifier.
-        Plus, LiteralAI's participant.id is a newly generated UUID.
-        Looking at LiteralDataLayer.create_user(), it doesn't pass in a UUID.
-        So rely on user.identifier and NOT the DB's User.id.
-
-        When given an identifier, LiteralAI creates a new user.id (UUID) that is different
-        from the one in the Postgres database. This causes issues since the Thread has a foreign
-        key to the Postgres user.id.
-        When a thread is created LiteralAI createa a new user with identifier=Postgres user.id
-        and a new UUID user.id.
-
-        Cannot set UUID via LiteralDataLayer.create_user(), but can set it via
-        ChainlitDataLayer.create_user(). So call LiteralDataLayer.create_user() and
-        use the UUID to call ChainlitDataLayer.create_user().
+        Unlike other persisted objects (like Thread and Step), the User argument has no id that can be set.
+        The ChainlitDataLayer and LiteralDataLayer implementations return a generated UUID user.id.
+        Unfortunately, since the UUIDs are different, referencing the user from the Thread consistently
+        across data layers is not possible.
+        (These Chainlit data layers were implemented to use a single data layer at a time.)
+        While the LiteralDataLayer does not allow setting the user.id, the ChainlitDataLayer fortunately does.
+        So call LiteralDataLayer.create_user() first and use the generated UUID in the call to
+        ChainlitDataLayer.create_user() via User.metadata["uuid"]. In this way, the user.id is the same
+        across all data layers.
         """
         assert user.identifier, "User identifier is required"
 
-        lai_dl = self.data_layers[1]
-        assert isinstance(lai_dl, LiteralDataLayer)
-        results = await self._call_method(lambda dl: dl.create_user(user))
+        if self.literalai_layer:
+            if lai_user := await self.literalai_layer.create_user(user):
+                user.metadata = (user.metadata or {}) | {"uuid": lai_user.id}
+                logger.info("Created LiteralAI user %r (%r)", user.identifier, lai_user.id)
+            else:
+                logger.warning("Failed to create LiteralAI user %r", user.identifier)
+                # 2 User objects will be created in LiteralAI:
+                # - one with a string identifier that we assigned but this User is not associated with a thread
+                #   because the primary data layer's (Postgres's) user.id is being used for Thread.user_id
+                # - one with identifier=a generated UUID that is automatically created later when a thread is created
+                # This means the user's identifier (a UUID) is shown in LiteralAI's UI instead of user.identifier,
+                # which is more meaningful since it was provided as part of the user argument.
+
+        results = await self._call_method(lambda dl: dl.create_user(user), self.literalai_layer)
         return results[0]
 
     async def delete_feedback(
@@ -124,7 +136,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
     @queue_until_user_message()
     async def create_element(self, element: Element) -> Optional[ElementDict]:  # pragma: no cover
         # Ensures that the uuid value is the same across data layers so that
-        # Thread, Step, and Element records can be cross-referenced across data layers.
+        # persisted records can be cross-referenced across data layers
         assert element.id, f"element.id is required for {element}"
         results = await self._call_method(lambda dl: dl.create_element(element))
         return results[0]
@@ -144,6 +156,9 @@ class ChainlitPolyDataLayer(BaseDataLayer):
 
     @queue_until_user_message()
     async def create_step(self, step_dict: StepDict) -> Optional[StepDict]:
+        # Ensures that the uuid value is the same across data layers so that
+        # persisted records can be cross-referenced across data layers
+        assert step_dict["id"], f"step_dict['id'] is required for {step_dict}"
         results = await self._call_method(lambda dl: dl.create_step(step_dict))
         return results[0]
 
@@ -211,6 +226,7 @@ class PostgresDataLayer(ChainlitDataLayer):
         return None
 
     async def create_user(self, user: User) -> Optional[PersistedUser]:
+        "Adapted from ChainlitDataLayer.create_user() to use uuid metadata as the id"
         query = """
         INSERT INTO "User" (id, identifier, metadata, "createdAt", "updatedAt")
         VALUES ($1, $2, $3, $4, $5)
@@ -235,68 +251,3 @@ class PostgresDataLayer(ChainlitDataLayer):
             createdAt=row.get("createdAt").isoformat(),  # type: ignore
             metadata=json.loads(row.get("metadata", "{}")),
         )
-
-
-# class Cl_Message(Message):  # pragma: no cover
-#     """
-#     Workaround to fix bug: https://github.com/Chainlit/chainlit/issues/2029
-#     by simply adding `await` for data_layer calls
-#     """
-
-#     async def update(
-#         self,
-#     ) -> bool:
-#         """
-#         Update a message already sent to the UI.
-#         """
-#         if self.streaming:
-#             self.streaming = False
-
-#         step_dict = self.to_dict()
-#         chat_context.add(self)
-
-#         data_layer = get_data_layer()
-#         if data_layer:
-#             try:
-#                 await data_layer.update_step(step_dict)
-#             except Exception as e:
-#                 if self.fail_on_persist_error:
-#                     raise e
-#                 logger.error(f"Failed to persist message update: {e!s}")
-
-#         await context.emitter.update_step(step_dict)
-
-#         return True
-
-#     async def remove(self) -> bool:
-#         """
-#         Remove a message already sent to the UI.
-#         """
-#         chat_context.remove(self)
-#         step_dict = self.to_dict()
-#         data_layer = get_data_layer()
-#         if data_layer:
-#             try:
-#                 await data_layer.delete_step(step_dict["id"])
-#             except Exception as e:
-#                 if self.fail_on_persist_error:
-#                     raise e
-#                 logger.error(f"Failed to persist message deletion: {e!s}")
-
-#         await context.emitter.delete_step(step_dict)
-
-#         return True
-
-#     async def _create(self) -> StepDict:
-#         step_dict = self.to_dict()
-#         data_layer = get_data_layer()
-#         if data_layer and not self.persisted:
-#             try:
-#                 await data_layer.create_step(step_dict)
-#                 self.persisted = True
-#             except Exception as e:
-#                 if self.fail_on_persist_error:
-#                     raise e
-#                 logger.error(f"Failed to persist message creation: {e!s}")
-
-#         return step_dict
