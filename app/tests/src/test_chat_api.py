@@ -85,6 +85,7 @@ def mock_lai(monkeypatch):
     # Create a no-op mock for the secondary data layer
     monkeypatch.setattr(chainlit_data, "get_literal_data_layer", lambda _key: AsyncMock())
 
+    # FIXME: remove
     monkeypatch.setattr(chat_api, "literalai", lambda: MockLiteralAI())
 
 

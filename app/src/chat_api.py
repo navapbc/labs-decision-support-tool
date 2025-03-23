@@ -47,12 +47,12 @@ def chainlit_data_layer() -> ChainlitPolyDataLayer:
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
-    # init_http_context() calls get_data_layer(), which creates a asyncpg connection pool,
-    # which is available only in a single event loop used by FastAPI to respond to requests.
+    # Initialize Chainlit Data Layer
+    # init_http_context() calls get_data_layer(), which creates an asyncpg connection pool,
+    # which is available only in a single event loop used by FastAPI to respond to requests
     init_http_context()
     yield
     logger.info("Cleaning up API")
-    # Clean up
 
 
 router = APIRouter(prefix="/api", tags=["Chat API"], lifespan=lifespan)
@@ -125,7 +125,7 @@ def __get_or_create_chat_session(
     )
 
 
-async def _get_chat_session(
+async def _init_chat_session(
     user_id: str,
     session_id: str | None,
     user_meta: Optional[dict] = None,
@@ -134,34 +134,25 @@ async def _get_chat_session(
         user_id = "EMPTY_USER_ID"  # temporary fix for empty user_id
         # raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
 
-    # Ensure user exists in Literal AI
-    literalai_user = await literalai().api.get_or_create_user(user_id, user_meta)
     # Ensure user exists in storage
     # init_http_context() will use stored_user.id as the thread.user_id
-    user_meta = user_meta or {}
-    user_meta |= {"uuid": literalai_user.id}
     stored_user = await get_data_layer().create_user(
-        cl.User(identifier=user_id, display_name=user_id, metadata=user_meta)
+        # display_name isn't persisted in Chainlit data layer
+        cl.User(identifier=user_id, display_name=user_id, metadata=user_meta or {})
     )
-    # display_name isn't persisted in Chainlit data layer
 
-    # Set the LiteralAI user ID for this session so it can be used in literalai().thread()
+    # Also associate stored_user.id with the user_id and session
     chat_session = __get_or_create_chat_session(user_id, session_id, user_uuid=stored_user.id)
-    thread_id = chat_session.user_session.lai_thread_id
 
-    # Set the thread ID in the http_context so new cl.Message instances will be associated with the thread
-    # when cl.MessageBase.__post_init__() accesses cl.context.session.thread_id.
+    # The thread_id is set in store_thread_id() after the thread is automatically created
+    thread_id = chat_session.user_session.lai_thread_id
+    # Set the thread ID in the http_context so that new cl.Message instances will be associated
+    # with the thread when cl.MessageBase.__post_init__() accesses cl.context.session.thread_id.
     # The http_context uses ContextVars to avoid concurrency issues.
-    # (There's also an init_ws_context() if we enable websocket support
-    # see chainlit.socket.py for how it's used)
+    # (There's also an init_ws_context() if we enable websocket support -- see chainlit.socket.py)
     init_http_context(thread_id=thread_id, user=stored_user)
 
-    logger.info(
-        "Session %r (user %r): LiteralAI thread_id=%s",
-        session_id,
-        user_id,
-        chat_session.user_session.lai_thread_id,
-    )
+    logger.info("Session %r (user %r): LiteralAI thread_id=%s", session_id, user_id, thread_id)
     return chat_session
 
 
@@ -210,7 +201,8 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
     # async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
     async with db_session_context_var():
         user_meta = {"engines": True}
-        session = await _get_chat_session(user_id, session_id, user_meta)
+        session = await _init_chat_session(user_id, session_id, user_meta)
+        # Only if new session (i.e., lai_thread_id hasn't been set), set the thread name
         thread_name = "API:/engines" if not session.user_session.lai_thread_id else None
 
         # Use get_data_layer() like in chainlit.server
@@ -221,7 +213,6 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
         # A Message is persisted in Step and chat_message tables
         # - A message/step can have an author/name
         request_step = cl.Message(
-            # with literalai().thread(name=thread_name, participant_id=session.literalai_user_id):
             author=session.user_uuid,  # author become the step.name
             content="List chat engines",  # content becomes the step.output
             type="user_message",
@@ -249,9 +240,6 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
             content=str(response),
             type="system_message",
             parent_id=request_step["id"],
-            metadata={
-                "user_id": session.user_session.user_id,
-            },
         ).to_dict()
         await data_layer.create_step(response_step)
         return response
@@ -354,60 +342,59 @@ async def query(request: QueryRequest) -> QueryResponse:
         start_time = time.perf_counter()
 
         user_meta = {"agency_id": request.agency_id, "beneficiary_id": request.beneficiary_id}
-        session = await _get_chat_session(request.user_id, request.session_id, user_meta)
-        _validate_session_against_literalai(request, session)
+        session = await _init_chat_session(request.user_id, request.session_id, user_meta)
+        _validate_session(request, session)
 
         # Load history BEFORE adding the new message to the DB
         chat_history = _load_chat_history(session.user_session)
         _validate_chat_history(request, chat_history)
 
-        thread_name = None
+        data_layer = get_data_layer()
+
+        request_step = cl.Message(
+            author=session.user_uuid,
+            content=request.message,
+            type="user_message",
+            metadata={
+                "user_id": session.user_session.user_id,
+                "request": request.__dict__,
+            },
+        ).to_dict()
+        await data_layer.create_step(request_step)
+
+        thread_id = request_step["threadId"]
+        assert thread_id
+        await store_thread_id(session, thread_id)
+
         # Only if new session, set the LiteralAI thread name; don't want the thread name to change otherwise
         if request.new_session:
             thread_name = request.message.strip().splitlines()[0] or "API:/query"
+            await data_layer.update_thread(thread_id=thread_id, name=thread_name)
 
-        with literalai().thread(
-            name=thread_name,
-            participant_id=session.user_uuid,
-            thread_id=session.user_session.lai_thread_id,
-        ):
-            # Log the message to LiteralAI
-            request_msg = literalai().message(
-                content=request.message,
-                type="user_message",
-                name=request.session_id,
-                metadata={
-                    "request": request.__dict__,
-                    "user_id": session.user_session.user_id,
-                },
-            )
-            _validate_literalai_message(session, request_msg)
+        engine = get_chat_engine(session)
+        response, metadata = await run_query(engine, request.message, chat_history)
 
-            await store_thread_id(session, request_msg.thread_id)
-
-            engine = get_chat_engine(session)
-            response, metadata = await run_query(engine, request.message, chat_history)
-
-            # Example of using parent_id to have a hierarchy of messages in Literal AI
-            response_msg = literalai().message(
-                content=response.response_text,
-                type="assistant_message",
-                parent_id=request_msg.id,
-                metadata={
-                    "citations": [c.__dict__ for c in response.citations],
-                    "chat_history": chat_history,
-                }
-                | metadata,
-            )
-            # id needed to later provide feedback on this message in LiteralAI
-            response.response_id = response_msg.id
+        # Example of using parent_id to have a hierarchy of messages in Literal AI
+        response_step = cl.Message(
+            content=response.response_text,
+            type="assistant_message",
+            parent_id=request_step["id"],
+            metadata={
+                "citations": [c.__dict__ for c in response.citations],
+                "chat_history": chat_history,
+            }
+            | metadata,
+        ).to_dict()
+        # An id is needed to later provide feedback on this message
+        response.response_id = response_step["id"]
 
         duration = time.perf_counter() - start_time
         logger.info(f"Total /query endpoint execution took {duration:.2f} seconds")
 
         # If successful, update the DB; otherwise the DB will contain questions without responses
         with db_session.begin():
-            # Now, add request and response messages to DB
+            # Now, add request and response messages to DB to be used for chat history in subsequent requests
+            # TODO: Update _load_chat_history() to use Step records and remove ChatMessage table
             db_session.add(
                 ChatMessage(session_id=request.session_id, role="user", content=request.message)
             )
@@ -418,11 +405,10 @@ async def query(request: QueryRequest) -> QueryResponse:
                     content=response.response_text,
                 )
             )
-
     return response
 
 
-async def store_thread_id(session: ChatSession, thread_id: str | None) -> None:
+async def store_thread_id(session: ChatSession, thread_id: str) -> None:
     # Update the DB with the LiteralAI thread ID, regardless of other DB updates,
     # so do this is its own DB transaction.
     # lai_thread_id is None when request.new_session=True
@@ -457,7 +443,7 @@ async def store_thread_id(session: ChatSession, thread_id: str | None) -> None:
         # assert lai_user.id == session.user_uuid
 
 
-def _validate_session_against_literalai(request: QueryRequest, session: ChatSession) -> None:
+def _validate_session(request: QueryRequest, session: ChatSession) -> None:
     # Check if request is consistent with LiteralAI thread
     if request.new_session and session.user_session.lai_thread_id:
         raise HTTPException(
@@ -485,24 +471,6 @@ def _validate_chat_history(request: QueryRequest, chat_history: ChatHistory) -> 
         raise HTTPException(
             status_code=409,
             detail=f"Chat history for existing session not found: {request.session_id}",
-        )
-
-
-def _validate_literalai_message(session: ChatSession, lai_req_msg: Message) -> None:
-    if not lai_req_msg.thread_id:
-        # Should never happen
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unexpected: thread_id is not set on LiteralAI message: {lai_req_msg}",
-        )
-
-    if (
-        session.user_session.lai_thread_id
-        and session.user_session.lai_thread_id != lai_req_msg.thread_id
-    ):
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unexpected: LiteralAI thread ID mismatch: {session.user_session.lai_thread_id} != {lai_req_msg.thread_id}",
         )
 
 
