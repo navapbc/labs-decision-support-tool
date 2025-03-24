@@ -150,17 +150,18 @@ async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
     assert len(pending_tasks) == 1
 
 
-@pytest.mark.asyncio
-async def test_api_query(monkeypatch, async_client):
-    async def mock_run_query(engine, question, chat_history):
-        return (
-            QueryResponse(
-                response_text=f"Response from LLM: {chat_history}",
-                citations=[],
-            ),
-            {},
-        )
+async def mock_run_query(engine, question, chat_history):
+    return (
+        QueryResponse(
+            response_text=f"Response from LLM: {chat_history}",
+            citations=[],
+        ),
+        {},
+    )
 
+
+@pytest.mark.asyncio
+async def test_api_query(async_client, monkeypatch):
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
 
     response = await async_client.post(
@@ -381,7 +382,8 @@ def test_get_chat_engine_not_allowed():
 
 
 @pytest.mark.asyncio
-async def test_api_post_feedback_success(async_client, db_session):
+async def test_api_post_feedback_success(async_client, monkeypatch, db_session):
+    monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
     response = await async_client.post(
         "/api/query",
         json={
