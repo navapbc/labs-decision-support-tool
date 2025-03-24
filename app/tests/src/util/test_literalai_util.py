@@ -6,7 +6,7 @@ from literalai import Thread
 from literalai.my_types import PageInfo
 
 from src.util import literalai_util
-from src.util.literalai_util import get_project_id, query_threads_between
+from src.util.literalai_util import filter_between, get_project_id, get_users, query_threads_between
 
 THREADS = [Thread(f"th_{i}") for i in range(18)]
 
@@ -33,6 +33,19 @@ class MockLiteralAIApi:
         )
         return response
 
+    def get_users(self, *args, **kwargs):
+        users = [MagicMock(id=f"user_{i}") for i in range(5)]
+
+        response = MagicMock()
+        response.data = users
+        response.total_count = len(users)
+        response.page_info = PageInfo(
+            has_next_page=False,
+            start_cursor=users[0].id,
+            end_cursor=users[-1].id,
+        )
+        return response
+
 
 @pytest.fixture
 def literalai_client(monkeypatch):
@@ -50,3 +63,11 @@ def test_query_threads(literalai_client):
     end_date = datetime.fromisoformat("2025-03-07")
     threads = query_threads_between(start_date, end_date)
     assert len(threads) == len(THREADS)
+
+
+def test_get_users(literalai_client):
+    start_date = datetime.fromisoformat("2025-03-06")
+    end_date = datetime.fromisoformat("2025-03-07")
+    filters = filter_between(start_date, end_date)
+    users = get_users(filters)
+    assert len(users) == 5
