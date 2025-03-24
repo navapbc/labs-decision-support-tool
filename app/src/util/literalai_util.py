@@ -79,7 +79,9 @@ def query_untagged_threads(user_ids: list[str]) -> list[Thread]:
     return get_threads(filters)
 
 
-def tag_threads_by_user(threads: list[Thread], user2tag: dict[str, str]) -> None:  # pragma: no cover
+def tag_threads_by_user(
+    threads: list[Thread], user2tag: dict[str, str]
+) -> None:  # pragma: no cover
     lai_client = client()
     for th in threads:
         assert (
