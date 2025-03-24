@@ -34,54 +34,6 @@ from tests.src.db.models.factories import ChunkFactory, UserSessionFactory
 from tests.src.test_chainlit_data import clear_data_layer_data
 
 
-@contextmanager
-def mockContextManager():
-    yield
-
-
-class MockLiteralAI:
-    def __init__(self):
-        self.api = MockLiteralAIApi()
-
-    def thread(self, *args, **kwargs):
-        return mockContextManager()
-
-    def step(self, *args, **kwargs):
-        return mockContextManager()
-
-    def message(self, *args, **kwargs):
-        mock_msg = MagicMock()
-        mock_msg.thread_id = "12345"
-        return mock_msg
-
-
-class MockLiteralAIApi:
-    async def get_or_create_user(self, identifier, metadata):
-        # Only the id is needed for tests
-        self.id = str(uuid.uuid4())
-        # include await call to yield control back to the event loop
-        await asyncio.sleep(0)
-        return self
-
-    async def create_score(
-        self,
-        name: str,
-        type: ScoreType,
-        value: float,
-        step_id: Optional[str] = None,
-        comment: Optional[str] = None,
-    ):
-        return Score(
-            name=name,
-            type=type,
-            value=value,
-            step_id=step_id,
-            comment=comment,
-            dataset_experiment_item_id=None,
-            tags=None,
-        )
-
-
 @pytest.fixture
 def mock_lai(monkeypatch):
     # Set LITERAL_API_KEY to create a secondary data layer
