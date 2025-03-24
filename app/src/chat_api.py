@@ -4,13 +4,14 @@
 This creates API endpoints using FastAPI, which is compatible with Chainlit.
 """
 
+import asyncio
 import logging
 import time
 import uuid
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Generator, Optional, Sequence
+from typing import Any, AsyncGenerator, Awaitable, Generator, Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
@@ -20,6 +21,7 @@ from sqlalchemy import select
 import chainlit as cl
 from chainlit.context import init_http_context
 from chainlit.data import get_data_layer
+from chainlit.step import StepDict
 from src import chat_engine
 from src.adapters import db
 from src.app_config import app_config
@@ -181,6 +183,22 @@ def db_session_context_var() -> Generator[db.Session, None, None]:
             dbsession.reset(token)
 
 
+def register_request(
+    session: ChatSession, request_step: StepDict, thread_name=None
+) -> list[Awaitable]:
+    coroutines = []
+    # The creating the first step in a thread will also create a new thread
+    coroutines.append(get_data_layer().create_step(request_step))
+
+    thread_id = request_step["threadId"]
+    assert thread_id
+    store_thread_id(session, thread_id)
+
+    if thread_name:
+        coroutines.append(get_data_layer().update_thread(thread_id=thread_id, name=thread_name))
+    return coroutines
+
+
 # Make sure to use async functions for faster responses
 @router.get("/engines")
 async def engines(user_id: str, session_id: str | None = None) -> list[str]:
@@ -206,14 +224,7 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
                 "user_id": session.user_session.user_id,
             },
         ).to_dict()
-        await data_layer.create_step(request_step)
-
-        thread_id = request_step["threadId"]
-        assert thread_id
-        store_thread_id(session, thread_id)
-
-        if thread_name:
-            await data_layer.update_thread(thread_id=thread_id, name=thread_name)
+        awaitables = register_request(session, request_step, thread_name)
 
         response = [
             engine
@@ -221,10 +232,11 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
             if engine in session.allowed_engines
         ]
 
+        await asyncio.gather(*awaitables)
         response_step = cl.Message(
-            # author="api_response",
             content=str(response),
             type="system_message",
+            # Set parent_id to have a hierarchy of messages in the thread
             parent_id=request_step["id"],
         ).to_dict()
         await data_layer.create_step(response_step)
@@ -249,7 +261,6 @@ async def feedback(
     data_layer = get_data_layer()
     cl_feedback = cl.types.Feedback(
         forId=request.response_id,
-        # name=request.user_id,
         value=1 if request.is_positive else 0,
         comment=request.comment,
     )
@@ -334,6 +345,8 @@ async def query(request: QueryRequest) -> QueryResponse:
 
         data_layer = get_data_layer()
 
+        # Only if new session, set the LiteralAI thread name; don't want the thread name to change otherwise
+        thread_name = request.message.strip().splitlines()[0] if request.new_session else None
         request_step = cl.Message(
             author=session.user_uuid,
             content=request.message,
@@ -343,21 +356,12 @@ async def query(request: QueryRequest) -> QueryResponse:
                 "request": request.__dict__,
             },
         ).to_dict()
-        await data_layer.create_step(request_step)
-
-        thread_id = request_step["threadId"]
-        assert thread_id
-        store_thread_id(session, thread_id)
-
-        # Only if new session, set the LiteralAI thread name; don't want the thread name to change otherwise
-        if request.new_session:
-            thread_name = request.message.strip().splitlines()[0] or "API:/query"
-            await data_layer.update_thread(thread_id=thread_id, name=thread_name)
+        awaitables = register_request(session, request_step, thread_name)
 
         engine = get_chat_engine(session)
         response, metadata = await run_query(engine, request.message, chat_history)
 
-        # Example of using parent_id to have a hierarchy of messages in Literal AI
+        await asyncio.gather(*awaitables)
         response_step = cl.Message(
             content=response.response_text,
             type="assistant_message",
@@ -396,7 +400,7 @@ def store_thread_id(session: ChatSession, thread_id: str) -> None:
     # Update the DB with the LiteralAI thread ID, regardless of other DB updates,
     # so do this is its own DB transaction.
     # lai_thread_id is None when request.new_session=True
-    # A thread_id is not created until the first message logged in LiteralAi
+    # A thread_id is not set until the first thread message is created
     if not session.user_session.lai_thread_id and thread_id:
         with dbsession.get().begin():
             session.user_session.lai_thread_id = thread_id
