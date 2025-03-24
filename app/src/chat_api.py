@@ -7,10 +7,10 @@ This creates API endpoints using FastAPI, which is compatible with Chainlit.
 import logging
 import time
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Optional, Sequence
+from typing import Any, AsyncGenerator, Generator, Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
@@ -166,8 +166,8 @@ def _load_chat_history(user_session: UserSession) -> ChatHistory:
 dbsession: ContextVar[db.Session] = ContextVar("db_session", default=app_config.db_session())
 
 
-@asynccontextmanager
-async def db_session_context_var() -> AsyncGenerator[db.Session, None]:
+@contextmanager
+def db_session_context_var() -> Generator[db.Session, None, None]:
     with app_config.db_session() as db_session:
         token = dbsession.set(db_session)
         try:
@@ -185,7 +185,7 @@ async def db_session_context_var() -> AsyncGenerator[db.Session, None]:
 @router.get("/engines")
 async def engines(user_id: str, session_id: str | None = None) -> list[str]:
     # async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
-    async with db_session_context_var():
+    with db_session_context_var():
         user_meta = {"engines": True}
         session = await _init_chat_session(user_id, session_id, user_meta)
         # Only if new session (i.e., lai_thread_id hasn't been set), set the thread name
@@ -321,7 +321,7 @@ def get_chat_engine(session: ChatSession) -> ChatEngineInterface:
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
-    async with db_session_context_var() as db_session:
+    with db_session_context_var() as db_session:
         start_time = time.perf_counter()
 
         user_meta = {"agency_id": request.agency_id, "beneficiary_id": request.beneficiary_id}

@@ -3,16 +3,11 @@ import datetime
 import logging
 import threading
 import uuid
-from contextlib import contextmanager
-from typing import Optional
-from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from httpx import ASGITransport, AsyncClient
-from literalai import Score
-from literalai.observability.step import ScoreType
 
 import chainlit as cl
 from chainlit import data as cl_data
