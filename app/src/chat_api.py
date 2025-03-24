@@ -65,17 +65,6 @@ async def healthcheck(request: Request) -> HealthCheck:
     return healthcheck_response
 
 
-@functools.cache
-def literalai() -> AsyncLiteralClient:
-    """
-    This needs to be a function so that it's not immediately instantiated upon
-    import of this module and so that it can mocked in tests.
-    """
-    if app_config.literal_api_key_for_api:
-        return AsyncLiteralClient(api_key=app_config.literal_api_key_for_api)
-    return AsyncLiteralClient()
-
-
 # region: ===================  Session Management ===================
 
 
@@ -259,18 +248,15 @@ async def feedback(
     request: FeedbackRequest,
 ) -> Response:
     """Endpoint for creating feedback for a chatbot response message"""
-    # API endpoint to send feedback https://docs.literalai.com/guides/logs#add-a-score
-    response = await literalai().api.create_score(
-        step_id=request.response_id,
-        name=request.user_id,
-        type="HUMAN",
+    await _init_chat_session(request.user_id, request.session_id)
+    data_layer = get_data_layer()
+    cl_feedback = cl.types.Feedback(
+        forId=request.response_id,
+        # name=request.user_id,
         value=1 if request.is_positive else 0,
         comment=request.comment,
     )
-    logger.info("Received feedback value: %s for response_id %s", response.value, response.step_id)
-    if response.comment:
-        logger.info("Received comment: %s", response.comment)
-
+    await data_layer.upsert_feedback(cl_feedback)
     return Response(status_code=200)
 
 
@@ -385,6 +371,7 @@ async def query(request: QueryRequest) -> QueryResponse:
             }
             | metadata,
         ).to_dict()
+        await data_layer.create_step(response_step)
         # An id is needed to later provide feedback on this message
         response.response_id = response_step["id"]
 
