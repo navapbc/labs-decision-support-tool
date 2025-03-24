@@ -8,16 +8,19 @@ import functools
 import logging
 import time
 import uuid
+from contextlib import asynccontextmanager, contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, AsyncGenerator, Generator, Optional, Sequence
 
 from asyncer import asyncify
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 from literalai import AsyncLiteralClient, Message
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from src import chat_engine
+from src.adapters import db
 from src.app_config import app_config
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
@@ -28,7 +31,17 @@ from src.healthcheck import HealthCheck, health
 from src.util.string_utils import format_highlighted_uri
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["Chat API"])
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[Any, None]:
+    logger.info("Initializing API")
+    yield
+    logger.info("Cleaning up API")
+    # Clean up
+
+
+router = APIRouter(prefix="/api", tags=["Chat API"], lifespan=lifespan)
 
 
 @router.get("/healthcheck")
@@ -85,17 +98,14 @@ def __get_or_create_chat_session(
             chat_engine_settings=ChatEngineSettings(user_session.chat_engine_id),
             allowed_engines=["imagine-la"],
         )
-    with (
-        app_config.db_session() as db_session,
-        db_session.begin(),  # session is auto-committed or rolled back upon exception
-    ):
+    with dbsession.get().begin():  # session is auto-committed or rolled back upon exception
         user_session = UserSession(
             session_id=session_id or str(uuid.uuid4()),
             user_id=user_id,
             chat_engine_id="imagine-la",
             lai_thread_id=None,
         )
-        db_session.add(user_session)
+        dbsession.get().add(user_session)
 
     session = ChatSession(
         user_session=user_session,
@@ -133,15 +143,17 @@ async def _get_chat_session(
 def _load_user_session(session_id: str | None) -> Optional[UserSession]:
     if not session_id:
         return None
-    with app_config.db_session() as db_session:
-        return db_session.scalars(
-            select(UserSession).where(UserSession.session_id == session_id)
-        ).first()
+    with dbsession.get().begin():
+        return (
+            dbsession.get()
+            .scalars(select(UserSession).where(UserSession.session_id == session_id))
+            .first()
+        )
 
 
 def _load_chat_history(user_session: UserSession) -> ChatHistory:
-    with app_config.db_session() as db_session:
-        db_user_session = db_session.merge(user_session)
+    with dbsession.get().begin():
+        db_user_session = dbsession.get().merge(user_session)
         session_msgs = db_user_session.chat_messages
         return [{"role": message.role, "content": message.content} for message in session_msgs]
 
@@ -149,27 +161,51 @@ def _load_chat_history(user_session: UserSession) -> ChatHistory:
 # endregion
 # region: ===================  Example API Endpoint and logging to LiteralAI  ===================
 
+dbsession: ContextVar[db.Session] = ContextVar("db_session", default=app_config.db_session())
+
+
+@contextmanager
+def db_session_context_var() -> Generator[db.Session, None, None]:
+    with app_config.db_session() as db_session:
+        token = dbsession.set(db_session)
+        try:
+            # Use dbsession.get() to get the session without having to pass it to nested functions.
+            # Use `with dbsession.get().begin():` to auto-committed or rolled back upon exception.
+            yield db_session
+            # Auto-commit
+            db_session.commit()
+        finally:
+            db_session.close()
+            dbsession.reset(token)
+
 
 # Make sure to use async functions for faster responses
 @router.get("/engines")
-async def engines(user_id: str) -> list[str]:
+async def engines(user_id: str, session_id: str | None = None) -> list[str]:
     # async def engines(user_id: Annotated[str, Query(min_length=1)]) -> list[str]:
-    session = await _get_chat_session(user_id, None)
-    # Example of using Literal AI to log the request and response
-    with literalai().thread(name="API:/engines", participant_id=session.literalai_user_id):
-        request_msg = literalai().message(
-            content="List chat engines", type="user_message", name=user_id
-        )
-        # This will show up as a separate step in LiteralAI, showing input and output
-        with literalai().step(type="tool"):
-            response = [
-                engine
-                for engine in chat_engine.available_engines()
-                if engine in session.allowed_engines
-            ]
-        # Example of using parent_id to have a hierarchy of messages in Literal AI
-        literalai().message(content=str(response), type="system_message", parent_id=request_msg.id)
-    return response
+    with db_session_context_var():
+        session = await _get_chat_session(user_id, session_id)
+        thread_name = "API:/engines" if not session.user_session.lai_thread_id else None
+
+        # Example of using Literal AI to log the request and response
+        with literalai().thread(name=thread_name, participant_id=session.literalai_user_id):
+            request_msg = literalai().message(
+                content="List chat engines", type="user_message", name=user_id
+            )
+            assert request_msg.thread_id
+            store_thread_id(session, request_msg.thread_id)
+            # This will show up as a separate step in LiteralAI, showing input and output
+            with literalai().step(type="tool"):
+                response = [
+                    engine
+                    for engine in chat_engine.available_engines()
+                    if engine in session.allowed_engines
+                ]
+            # Example of using parent_id to have a hierarchy of messages in Literal AI
+            literalai().message(
+                content=str(response), type="system_message", parent_id=request_msg.id
+            )
+        return response
 
 
 class FeedbackRequest(BaseModel):
@@ -265,86 +301,91 @@ def get_chat_engine(session: ChatSession) -> ChatEngineInterface:
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
-    start_time = time.perf_counter()
+    with db_session_context_var() as db_session:
+        start_time = time.perf_counter()
 
-    user_meta = {"agency_id": request.agency_id, "beneficiary_id": request.beneficiary_id}
-    session = await _get_chat_session(request.user_id, request.session_id, user_meta)
-    _validate_session_against_literalai(request, session)
+        user_meta = {"agency_id": request.agency_id, "beneficiary_id": request.beneficiary_id}
+        session = await _get_chat_session(request.user_id, request.session_id, user_meta)
+        _validate_session_against_literalai(request, session)
 
-    # Load history BEFORE adding the new message to the DB
-    chat_history = _load_chat_history(session.user_session)
-    _validate_chat_history(request, chat_history)
+        # Load history BEFORE adding the new message to the DB
+        chat_history = _load_chat_history(session.user_session)
+        _validate_chat_history(request, chat_history)
 
-    thread_name = None
-    # Only if new session, set the LiteralAI thread name; don't want the thread name to change otherwise
-    if request.new_session:
-        thread_name = request.message.strip().splitlines()[0] or "API:/query"
+        thread_name = None
+        # Only if new session, set the LiteralAI thread name; don't want the thread name to change otherwise
+        if request.new_session:
+            thread_name = request.message.strip().splitlines()[0] or "API:/query"
 
-    with literalai().thread(
-        name=thread_name,
-        participant_id=session.literalai_user_id,
-        thread_id=session.user_session.lai_thread_id,
-    ):
-        # Log the message to LiteralAI
-        request_msg = literalai().message(
-            content=request.message,
-            type="user_message",
-            name=request.session_id,
-            metadata={
-                "request": request.__dict__,
-                "user_id": session.user_session.user_id,
-            },
-        )
-        _validate_literalai_message(session, request_msg)
-
-        with app_config.db_session() as db_session, db_session.begin():
-            # Update the DB with the LiteralAI thread ID, regardless of other DB updates,
-            # so do this is its own DB transaction.
-            # lai_thread_id is None when request.new_session=True
-            # A thread_id is not created until the first message logged in LiteralAi
-            if not session.user_session.lai_thread_id and request_msg.thread_id:
-                session.user_session.lai_thread_id = request_msg.thread_id
-                logger.info(
-                    "Started new session with thread_id: %s",
-                    session.user_session.lai_thread_id,
-                )
-                db_session.merge(session.user_session)
-
-        engine = get_chat_engine(session)
-        response, metadata = await run_query(engine, request.message, chat_history)
-
-        # Example of using parent_id to have a hierarchy of messages in Literal AI
-        response_msg = literalai().message(
-            content=response.response_text,
-            type="assistant_message",
-            parent_id=request_msg.id,
-            metadata={
-                "citations": [c.__dict__ for c in response.citations],
-                "chat_history": chat_history,
-            }
-            | metadata,
-        )
-        # id needed to later provide feedback on this message in LiteralAI
-        response.response_id = response_msg.id
-
-    duration = time.perf_counter() - start_time
-    logger.info(f"Total /query endpoint execution took {duration:.2f} seconds")
-
-    # If successful, update the DB; otherwise the DB will contain questions without responses
-    with app_config.db_session() as db_session, db_session.begin():
-        # Now, add request and response messages to DB
-        db_session.add(
-            ChatMessage(session_id=request.session_id, role="user", content=request.message)
-        )
-        db_session.add(
-            ChatMessage(
-                session_id=request.session_id,
-                role="assistant",
-                content=response.response_text,
+        with literalai().thread(
+            name=thread_name,
+            participant_id=session.literalai_user_id,
+            thread_id=session.user_session.lai_thread_id,
+        ):
+            # Log the message to LiteralAI
+            request_msg = literalai().message(
+                content=request.message,
+                type="user_message",
+                name=request.session_id,
+                metadata={
+                    "request": request.__dict__,
+                    "user_id": session.user_session.user_id,
+                },
             )
-        )
+            _validate_literalai_message(session, request_msg)
+
+            store_thread_id(session, request_msg.thread_id)
+
+            engine = get_chat_engine(session)
+            response, metadata = await run_query(engine, request.message, chat_history)
+
+            # Example of using parent_id to have a hierarchy of messages in Literal AI
+            response_msg = literalai().message(
+                content=response.response_text,
+                type="assistant_message",
+                parent_id=request_msg.id,
+                metadata={
+                    "citations": [c.__dict__ for c in response.citations],
+                    "chat_history": chat_history,
+                }
+                | metadata,
+            )
+            # id needed to later provide feedback on this message in LiteralAI
+            response.response_id = response_msg.id
+
+        duration = time.perf_counter() - start_time
+        logger.info(f"Total /query endpoint execution took {duration:.2f} seconds")
+
+        # If successful, update the DB; otherwise the DB will contain questions without responses
+        with db_session.begin():
+            # Now, add request and response messages to DB
+            db_session.add(
+                ChatMessage(session_id=request.session_id, role="user", content=request.message)
+            )
+            db_session.add(
+                ChatMessage(
+                    session_id=request.session_id,
+                    role="assistant",
+                    content=response.response_text,
+                )
+            )
 
     return response
+
+
+def store_thread_id(session: ChatSession, thread_id: str | None) -> None:
+    # Update the DB with the LiteralAI thread ID, regardless of other DB updates,
+    # so do this is its own DB transaction.
+    # lai_thread_id is None when request.new_session=True
+    # A thread_id is not created until the first message logged in LiteralAi
+    if not session.user_session.lai_thread_id and thread_id:
+        with dbsession.get().begin():
+            session.user_session.lai_thread_id = thread_id
+            logger.info(
+                "Started new session with thread_id: %s",
+                session.user_session.lai_thread_id,
+            )
+            dbsession.get().merge(session.user_session)
 
 
 def _validate_session_against_literalai(request: QueryRequest, session: ChatSession) -> None:
