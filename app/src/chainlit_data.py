@@ -4,9 +4,6 @@ import os
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-from chainlit.chat_context import chat_context
-from chainlit.context import context
-from chainlit.data import get_data_layer
 from chainlit.data.base import BaseDataLayer
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
 from chainlit.data.literalai import LiteralDataLayer
@@ -14,7 +11,6 @@ from chainlit.data.storage_clients.base import BaseStorageClient
 from chainlit.data.utils import queue_until_user_message
 from chainlit.element import Element, ElementDict
 from chainlit.logger import logger
-from chainlit.message import Message
 from chainlit.step import StepDict
 from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, ThreadFilter
 from chainlit.user import PersistedUser, User
@@ -54,9 +50,7 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         """
         self.data_layers = data_layers or get_default_data_layers()
         logger.info(
-            "%r Custom Chainlit data layers: %s",
-            self,
-            [type(dl).__name__ for dl in self.data_layers],
+            "Custom Chainlit data layers: %s", [type(dl).__name__ for dl in self.data_layers]
         )
         assert self.data_layers, "No data layers initialized"
 

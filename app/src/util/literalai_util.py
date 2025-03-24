@@ -60,22 +60,6 @@ def get_all_entities[T](api_call: Callable[[LiteralClient, Any], PaginatedRespon
             return entities
 
 
-def get_users() -> list[User]:
-    lai_client = client()
-    entities = []
-    after = None
-    while True:
-        response = lai_client.api.get_users(after=after)
-        after = response.page_info.end_cursor
-        entities += response.data
-        logger.info("Got %r of %r total entities", len(entities), response.total_count)
-        if not response.page_info.has_next_page:
-            assert (
-                len(entities) == response.total_count
-            ), f"Expected {response.total_count} entities, but got only {len(entities)}"
-            return entities
-
-
 def query_threads_between(start_date: datetime, end_date: datetime) -> list[Thread]:
     return get_threads(filter_between(start_date, end_date))
 
