@@ -4,7 +4,6 @@
 This creates API endpoints using FastAPI, which is compatible with Chainlit.
 """
 
-import functools
 import logging
 import time
 import uuid
@@ -15,7 +14,6 @@ from typing import Any, AsyncGenerator, Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
-from literalai import AsyncLiteralClient, Message
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -39,13 +37,12 @@ logger = logging.getLogger(__name__)
 
 @cl.data_layer
 def chainlit_data_layer() -> ChainlitPolyDataLayer:
-    print("chainlit_data_layer: ChainlitPolyDataLayer()")
-    logger.info("chainlit_data_layer: ChainlitPolyDataLayer()")
+    logger.info("API: creating chainlit_data_layer: ChainlitPolyDataLayer()")
     return ChainlitPolyDataLayer()
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncGenerator[Any, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
     # Initialize Chainlit Data Layer
     # init_http_context() calls get_data_layer(), which creates an asyncpg connection pool,
@@ -213,7 +210,7 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
 
         thread_id = request_step["threadId"]
         assert thread_id
-        await store_thread_id(session, thread_id)
+        store_thread_id(session, thread_id)
 
         if thread_name:
             await data_layer.update_thread(thread_id=thread_id, name=thread_name)
@@ -350,7 +347,7 @@ async def query(request: QueryRequest) -> QueryResponse:
 
         thread_id = request_step["threadId"]
         assert thread_id
-        await store_thread_id(session, thread_id)
+        store_thread_id(session, thread_id)
 
         # Only if new session, set the LiteralAI thread name; don't want the thread name to change otherwise
         if request.new_session:
@@ -395,7 +392,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
-async def store_thread_id(session: ChatSession, thread_id: str) -> None:
+def store_thread_id(session: ChatSession, thread_id: str) -> None:
     # Update the DB with the LiteralAI thread ID, regardless of other DB updates,
     # so do this is its own DB transaction.
     # lai_thread_id is None when request.new_session=True
@@ -408,26 +405,6 @@ async def store_thread_id(session: ChatSession, thread_id: str) -> None:
                 session.user_session.lai_thread_id,
             )
             dbsession.get().merge(session.user_session)
-
-        # lai_dl = get_data_layer().data_layers[1]
-        # assert isinstance(lai_dl.client, AsyncLiteralClient)
-        # Workaround/fix: When using the chainlit_data_layer, the participant_id is not set.
-        """
-        When calling client.api.update_thread(id=thread_id, participant_id=session.user_session.user_id),
-        we get "Thread violates foreign key constraint Thread_participantId_fkey" b/c need to pass in
-        the UUID from the Postgres database.
-        In LiteralAI thread export, identifier comes from the Postgres database user.id:
-            "participant": {
-            "id": "b939dbdc-7cfe-4b74-b7a8-7fb1c87e5793",
-            "identifier": "9dec2129-b70c-4a49-9cff-d1f8d366b951"
-            },
-
-        This works but it creates a new user in LiteralAI with the user.identifier = Postgres user.id
-        with no associated threads.
-        """
-        # lai_user = await lai_dl.client.api.get_user(session.user_session.user_id)
-        # await lai_dl.client.api.update_thread(id=thread_id, participant_id=session.user_uuid)
-        # assert lai_user.id == session.user_uuid
 
 
 def _validate_session(request: QueryRequest, session: ChatSession) -> None:

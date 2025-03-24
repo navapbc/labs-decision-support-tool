@@ -5,7 +5,7 @@ import threading
 import uuid
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -31,6 +31,7 @@ from src.citations import CitationFactory, split_into_subsections
 from src.db.models.conversation import Feedback
 from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory, UserSessionFactory
+from tests.src.test_chainlit_data import clear_data_layer_data
 
 
 @contextmanager
@@ -120,6 +121,7 @@ def async_client(mock_lai, db_session):  # mock LiteralAI when testing API
     make tests asynchronous and directly use httpx.AsyncClient to work within the same event loop context.
     """
     reset_cl_data_layer()
+    clear_data_layer_data(db_session)
     return AsyncClient(transport=ASGITransport(app=router), base_url="http://test")
 
 
@@ -158,22 +160,20 @@ async def test_api_engines(async_client):
 
 
 @pytest.mark.asyncio
-async def Atest_api_engines__dbsession_contextvar(async_client, monkeypatch):
+async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
     event = threading.Event()
     db_sessions = []
+    orig_init_chat_session = chat_api._init_chat_session
 
-    async def waiting_get_or_create_user(_self, identifier, _metadata):
+    async def wait_for_all_requests(_self, *_args):
         db_session = chat_api.dbsession.get()
         db_sessions.append(db_session)
-        print("Waiting for event.set() ...", db_session)
         # Run the blocking wait in a separate thread to avoid blocking the event loop
         await asyncio.to_thread(event.wait)
+        # Call original function
+        return await orig_init_chat_session(_self, *_args)
 
-        mock_user = MagicMock()
-        mock_user.id = str(uuid.uuid4())
-        return mock_user
-
-    monkeypatch.setattr(MockLiteralAIApi, "get_or_create_user", waiting_get_or_create_user)
+    monkeypatch.setattr(chat_api, "_init_chat_session", wait_for_all_requests)
 
     async def checker_coroutine():
         while len(db_sessions) < 2:
@@ -216,110 +216,106 @@ async def test_api_query(monkeypatch, async_client):
 
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
 
-    async with async_client:
-        response = await async_client.post(
+    response = await async_client.post(
+        "/api/query",
+        json={
+            "user_id": "user9",
+            "session_id": "Session0",
+            "new_session": True,
+            "message": "Hello",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["response_text"] == "Response from LLM: []"
+
+    # Posting again with the same session_id should fail
+    try:
+        await async_client.post(
             "/api/query",
             json={
                 "user_id": "user9",
                 "session_id": "Session0",
                 "new_session": True,
-                "message": "Hello",
+                "message": "Hello again should fail",
             },
         )
-        assert response.status_code == 200
-        assert response.json()["response_text"] == "Response from LLM: []"
-
-        # Posting again with the same session_id should fail
-        try:
-            await async_client.post(
-                "/api/query",
-                json={
-                    "user_id": "user9",
-                    "session_id": "Session0",
-                    "new_session": True,
-                    "message": "Hello again should fail",
-                },
-            )
-            raise AssertionError("Expected HTTPException")
-        except HTTPException as e:
-            assert e.status_code == 409
-            assert e.detail.startswith(
-                "Cannot start a new session 'Session0' that is already associated with thread_id"
-            )
-
-        # Test chat history
-        response = await async_client.post(
-            "/api/query",
-            json={
-                "user_id": "user9",
-                "session_id": "Session0",
-                "new_session": False,
-                "message": "Hello again",
-            },
+        raise AssertionError("Expected HTTPException")
+    except HTTPException as e:
+        assert e.status_code == 409
+        assert e.detail.startswith(
+            "Cannot start a new session 'Session0' that is already associated with thread_id"
         )
-        assert response.status_code == 200
-        assert (
-            response.json()["response_text"]
-            == "Response from LLM: [{'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Response from LLM: []'}]"
-        )
+
+    # Test chat history
+    response = await async_client.post(
+        "/api/query",
+        json={
+            "user_id": "user9",
+            "session_id": "Session0",
+            "new_session": False,
+            "message": "Hello again",
+        },
+    )
+    assert response.status_code == 200
+    assert (
+        response.json()["response_text"]
+        == "Response from LLM: [{'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Response from LLM: []'}]"
+    )
 
 
 """
 @pytest.mark.asyncio
 async def test_api_query__empty_user_id(monkeypatch, async_client):
-    async with async_client:
-        try:
-            await async_client.post(
-                "/api/query",
-                json={
-                    "user_id": "",
-                    "session_id": "NewSession999",
-                    "new_session": False,
-                    "message": "Should fail",
-                },
-            )
-            raise AssertionError("Expected RequestValidationError")
-        except RequestValidationError as e:
-            error = e.errors()[0]
-            assert error["type"] == "string_too_short"
-            assert error["msg"] == "String should have at least 1 character"
-            assert error["loc"] == ("body", "user_id")
+    try:
+        await async_client.post(
+            "/api/query",
+            json={
+                "user_id": "",
+                "session_id": "NewSession999",
+                "new_session": False,
+                "message": "Should fail",
+            },
+        )
+        raise AssertionError("Expected RequestValidationError")
+    except RequestValidationError as e:
+        error = e.errors()[0]
+        assert error["type"] == "string_too_short"
+        assert error["msg"] == "String should have at least 1 character"
+        assert error["loc"] == ("body", "user_id")
 """
 
 
 @pytest.mark.asyncio
 async def test_api_query__nonexistent_session_id(monkeypatch, async_client):
-    async with async_client:
-        try:
-            await async_client.post(
-                "/api/query",
-                json={
-                    "user_id": "user8",
-                    "session_id": "NewSession999",
-                    "new_session": False,
-                    "message": "Should fail",
-                },
-            )
-            raise AssertionError("Expected HTTPException")
-        except HTTPException as e:
-            assert e.status_code == 409
-            assert e.detail == "LiteralAI thread ID for existing session 'NewSession999' not found"
+    try:
+        await async_client.post(
+            "/api/query",
+            json={
+                "user_id": "user8",
+                "session_id": "NewSession999",
+                "new_session": False,
+                "message": "Should fail",
+            },
+        )
+        raise AssertionError("Expected HTTPException")
+    except HTTPException as e:
+        assert e.status_code == 409
+        assert e.detail == "LiteralAI thread ID for existing session 'NewSession999' not found"
 
 
 @pytest.mark.asyncio
 async def test_api_query__bad_request(async_client):
-    async with async_client:
-        try:
-            await async_client.post(
-                "/api/query",
-                json={"user_id": "user7", "session_id": "Session0", "new_session": True},
-            )
-            raise AssertionError("Expected RequestValidationError")
-        except RequestValidationError as e:
-            error = e.errors()[0]
-            assert error["type"] == "missing"
-            assert error["msg"] == "Field required"
-            assert error["loc"] == ("body", "message")
+    try:
+        await async_client.post(
+            "/api/query",
+            json={"user_id": "user7", "session_id": "Session0", "new_session": True},
+        )
+        raise AssertionError("Expected RequestValidationError")
+    except RequestValidationError as e:
+        error = e.errors()[0]
+        assert error["type"] == "missing"
+        assert error["msg"] == "Field required"
+        assert error["loc"] == ("body", "message")
 
 
 @pytest.fixture
@@ -439,54 +435,52 @@ def test_get_chat_engine_not_allowed():
 
 @pytest.mark.asyncio
 async def test_api_post_feedback_success(async_client, db_session):
-    async with async_client:
-        response = await async_client.post(
-            "/api/query",
-            json={
-                "user_id": "user9",
-                "session_id": "Session_feedback",
-                "new_session": True,
-                "message": "Feedback test",
-            },
-        )
-        assert response.status_code == 200
-        step_id = response.json()["response_id"]
-        assert step_id
+    response = await async_client.post(
+        "/api/query",
+        json={
+            "user_id": "user9",
+            "session_id": "Session_feedback",
+            "new_session": True,
+            "message": "Feedback test",
+        },
+    )
+    assert response.status_code == 200
+    step_id = response.json()["response_id"]
+    assert step_id
 
-        response = await async_client.post(
-            "/api/feedback",
-            json={
-                "session_id": "Session_feedback",
-                "user_id": "user9",
-                "is_positive": "true",
-                "response_id": step_id,
-                "comment": "great answer",
-            },
-        )
-        assert response.status_code == 200
+    response = await async_client.post(
+        "/api/feedback",
+        json={
+            "session_id": "Session_feedback",
+            "user_id": "user9",
+            "is_positive": "true",
+            "response_id": step_id,
+            "comment": "great answer",
+        },
+    )
+    assert response.status_code == 200
 
-        # Check feedback in DB
-        feedback_record = db_session.query(Feedback).filter(Feedback.step_id == step_id).first()
-        assert feedback_record.comment == "great answer"
-        assert feedback_record.value == 1
+    # Check feedback in DB
+    feedback_record = db_session.query(Feedback).filter(Feedback.step_id == step_id).first()
+    assert feedback_record.comment == "great answer"
+    assert feedback_record.value == 1
 
 
 @pytest.mark.asyncio
-async def test_api_post_feedback_fail(monkeypatch, async_client):
-    async with async_client:
-        try:
-            await async_client.post(
-                "/api/feedback",
-                json={
-                    "session_id": "Session_feedback_no_response_id",
-                    "user_id": "user2",
-                    "is_positive": "true",
-                    "comment": "great answer",
-                },
-            )
-            raise AssertionError("Expected RequestValidationError")
-        except RequestValidationError as e:
-            error = e.errors()[0]
-            assert error["type"] == "missing"
-            assert error["msg"] == "Field required"
-            assert error["loc"] == ("body", "response_id")
+async def test_api_post_feedback_fail(async_client):
+    try:
+        await async_client.post(
+            "/api/feedback",
+            json={
+                "session_id": "Session_feedback_no_response_id",
+                "user_id": "user2",
+                "is_positive": "true",
+                "comment": "great answer",
+            },
+        )
+        raise AssertionError("Expected RequestValidationError")
+    except RequestValidationError as e:
+        error = e.errors()[0]
+        assert error["type"] == "missing"
+        assert error["msg"] == "Field required"
+        assert error["loc"] == ("body", "response_id")
