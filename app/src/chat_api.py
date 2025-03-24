@@ -15,6 +15,7 @@ from typing import Any, AsyncGenerator, Coroutine, Generator, Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
+from lazify import LazyProxy
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -165,7 +166,9 @@ def _load_chat_history(user_session: UserSession) -> ChatHistory:
 # endregion
 # region: ===================  Example API Endpoint and logging to LiteralAI  ===================
 
-dbsession: ContextVar[db.Session] = ContextVar("db_session", default=app_config.db_session())
+dbsession: ContextVar[db.Session] = ContextVar(
+    "api_db_session", default=LazyProxy(app_config.db_session(), enable_cache=False)
+)
 
 
 @contextmanager
@@ -271,14 +274,16 @@ async def feedback(
     request: FeedbackRequest,
 ) -> Response:
     """Endpoint for creating feedback for a chatbot response message"""
-    await _init_chat_session(request.user_id, request.session_id)
-    cl_feedback = cl.types.Feedback(
-        forId=request.response_id,
-        value=1 if request.is_positive else 0,
-        comment=request.comment,
-    )
-    await get_data_layer().upsert_feedback(cl_feedback)
-    return Response(status_code=200)
+    with db_session_context_var():
+        await _init_chat_session(request.user_id, request.session_id)
+        await get_data_layer().upsert_feedback(
+            cl.types.Feedback(
+                forId=request.response_id,
+                value=1 if request.is_positive else 0,
+                comment=request.comment,
+            )
+        )
+        return Response(status_code=200)
 
 
 # endregion
