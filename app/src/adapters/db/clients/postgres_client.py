@@ -123,6 +123,12 @@ def generate_iam_auth_token(aws_region: str, host: str, port: int, user: str) ->
     return token
 
 
+def get_database_url() -> str:
+    conf = get_db_config()
+    conn = get_connection_parameters(conf)
+    return f"postgresql://{conn['user']}:{conn['password']}@{conn['host']}:{conn['port']}/{conn['dbname']}?search_path={conf.db_schema}"
+
+
 def verify_ssl(connection_info: Any) -> None:
     """Verify that the database connection is encrypted and log the SSL status."""
     ssl_status = "using SSL" if connection_info.pgconn.ssl_in_use else "not using SSL"
