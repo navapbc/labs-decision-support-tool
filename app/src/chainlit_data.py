@@ -11,18 +11,13 @@ from chainlit.logger import logger
 from chainlit.step import StepDict
 from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, ThreadFilter
 from chainlit.user import PersistedUser, User
-from src.adapters.db.clients.postgres_config import PostgresDBConfig
+from src.adapters.db.clients.postgres_client import get_database_url
 
 
 def get_postgres_data_layer(database_url: str) -> ChainlitDataLayer:
     # See chainlit/data/__init__.py for storage_client options like S3
     storage_client = None
     return ChainlitDataLayer(database_url=database_url, storage_client=storage_client)
-
-
-def get_database_url() -> str:
-    conf = PostgresDBConfig()
-    return f"postgresql://{conf.username}:{conf.password}@{conf.host}:{conf.port}/{conf.name}?search_path={conf.db_schema}"
 
 
 def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
