@@ -47,6 +47,39 @@ class QARow(NamedTuple):
         )
 
     @classmethod
+    def csv_dict_headers(cls) -> dict[str, str]:
+        return [
+            "User ID",
+            "Date",
+            "Question",
+            "Response",
+            "LiteralAI Thread",
+            "Agency ID",
+            "Session ID",
+            "Program",
+            "Citation Links",
+            "Citation Sources",
+            "Has Chat History",
+            "Thread ID",
+        ]
+
+    def to_csv_dict(self) -> dict[str, str]:
+        return {
+            "User ID": self.user_id,
+            "Date": datetime.fromisoformat(self.timestamp).strftime("%m/%d/%Y"),
+            "Question": self.question,
+            "Response": self.answer,
+            "LiteralAI Thread": self.lai_link,
+            "Agency ID": self.agency_id,
+            "Session ID": self.session_id,
+            "Program": self.program if self.program else "",
+            "Citation Links": self.citation_links if self.citation_links else "",
+            "Citation Sources": self.citation_sources if self.citation_sources else "",
+            "Has Chat History": str(self.has_chat_history),
+            "Thread ID": self.thread_id,
+        }
+
+    @classmethod
     def from_lai_thread(
         cls, project_id: str, thread: Thread, question_step: Step, answer_step: Step
     ) -> "QARow":
@@ -126,11 +159,11 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
 
 
 def save_csv(qa_pairs: list[QARow], csv_file: IO) -> None:
-    fields = [field for field in QARow._fields if field != "project_id"]
+    fields = QARow.csv_dict_headers()
     writer = csv.DictWriter(csv_file, fieldnames=fields)
     writer.writeheader()
     for pair in qa_pairs:
-        writer.writerow({k: getattr(pair, k, "") for k in fields})
+        writer.writerow(pair.to_csv_dict())
 
 
 def main() -> None:  # pragma: no cover

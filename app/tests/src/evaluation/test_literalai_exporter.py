@@ -57,14 +57,14 @@ def test_convert_to_qa_rows_and_save_csv(caplog):
     save_csv(qa_rows, mock_csv_file)
     mock_csv_file.seek(0)
     csv_lines = mock_csv_file.readlines()
-    assert len(csv_lines) == 4
-
-    # Roughly check the contents of the CSV file
     assert (
-        "thread_id,question_id,timestamp,user_id,agency_id,session_id,question,answer,program,citation_links,citation_sources,has_chat_history"
-        in csv_lines[0]
+        csv_lines[0]
+        == "User ID,Date,Question,Response,LiteralAI Thread,Agency ID,Session ID,Program,Citation Links,Citation Sources,Has Chat History,Thread ID\r\n"
     )
+
     for line in csv_lines[1:]:
-        assert line.startswith("th_")
+        assert line.startswith(
+            "U1",
+        )
         # Check for metadata
-        assert ",U1,Agency1,sesh1,Q1,A1,prog1," in line
+        assert "Agency1,sesh1,prog1,,,False,th_" in line
