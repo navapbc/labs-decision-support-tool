@@ -47,7 +47,7 @@ class QARow(NamedTuple):
         )
 
     @classmethod
-    def csv_dict_headers(cls) -> dict[str, str]:
+    def csv_dict_headers(cls) -> list[str]:
         return [
             "User ID",
             "Date",
@@ -61,6 +61,7 @@ class QARow(NamedTuple):
             "Citation Sources",
             "Has Chat History",
             "Thread ID",
+            "Timestamp",
         ]
 
     def to_csv_dict(self) -> dict[str, str]:
@@ -77,6 +78,7 @@ class QARow(NamedTuple):
             "Citation Sources": self.citation_sources if self.citation_sources else "",
             "Has Chat History": str(self.has_chat_history),
             "Thread ID": self.thread_id,
+            "Timestamp": self.timestamp,
         }
 
     @classmethod
