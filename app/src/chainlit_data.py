@@ -4,6 +4,8 @@ import os
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+import asyncpg
+
 from chainlit.data.base import BaseDataLayer
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
 from chainlit.data.literalai import LiteralDataLayer
@@ -16,11 +18,30 @@ from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, 
 from chainlit.user import PersistedUser, User
 from src.adapters.db.clients.postgres_client import get_database_url
 
+# import nest_asyncio
+# nest_asyncio.apply()
 
-def get_postgres_data_layer(database_url: str) -> "PostgresDataLayer":
+# def create_db_connection_pool() -> asyncpg.Pool:
+#     "Connection pool is needed for AWS where IAM auth token expires periodically"
+
+#     async def create_connection(*args, **kwargs) -> asyncpg.connection.Connection:
+#         logger.info("Creating new connection for pool")
+#         return await asyncpg.connect(get_database_url())
+
+#     async def pool() -> asyncpg.Pool:
+#         return await asyncpg.create_pool(connect=create_connection)
+
+#     # import pdb; pdb.set_trace()
+#     loop = asyncio.get_running_loop()
+#     task = loop.create_task(pool())
+#     loop.run_until_complete(task)
+#     result = task.result()
+#     return result
+
+
+def get_postgres_data_layer(database_url: Optional[str] = None) -> "PostgresDataLayer":
     # See chainlit/data/__init__.py for storage_client options like S3
-    storage_client = None
-    return PostgresDataLayer(database_url=database_url, storage_client=storage_client)
+    return PostgresDataLayer(database_url=database_url, storage_client=None)
 
 
 def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
@@ -30,8 +51,11 @@ def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
 
 def get_default_data_layers() -> List[BaseDataLayer]:
     data_layers: List[BaseDataLayer] = []
-    if database_url := os.environ.get("DATABASE_URL", get_database_url()):
-        data_layers.append(get_postgres_data_layer(database_url))
+
+    # The primary data layer is always our Postgres DB
+    database_url = os.environ.get("DATABASE_URL")
+    data_layers.append(get_postgres_data_layer(database_url))
+
     if api_key := os.environ.get("LITERAL_API_KEY"):
         data_layers.append(get_literal_data_layer(api_key))
     return data_layers
@@ -201,13 +225,34 @@ class ChainlitPolyDataLayer(BaseDataLayer):
 class PostgresDataLayer(ChainlitDataLayer):
     def __init__(
         self,
-        database_url: str,
+        database_url: Optional[str] = None,
         storage_client: Optional[BaseStorageClient] = None,
         show_logger: bool = False,
     ):
+        if database_url is None:
+            database_url = ""
+        logger.info("Creating PostgresDataLayer with database_url=%r", database_url)
+
         super().__init__(
             database_url=database_url, storage_client=storage_client, show_logger=show_logger
         )
+
+    async def connect(self):
+        """
+        Override ChainlitDataLayer.connect() to use a connection pool that calls our get_database_url().
+        A connection pool is needed for AWS where IAM auth token expires periodically.
+        """
+        if self.database_url:
+            await super().connect()
+            return
+
+        if not self.pool:
+
+            async def create_connection(*args, **kwargs) -> asyncpg.connection.Connection:
+                logger.info("Creating new connection for pool")
+                return await asyncpg.connect(get_database_url())
+
+            self.pool = await asyncpg.create_pool(connect=create_connection)
 
     def _get_uuid_metadata(self, user: User) -> str | None:
         if "uuid" in user.metadata:
