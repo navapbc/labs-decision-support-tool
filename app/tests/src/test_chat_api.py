@@ -163,7 +163,6 @@ async def mock_run_query(engine, question, chat_history):
 @pytest.mark.asyncio
 async def test_api_query(async_client, monkeypatch):
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
-
     response = await async_client.post(
         "/api/query",
         json={
@@ -250,7 +249,8 @@ async def test_api_query__nonexistent_session_id(async_client):
 
 
 @pytest.mark.asyncio
-async def test_api_query__user_session_mismatch(async_client):
+async def test_api_query__user_session_mismatch(async_client, monkeypatch):
+    monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
     try:
         await async_client.post(
             "/api/query",

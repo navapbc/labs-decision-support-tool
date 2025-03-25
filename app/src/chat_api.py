@@ -20,8 +20,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 import chainlit as cl
-from chainlit.context import init_http_context
-from chainlit.data import get_data_layer
+from chainlit.context import init_http_context as cl_init_context
+from chainlit.data import get_data_layer as cl_get_data_layer
 from chainlit.step import StepDict
 from src import chat_engine
 from src.adapters import db
@@ -48,9 +48,9 @@ def chainlit_data_layer() -> ChainlitPolyDataLayer:
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
     # Initialize Chainlit Data Layer
-    # init_http_context() calls get_data_layer(), which creates an asyncpg connection pool,
+    # cl_init_context() calls get_data_layer(), which creates an asyncpg connection pool,
     # which is available only in a single event loop used by FastAPI to respond to requests
-    init_http_context()
+    cl_init_context()
     yield
     logger.info("Cleaning up API")
 
@@ -135,8 +135,8 @@ async def _init_chat_session(
         # raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
 
     # Ensure user exists in storage
-    # init_http_context() will use stored_user.id as the thread.user_id
-    stored_user = await get_data_layer().create_user(
+    # cl_init_context() will use stored_user.id as the thread.user_id
+    stored_user = await cl_get_data_layer().create_user(
         # display_name isn't persisted in Chainlit data layer
         cl.User(identifier=user_id, display_name=user_id, metadata=user_meta or {})
     )
@@ -150,7 +150,7 @@ async def _init_chat_session(
     # with the thread when cl.MessageBase.__post_init__() accesses cl.context.session.thread_id.
     # The http_context uses ContextVars to avoid concurrency issues.
     # (There's also an init_ws_context() if we enable websocket support -- see chainlit.socket.py)
-    init_http_context(thread_id=thread_id, user=stored_user)
+    cl_init_context(thread_id=thread_id, user=stored_user)
     return chat_session
 
 
@@ -203,7 +203,7 @@ async def persist_messages(
     "Asynchronously persist request and response messages"
     coroutines = []
     # Use get_data_layer() like in chainlit.server
-    data_layer = get_data_layer()
+    data_layer = cl_get_data_layer()
     # The creating the first step in a thread will also create a new thread
     coroutines.append(data_layer.create_step(request_step))
 
@@ -281,15 +281,21 @@ async def feedback(
 ) -> Response:
     """Endpoint for creating feedback for a chatbot response message"""
     with db_session_context_var():
-        await _init_chat_session(request.user_id, request.session_id)
-        await get_data_layer().upsert_feedback(
-            cl.types.Feedback(
-                forId=request.response_id,
-                value=1 if request.is_positive else 0,
-                comment=request.comment,
+        try:
+            await _init_chat_session(request.user_id, request.session_id)
+            await cl_get_data_layer().upsert_feedback(
+                cl.types.Feedback(
+                    forId=request.response_id,
+                    value=1 if request.is_positive else 0,
+                    comment=request.comment,
+                )
             )
-        )
-        return Response(status_code=200)
+            return Response(status_code=200)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error: {e}",
+            ) from e
 
 
 # endregion
