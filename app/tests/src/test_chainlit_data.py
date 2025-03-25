@@ -9,6 +9,7 @@ from sqlalchemy import delete
 import chainlit as cl
 from chainlit.context import init_http_context
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
+from chainlit.data.literalai import LiteralDataLayer
 from src import chainlit_data
 from src.adapters.db.clients.postgres_client import get_database_url
 from src.chainlit_data import ChainlitPolyDataLayer, get_postgres_data_layer
@@ -196,3 +197,42 @@ async def test_exception_in_primary_layer(db_session, monkeypatch, caplog):
         except ZeroDivisionError:
             pass
         assert "Error in primary data layer: mock error" in caplog.messages
+
+
+@pytest.mark.asyncio
+async def test_create_user_has_consistent_id(db_session, monkeypatch, caplog):
+    clear_data_layer_data(db_session)
+
+    # Set LITERAL_API_KEY to create a secondary data layer
+    monkeypatch.setenv("LITERAL_API_KEY", "dummy_key")
+
+    # Create mock for the secondary data layer
+    class MockLiteralAiDataLayer(LiteralDataLayer):
+        def __init__(self):
+            self.stored_user = None
+
+        async def create_user(self, user: cl.User):
+            self.stored_user = cl.PersistedUser(
+                id=str(uuid.uuid4()),
+                identifier=user.identifier,
+                metadata=user.metadata,
+                createdAt=str(datetime.datetime.now()),
+            )
+            return self.stored_user
+
+        async def get_user(self, identifier: str):
+            assert identifier == self.stored_user.identifier
+            return self.stored_user
+
+    monkeypatch.setattr(
+        chainlit_data, "get_literal_data_layer", lambda _key: MockLiteralAiDataLayer()
+    )
+
+    data_layer = ChainlitPolyDataLayer()
+    assert len(data_layer.data_layers) == 2
+
+    user = cl.User(identifier="test_user", metadata={"test": True})
+    stored_user_pg = await data_layer.create_user(user)
+
+    stored_user_lai = await data_layer.data_layers[1].get_user("test_user")
+    assert stored_user_pg.id == stored_user_lai.id
