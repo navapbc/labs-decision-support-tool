@@ -126,7 +126,7 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
 
 
 def save_csv(qa_pairs: list[QARow], csv_file: IO) -> None:
-    fields = [field for field in QARow._fields if field != "project_id"]
+    fields = [field for field in QARow._fields if field != "project_id"] + ["lai_link"]
     writer = csv.DictWriter(csv_file, fieldnames=fields)
     writer.writeheader()
     for pair in qa_pairs:
