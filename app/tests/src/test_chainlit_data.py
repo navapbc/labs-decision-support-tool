@@ -10,7 +10,8 @@ import chainlit as cl
 from chainlit.context import init_http_context
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
 from src import chainlit_data
-from src.chainlit_data import ChainlitPolyDataLayer, get_database_url, get_postgres_data_layer
+from src.adapters.db.clients.postgres_client import get_database_url
+from src.chainlit_data import ChainlitPolyDataLayer, get_postgres_data_layer
 from src.db.models.conversation import Element, Feedback, Step, Thread, User
 
 
