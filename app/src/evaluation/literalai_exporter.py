@@ -46,24 +46,6 @@ class QARow(NamedTuple):
             f"threads/{self.thread_id}?currentStepId={self.question_id}"
         )
 
-    @classmethod
-    def csv_dict_headers(cls) -> list[str]:
-        return [
-            "User ID",
-            "Date",
-            "Question",
-            "Response",
-            "LiteralAI Thread",
-            "Agency ID",
-            "Session ID",
-            "Program",
-            "Citation Links",
-            "Citation Sources",
-            "Has Chat History",
-            "Thread ID",
-            "Timestamp",
-        ]
-
     def to_csv_dict(self) -> dict[str, str]:
         return {
             "User ID": self.user_id,
@@ -161,7 +143,7 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
 
 
 def save_csv(qa_pairs: list[QARow], csv_file: IO) -> None:
-    fields = QARow.csv_dict_headers()
+    fields = list(qa_pairs[0].to_csv_dict().keys())
     writer = csv.DictWriter(csv_file, fieldnames=fields)
     writer.writeheader()
     for pair in qa_pairs:
