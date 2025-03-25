@@ -45,7 +45,7 @@ def chainlit_data_layer() -> ChainlitPolyDataLayer:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[Any, None]:
     logger.info("Initializing API")
     # Initialize Chainlit Data Layer
     # cl_init_context() calls get_data_layer(), which creates an asyncpg connection pool,
@@ -200,11 +200,17 @@ async def persist_messages(
     thread_name: str | None,
     process_request: Coroutine,
 ) -> tuple[Any, StepDict]:
-    "Asynchronously persist request and response messages"
+    """Asynchronously persist request and response messages
+
+    A ChatSession is persisted in Thread and user_session tables
+    - A session/thread is associated with only 1 user
+    A Message is persisted in Step and chat_message tables
+    - A message/step can have an author/name
+    """
     coroutines = []
     # Use get_data_layer() like in chainlit.server
     data_layer = cl_get_data_layer()
-    # The creating the first step in a thread will also create a new thread
+    # Creating the first step in a thread will also create a new thread
     coroutines.append(data_layer.create_step(request_step))
 
     if thread_name:
@@ -231,13 +237,9 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
         # Only if new session (i.e., lai_thread_id hasn't been set), set the thread name
         thread_name = "API:/engines" if session.is_new else None
 
-        # A ChatSession is persisted in Thread and user_session tables
-        # - A session/thread is associated with only 1 user
-        # A Message is persisted in Step and chat_message tables
-        # - A message/step can have an author/name
         request_step = cl.Message(
-            author=session.user_uuid,  # author become the step.name
             content="List chat engines",  # content becomes the step.output
+            author=session.user_uuid,  # author becomes the step.name
             type="user_message",
             metadata={
                 "user_id": session.user_session.user_id,
@@ -260,9 +262,7 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
 
             return response, resp_msg
 
-        response, _response_step = await persist_messages(
-            request_step, thread_name, process_request()
-        )
+        response, _resp_step = await persist_messages(request_step, thread_name, process_request())
         return response
 
 
