@@ -18,30 +18,9 @@ from chainlit.types import Feedback, PaginatedResponse, Pagination, ThreadDict, 
 from chainlit.user import PersistedUser, User
 from src.adapters.db.clients.postgres_client import get_database_url
 
-# import nest_asyncio
-# nest_asyncio.apply()
-
-# def create_db_connection_pool() -> asyncpg.Pool:
-#     "Connection pool is needed for AWS where IAM auth token expires periodically"
-
-#     async def create_connection(*args, **kwargs) -> asyncpg.connection.Connection:
-#         logger.info("Creating new connection for pool")
-#         return await asyncpg.connect(get_database_url())
-
-#     async def pool() -> asyncpg.Pool:
-#         return await asyncpg.create_pool(connect=create_connection)
-
-#     # import pdb; pdb.set_trace()
-#     loop = asyncio.get_running_loop()
-#     task = loop.create_task(pool())
-#     loop.run_until_complete(task)
-#     result = task.result()
-#     return result
-
 
 def get_postgres_data_layer(database_url: Optional[str] = None) -> "PostgresDataLayer":
-    # See chainlit/data/__init__.py for storage_client options like S3
-    return PostgresDataLayer(database_url=database_url, storage_client=None)
+    return PostgresDataLayer(database_url=database_url)
 
 
 def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
@@ -233,11 +212,12 @@ class PostgresDataLayer(ChainlitDataLayer):
             database_url = ""
         logger.info("Creating PostgresDataLayer with database_url=%r", database_url)
 
+        # See chainlit/data/__init__.py for storage_client options like S3
         super().__init__(
             database_url=database_url, storage_client=storage_client, show_logger=show_logger
         )
 
-    async def connect(self):
+    async def connect(self) -> None:
         """
         Override ChainlitDataLayer.connect() to use a connection pool that calls our get_database_url().
         A connection pool is needed for AWS where IAM auth token expires periodically.
@@ -248,7 +228,10 @@ class PostgresDataLayer(ChainlitDataLayer):
 
         if not self.pool:
 
-            async def create_connection(*args, **kwargs) -> asyncpg.connection.Connection:
+            async def create_connection(
+                *_args: Any, **_kwargs: Any
+            ) -> asyncpg.connection.Connection:
+                "See asyncpg.connection.connect() for possible args and kwargs, which are configurable via create_pool()"
                 logger.info("Creating new connection for pool")
                 return await asyncpg.connect(get_database_url())
 
