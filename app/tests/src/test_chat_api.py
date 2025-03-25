@@ -210,7 +210,7 @@ async def test_api_query(async_client, monkeypatch):
 
 """
 @pytest.mark.asyncio
-async def test_api_query__empty_user_id(monkeypatch, async_client):
+async def test_api_query__empty_user_id(async_client):
     try:
         await async_client.post(
             "/api/query",
