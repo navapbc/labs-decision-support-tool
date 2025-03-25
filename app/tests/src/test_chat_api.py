@@ -176,7 +176,7 @@ async def test_api_query(async_client, monkeypatch):
     assert response.status_code == 200
     assert response.json()["response_text"] == "Response from LLM: []"
 
-    # Posting again with the same session_id should fail
+    # Posting again with new_session=True and the same session_id should fail
     try:
         await async_client.post(
             "/api/query",
@@ -190,9 +190,7 @@ async def test_api_query(async_client, monkeypatch):
         raise AssertionError("Expected HTTPException")
     except HTTPException as e:
         assert e.status_code == 409
-        assert e.detail.startswith(
-            "Cannot start a new session 'Session0' that is already associated with thread_id"
-        )
+        assert e.detail.startswith("Cannot start a new session 'Session0' that already exists")
 
     # Test chat history
     response = await async_client.post(
@@ -234,13 +232,13 @@ async def test_api_query__empty_user_id(monkeypatch, async_client):
 
 
 @pytest.mark.asyncio
-async def test_api_query__nonexistent_session_id(monkeypatch, async_client):
+async def test_api_query__nonexistent_session_id(async_client):
     try:
         await async_client.post(
             "/api/query",
             json={
                 "user_id": "user8",
-                "session_id": "NewSession999",
+                "session_id": "SessionForUser8",
                 "new_session": False,
                 "message": "Should fail",
             },
@@ -248,7 +246,34 @@ async def test_api_query__nonexistent_session_id(monkeypatch, async_client):
         raise AssertionError("Expected HTTPException")
     except HTTPException as e:
         assert e.status_code == 409
-        assert e.detail == "LiteralAI thread ID for existing session 'NewSession999' not found"
+        assert e.detail == "Existing session 'SessionForUser8' not found"
+
+
+@pytest.mark.asyncio
+async def test_api_query__user_session_mismatch(async_client):
+    try:
+        await async_client.post(
+            "/api/query",
+            json={
+                "user_id": "user9",
+                "session_id": "SessionForUser9",
+                "new_session": True,
+                "message": "Should fail",
+            },
+        )
+        await async_client.post(
+            "/api/query",
+            json={
+                "user_id": "user10",
+                "session_id": "SessionForUser9",
+                "new_session": False,
+                "message": "Should fail",
+            },
+        )
+        raise AssertionError("Expected HTTPException")
+    except HTTPException as e:
+        assert e.status_code == 409
+        assert e.detail == "Session 'SessionForUser9' is not associated with user 'user10'"
 
 
 @pytest.mark.asyncio
@@ -351,6 +376,7 @@ async def test_run_query__unknown_citation(subsections, caplog):
 def test_get_chat_engine():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
+        is_new=True,
         user_uuid="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("ca-edd-web", retrieval_k=6),
         allowed_engines=["ca-edd-web"],
@@ -362,6 +388,7 @@ def test_get_chat_engine():
 def test_get_chat_engine__unknown():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
+        is_new=True,
         user_uuid="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("engine_y"),
         allowed_engines=["ca-edd-web"],
@@ -373,6 +400,7 @@ def test_get_chat_engine__unknown():
 def test_get_chat_engine_not_allowed():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
+        is_new=True,
         user_uuid="some_literalai_user_id",
         chat_engine_settings=ChatEngineSettings("bridges-eligibility-manual"),
         allowed_engines=["ca-edd-web"],

@@ -78,6 +78,7 @@ class ChatEngineSettings:
 @dataclass
 class ChatSession:
     user_session: UserSession
+    is_new: bool
     # This user uuid is always retrieved from chainlit data layer so it doesn't need to be stored in the DB
     user_uuid: str | None
     chat_engine_settings: ChatEngineSettings
@@ -85,29 +86,39 @@ class ChatSession:
 
 
 def __get_or_create_chat_session(
-    user_id: str, session_id: str | None, user_uuid: str | None
+    user_id: str, session_id: str | None, user_uuid: str
 ) -> ChatSession:
     "Creating/retrieving user's session from the DB"
     if user_session := _load_user_session(session_id):
         logger.info("Found user session %r for: %s", session_id, user_id)
         if user_session.user_id != user_id:
             raise HTTPException(
-                status_code=400,
-                detail=f"Session {session_id} is not associated with user {user_id}",
+                status_code=409,
+                detail=f"Session {session_id!r} is not associated with user {user_id!r}",
             )
+        new_session = False
     else:
         with dbsession.get().begin():  # session is auto-committed or rolled back upon exception
-            logger.info("Creating new user session %r for: %s", session_id, user_id)
             user_session = UserSession(
                 session_id=session_id or str(uuid.uuid4()),
                 user_id=user_id,
                 chat_engine_id="imagine-la",
-                lai_thread_id=None,
+                # Assign a new thread ID for the session
+                # This will be used as Message/Step.thread_id and Thread.id when they're created
+                lai_thread_id=str(uuid.uuid4()),
+            )
+            logger.info(
+                "Creating new user session %r (thread.id %r) for user %r",
+                user_session.session_id,
+                user_session.lai_thread_id,
+                user_id,
             )
             dbsession.get().add(user_session)
+        new_session = True
 
     return ChatSession(
         user_session=user_session,
+        is_new=new_session,
         user_uuid=user_uuid,
         chat_engine_settings=ChatEngineSettings(user_session.chat_engine_id),
         allowed_engines=["imagine-la"],
@@ -140,8 +151,6 @@ async def _init_chat_session(
     # The http_context uses ContextVars to avoid concurrency issues.
     # (There's also an init_ws_context() if we enable websocket support -- see chainlit.socket.py)
     init_http_context(thread_id=thread_id, user=stored_user)
-
-    logger.info("Session %r (user %r): LiteralAI thread_id=%s", session_id, user_id, thread_id)
     return chat_session
 
 
@@ -187,7 +196,6 @@ def db_session_context_var() -> Generator[db.Session, None, None]:
 
 
 async def persist_messages(
-    session: ChatSession,
     request_step: StepDict,
     thread_name: str | None,
     process_request: Coroutine,
@@ -199,13 +207,11 @@ async def persist_messages(
     # The creating the first step in a thread will also create a new thread
     coroutines.append(data_layer.create_step(request_step))
 
-    thread_id = request_step["threadId"]
-    assert thread_id
-    store_thread_id(session.user_session, thread_id)
-
     if thread_name:
         # In the data layer, update_thread() can execute before or after create_step()
-        coroutines.append(data_layer.update_thread(thread_id=thread_id, name=thread_name))
+        coroutines.append(
+            data_layer.update_thread(thread_id=request_step["threadId"], name=thread_name)
+        )
 
     response, response_step = await process_request
 
@@ -223,7 +229,7 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
         user_meta = {"engines": True}
         session = await _init_chat_session(user_id, session_id, user_meta)
         # Only if new session (i.e., lai_thread_id hasn't been set), set the thread name
-        thread_name = "API:/engines" if not session.user_session.lai_thread_id else None
+        thread_name = "API:/engines" if session.is_new else None
 
         # A ChatSession is persisted in Thread and user_session tables
         # - A session/thread is associated with only 1 user
@@ -255,7 +261,7 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
             return response, resp_msg
 
         response, _response_step = await persist_messages(
-            session, request_step, thread_name, process_request()
+            request_step, thread_name, process_request()
         )
         return response
 
@@ -390,7 +396,7 @@ async def query(request: QueryRequest) -> QueryResponse:
             return response, response_step
 
         response, response_step = await persist_messages(
-            session, request_step, thread_name, process_request()
+            request_step, thread_name, process_request()
         )
         # An id is needed to later provide feedback on this message
         response.response_id = response_step["id"]
@@ -415,36 +421,18 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
-def store_thread_id(user_session: UserSession, thread_id: str) -> None:
-    # Update the DB with the LiteralAI thread ID, regardless of other DB updates,
-    # so do this is its own DB transaction.
-    # lai_thread_id is None when request.new_session=True
-    # A thread_id is not set until the first thread message is created
-    if not user_session.lai_thread_id and thread_id:
-        with dbsession.get().begin():
-            user_session.lai_thread_id = thread_id
-            logger.info(
-                "Started new session with thread_id: %s",
-                user_session.lai_thread_id,
-            )
-            dbsession.get().merge(user_session)
-
-
 def _validate_session(request: QueryRequest, session: ChatSession) -> None:
     # Check if request is consistent with LiteralAI thread
-    if request.new_session and session.user_session.lai_thread_id:
+    if request.new_session and not session.is_new:
         raise HTTPException(
             status_code=409,
-            detail=(
-                f"Cannot start a new session {request.session_id!r} that is "
-                f"already associated with thread_id {session.user_session.lai_thread_id!r}"
-            ),
+            detail=(f"Cannot start a new session {request.session_id!r} that already exists"),
         )
 
-    if not request.new_session and not session.user_session.lai_thread_id:
+    if not request.new_session and session.is_new:
         raise HTTPException(
             status_code=409,
-            detail=f"LiteralAI thread ID for existing session {request.session_id!r} not found",
+            detail=f"Existing session {request.session_id!r} not found",
         )
 
 
@@ -452,7 +440,7 @@ def _validate_chat_history(request: QueryRequest, chat_history: ChatHistory) -> 
     if request.new_session and chat_history:
         raise HTTPException(
             status_code=409,
-            detail=f"Cannot start a new session with an existing session_id: {request.session_id}",
+            detail=f"Cannot start a new session with an existing chat_history: {request.session_id}",
         )
     if not request.new_session and not chat_history:
         raise HTTPException(
