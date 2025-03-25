@@ -1,5 +1,6 @@
 import logging
 from typing import Any
+from urllib.parse import quote_plus
 
 import boto3
 import psycopg
@@ -126,7 +127,7 @@ def generate_iam_auth_token(aws_region: str, host: str, port: int, user: str) ->
 def get_database_url() -> str:
     conf = get_db_config()
     conn = get_connection_parameters(conf)
-    return f"postgresql://{conn['user']}:{conn['password']}@{conn['host']}:{conn['port']}/{conn['dbname']}?search_path={conf.db_schema}"
+    return f"postgresql://{conn['user']}:{quote_plus(conn['password'])}@{conn['host']}:{conn['port']}/{conn['dbname']}?search_path={conf.db_schema}"
 
 
 def verify_ssl(connection_info: Any) -> None:
