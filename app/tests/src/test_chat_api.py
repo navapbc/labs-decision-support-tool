@@ -258,6 +258,8 @@ async def test_api_query(async_client, monkeypatch, db_session):
     assert len(request_steps) == 2
     assert len(response_steps) == 2
     assert set(step.parent_id for step in response_steps) == set(step.id for step in request_steps)
+    for request_step in request_steps:
+        assert request_step.name == "user9"
     assert request_steps[0].output == "Hello"
     assert response_steps[0].output == "Response from LLM: []"
     assert request_steps[1].output == "Hello again"

@@ -239,10 +239,11 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
 
         request_step = cl.Message(
             content="List chat engines",  # content becomes the step.output
-            author=session.user_uuid,  # author becomes the step.name
+            author=session.user_session.user_id,  # author becomes the step.name
             type="user_message",
             metadata={
                 "user_id": session.user_session.user_id,
+                "user_uuid": session.user_uuid,
             },
         ).to_dict()
 
@@ -376,11 +377,12 @@ async def query(request: QueryRequest) -> QueryResponse:
         # Only if new session, set the LiteralAI thread name; don't want the thread name to change otherwise
         thread_name = request.message.strip().splitlines()[0] if request.new_session else None
         request_step = cl.Message(
-            author=session.user_uuid,
+            author=session.user_session.user_id,
             content=request.message,
             type="user_message",
             metadata={
                 "user_id": session.user_session.user_id,
+                "user_uuid": session.user_uuid,
                 "request": request.__dict__,
             },
         ).to_dict()
