@@ -199,12 +199,17 @@ async def test_api_query(async_client, monkeypatch, db_session):
         json={
             "user_id": "user9",
             "session_id": "Session0",
+            "agency_id": "my_agency",
             "new_session": True,
             "message": "Hello",
         },
     )
     assert response.status_code == 200
     assert response.json()["response_text"] == "Response from LLM: []"
+
+    user = db_session.query(User).first()
+    assert user.identifier == "user9"
+    assert user.metadata_col == {"agency_id": "my_agency"}
 
     # Posting again with new_session=True and the same session_id should fail
     try:
@@ -228,6 +233,8 @@ async def test_api_query(async_client, monkeypatch, db_session):
         json={
             "user_id": "user9",
             "session_id": "Session0",
+            "agency_id": "my_updated_agency",
+            "beneficiary_id": "my_beneficiary",
             "new_session": False,
             "message": "Hello again",
         },
@@ -238,10 +245,16 @@ async def test_api_query(async_client, monkeypatch, db_session):
         == "Response from LLM: [{'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Response from LLM: []'}]"
     )
 
+    # Reset to force re-fetching from DB
+    db_session.reset()
     # Check persistence to DB
     users = db_session.query(User).all()
     assert len(users) == 1
     assert users[0].identifier == "user9"
+    assert users[0].metadata_col == {
+        "agency_id": "my_updated_agency",
+        "beneficiary_id": "my_beneficiary",
+    }
 
     threads = db_session.query(Thread).all()
     assert len(threads) == 1
@@ -308,7 +321,7 @@ async def test_api_query__nonexistent_session_id(async_client, db_session):
         assert e.detail == "Existing session 'SessionForUser8' not found"
 
     # Check persistence to DB
-    assert db_session.execute(select(User.identifier)).scalars().all() == ["user8"]
+    assert db_session.query(User).count() == 0
     assert db_session.query(Thread).count() == 0
     assert db_session.query(Step).count() == 0
     assert db_session.query(Feedback).count() == 0
@@ -342,7 +355,7 @@ async def test_api_query__user_session_mismatch(async_client, monkeypatch, db_se
         assert e.detail == "Session 'SessionForUser9' is not associated with user 'user10'"
 
     # Check persistence to DB
-    assert db_session.execute(select(User.identifier)).scalars().all() == ["user9", "user10"]
+    assert db_session.execute(select(User.identifier)).scalars().all() == ["user9"]
     assert db_session.query(Thread).count() == 1
     assert db_session.query(Step).count() == 2
     assert db_session.query(Feedback).count() == 0

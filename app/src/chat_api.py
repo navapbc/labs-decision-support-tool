@@ -79,25 +79,31 @@ class ChatEngineSettings:
 class ChatSession:
     user_session: UserSession
     is_new: bool
-    # This user uuid is always retrieved from chainlit data layer so it doesn't need to be stored in the DB
-    user_uuid: str | None
     chat_engine_settings: ChatEngineSettings
     allowed_engines: list[str]
+    # This user uuid is always retrieved from chainlit data layer so it doesn't need to be stored in the DB
+    user_uuid: str | None = None
 
 
 def __get_or_create_chat_session(
-    user_id: str, session_id: str | None, user_uuid: str
+    user_id: str, session_id: str | None, new_session: bool
 ) -> ChatSession:
     "Creating/retrieving user's session from the DB"
     if user_session := _load_user_session(session_id):
+        if new_session:
+            raise HTTPException(
+                status_code=409,
+                detail=(f"Cannot start a new session {session_id!r} that already exists"),
+            )
+
         logger.info("Found user session %r for: %s", session_id, user_id)
         if user_session.user_id != user_id:
             raise HTTPException(
                 status_code=409,
                 detail=f"Session {session_id!r} is not associated with user {user_id!r}",
             )
-        new_session = False
-    else:
+        session_created = False
+    elif new_session:
         with dbsession.get().begin():  # session is auto-committed or rolled back upon exception
             user_session = UserSession(
                 session_id=session_id or str(uuid.uuid4()),
@@ -114,12 +120,16 @@ def __get_or_create_chat_session(
                 user_id,
             )
             dbsession.get().add(user_session)
-        new_session = True
+        session_created = True
+    else:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Existing session {session_id!r} not found",
+        )
 
     return ChatSession(
         user_session=user_session,
-        is_new=new_session,
-        user_uuid=user_uuid,
+        is_new=session_created,
         chat_engine_settings=ChatEngineSettings(user_session.chat_engine_id),
         allowed_engines=["imagine-la"],
     )
@@ -129,20 +139,38 @@ async def _init_chat_session(
     user_id: str,
     session_id: str | None,
     user_meta: Optional[dict] = None,
+    new_session: bool = True,
 ) -> ChatSession:
     if user_id == "":
         user_id = "EMPTY_USER_ID"  # temporary fix for empty user_id
         # raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
 
-    # Ensure user exists in storage
-    # cl_init_context() will use stored_user.id as the thread.user_id
-    stored_user = await cl_get_data_layer().create_user(
-        # display_name isn't persisted in Chainlit data layer
-        cl.User(identifier=user_id, display_name=user_id, metadata=user_meta or {})
-    )
-
     # Also associate stored_user.id with the user_id and session
-    chat_session = __get_or_create_chat_session(user_id, session_id, user_uuid=stored_user.id)
+    chat_session = __get_or_create_chat_session(user_id, session_id, new_session)
+
+    # Ensure user exists in storage
+    stored_user = await cl_get_data_layer().get_user(user_id)
+    if not stored_user and not new_session:
+        raise HTTPException(status_code=404, detail=f"User {user_id!r} not found")
+
+    if stored_user and user_meta:
+        # Merge metadata from the stored user with user_meta if key doesn't already exist
+        for key, value in stored_user.metadata.items():
+            if key not in user_meta:
+                user_meta[key] = value
+        # If metadata is the same, assume there's no metadata to update
+        if user_meta == stored_user.metadata:
+            user_meta = None
+
+    # If user doesn't exist or there is new metadata, create or update the user
+    if not stored_user or user_meta:
+        stored_user = await cl_get_data_layer().create_user(
+            # display_name isn't persisted in Chainlit data layer
+            cl.User(identifier=user_id, display_name=user_id, metadata=user_meta or {})
+        )
+
+    # cl_init_context() will use stored_user.id as the thread.user_id
+    chat_session.user_uuid = stored_user.id
 
     # The thread_id is set in store_thread_id() after the thread is automatically created
     thread_id = chat_session.user_session.lai_thread_id
@@ -283,7 +311,7 @@ async def feedback(
     """Endpoint for creating feedback for a chatbot response message"""
     with db_session_context_var():
         try:
-            await _init_chat_session(request.user_id, request.session_id)
+            await _init_chat_session(request.user_id, request.session_id, new_session=False)
             await cl_get_data_layer().upsert_feedback(
                 cl.types.Feedback(
                     forId=request.response_id,
@@ -366,9 +394,15 @@ async def query(request: QueryRequest) -> QueryResponse:
     with db_session_context_var() as db_session:
         start_time = time.perf_counter()
 
-        user_meta = {"agency_id": request.agency_id, "beneficiary_id": request.beneficiary_id}
-        session = await _init_chat_session(request.user_id, request.session_id, user_meta)
-        _validate_session(request, session)
+        user_meta = {}
+        if request.agency_id is not None:
+            user_meta["agency_id"] = request.agency_id
+        if request.beneficiary_id is not None:
+            user_meta["beneficiary_id"] = request.beneficiary_id
+
+        session = await _init_chat_session(
+            request.user_id, request.session_id, user_meta, request.new_session
+        )
 
         # Load history BEFORE adding the new message to the DB
         chat_history = _load_chat_history(session.user_session)
@@ -427,21 +461,6 @@ async def query(request: QueryRequest) -> QueryResponse:
                 )
             )
     return response
-
-
-def _validate_session(request: QueryRequest, session: ChatSession) -> None:
-    # Check if request is consistent with LiteralAI thread
-    if request.new_session and not session.is_new:
-        raise HTTPException(
-            status_code=409,
-            detail=(f"Cannot start a new session {request.session_id!r} that already exists"),
-        )
-
-    if not request.new_session and session.is_new:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Existing session {request.session_id!r} not found",
-        )
 
 
 def _validate_chat_history(request: QueryRequest, chat_history: ChatHistory) -> None:
