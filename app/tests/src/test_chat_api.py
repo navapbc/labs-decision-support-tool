@@ -8,6 +8,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
 import chainlit as cl
 from chainlit import data as cl_data
@@ -23,7 +24,7 @@ from src.chat_api import (
 )
 from src.chat_engine import ImagineLA_MessageAttributes, OnMessageResult
 from src.citations import CitationFactory, split_into_subsections
-from src.db.models.conversation import Feedback
+from src.db.models.conversation import Feedback, Step, Thread, User
 from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory, UserSessionFactory
 from tests.src.test_chainlit_data import clear_data_layer_data
@@ -100,14 +101,36 @@ def reset_cl_data_layer():
 
 
 @pytest.mark.asyncio
-async def test_api_engines(async_client):
+async def test_api_engines(async_client, db_session):
     response = await async_client.get("/api/engines?user_id=TestUser")
     assert response.status_code == 200
     assert response.json() == ["imagine-la"]
 
+    # Check persistence to DB
+    users = db_session.query(User).all()
+    assert len(users) == 1
+    assert users[0].identifier == "TestUser"
+
+    threads = db_session.query(Thread).all()
+    assert len(threads) == 1
+    assert threads[0].user_id == users[0].id
+
+    steps = db_session.query(Step).order_by(Step.created_at).all()
+    assert len(steps) == 2
+    for step in steps:
+        assert step.thread_id == threads[0].id
+        assert step.is_error is False
+    request_step = next(step for step in steps if step.type == "user_message")
+    response_step = next(step for step in steps if step.type == "system_message")
+    assert response_step.parent_id == request_step.id
+    assert request_step.output == "List chat engines"
+    assert response_step.output == "['imagine-la']"
+
+    assert db_session.query(Feedback).count() == 0
+
 
 @pytest.mark.asyncio
-async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
+async def test_api_engines__dbsession_contextvar(async_client, monkeypatch, db_session):
     event = threading.Event()
     db_sessions = []
     orig_init_chat_session = chat_api._init_chat_session
@@ -149,6 +172,14 @@ async def test_api_engines__dbsession_contextvar(async_client, monkeypatch):
     pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]
     assert len(pending_tasks) == 1
 
+    # Check persistence to DB
+    assert set(db_session.execute(select(User.identifier)).scalars().all()) == set(
+        ["TestUser1", "TestUser2"]
+    )
+    assert db_session.query(Thread).count() == 2
+    assert db_session.query(Step).count() == 4
+    assert db_session.query(Feedback).count() == 0
+
 
 async def mock_run_query(engine, question, chat_history):
     return (
@@ -161,7 +192,7 @@ async def mock_run_query(engine, question, chat_history):
 
 
 @pytest.mark.asyncio
-async def test_api_query(async_client, monkeypatch):
+async def test_api_query(async_client, monkeypatch, db_session):
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
     response = await async_client.post(
         "/api/query",
@@ -207,6 +238,33 @@ async def test_api_query(async_client, monkeypatch):
         == "Response from LLM: [{'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Response from LLM: []'}]"
     )
 
+    # Check persistence to DB
+    users = db_session.query(User).all()
+    assert len(users) == 1
+    assert users[0].identifier == "user9"
+
+    threads = db_session.query(Thread).all()
+    assert len(threads) == 1
+    assert threads[0].user_id == users[0].id
+
+    steps = db_session.query(Step).order_by(Step.created_at).all()
+    assert len(steps) == 4
+    for step in steps:
+        assert step.thread_id == threads[0].id
+        assert step.is_error is False
+
+    request_steps = [step for step in steps if step.type == "user_message"]
+    response_steps = [step for step in steps if step.type == "assistant_message"]
+    assert len(request_steps) == 2
+    assert len(response_steps) == 2
+    assert set(step.parent_id for step in response_steps) == set(step.id for step in request_steps)
+    assert request_steps[0].output == "Hello"
+    assert response_steps[0].output == "Response from LLM: []"
+    assert request_steps[1].output == "Hello again"
+    assert response_steps[1].output == response.json()["response_text"]
+
+    assert db_session.query(Feedback).count() == 0
+
 
 """
 @pytest.mark.asyncio
@@ -231,7 +289,7 @@ async def test_api_query__empty_user_id(async_client):
 
 
 @pytest.mark.asyncio
-async def test_api_query__nonexistent_session_id(async_client):
+async def test_api_query__nonexistent_session_id(async_client, db_session):
     try:
         await async_client.post(
             "/api/query",
@@ -247,9 +305,15 @@ async def test_api_query__nonexistent_session_id(async_client):
         assert e.status_code == 409
         assert e.detail == "Existing session 'SessionForUser8' not found"
 
+    # Check persistence to DB
+    assert db_session.execute(select(User.identifier)).scalars().all() == ["user8"]
+    assert db_session.query(Thread).count() == 0
+    assert db_session.query(Step).count() == 0
+    assert db_session.query(Feedback).count() == 0
+
 
 @pytest.mark.asyncio
-async def test_api_query__user_session_mismatch(async_client, monkeypatch):
+async def test_api_query__user_session_mismatch(async_client, monkeypatch, db_session):
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
     try:
         await async_client.post(
@@ -275,9 +339,15 @@ async def test_api_query__user_session_mismatch(async_client, monkeypatch):
         assert e.status_code == 409
         assert e.detail == "Session 'SessionForUser9' is not associated with user 'user10'"
 
+    # Check persistence to DB
+    assert db_session.execute(select(User.identifier)).scalars().all() == ["user9", "user10"]
+    assert db_session.query(Thread).count() == 1
+    assert db_session.query(Step).count() == 2
+    assert db_session.query(Feedback).count() == 0
+
 
 @pytest.mark.asyncio
-async def test_api_query__bad_request(async_client):
+async def test_api_query__bad_request(async_client, db_session):
     try:
         await async_client.post(
             "/api/query",
@@ -289,6 +359,12 @@ async def test_api_query__bad_request(async_client):
         assert error["type"] == "missing"
         assert error["msg"] == "Field required"
         assert error["loc"] == ("body", "message")
+
+    # Check persistence to DB
+    assert db_session.query(User).count() == 0
+    assert db_session.query(Thread).count() == 0
+    assert db_session.query(Step).count() == 0
+    assert db_session.query(Feedback).count() == 0
 
 
 @pytest.fixture
@@ -415,7 +491,7 @@ async def test_api_post_feedback_success(async_client, monkeypatch, db_session):
     response = await async_client.post(
         "/api/query",
         json={
-            "user_id": "user9",
+            "user_id": "user11",
             "session_id": "Session_feedback",
             "new_session": True,
             "message": "Feedback test",
@@ -429,7 +505,7 @@ async def test_api_post_feedback_success(async_client, monkeypatch, db_session):
         "/api/feedback",
         json={
             "session_id": "Session_feedback",
-            "user_id": "user9",
+            "user_id": "user11",
             "is_positive": "true",
             "response_id": step_id,
             "comment": "great answer",
@@ -438,13 +514,19 @@ async def test_api_post_feedback_success(async_client, monkeypatch, db_session):
     assert response.status_code == 200
 
     # Check feedback in DB
-    feedback_record = db_session.query(Feedback).filter(Feedback.step_id == step_id).first()
+    assert db_session.execute(select(User.identifier)).scalars().all() == ["user11"]
+    assert db_session.query(Thread).count() == 1
+    assert db_session.query(Step).count() == 2
+    response_step = db_session.query(Step).where(Step.id == step_id).first()
+    assert response_step.type == "assistant_message"
+
+    feedback_record = db_session.query(Feedback).where(Feedback.step_id == step_id).first()
     assert feedback_record.comment == "great answer"
     assert feedback_record.value == 1
 
 
 @pytest.mark.asyncio
-async def test_api_post_feedback_fail(async_client):
+async def test_api_post_feedback_fail(async_client, db_session):
     try:
         await async_client.post(
             "/api/feedback",
@@ -461,3 +543,9 @@ async def test_api_post_feedback_fail(async_client):
         assert error["type"] == "missing"
         assert error["msg"] == "Field required"
         assert error["loc"] == ("body", "response_id")
+
+    # Check persistence to DB
+    assert db_session.query(User).count() == 0
+    assert db_session.query(Thread).count() == 0
+    assert db_session.query(Step).count() == 0
+    assert db_session.query(Feedback).count() == 0
