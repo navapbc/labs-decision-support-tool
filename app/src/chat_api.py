@@ -135,20 +135,9 @@ def __get_or_create_chat_session(
     )
 
 
-async def _init_chat_session(
-    user_id: str,
-    session_id: str | None,
-    user_meta: Optional[dict] = None,
-    new_session: bool = True,
-) -> ChatSession:
-    if user_id == "":
-        user_id = "EMPTY_USER_ID"  # temporary fix for empty user_id
-        # raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
-
-    # Also associate stored_user.id with the user_id and session
-    chat_session = __get_or_create_chat_session(user_id, session_id, new_session)
-
-    # Ensure user exists in storage
+async def __ensure_user_exists(
+    user_id: str, user_meta: Optional[dict], new_session: bool
+) -> cl.PersistedUser:
     stored_user = await cl_get_data_layer().get_user(user_id)
     if not stored_user and not new_session:
         raise HTTPException(status_code=404, detail=f"User {user_id!r} not found")
@@ -168,6 +157,25 @@ async def _init_chat_session(
             # display_name isn't persisted in Chainlit data layer
             cl.User(identifier=user_id, display_name=user_id, metadata=user_meta or {})
         )
+
+    return stored_user
+
+
+async def _init_chat_session(
+    user_id: str,
+    session_id: str | None,
+    user_meta: Optional[dict] = None,
+    new_session: bool = True,
+) -> ChatSession:
+    if user_id == "":
+        user_id = "EMPTY_USER_ID"  # temporary fix for empty user_id
+        # raise HTTPException(status_code=400, detail="user_id must be a non-empty string")
+
+    # Also associate stored_user.id with the user_id and session
+    chat_session = __get_or_create_chat_session(user_id, session_id, new_session)
+
+    # Ensure user exists in storage
+    stored_user = await __ensure_user_exists(user_id, user_meta, new_session)
 
     # cl_init_context() will use stored_user.id as the thread.user_id
     chat_session.user_uuid = stored_user.id
