@@ -202,7 +202,9 @@ async def test_api_query(async_client, monkeypatch, db_session):
     assert user.metadata_col == {"agency_id": "my_agency"}
 
     # Posting again with new_session=True and the same session_id should fail
-    try:
+    with pytest.raises(
+        HTTPException, match="Cannot start a new session 'Session0' that already exists"
+    ) as e_info:
         await async_client.post(
             "/api/query",
             json={
@@ -212,10 +214,7 @@ async def test_api_query(async_client, monkeypatch, db_session):
                 "message": "Hello again should fail",
             },
         )
-        raise AssertionError("Expected HTTPException")
-    except HTTPException as e:
-        assert e.status_code == 409
-        assert e.detail.startswith("Cannot start a new session 'Session0' that already exists")
+    assert e_info.value.status_code == 409
 
     # Test chat history
     response = await async_client.post(
@@ -274,7 +273,7 @@ async def test_api_query(async_client, monkeypatch, db_session):
 """
 @pytest.mark.asyncio
 async def test_api_query__empty_user_id(async_client):
-    try:
+    with pytest.raises(RequestValidationError) as e_info:
         await async_client.post(
             "/api/query",
             json={
@@ -284,18 +283,18 @@ async def test_api_query__empty_user_id(async_client):
                 "message": "Should fail",
             },
         )
-        raise AssertionError("Expected RequestValidationError")
-    except RequestValidationError as e:
-        error = e.errors()[0]
-        assert error["type"] == "string_too_short"
-        assert error["msg"] == "String should have at least 1 character"
-        assert error["loc"] == ("body", "user_id")
+    error = e_info.value.errors()[0]
+    assert error["type"] == "string_too_short"
+    assert error["msg"] == "String should have at least 1 character"
+    assert error["loc"] == ("body", "user_id")
 """
 
 
 @pytest.mark.asyncio
 async def test_api_query__nonexistent_session_id(async_client, db_session):
-    try:
+    with pytest.raises(
+        HTTPException, match="Existing session 'SessionForUser8' not found"
+    ) as e_info:
         await async_client.post(
             "/api/query",
             json={
@@ -305,10 +304,7 @@ async def test_api_query__nonexistent_session_id(async_client, db_session):
                 "message": "Should fail",
             },
         )
-        raise AssertionError("Expected HTTPException")
-    except HTTPException as e:
-        assert e.status_code == 409
-        assert e.detail == "Existing session 'SessionForUser8' not found"
+    assert e_info.value.status_code == 409
 
     # Check persistence to DB
     assert db_session.query(User).count() == 0
@@ -320,16 +316,18 @@ async def test_api_query__nonexistent_session_id(async_client, db_session):
 @pytest.mark.asyncio
 async def test_api_query__user_session_mismatch(async_client, monkeypatch, db_session):
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
-    try:
-        await async_client.post(
-            "/api/query",
-            json={
-                "user_id": "user9",
-                "session_id": "SessionForUser9",
-                "new_session": True,
-                "message": "Should fail",
-            },
-        )
+    await async_client.post(
+        "/api/query",
+        json={
+            "user_id": "user9",
+            "session_id": "SessionForUser9",
+            "new_session": True,
+            "message": "Question that starts new session",
+        },
+    )
+    with pytest.raises(
+        HTTPException, match="Session 'SessionForUser9' is not associated with user 'user10'"
+    ) as e_info:
         await async_client.post(
             "/api/query",
             json={
@@ -339,10 +337,7 @@ async def test_api_query__user_session_mismatch(async_client, monkeypatch, db_se
                 "message": "Should fail",
             },
         )
-        raise AssertionError("Expected HTTPException")
-    except HTTPException as e:
-        assert e.status_code == 409
-        assert e.detail == "Session 'SessionForUser9' is not associated with user 'user10'"
+    assert e_info.value.status_code == 409
 
     # Check persistence to DB
     assert db_session.execute(select(User.identifier)).scalars().all() == ["user9"]
@@ -353,17 +348,15 @@ async def test_api_query__user_session_mismatch(async_client, monkeypatch, db_se
 
 @pytest.mark.asyncio
 async def test_api_query__bad_request(async_client, db_session):
-    try:
+    with pytest.raises(RequestValidationError) as e_info:
         await async_client.post(
             "/api/query",
             json={"user_id": "user7", "session_id": "Session0", "new_session": True},
         )
-        raise AssertionError("Expected RequestValidationError")
-    except RequestValidationError as e:
-        error = e.errors()[0]
-        assert error["type"] == "missing"
-        assert error["msg"] == "Field required"
-        assert error["loc"] == ("body", "message")
+    error = e_info.value.errors()[0]
+    assert error["type"] == "missing"
+    assert error["msg"] == "Field required"
+    assert error["loc"] == ("body", "message")
 
     # Check persistence to DB
     assert db_session.query(User).count() == 0
@@ -532,7 +525,7 @@ async def test_api_post_feedback_success(async_client, monkeypatch, db_session):
 
 @pytest.mark.asyncio
 async def test_api_post_feedback_fail(async_client, db_session):
-    try:
+    with pytest.raises(RequestValidationError) as e_info:
         await async_client.post(
             "/api/feedback",
             json={
@@ -542,12 +535,10 @@ async def test_api_post_feedback_fail(async_client, db_session):
                 "comment": "great answer",
             },
         )
-        raise AssertionError("Expected RequestValidationError")
-    except RequestValidationError as e:
-        error = e.errors()[0]
-        assert error["type"] == "missing"
-        assert error["msg"] == "Field required"
-        assert error["loc"] == ("body", "response_id")
+    error = e_info.value.errors()[0]
+    assert error["type"] == "missing"
+    assert error["msg"] == "Field required"
+    assert error["loc"] == ("body", "response_id")
 
     # Check persistence to DB
     assert db_session.query(User).count() == 0
