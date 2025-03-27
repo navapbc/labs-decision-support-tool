@@ -130,16 +130,18 @@ async def test_api_engines(async_client, db_session):
 
 @pytest.mark.asyncio
 async def test_api_engines__dbsession_contextvar(async_client, monkeypatch, db_session):
+    event = asyncio.Event()
     db_sessions = []
     orig_init_chat_session = chat_api._init_chat_session
 
     async def wait_for_all_requests(_self, *_args):
         db_session = chat_api.dbsession.get()
         db_sessions.append(db_session)
-        while len(db_sessions) < 2:
-            # Allow the event loop to run other tasks
-            await asyncio.sleep(0.1)
+        if len(db_sessions) < 2:
+            # Wait to allow the event loop to run other tasks
+            await event.wait()
         # At this point, both requests should have been started and have their own DB session
+        event.set()
         # Call original function
         return await orig_init_chat_session(_self, *_args)
 
