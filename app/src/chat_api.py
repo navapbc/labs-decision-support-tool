@@ -6,6 +6,7 @@ This creates API endpoints using FastAPI, which is compatible with Chainlit.
 
 import asyncio
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager, contextmanager
@@ -26,7 +27,7 @@ from chainlit.step import StepDict
 from src import chat_engine
 from src.adapters import db
 from src.app_config import app_config
-from src.chainlit_data import ChainlitPolyDataLayer
+from src.chainlit_data import ChainlitPolyDataLayer, get_literal_data_layer, get_postgres_data_layer
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 from src.db.models.conversation import ChatMessage, UserSession
@@ -40,8 +41,14 @@ logger = logging.getLogger(__name__)
 
 @cl.data_layer
 def chainlit_data_layer() -> ChainlitPolyDataLayer:
-    logger.info("API: creating chainlit_data_layer: ChainlitPolyDataLayer()")
-    return ChainlitPolyDataLayer()
+    data_layers = None
+    if app_config.literal_api_key_for_api:
+        data_layers = [
+            get_postgres_data_layer(os.environ.get("DATABASE_URL")),
+            get_literal_data_layer(app_config.literal_api_key_for_api),
+        ]
+    logger.info("API: creating chainlit_data_layer: ChainlitPolyDataLayer(%r)", data_layers)
+    return ChainlitPolyDataLayer(data_layers)
 
 
 @asynccontextmanager
