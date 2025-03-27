@@ -234,7 +234,7 @@ def db_session_context_var() -> Generator[db.Session, None, None]:
 async def persist_messages(
     request_step: StepDict,
     thread_name: str | None,
-    process_request: Coroutine,
+    process_request: Coroutine[None, None, tuple[Any, StepDict]],
 ) -> tuple[Any, StepDict]:
     """Asynchronously persist request and response messages
 
@@ -257,10 +257,10 @@ async def persist_messages(
             )
         )
 
-    response, response_step = await process_request
-
-    # Wait for all create_step and update_thread tasks to finish before persisting response_step
-    await asyncio.gather(*tasks)
+    # Wait for all tasks to finish before persisting response_step
+    results = await asyncio.gather(process_request, *tasks)
+    # Get result from process_request
+    response, response_step = results[0]
     await data_layer.create_step(response_step)
     return response, response_step
 
