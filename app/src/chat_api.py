@@ -243,22 +243,24 @@ async def persist_messages(
     A Message is persisted in Step and chat_message tables
     - A message/step can have an author/name
     """
-    coroutines = []
+    tasks = []
     # Use get_data_layer() like in chainlit.server
     data_layer = cl_get_data_layer()
-    # Creating the first step in a thread will also create a new thread
-    coroutines.append(data_layer.create_step(request_step))
+    # Creating the first step in a thread will also create the associated thread
+    tasks.append(asyncio.create_task(data_layer.create_step(request_step)))
 
     if thread_name:
         # In the data layer, update_thread() can execute before or after create_step()
-        coroutines.append(
-            data_layer.update_thread(thread_id=request_step["threadId"], name=thread_name)
+        tasks.append(
+            asyncio.create_task(
+                data_layer.update_thread(thread_id=request_step["threadId"], name=thread_name)
+            )
         )
 
     response, response_step = await process_request
 
-    # Wait for all create_step and update_thread coroutines to finish before persisting the response
-    await asyncio.gather(*coroutines)
+    # Wait for all create_step and update_thread tasks to finish before persisting response_step
+    await asyncio.gather(*tasks)
     await data_layer.create_step(response_step)
     return response, response_step
 
