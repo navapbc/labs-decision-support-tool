@@ -13,7 +13,7 @@ locals {
     literalai_tagger = {
       # Tag LiteralAI threads to distinguish testing from pilot users
       # Only needs to run in prod
-      task_command        = ["poetry", "run", "literalai-tagger"]
+      task_command = ["poetry", "run", "literalai-tagger"]
       # Run every 3 hours during the day
       schedule_expression = "cron(0 12,15,18,21,24 * * ? *)"
     }
