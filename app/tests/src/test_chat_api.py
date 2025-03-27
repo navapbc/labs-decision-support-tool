@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import logging
-import threading
 import uuid
 
 import pytest
@@ -131,37 +130,26 @@ async def test_api_engines(async_client, db_session):
 
 @pytest.mark.asyncio
 async def test_api_engines__dbsession_contextvar(async_client, monkeypatch, db_session):
-    event = threading.Event()
     db_sessions = []
     orig_init_chat_session = chat_api._init_chat_session
 
     async def wait_for_all_requests(_self, *_args):
         db_session = chat_api.dbsession.get()
         db_sessions.append(db_session)
-        # Run the blocking wait in a separate thread to avoid blocking the event loop
-        await asyncio.to_thread(event.wait)
+        while len(db_sessions) < 2:
+            # Allow the event loop to run other tasks
+            await asyncio.sleep(0.1)
+        # At this point, both requests should have been started and have their own DB session
         # Call original function
         return await orig_init_chat_session(_self, *_args)
 
     monkeypatch.setattr(chat_api, "_init_chat_session", wait_for_all_requests)
 
-    async def checker_coroutine():
-        while len(db_sessions) < 2:
-            print(
-                "Checker coroutine waiting for other tasks to add to dbsessions", len(db_sessions)
-            )
-            # Allow the event loop to run other tasks
-            await asyncio.sleep(0.1)
-        print("Checker coroutine event.set()")
-        # Wake up the waiting threads to let the API resume responding
-        event.set()
-
     async with async_client:
         call1 = async_client.get("/api/engines?user_id=TestUser1")
         call2 = async_client.get("/api/engines?user_id=TestUser2")
-        checker = checker_coroutine()
 
-        tasks = [asyncio.create_task(call) for call in [call1, call2, checker]]
+        tasks = [asyncio.create_task(call) for call in [call1, call2]]
         results = await asyncio.gather(*tasks)
         assert [r.status_code for r in results if r] == [200, 200]
 
