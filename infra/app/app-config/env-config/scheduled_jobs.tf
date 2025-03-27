@@ -15,7 +15,7 @@ locals {
       # Only needs to run in prod
       task_command = ["poetry", "run", "literalai-tagger"]
       # Run every 3 hours during the day
-      schedule_expression = "cron(0 12,15,18,21,24 * * ? *)"
+      schedule_expression = "cron(0 12,15,18,21,0 * * ? *)"
     }
   }
 }
