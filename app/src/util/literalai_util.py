@@ -7,6 +7,7 @@ import pickle
 import sys
 from datetime import datetime
 from typing import Any, Callable
+from smart_open import open as smart_open
 
 from literalai import LiteralClient, Thread, User
 from literalai.my_types import PaginatedResponse
@@ -157,13 +158,13 @@ def tag_threads() -> None:  # pragma: no cover
 
     input_json = "literalai_user_tags.json"
     if not os.path.exists(input_json):
-        logger.error(
-            "Missing input file %r. Download from the 'LiteralAI logs' Google Drive folder.",
+        logger.info(
+            "Missing input file %r. Attempting to use the file from S3.",
             input_json,
         )
-        sys.exit(4)
+        input_json = "s3://decision-support-tool-app-prod/literalai_user_tags.json"
 
-    with open(input_json, "r", encoding="utf-8") as f:
+    with smart_open(input_json, "r", encoding="utf-8") as f:
         user_objs = json.load(f)
     user2tag = {u["user_id"]: u["tag"] for u in user_objs}
     logger.info(user2tag)
