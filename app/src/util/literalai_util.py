@@ -161,10 +161,7 @@ def tag_threads() -> None:  # pragma: no cover
     if env == "local" and not bucket_name:
         input_json = "literalai_user_tags.json"
         if not os.path.exists(input_json):
-            logger.error(
-                "Missing input file %r. Download from S3.",
-                input_json,
-            )
+            logger.error("Missing input file %r. Download from S3.", input_json)
             sys.exit(4)
     else:
         bucket = bucket_name or f"decision-support-tool-app-{env}"
