@@ -236,6 +236,7 @@ class PostgresDataLayer(ChainlitDataLayer):
                 return await asyncpg.connect(get_database_url())
 
             self.pool = await asyncpg.create_pool(connect=create_connection)
+            logger.info("New DB connection pool: idle_size=%r", self.pool.get_idle_size())
 
     def _get_uuid_metadata(self, user: User) -> str | None:
         if "uuid" in user.metadata:
