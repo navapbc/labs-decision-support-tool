@@ -11,6 +11,7 @@ from typing import Any, Callable
 from literalai import LiteralClient, Thread, User
 from literalai.my_types import PaginatedResponse
 from literalai.observability.filter import Filter, OrderBy
+from smart_open import open as smart_open
 
 from src.app_config import app_config
 
@@ -155,15 +156,22 @@ def tag_threads() -> None:  # pragma: no cover
     args = parser.parse_args(sys.argv[1:])
     logger.info("Running with args %r", args)
 
-    input_json = "literalai_user_tags.json"
-    if not os.path.exists(input_json):
-        logger.error(
-            "Missing input file %r. Download from the 'LiteralAI logs' Google Drive folder.",
-            input_json,
-        )
-        sys.exit(4)
+    env = os.environ.get("ENVIRONMENT", "local")
+    bucket_name = os.environ.get("BUCKET_NAME")
+    if env == "local" and not bucket_name:
+        input_json = "literalai_user_tags.json"
+        if not os.path.exists(input_json):
+            logger.error(
+                "Missing input file %r. Download from S3 or specify BUCKET_NAME environment variable.",
+                input_json,
+            )
+            sys.exit(4)
+    else:
+        bucket = bucket_name or f"decision-support-tool-app-{env}"
+        input_json = f"s3://{bucket}/literalai_user_tags.json"
 
-    with open(input_json, "r", encoding="utf-8") as f:
+    logger.info("Using file: %r", input_json)
+    with smart_open(input_json, "r", encoding="utf-8") as f:
         user_objs = json.load(f)
     user2tag = {u["user_id"]: u["tag"] for u in user_objs}
     logger.info(user2tag)
