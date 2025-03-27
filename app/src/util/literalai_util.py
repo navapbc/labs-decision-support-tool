@@ -156,7 +156,7 @@ def tag_threads() -> None:  # pragma: no cover
     args = parser.parse_args(sys.argv[1:])
     logger.info("Running with args %r", args)
 
-    env = os.environ.get("ENVIRONMENT")
+    env = os.environ.get("ENVIRONMENT", "local")
     bucket_name = os.environ.get("BUCKET_NAME")
     if env == "local" and not bucket_name:
         input_json = "literalai_user_tags.json"
