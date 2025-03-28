@@ -3,7 +3,7 @@ import random
 import re
 from collections import defaultdict
 from itertools import groupby
-from typing import Match, Sequence
+from typing import Match, Sequence, Union
 
 import markdown
 
@@ -30,7 +30,7 @@ class FormattingConfig:
             return f"<p>Source: <a href={document.source!r}>{document.source}</a></p>"
         return ""
 
-    def get_citation_link(self, subsection: Subsection) -> str:
+    def get_citation_link(self, subsection: Union[Subsection, "ContiguousGroup"]) -> str:
         return self.get_document_link(subsection.chunk.document)
 
     def get_superscript_link(self, chunk: Chunk) -> str:
@@ -42,7 +42,7 @@ class FormattingConfig:
 
 def to_html(text: str) -> str:
     # markdown expects '\n' before the start of a list
-    corrected_text = re.sub(r"^- ", "\n- ", text, flags=re.MULTILINE, count=1)
+    corrected_text = re.sub(r"^([\-\+\*]) ", "\n- ", text, flags=re.MULTILINE, count=1)
     return markdown.markdown(corrected_text)
 
 
@@ -91,9 +91,12 @@ def _create_accordion_html(
     map_of_accordion_ids = {}
     for document, cited_subsections in _group_by_document(remapped_citations).items():
         _accordion_id += 1
+
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
+
         citation_numbers = [citation.id for citation in cited_subsections]
+        subsection_indices = [str(citation.subsection_index) for citation in cited_subsections]
 
         for citation_number in citation_numbers:
             map_of_accordion_ids[citation_number] = _accordion_id
@@ -105,7 +108,7 @@ def _create_accordion_html(
                     class="usa-accordion__button"
                     aria-expanded="false"
                     aria-controls="a-{_accordion_id}">
-                    {",".join(citation_numbers)}. {document.dataset}: {document.name}
+                    {",".join(citation_numbers)}. ({",".join(subsection_indices)}) {document.dataset}: {document.name}
                 </button>
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>
@@ -137,10 +140,11 @@ def _build_citation_body(
 ) -> str:
     citation_body = ""
     rendered_heading = ""
-    for subsection in subsections:
+    for grouping in _group_by_contiguous_subsections(subsections):
+        # for subsection in subsections:
         citation_headings = (
-            _get_breadcrumb_html(subsection.text_headings, document.name)
-            if subsection.text_headings
+            _get_breadcrumb_html(grouping.text_headings, document.name)
+            if grouping.text_headings
             else ""
         )
         # only show headings if they are different
@@ -148,18 +152,63 @@ def _build_citation_body(
             citation_body += f"<b>{citation_headings}</b>"
             rendered_heading = citation_headings
 
+        citation_ids = ", ".join([f"#{id}" for id in grouping.ids])
+        citation_text = "\n\n".join(grouping.texts)
         citation_body += (
-            f"<div>Citation #{subsection.id}: </div>"
-            f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(subsection.text)}</div>'
+            f"<div>Citation {citation_ids}: </div>"
+            f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(citation_text)}</div>'
         )
         if config.add_citation_link_per_subsection:
-            citation_link = config.get_citation_link(subsection)
+            citation_link = config.get_citation_link(grouping)
             citation_body += f"<div>{citation_link}</div>"
 
     if not config.add_citation_link_per_subsection:
         citation_link = config.get_document_link(document)
         citation_body += f"<div>{citation_link}</div>"
     return citation_body
+
+
+class ContiguousGroup:
+    "Used to group contiguous subsections in the same chunk"
+
+    def __init__(self, subsections: Sequence[Subsection]):
+        self.chunk = subsections[0].chunk
+        self.text_headings = subsections[0].text_headings
+
+        curr_index = subsections[0].subsection_index
+        for ss in subsections[1:]:
+            assert ss.chunk == self.chunk
+            assert ss.text_headings == self.text_headings
+            # assert ss.subsection_index == curr_index + 1
+            curr_index = ss.subsection_index
+
+        self.ids = [ss.id for ss in subsections]
+        self.texts = [ss.text for ss in subsections]
+
+
+def _group_by_contiguous_subsections(
+    cited_subsections: Sequence[Subsection],
+) -> list[ContiguousGroup]:
+    groups = []
+
+    # Initialize looping variables
+    contig_sections = [cited_subsections[0]]
+    curr_chunk = cited_subsections[0].chunk
+    curr_index = cited_subsections[0].subsection_index
+
+    for ss in cited_subsections[1:]:
+        if ss.chunk == curr_chunk and ss.subsection_index == curr_index + 1:
+            # This subsection is contiguous with the previous one
+            contig_sections.append(ss)
+        else:
+            groups.append(ContiguousGroup(contig_sections))
+            contig_sections = [ss]
+
+        # Update looping variables
+        curr_chunk = ss.chunk
+        curr_index = ss.subsection_index
+    groups.append(ContiguousGroup(contig_sections))
+    return groups
 
 
 def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> str:
