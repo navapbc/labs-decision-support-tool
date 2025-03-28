@@ -94,9 +94,7 @@ def _create_accordion_html(
 
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
-
         citation_numbers = [citation.id for citation in cited_subsections]
-        subsection_indices = [str(citation.subsection_index) for citation in cited_subsections]
 
         for citation_number in citation_numbers:
             map_of_accordion_ids[citation_number] = _accordion_id
@@ -108,7 +106,7 @@ def _create_accordion_html(
                     class="usa-accordion__button"
                     aria-expanded="false"
                     aria-controls="a-{_accordion_id}">
-                    {",".join(citation_numbers)}. ({",".join(subsection_indices)}) {document.dataset}: {document.name}
+                    {",".join(citation_numbers)}. {document.dataset}: {document.name}
                 </button>
             </h4>
             <div id="a-{_accordion_id}" class="usa-accordion__content usa-prose" hidden>

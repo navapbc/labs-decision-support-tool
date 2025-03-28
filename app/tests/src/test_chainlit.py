@@ -27,7 +27,7 @@ def test_url_query_values(monkeypatch):
 def test__get_retrieval_metadata(chunks_with_scores):
     system_prompt = "Some system prompt"
     chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-    subsections = [Subsection(chunk.id, chunk, chunk.content) for chunk in chunks]
+    subsections = [Subsection(chunk.id, chunk, 0, chunk.content) for chunk in chunks]
     result = OnMessageResult(
         "Some response",
         system_prompt,
