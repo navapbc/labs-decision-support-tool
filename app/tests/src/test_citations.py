@@ -39,9 +39,9 @@ def subsections(chunks):
 def context(chunks):
     factory = CitationFactory()
     return [
-        factory.create_citation(chunks[0], "This is the first chunk."),
-        factory.create_citation(chunks[0], "With two subsections"),
-        factory.create_citation(chunks[1], chunks[1].content),
+        factory.create_citation(chunks[0], 0, "This is the first chunk."),
+        factory.create_citation(chunks[0], 1, "With two subsections"),
+        factory.create_citation(chunks[1], 0, chunks[1].content),
     ]
 
 
@@ -156,8 +156,8 @@ def test_replace_citation_ids():
     assert replace_citation_ids("Hallucinated.(citation-1)", {}) == "Hallucinated."
 
     remapped_citations = {
-        "citation-4": Subsection("1", ChunkFactory.build(), ""),
-        "citation-3": Subsection("2", ChunkFactory.build(), ""),
+        "citation-4": Subsection("1", ChunkFactory.build(), 0, ""),
+        "citation-3": Subsection("2", ChunkFactory.build(), 1, ""),
     }
     assert (
         replace_citation_ids("Remapped. (citation-4)(citation-3)", remapped_citations)
