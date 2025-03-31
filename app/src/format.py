@@ -137,7 +137,6 @@ def _build_citation_body(
     config: FormattingConfig, document: Document, subsections: Sequence[Subsection]
 ) -> str:
     citation_body = ""
-    rendered_heading = ""
     for grouping in _group_by_contiguous_subsections(subsections):
         # for subsection in subsections:
         citation_headings = (
@@ -145,17 +144,15 @@ def _build_citation_body(
             if grouping.text_headings
             else ""
         )
-        # only show headings if they are different
-        if rendered_heading != citation_headings:
-            citation_body += f"<b>{citation_headings}</b>"
-            rendered_heading = citation_headings
 
         citation_ids = ", ".join([f"#{id}" for id in grouping.ids])
         citation_text = "\n\n".join(grouping.texts)
         citation_body += (
+            f"<b>{citation_headings}</b>"
             f"<div>Citation {citation_ids}: </div>"
             f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(citation_text)}</div>'
         )
+        logger.info("citation_body: %s", citation_body)
         if config.add_citation_link_per_subsection:
             citation_link = config.get_citation_link(grouping)
             citation_body += f"<div>{citation_link}</div>"
@@ -177,7 +174,7 @@ class ContiguousGroup:
         for ss in subsections[1:]:
             assert ss.chunk == self.chunk
             assert ss.text_headings == self.text_headings
-            # assert ss.subsection_index == curr_index + 1
+            assert ss.subsection_index == curr_index + 1
             curr_index = ss.subsection_index
 
         self.ids = [ss.id for ss in subsections]
