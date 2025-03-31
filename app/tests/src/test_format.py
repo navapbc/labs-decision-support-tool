@@ -100,9 +100,9 @@ def test_format_response__merge_contiguous_citations(chunks_with_scores):
     )
 
     assert re.search(
-        f"<div>Citation #1, #2: </div><div .*><p>{subsection.text}</p></p>\n<p>{contig_subsection.text}</p>\n<p></div>",
+        f"<div>Citation #1, #2:</div>\n<div .*><p>{subsection.text}</p>\n<p>{contig_subsection.text}</p></div>",
         html,
     )
     assert re.search(
-        f"<div>Citation #3: </div></p>\n<div .*><p>{noncontig_subsection.text}</p></div>", html
+        f"<div>Citation #3:</div>\n<div .*><p>{noncontig_subsection.text}</p></div>", html
     )

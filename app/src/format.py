@@ -27,7 +27,7 @@ class FormattingConfig:
 
     def get_document_link(self, document: Document) -> str:
         if document.source:
-            return f"<p>Source: <a href={document.source!r}>{document.source}</a></p>"
+            return f"Source: <a href={document.source!r}>{document.source}</a>"
         return ""
 
     def get_citation_link(self, subsection: Union[Subsection, "ContiguousGroup"]) -> str:
