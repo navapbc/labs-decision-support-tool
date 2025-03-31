@@ -172,7 +172,6 @@ class ContiguousGroup:
         curr_index = subsections[0].subsection_index
         for ss in subsections[1:]:
             assert ss.chunk == self.chunk
-            assert ss.text_headings == self.text_headings
             assert ss.subsection_index == curr_index + 1
             curr_index = ss.subsection_index
 
