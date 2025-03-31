@@ -367,8 +367,6 @@ class Citation(BaseModel):
     uri: Optional[str] | None
     headings: Sequence[str]
     citation_text: str
-    chunk_id: str
-    subsection_index: int
 
     @staticmethod
     def from_subsection(subsection: Subsection) -> "Citation":
@@ -383,8 +381,6 @@ class Citation(BaseModel):
             uri=highlighted_text_src,
             headings=subsection.text_headings,
             citation_text=subsection.text,
-            chunk_id=str(chunk.id),
-            subsection_index=subsection.subsection_index,
         )
 
 
