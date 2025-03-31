@@ -136,31 +136,30 @@ ChunkWithCitation = tuple[Chunk, Sequence[Subsection]]
 def _build_citation_body(
     config: FormattingConfig, document: Document, subsections: Sequence[Subsection]
 ) -> str:
-    citation_body = ""
+    citation_body = []
     for grouping in _group_by_contiguous_subsections(subsections):
         # for subsection in subsections:
-        citation_headings = (
+        citation_headings_html = (
             _get_breadcrumb_html(grouping.text_headings, document.name)
             if grouping.text_headings
             else ""
-        )
+        ).strip()
 
         citation_ids = ", ".join([f"#{id}" for id in grouping.ids])
         citation_text = "\n\n".join(grouping.texts)
-        citation_body += (
-            f"<b>{citation_headings}</b>"
-            f"<div>Citation {citation_ids}: </div>"
-            f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(citation_text)}</div>'
+        citation_body.append(
+            f"{citation_headings_html}\n"
+            f"<div>Citation {citation_ids}:</div>\n"
+            f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(citation_text)}</div>\n'
         )
-        logger.info("citation_body: %s", citation_body)
         if config.add_citation_link_per_subsection:
             citation_link = config.get_citation_link(grouping)
-            citation_body += f"<div>{citation_link}</div>"
+            citation_body.append(f"<div>{citation_link}</div>")
 
     if not config.add_citation_link_per_subsection:
         citation_link = config.get_document_link(document)
-        citation_body += f"<div>{citation_link}</div>"
-    return citation_body
+        citation_body.append(f"<div>{citation_link}</div>")
+    return "\n".join(citation_body)
 
 
 class ContiguousGroup:
