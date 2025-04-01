@@ -30,7 +30,7 @@ class FormattingConfig:
             return f"Source: <a href={document.source!r}>{document.source}</a>"
         return ""
 
-    def get_citation_link(self, subsection: Union[Subsection, "ContiguousGroup"]) -> str:
+    def get_citation_link(self, subsection: Union[Subsection]) -> str:
         return self.get_document_link(subsection.chunk.document)
 
     def get_superscript_link(self, chunk: Chunk) -> str:
@@ -137,71 +137,32 @@ def _build_citation_body(
     config: FormattingConfig, document: Document, subsections: Sequence[Subsection]
 ) -> str:
     citation_body = []
-    for grouping in _group_by_contiguous_subsections(subsections):
+    rendered_heading = ""
+    for subsection in subsections:
         # for subsection in subsections:
         citation_headings_html = (
-            _get_breadcrumb_html(grouping.text_headings, document.name)
-            if grouping.text_headings
+            _get_breadcrumb_html(subsection.text_headings, document.name)
+            if subsection.text_headings
             else ""
         ).strip()
 
-        citation_ids = ", ".join([f"#{id}" for id in grouping.ids])
-        citation_text = "\n\n".join(grouping.texts)
+        # only show headings if they are different
+        if rendered_heading != citation_headings_html:
+            citation_body.append(citation_headings_html)
+            rendered_heading = citation_headings_html
+
         citation_body.append(
-            f"{citation_headings_html}\n"
-            f"<div>Citation {citation_ids}:</div>\n"
-            f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(citation_text)}</div>\n'
+            f"<div>Citation #{subsection.id}: </div>"
+            f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(subsection.text)}</div>'
         )
         if config.add_citation_link_per_subsection:
-            citation_link = config.get_citation_link(grouping)
+            citation_link = config.get_citation_link(subsection)
             citation_body.append(f"<div>{citation_link}</div>")
 
     if not config.add_citation_link_per_subsection:
         citation_link = config.get_document_link(document)
         citation_body.append(f"<div>{citation_link}</div>")
     return "\n".join(citation_body)
-
-
-class ContiguousGroup:
-    "Used to group contiguous subsections in the same chunk"
-
-    def __init__(self, subsections: Sequence[Subsection]):
-        self.chunk = subsections[0].chunk
-        self.text_headings = subsections[0].text_headings
-
-        curr_index = subsections[0].subsection_index
-        for ss in subsections[1:]:
-            assert ss.chunk == self.chunk
-            assert ss.subsection_index == curr_index + 1
-            curr_index = ss.subsection_index
-
-        self.ids = [ss.id for ss in subsections]
-        self.texts = [ss.text for ss in subsections]
-
-
-def _group_by_contiguous_subsections(
-    cited_subsections: Sequence[Subsection],
-) -> list[ContiguousGroup]:
-    groups = []
-
-    # Initialize looping variables
-    contig_sections = [cited_subsections[0]]
-    curr_chunk = cited_subsections[0].chunk
-    curr_index = cited_subsections[0].subsection_index
-
-    for ss in cited_subsections[1:]:
-        if ss.chunk == curr_chunk and ss.subsection_index == curr_index + 1:
-            # This subsection is contiguous with the previous one
-            contig_sections.append(ss)
-        else:
-            groups.append(ContiguousGroup(contig_sections))
-            contig_sections = [ss]
-
-        # Update looping variables
-        curr_chunk = ss.chunk
-        curr_index = ss.subsection_index
-    groups.append(ContiguousGroup(contig_sections))
-    return groups
 
 
 def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> str:

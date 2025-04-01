@@ -1,4 +1,3 @@
-import copy
 import re
 
 from src.citations import CitationFactory, split_into_subsections
@@ -68,41 +67,3 @@ def test_format_response(chunks_with_scores):
     assert "Source(s)" in html
     assert "usa-accordion__button" in html
     assert "usa-accordion__content" in html
-
-
-def test_format_response__merge_contiguous_citations(chunks_with_scores):
-    subsections = to_subsections(chunks_with_scores)
-
-    # Append a subsection that is contiguous with the last one
-    subsection = subsections[-1]
-    contig_subsection = copy.copy(subsection)
-    contig_subsection.id = f"citation-{len(subsections) + 1}"
-    contig_subsection.subsection_index = 1
-    contig_subsection.text = "Continued citation text about topic A."
-    subsections.append(contig_subsection)
-
-    # Append a subsection that is NOT contiguous with the last one
-    noncontig_subsection = copy.copy(subsection)
-    noncontig_subsection.id = f"citation-{len(subsections) + 1}"
-    noncontig_subsection.subsection_index = 3
-    noncontig_subsection.text = "Noncontiguous citation text about topic A."
-    subsections.append(noncontig_subsection)
-
-    config = FormattingConfig()
-    msg_attribs = MessageAttributes(needs_context=True, translated_message="")
-
-    llm_response = f"Something about A. ({subsection.id}) More about A. ({contig_subsection.id}) Some topic related to A. ({noncontig_subsection.id})"
-    html = format_response(
-        subsections,
-        llm_response,
-        config,
-        msg_attribs,
-    )
-
-    assert re.search(
-        f"<div>Citation #1, #2:</div>\n<div .*><p>{subsection.text}</p>\n<p>{contig_subsection.text}</p></div>",
-        html,
-    )
-    assert re.search(
-        f"<div>Citation #3:</div>\n<div .*><p>{noncontig_subsection.text}</p></div>", html
-    )

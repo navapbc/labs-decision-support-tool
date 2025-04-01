@@ -416,7 +416,7 @@ async def test_run_query__2_citations(subsections):
     )
     assert (
         query_response.response_text
-        == f"{query_response.alert_message}\n\nResponse from LLM (citation-1)(citation-2)"
+        == f"{query_response.alert_message}\n\nResponse from LLM (citation-1) (citation-2)"
     )
     assert len(query_response.citations) == 2
     assert query_response.citations[0].citation_id == "citation-1"
@@ -438,7 +438,8 @@ async def test_run_query__unknown_citation(subsections, caplog):
     with caplog.at_level(logging.ERROR):
         query_response, _metadata = await run_query(MockChatEngine(), "My question")
         assert any(
-            text == "LLM generated a citation for a reference (citation-44) that doesn't exist."
+            text
+            == "LLM generated a citation for a reference (citation-44) that doesn't exist; ignoring."
             for text in caplog.messages
         )
 
