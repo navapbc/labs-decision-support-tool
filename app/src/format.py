@@ -7,12 +7,7 @@ from typing import Match, Sequence
 
 import markdown
 
-from src.citations import (
-    CITATION_PATTERN,
-    merge_contiguous_cited_subsections,
-    move_citations_after_punctuation,
-    remap_citation_ids,
-)
+from src.citations import CITATION_PATTERN, simplify_citation_numbers
 from src.db.models.document import Chunk, Document, Subsection
 from src.generate import MessageAttributesT
 
@@ -57,12 +52,14 @@ def format_response(
     config: FormattingConfig,
     attributes: MessageAttributesT,
 ) -> str:
-    formatted_response = move_citations_after_punctuation(raw_response)
-    merged_subsection_response, merged_subsections = merge_contiguous_cited_subsections(
-        formatted_response, subsections
-    )
-    remapped_citations = remap_citation_ids(merged_subsections, merged_subsection_response)
-    citations_html, map_of_accordion_ids = _create_accordion_html(config, remapped_citations)
+    # formatted_response = move_citations_after_punctuation(raw_response)
+    # merged_subsection_response, merged_subsections = merge_contiguous_cited_subsections(
+    #     formatted_response, subsections
+    # )
+    # remapped_citations = remap_citation_ids(merged_subsections, merged_subsection_response)
+
+    result = simplify_citation_numbers(raw_response, subsections)
+    citations_html, map_of_accordion_ids = _create_accordion_html(config, result.subsections)
 
     html_response = []
     if alert_msg := getattr(attributes, "alert_message", None):
@@ -74,9 +71,7 @@ def format_response(
     # as the next part of a list in html_response
     html_response.append(
         to_html(
-            _add_citation_links(
-                merged_subsection_response, remapped_citations, config, map_of_accordion_ids
-            )
+            _add_citation_links(result.response, result.subsections, config, map_of_accordion_ids)
         )
     )
 
@@ -92,12 +87,12 @@ def format_response(
 
 
 def _create_accordion_html(
-    config: FormattingConfig, remapped_citations: dict[str, Subsection]
+    config: FormattingConfig, subsections: Sequence[Subsection]
 ) -> tuple[str, dict]:
     global _accordion_id
     html = ""
     map_of_accordion_ids = {}
-    for document, cited_subsections in _group_by_document(remapped_citations).items():
+    for document, cited_subsections in _group_by_document(subsections).items():
         _accordion_id += 1
 
         citation_body = _build_citation_body(config, document, cited_subsections)
@@ -125,15 +120,11 @@ def _create_accordion_html(
     return html, map_of_accordion_ids
 
 
-def _group_by_document(
-    remapped_citations: dict[str, Subsection],
-) -> dict[Document, list[Subsection]]:
+def _group_by_document(subsections: Sequence[Subsection]) -> dict[Document, list[Subsection]]:
     # Group the citations by document to build an accordion for each document
     citations_by_document: dict[Document, list[Subsection]] = defaultdict(list)
     # Combine all citations for each document
-    for document, subsection_itr in groupby(
-        remapped_citations.values(), key=lambda t: t.chunk.document
-    ):
+    for document, subsection_itr in groupby(subsections, key=lambda t: t.chunk.document):
         citations_by_document[document] += list(subsection_itr)
     return citations_by_document
 
@@ -194,11 +185,9 @@ _footnote_id = random.randint(0, 1000000)
 _footnote_index = 0
 
 
-# FIXME: Refactor to reduce code replication with replace_citation_ids();
-#        perhaps use simplify_citation_numbers() like chat_api and batch_process
 def _add_citation_links(
     response: str,
-    remapped_citations: dict[str, Subsection],
+    subsections: Sequence[Subsection],
     config: FormattingConfig,
     map_of_accordion_ids: dict,
 ) -> str:
@@ -206,26 +195,20 @@ def _add_citation_links(
     _footnote_id += 1
     footnote_list = []
 
-    # Replace (citation-<index>) with the appropriate citation
-    def replace_citation(match: Match) -> str:
-        citation_id = match.group(1)
-        # Remove citation for chunks that don't exist alone
-        if citation_id not in remapped_citations:
-            logger.error(
-                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
-            )
-            return ""
+    citation_dict = {ss.id: ss for ss in subsections}
 
-        chunk = remapped_citations[citation_id].chunk
+    # Replace (citation-<index>) with a superscript citation link to the respective accordion item
+    def replace_citation(match: Match) -> str:
+        citation_id = match.group(1).removeprefix("citation-")
+
+        chunk = citation_dict[citation_id].chunk
         link = config.get_superscript_link(chunk)
 
         matched_accordion_num = (
-            map_of_accordion_ids[remapped_citations[citation_id].id]
-            if map_of_accordion_ids and remapped_citations[citation_id].id in map_of_accordion_ids
-            else None
+            map_of_accordion_ids[citation_id] if citation_id in map_of_accordion_ids else None
         )
 
-        citation = f"<sup><a class='accordion_item' data-id='a-{matched_accordion_num}' style='cursor:pointer'>{remapped_citations[citation_id].id}</a>&nbsp;</sup>"
+        citation = f"<sup><a class='accordion_item' data-id='a-{matched_accordion_num}' style='cursor:pointer'>{citation_id}</a>&nbsp;</sup>"
 
         global _footnote_index
         _footnote_index += 1

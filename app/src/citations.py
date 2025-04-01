@@ -207,7 +207,7 @@ def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection
     """Replace (citation-XX) in response with (citation-YY), where XX is the original citation ID
     and YY is the remapped citation ID"""
 
-    def replace_citation(match: Match) -> str:
+    def replace_with_new_id(match: Match) -> str:
         citation_id = match.group(1)
         if citation_id not in remapped_citations:
             logger.error(
@@ -216,7 +216,7 @@ def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection
             return ""
         return "(citation-" + remapped_citations[citation_id].id + ")"
 
-    return re.sub(CITATION_PATTERN, replace_citation, response)
+    return re.sub(CITATION_PATTERN, replace_with_new_id, response)
 
 
 def merge_contiguous_cited_subsections(
