@@ -240,7 +240,8 @@ def test_merge_contiguous_cited_subsections(subsections):
         f"Some topic related to B. ({noncontig_subsection.id}) "
         f"Something about topic A. ({subsections[0].id}) ({subsections[1].id}) ({noncontig_subsection.id}) "
         f"Repeated citation to topic A. ({subsections[0].id}) ({subsections[1].id}) "
-        f"Single citation to topic B. ({contig_subsection.id}) "
+        f"Single citation from contiguous group to topic B. ({contig_subsection.id}) "
+        f"Reverse order citations to topic B. ({contig_subsection.id}) ({subsection.id}) "
     )
     m_response, m_subsections = merge_contiguous_cited_subsections(llm_response, subsections)
 
@@ -249,7 +250,8 @@ def test_merge_contiguous_cited_subsections(subsections):
         "Some topic related to B. (citation-3) "
         "Something about topic A. (citation-00010002) (citation-3) "
         "Repeated citation to topic A. (citation-00010002) "
-        "Single citation to topic B. (citation-5) "
+        "Single citation from contiguous group to topic B. (citation-5) "
+        "Reverse order citations to topic B. (citation-5) (citation-4) "
     )
 
     # Check new citations
@@ -274,10 +276,13 @@ def test_merge_contiguous_cited_subsections(subsections):
         "Some topic related to B. (citation-2) "
         "Something about topic A. (citation-3) (citation-2) "
         "Repeated citation to topic A. (citation-3) "
-        "Single citation to topic B. (citation-4) "
+        "Single citation from contiguous group to topic B. (citation-4) "
+        "Reverse order citations to topic B. (citation-4) (citation-5) "
     )
 
     remapped_subsections = {ss.id: ss for ss in remapped_citations.values()}
     assert remapped_subsections["1"].text == citation_aboutB.text
     assert remapped_subsections["2"].text == noncontig_subsection.text
     assert remapped_subsections["3"].text == citation_aboutA.text
+    assert remapped_subsections["4"].text == contig_subsection.text
+    assert remapped_subsections["5"].text == subsection.text

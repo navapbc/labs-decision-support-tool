@@ -224,6 +224,10 @@ def merge_contiguous_cited_subsections(
 ) -> Tuple[str, Sequence[Subsection]]:
     subsection_dict: dict[str, Subsection] = {ss.id: ss for ss in subsections}
     updated_subsections = {ss.id: ss for ss in subsections}
+    # logger.info(
+    #     "Merging any contiguous citations:\n  %s",
+    #     "\n  ".join([f"{ss.id} -> {ss.chunk.id}, {ss.subsection_index}" for ss in subsections]),
+    # )
 
     def group_contiguous_cited_subsections(
         multiple_citations_group: str,
@@ -274,6 +278,7 @@ def merge_contiguous_cited_subsections(
                 if citation_id in updated_subsections:
                     new_ss = updated_subsections[citation_id]
                 else:
+                    logger.info("Merging %d citations into %s", len(contig_group), citation_id)
                     new_ss = Subsection(
                         id=citation_id,
                         chunk=contig_group[0].chunk,

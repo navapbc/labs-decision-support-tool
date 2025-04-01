@@ -3,11 +3,16 @@ import random
 import re
 from collections import defaultdict
 from itertools import groupby
-from typing import Match, Sequence, Union
+from typing import Match, Sequence
 
 import markdown
 
-from src.citations import CITATION_PATTERN, move_citations_after_punctuation, remap_citation_ids
+from src.citations import (
+    CITATION_PATTERN,
+    merge_contiguous_cited_subsections,
+    move_citations_after_punctuation,
+    remap_citation_ids,
+)
 from src.db.models.document import Chunk, Document, Subsection
 from src.generate import MessageAttributesT
 
@@ -30,7 +35,7 @@ class FormattingConfig:
             return f"Source: <a href={document.source!r}>{document.source}</a>"
         return ""
 
-    def get_citation_link(self, subsection: Union[Subsection]) -> str:
+    def get_citation_link(self, subsection: Subsection) -> str:
         return self.get_document_link(subsection.chunk.document)
 
     def get_superscript_link(self, chunk: Chunk) -> str:
@@ -53,7 +58,10 @@ def format_response(
     attributes: MessageAttributesT,
 ) -> str:
     formatted_response = move_citations_after_punctuation(raw_response)
-    remapped_citations = remap_citation_ids(subsections, formatted_response)
+    merged_subsection_response, merged_subsections = merge_contiguous_cited_subsections(
+        formatted_response, subsections
+    )
+    remapped_citations = remap_citation_ids(merged_subsections, merged_subsection_response)
     citations_html, map_of_accordion_ids = _create_accordion_html(config, remapped_citations)
 
     html_response = []
@@ -67,7 +75,7 @@ def format_response(
     html_response.append(
         to_html(
             _add_citation_links(
-                formatted_response, remapped_citations, config, map_of_accordion_ids
+                merged_subsection_response, remapped_citations, config, map_of_accordion_ids
             )
         )
     )
@@ -118,7 +126,7 @@ def _create_accordion_html(
 
 
 def _group_by_document(
-    remapped_citations: dict[str, Subsection]
+    remapped_citations: dict[str, Subsection],
 ) -> dict[Document, list[Subsection]]:
     # Group the citations by document to build an accordion for each document
     citations_by_document: dict[Document, list[Subsection]] = defaultdict(list)
