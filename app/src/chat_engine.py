@@ -3,12 +3,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence
 
-from src.citations import (
-    CitationFactory,
-    ResponseWithSubsections,
-    create_prompt_context,
-    split_into_subsections,
-)
+from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, Subsection
 from src.format import FormattingConfig
 from src.generate import (
@@ -49,7 +44,7 @@ If the client lost their job at no fault, they may be eligible for unemployment 
 """
 
 
-class OnMessageResult(ResponseWithSubsections):
+class OnMessageResult:
     def __init__(
         self,
         response: str,
@@ -59,7 +54,8 @@ class OnMessageResult(ResponseWithSubsections):
         chunks_with_scores: Sequence[ChunkWithScore] | None = None,
         subsections: Sequence[Subsection] | None = None,
     ):
-        super().__init__(response, subsections if subsections is not None else [])
+        self.response = response
+        self.subsections = subsections if subsections is not None else []
         self.system_prompt = system_prompt
         self.attributes = attributes
         self.chunks_with_scores = chunks_with_scores if chunks_with_scores is not None else []

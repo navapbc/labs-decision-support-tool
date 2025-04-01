@@ -1,8 +1,7 @@
 import logging
 import re
-from dataclasses import dataclass
 from itertools import count
-from typing import Callable, Match, Optional, Sequence
+from typing import Callable, Match, NamedTuple, Optional, Sequence, Tuple
 
 from nutree import Node
 
@@ -220,6 +219,81 @@ def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection
     return re.sub(CITATION_PATTERN, replace_citation, response)
 
 
+def merge_contiguous_cited_subsections(
+    response: str, subsections: Sequence[Subsection]
+) -> Tuple[str, Sequence[Subsection]]:
+    subsection_dict: dict[str, Subsection] = {ss.id: ss for ss in subsections}
+    updated_subsections = {ss.id: ss for ss in subsections}
+
+    def group_contiguous_cited_subsections(
+        multiple_citations_group: str,
+    ) -> Sequence[Sequence[Subsection]]:
+        citations = re.findall(CITATION_PATTERN, multiple_citations_group)
+        # Initialize looping variables based on the first citation
+        ss = subsection_dict[citations[0]]
+        curr_group = [ss]
+        contig_groups = [curr_group]
+        for citation_id in citations[1:]:
+            if citation_id not in subsection_dict:
+                logger.error(
+                    "LLM generated a citation for a reference (%s) that doesn't exist; ignoring.",
+                    citation_id,
+                )
+                continue
+
+            curr_ss = subsection_dict[citation_id]
+            if curr_ss.chunk == ss.chunk and curr_ss.subsection_index == ss.subsection_index + 1:
+                # This subsection is contiguous with the previous one
+                curr_group.append(curr_ss)
+            else:
+                # Create a new contiguous group
+                curr_group = [curr_ss]
+                contig_groups.append(curr_group)
+
+            # Update looping variable
+            ss = curr_ss
+        return contig_groups
+
+    def merge_citations(match: Match) -> str:
+        multiple_citations_group = match.group(1)
+        contig_groups = group_contiguous_cited_subsections(multiple_citations_group)
+
+        new_citation_strs = []
+        for contig_group in contig_groups:
+            if len(contig_group) == 1:
+                # Use the single citation as is
+                citation_id = contig_group[0].id
+                new_ss = subsection_dict[citation_id]
+            else:
+                # Merge the citations into a string of numbers so that it still matches CITATION_PATTERN
+                # concat_ids should be deterministic and unique to match the same repeated citations
+                concat_ids = "".join(
+                    [ss.id.removeprefix("citation-").zfill(4) for ss in contig_group]
+                )
+                citation_id = f"citation-{concat_ids}"
+                if citation_id in updated_subsections:
+                    new_ss = updated_subsections[citation_id]
+                else:
+                    new_ss = Subsection(
+                        id=citation_id,
+                        chunk=contig_group[0].chunk,
+                        subsection_index=contig_group[0].subsection_index,
+                        text="\n\n".join([ss.text for ss in contig_group]),
+                        text_headings=contig_group[0].text_headings,
+                    )
+                    for ss in contig_group:
+                        if ss.id in updated_subsections:
+                            del updated_subsections[ss.id]
+
+            updated_subsections[new_ss.id] = new_ss
+            new_citation_strs.append(f" ({citation_id})")
+        return "".join(new_citation_strs)
+
+    # Find multiple citations that are listed together
+    new_response = re.sub(r"(( ?\(citation-\d+\)){2,})", merge_citations, response)
+    return (new_response, tuple(updated_subsections.values()))
+
+
 def move_citations_after_punctuation(response: str) -> str:
     def move_citation(match: Match) -> str:
         citations = match.group(1)
@@ -232,20 +306,27 @@ def move_citations_after_punctuation(response: str) -> str:
     return re.sub(r" *(( *\(citation-\d+\))+) *([\.\?\!])", move_citation, response).strip()
 
 
-@dataclass
-class ResponseWithSubsections:
+class ResponseWithSubsections(NamedTuple):
     response: str
     subsections: Sequence[Subsection]
 
 
-def simplify_citation_numbers(result: ResponseWithSubsections) -> ResponseWithSubsections:
+def simplify_citation_numbers(
+    response: str, subsections: Sequence[Subsection]
+) -> ResponseWithSubsections:
     """
     Returns the response with remapped `(citation-X)` strings and
     a list of subsections representing the citations.
     The returned subsections only contain citations used in the response
     and are ordered consecutively starting from 1.
     """
-    formatted_response = move_citations_after_punctuation(result.response)
-    remapped_citations = remap_citation_ids(result.subsections, formatted_response)
-    remapped_response = replace_citation_ids(formatted_response, remapped_citations)
+    formatted_response = move_citations_after_punctuation(response)
+
+    merged_subsection_response, merged_subsections = merge_contiguous_cited_subsections(
+        formatted_response, subsections
+    )
+
+    remapped_citations = remap_citation_ids(merged_subsections, merged_subsection_response)
+    remapped_response = replace_citation_ids(merged_subsection_response, remapped_citations)
+
     return ResponseWithSubsections(remapped_response, tuple(remapped_citations.values()))
