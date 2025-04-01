@@ -992,6 +992,16 @@ def _remove_empty_elements(contents: list[PageElement]) -> None:
                 c.decompose()
 
 
+def _strip_empty_strings(elements: list[PageElement]) -> list[PageElement]:
+    # Contents should either be empty string or Tag
+    for child in elements:
+        if isinstance(child, NavigableString) and child.strip() == "":
+            continue
+        assert isinstance(child, Tag)
+
+    return [child for child in elements if isinstance(child, Tag)]
+
+
 def __flatten_and_filter_out_blank(rows: ResultSet, resultset_generator: Callable) -> Sequence[Tag]:
     return [
         para
@@ -1075,13 +1085,3 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     markdown = re.sub(r"\n\n+", "\n\n", markdown)
 
     return markdown.strip()
-
-
-def _strip_empty_strings(elements: list[PageElement]) -> list[PageElement]:
-    # Contents should either be empty string or Tag
-    for child in elements:
-        if isinstance(child, NavigableString) and child.strip() == "":
-            continue
-        assert isinstance(child, Tag)
-
-    return [child for child in elements if isinstance(child, Tag)]
