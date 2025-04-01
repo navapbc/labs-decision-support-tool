@@ -331,7 +331,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
         # At this point, we can't rely on class annotations, just parse based on order of paragraphs
         # H1 and H2 headings are typically in the second row, so exclude the first row
         # to avoid including irrelevant page header paragraphs
-        heading_rows = top_rows[1:]
+        if len(top_rows) < 1:
+            return
+        top_rows.pop(0)
+        heading_rows = top_rows
         assert isinstance(heading_rows, ResultSet)
         set_headings_by_order(_nonempty_paragraphs(heading_rows))
 
@@ -887,6 +890,12 @@ class LA_PolicyManualSpider(scrapy.Spider):
                 else:
                     cols[0].name = f"h{heading_level + 1}"
             elif len(cols) == 2:
+                assert isinstance(cols[1], Tag)
+
+                # Remove empty strings from the columns
+                cols[0].contents = _strip_empty_strings(cols[0].contents)
+                cols[1].contents = _strip_empty_strings(cols[1].contents)
+
                 # Treat 2-column rows as a subheading and its associated body
                 row.name = "div"
                 row.attrs = {}
@@ -1006,6 +1015,8 @@ def split_block_tags(tag: Tag) -> list[list[Tag]]:
     splits: list[list[Tag]] = []
     curr_split: list[Tag] = []
     for c in tag.contents:
+        if isinstance(c, NavigableString) and c.strip() == "":
+            continue
         assert isinstance(c, Tag)
         if c.name in ["p", "div", "table"]:
             if curr_split:
@@ -1064,3 +1075,13 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
     markdown = re.sub(r"\n\n+", "\n\n", markdown)
 
     return markdown.strip()
+
+
+def _strip_empty_strings(elements: list[PageElement]) -> list[PageElement]:
+    # Contents should either be empty string or Tag
+    for child in elements:
+        if isinstance(child, NavigableString) and child.strip() == "":
+            continue
+        assert isinstance(child, Tag)
+
+    return [child for child in elements if isinstance(child, Tag)]
