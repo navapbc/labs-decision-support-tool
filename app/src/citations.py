@@ -281,9 +281,6 @@ def merge_contiguous_cited_subsections(
                         text="\n\n".join([ss.text for ss in contig_group]),
                         text_headings=contig_group[0].text_headings,
                     )
-                    for ss in contig_group:
-                        if ss.id in updated_subsections:
-                            del updated_subsections[ss.id]
 
             updated_subsections[new_ss.id] = new_ss
             new_citation_strs.append(f" ({citation_id})")

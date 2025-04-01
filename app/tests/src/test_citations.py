@@ -239,7 +239,8 @@ def test_merge_contiguous_cited_subsections(subsections):
         f"Something about B. ({subsection.id}) ({contig_subsection.id}) ({contig_subsection2.id}) "
         f"Some topic related to B. ({noncontig_subsection.id}) "
         f"Something about topic A. ({subsections[0].id}) ({subsections[1].id}) ({noncontig_subsection.id}) "
-        f"Repeated citation to topic A. ({subsections[0].id}) ({subsections[1].id})"
+        f"Repeated citation to topic A. ({subsections[0].id}) ({subsections[1].id}) "
+        f"Single citation to topic B. ({contig_subsection.id}) "
     )
     m_response, m_subsections = merge_contiguous_cited_subsections(llm_response, subsections)
 
@@ -247,7 +248,8 @@ def test_merge_contiguous_cited_subsections(subsections):
         "Something about B. (citation-000400050006) "
         "Some topic related to B. (citation-3) "
         "Something about topic A. (citation-00010002) (citation-3) "
-        "Repeated citation to topic A. (citation-00010002)"
+        "Repeated citation to topic A. (citation-00010002) "
+        "Single citation to topic B. (citation-5) "
     )
 
     # Check new citations
@@ -271,7 +273,8 @@ def test_merge_contiguous_cited_subsections(subsections):
         "Something about B. (citation-1) "
         "Some topic related to B. (citation-2) "
         "Something about topic A. (citation-3) (citation-2) "
-        "Repeated citation to topic A. (citation-3)"
+        "Repeated citation to topic A. (citation-3) "
+        "Single citation to topic B. (citation-4) "
     )
 
     remapped_subsections = {ss.id: ss for ss in remapped_citations.values()}
