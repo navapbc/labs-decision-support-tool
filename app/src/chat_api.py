@@ -504,7 +504,7 @@ async def run_query(
     result = await asyncify(lambda: engine.on_message(question, chat_history))()
     logger.info("Response: %s", result.response)
 
-    final_result = simplify_citation_numbers(result)
+    final_result = simplify_citation_numbers(result.response, result.subsections)
     citations = [Citation.from_subsection(subsection) for subsection in final_result.subsections]
 
     alert_msg = getattr(result.attributes, "alert_message", None)

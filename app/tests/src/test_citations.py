@@ -1,3 +1,4 @@
+import copy
 from textwrap import dedent
 
 import pytest
@@ -6,6 +7,7 @@ from src.citations import (
     CitationFactory,
     basic_chunk_splitter,
     create_prompt_context,
+    merge_contiguous_cited_subsections,
     move_citations_after_punctuation,
     remap_citation_ids,
     replace_citation_ids,
@@ -39,13 +41,13 @@ def subsections(chunks):
 def context(chunks):
     factory = CitationFactory()
     return [
-        factory.create_citation(chunks[0], "This is the first chunk."),
-        factory.create_citation(chunks[0], "With two subsections"),
-        factory.create_citation(chunks[1], chunks[1].content),
+        factory.create_citation(chunks[0], 0, "This is the first chunk."),
+        factory.create_citation(chunks[0], 1, "With two subsections"),
+        factory.create_citation(chunks[1], 0, chunks[1].content),
     ]
 
 
-def test_get_context_for_prompt(chunks, subsections):
+def test_create_prompt_context(chunks, subsections):
     assert create_prompt_context([]) == ""
 
     assert create_prompt_context(subsections) == (
@@ -78,7 +80,7 @@ Content: | Header 1 | Header 2 |
     )
 
 
-def test_get_context(chunks, subsections):
+def test_split_into_subsections(chunks, subsections):
     assert subsections[0].id == "citation-1"
     assert subsections[0].chunk == chunks[0]
     assert subsections[0].text == "This is the first chunk."
@@ -156,8 +158,8 @@ def test_replace_citation_ids():
     assert replace_citation_ids("Hallucinated.(citation-1)", {}) == "Hallucinated."
 
     remapped_citations = {
-        "citation-4": Subsection("1", ChunkFactory.build(), ""),
-        "citation-3": Subsection("2", ChunkFactory.build(), ""),
+        "citation-4": Subsection("1", ChunkFactory.build(), 0, ""),
+        "citation-3": Subsection("2", ChunkFactory.build(), 1, ""),
     }
     assert (
         replace_citation_ids("Remapped. (citation-4)(citation-3)", remapped_citations)
@@ -191,22 +193,96 @@ The officer weighs all these factors. They consider positive factors, like a job
 def test_move_citations_after_punctuation():
     text = dedent(
         """
-                     Some text (citation-1). Another sentence on same line with no space(citation-2)? Sentence 3 has the correct citation formatting. (citation-3)
-                     - Bullet 1 is on a new line (citation-4) (citation-5)!
-                     - Bullet 2 is on next line (citation-14) (citation-15) (citation-16).
-                     Last sentence(citation-6)!
+        Some text (citation-1). Another sentence on same line with no space(citation-2)? Sentence 3 has the correct citation formatting. (citation-3)
+        - Bullet 1 is on a new line (citation-4) (citation-5)!
+        - Bullet 2 is on next line (citation-14) (citation-15) (citation-16).
+        Last sentence(citation-6)!
 
-                     New paragraph (citation-100).
-                  """
+        New paragraph (citation-100).
+        """
     )
     expected_text = dedent(
         """
-                            Some text. (citation-1) Another sentence on same line with no space? (citation-2) Sentence 3 has the correct citation formatting. (citation-3)
-                            - Bullet 1 is on a new line! (citation-4) (citation-5)
-                            - Bullet 2 is on next line. (citation-14) (citation-15) (citation-16)
-                            Last sentence! (citation-6)
+        Some text. (citation-1) Another sentence on same line with no space? (citation-2) Sentence 3 has the correct citation formatting. (citation-3)
+        - Bullet 1 is on a new line! (citation-4) (citation-5)
+        - Bullet 2 is on next line. (citation-14) (citation-15) (citation-16)
+        Last sentence! (citation-6)
 
-                            New paragraph. (citation-100)
-                           """
+        New paragraph. (citation-100)
+        """
     ).strip()
     assert move_citations_after_punctuation(text) == expected_text
+
+
+def test_merge_contiguous_cited_subsections(subsections):
+    # Ensure we have some contiguous subsections
+    assert subsections[0].chunk == subsections[1].chunk
+    assert subsections[0].subsection_index == 0
+    assert subsections[1].subsection_index == 1
+
+    assert subsections[3].chunk == subsections[4].chunk
+    assert subsections[3].subsection_index == 0
+    assert subsections[4].subsection_index == 1
+
+    noncontig_subsection = subsections[2]
+
+    subsection = subsections[3]
+    contig_subsection = subsections[4]
+    # Append a third contiguous subsection
+    contig_subsection2 = copy.copy(contig_subsection)
+    contig_subsection2.subsection_index = 2
+    contig_subsection2.id = f"citation-{len(subsections) + 1}"
+    contig_subsection2.text = "Third contiguous subsection text about topic B."
+    subsections.append(contig_subsection2)
+
+    llm_response = dedent(
+        f"Something about B. ({subsection.id}) ({contig_subsection.id}) ({contig_subsection2.id}) "
+        f"Some topic related to B. ({noncontig_subsection.id}) "
+        f"Something about topic A. ({subsections[0].id}) ({subsections[1].id}) ({noncontig_subsection.id}) "
+        f"Repeated citation to topic A. ({subsections[0].id}) ({subsections[1].id}) "
+        f"Single citation from contiguous group to topic B. ({contig_subsection.id}) "
+        f"Reverse order citations to topic B. ({contig_subsection.id}) ({subsection.id}) "
+    )
+    m_response, m_subsections = merge_contiguous_cited_subsections(llm_response, subsections)
+
+    assert m_response == (
+        "Something about B. (citation-000400050006) "
+        "Some topic related to B. (citation-3) "
+        "Something about topic A. (citation-00010002) (citation-3) "
+        "Repeated citation to topic A. (citation-00010002) "
+        "Single citation from contiguous group to topic B. (citation-5) "
+        "Reverse order citations to topic B. (citation-5) (citation-4) "
+    )
+
+    # Check new citations
+    subsection_dict = {ss.id: ss for ss in m_subsections}
+    citation_aboutB = subsection_dict["citation-000400050006"]
+    assert citation_aboutB.text == "\n\n".join(
+        [subsection.text, contig_subsection.text, contig_subsection2.text]
+    )
+
+    citation_aboutA = subsection_dict["citation-00010002"]
+    assert citation_aboutA.text == "\n\n".join([subsections[0].text, subsections[1].text])
+
+    citation_3 = subsection_dict["citation-3"]
+    assert citation_3 == noncontig_subsection
+
+    remapped_citations = remap_citation_ids(m_subsections, m_response)
+    remapped_response = replace_citation_ids(m_response, remapped_citations)
+
+    print("Remapped response:", remapped_response)
+    assert remapped_response == (
+        "Something about B. (citation-1) "
+        "Some topic related to B. (citation-2) "
+        "Something about topic A. (citation-3) (citation-2) "
+        "Repeated citation to topic A. (citation-3) "
+        "Single citation from contiguous group to topic B. (citation-4) "
+        "Reverse order citations to topic B. (citation-4) (citation-5) "
+    )
+
+    remapped_subsections = {ss.id: ss for ss in remapped_citations.values()}
+    assert remapped_subsections["1"].text == citation_aboutB.text
+    assert remapped_subsections["2"].text == noncontig_subsection.text
+    assert remapped_subsections["3"].text == citation_aboutA.text
+    assert remapped_subsections["4"].text == contig_subsection.text
+    assert remapped_subsections["5"].text == subsection.text

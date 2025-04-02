@@ -60,7 +60,7 @@ def test_process_question(monkeypatch, engine):
     subsection_text = chunk.content[: int(len(chunk.content) / 2)]
     mock_result = OnMessageResult(
         response="Answer to question.(citation-1)",
-        subsections=[Subsection("citation-1", chunk, subsection_text)],
+        subsections=[Subsection("citation-1", chunk, 0, subsection_text)],
         attributes=ImagineLA_MessageAttributes(
             needs_context=True,
             translated_message="",
