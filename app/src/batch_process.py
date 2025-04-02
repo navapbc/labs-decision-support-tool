@@ -67,7 +67,7 @@ def _process_question(
     try:
         logger.info("Processing question %i: %s...", index, question[:50])
         result = engine.on_message(question=question, chat_history=[])
-        final_result = simplify_citation_numbers(result)
+        final_result = simplify_citation_numbers(result.response, result.subsections)
 
         result_table: dict[str, str | None] = {"answer": final_result.response}
 

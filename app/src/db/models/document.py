@@ -83,12 +83,19 @@ class DocumentWithMaxScore(NamedTuple):
 class Subsection:
 
     def __init__(
-        self, id: str, chunk: Chunk, text: str, text_headings: Optional[Sequence[str]] = None
+        self,
+        id: str,
+        chunk: Chunk,
+        subsection_index: int,
+        text: str,
+        text_headings: Optional[Sequence[str]] = None,
     ) -> None:
         # user-friendly, consecutive identifier for the subsection starting from 1
         self.id = id
         # chunk containing the subsection
         self.chunk = chunk
+        # index of the subsection within the chunk (0-based)
+        self.subsection_index = subsection_index
         # specific substring within chunk.text
         self.text = text
         # parent headings for the text

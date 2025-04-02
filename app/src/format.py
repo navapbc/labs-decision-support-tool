@@ -7,7 +7,12 @@ from typing import Match, Sequence
 
 import markdown
 
-from src.citations import CITATION_PATTERN, move_citations_after_punctuation, remap_citation_ids
+from src.citations import (
+    CITATION_PATTERN,
+    merge_contiguous_cited_subsections,
+    move_citations_after_punctuation,
+    remap_citation_ids,
+)
 from src.db.models.document import Chunk, Document, Subsection
 from src.generate import MessageAttributesT
 
@@ -27,7 +32,7 @@ class FormattingConfig:
 
     def get_document_link(self, document: Document) -> str:
         if document.source:
-            return f"<p>Source: <a href={document.source!r}>{document.source}</a></p>"
+            return f"Source: <a href={document.source!r}>{document.source}</a>"
         return ""
 
     def get_citation_link(self, subsection: Subsection) -> str:
@@ -42,7 +47,7 @@ class FormattingConfig:
 
 def to_html(text: str) -> str:
     # markdown expects '\n' before the start of a list
-    corrected_text = re.sub(r"^- ", "\n- ", text, flags=re.MULTILINE, count=1)
+    corrected_text = re.sub(r"^([\-\+\*]) ", "\n- ", text, flags=re.MULTILINE, count=1)
     return markdown.markdown(corrected_text)
 
 
@@ -53,7 +58,10 @@ def format_response(
     attributes: MessageAttributesT,
 ) -> str:
     formatted_response = move_citations_after_punctuation(raw_response)
-    remapped_citations = remap_citation_ids(subsections, formatted_response)
+    merged_subsection_response, merged_subsections = merge_contiguous_cited_subsections(
+        formatted_response, subsections
+    )
+    remapped_citations = remap_citation_ids(merged_subsections, merged_subsection_response)
     citations_html, map_of_accordion_ids = _create_accordion_html(config, remapped_citations)
 
     html_response = []
@@ -67,7 +75,7 @@ def format_response(
     html_response.append(
         to_html(
             _add_citation_links(
-                formatted_response, remapped_citations, config, map_of_accordion_ids
+                merged_subsection_response, remapped_citations, config, map_of_accordion_ids
             )
         )
     )
@@ -91,6 +99,7 @@ def _create_accordion_html(
     map_of_accordion_ids = {}
     for document, cited_subsections in _group_by_document(remapped_citations).items():
         _accordion_id += 1
+
         citation_body = _build_citation_body(config, document, cited_subsections)
         formatted_citation_body = config.format_accordion_body(citation_body)
         citation_numbers = [citation.id for citation in cited_subsections]
@@ -117,7 +126,7 @@ def _create_accordion_html(
 
 
 def _group_by_document(
-    remapped_citations: dict[str, Subsection]
+    remapped_citations: dict[str, Subsection],
 ) -> dict[Document, list[Subsection]]:
     # Group the citations by document to build an accordion for each document
     citations_by_document: dict[Document, list[Subsection]] = defaultdict(list)
@@ -135,31 +144,33 @@ ChunkWithCitation = tuple[Chunk, Sequence[Subsection]]
 def _build_citation_body(
     config: FormattingConfig, document: Document, subsections: Sequence[Subsection]
 ) -> str:
-    citation_body = ""
+    citation_body = []
     rendered_heading = ""
     for subsection in subsections:
-        citation_headings = (
+        # for subsection in subsections:
+        citation_headings_html = (
             _get_breadcrumb_html(subsection.text_headings, document.name)
             if subsection.text_headings
             else ""
-        )
-        # only show headings if they are different
-        if rendered_heading != citation_headings:
-            citation_body += f"<b>{citation_headings}</b>"
-            rendered_heading = citation_headings
+        ).strip()
 
-        citation_body += (
+        # only show headings if they are different
+        if rendered_heading != citation_headings_html:
+            citation_body.append(citation_headings_html)
+            rendered_heading = citation_headings_html
+
+        citation_body.append(
             f"<div>Citation #{subsection.id}: </div>"
             f'<div class="margin-left-2 border-left-1 border-base-lighter padding-left-2">{to_html(subsection.text)}</div>'
         )
         if config.add_citation_link_per_subsection:
             citation_link = config.get_citation_link(subsection)
-            citation_body += f"<div>{citation_link}</div>"
+            citation_body.append(f"<div>{citation_link}</div>")
 
     if not config.add_citation_link_per_subsection:
         citation_link = config.get_document_link(document)
-        citation_body += f"<div>{citation_link}</div>"
-    return citation_body
+        citation_body.append(f"<div>{citation_link}</div>")
+    return "\n".join(citation_body)
 
 
 def _get_breadcrumb_html(headings: Sequence[str] | None, document_name: str) -> str:

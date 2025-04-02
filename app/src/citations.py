@@ -1,8 +1,7 @@
 import logging
 import re
-from dataclasses import dataclass
 from itertools import count
-from typing import Callable, Match, Sequence
+from typing import Callable, Match, NamedTuple, Optional, Sequence, Tuple
 
 from nutree import Node
 
@@ -21,12 +20,18 @@ class CitationFactory:
         if next_id:
             self.next_id = next_id
         else:
-            self.next_id = lambda: f"{prefix}{self.counter.__next__()}"
+            self.next_id = lambda: f"{prefix}{next(self.counter)}"
 
-    def create_citation(self, chunk: Chunk, text: str, text_headings: Sequence[str]) -> Subsection:
+    def create_citation(
+        self,
+        chunk: Chunk,
+        subsection_index: int,
+        text: str,
+        text_headings: Optional[Sequence[str]] = None,
+    ) -> Subsection:
         if not self._text_in_chunk(text, chunk):
             logger.warning("Text not found in chunk: %r\n%r", text, chunk.content)
-        return Subsection(self.next_id(), chunk, text, text_headings)
+        return Subsection(self.next_id(), chunk, subsection_index, text, text_headings)
 
     def _text_in_chunk(self, text: str, chunk: Chunk) -> bool:
         # Check that text is in chunk.content, ignoring whitespace and dashes
@@ -58,6 +63,7 @@ def basic_chunk_splitter(
     better_splits = []
     base_headings = chunk.headings or []
     curr_headings = ["" for _ in range(6)]
+    split_index = count()
     for split in splits:
         if split.startswith("#"):
             heading_level, heading_text = parse_heading_markdown(split)
@@ -68,7 +74,7 @@ def basic_chunk_splitter(
             continue
 
         headings = [text for text in base_headings + curr_headings if text]
-        better_splits.append(factory.create_citation(chunk, split, headings))
+        better_splits.append(factory.create_citation(chunk, next(split_index), split, headings))
     return better_splits
 
 
@@ -76,21 +82,23 @@ def tree_based_chunk_splitter(
     chunk: Chunk, factory: CitationFactory = citation_factory
 ) -> list[Subsection]:
     tree = create_markdown_tree(chunk.content)
-    return _split_section(tree.first_child(), chunk, factory)
+    subsections: list[Subsection] = []
+    _split_section(subsections, tree.first_child(), chunk, factory)
+    return subsections
 
 
 def _split_section(
+    subsections: list[Subsection],
     hs_node: Node,
     chunk: Chunk,
     factory: CitationFactory = citation_factory,
-) -> list[Subsection]:
+) -> None:
     base_headings = chunk.headings or []
     headings = None
-    subsections: list[Subsection] = []
     node = hs_node.first_child()
     while node:
         if node.data_type == "HeadingSection":
-            subsections += _split_section(node, chunk, factory)
+            _split_section(subsections, node, chunk, factory)
         elif node.data_type == "Heading":
             pass
         elif node.has_token() and node.is_block_token():
@@ -105,15 +113,18 @@ def _split_section(
                 intro_sentence = markdown
                 markdown = next_node.render().strip()
                 subsections.append(
-                    factory.create_citation(chunk, intro_sentence + "\n" + markdown, headings)
+                    factory.create_citation(
+                        chunk, len(subsections), intro_sentence + "\n" + markdown, headings
+                    )
                 )
                 node.next_sibling().remove()
             else:
-                subsections.append(factory.create_citation(chunk, markdown, headings))
+                subsections.append(
+                    factory.create_citation(chunk, len(subsections), markdown, headings)
+                )
         else:
             raise NotImplementedError(f"Unexpected: {node.id_string()}")
         node = node.next_sibling()
-    return subsections
 
 
 def split_into_subsections(
@@ -148,10 +159,10 @@ def create_prompt_context(subsections: Sequence[Subsection]) -> str:
 
 def remap_citation_ids(subsections: Sequence[Subsection], response: str) -> dict[str, Subsection]:
     """
-    Map '(citation-<id>)' in `response`, where '(citation-<id>)' is the `id` in one of the `subsections`,
-    to a dict from '(citation-<id>)' to corresponding Subsection,
+    Map '(citation-<id>)' in `response`, where '(citation-<id>)' refers to the `id` in one of the `subsections`,
+    to a dict from string '(citation-<id>)' to the corresponding Subsection,
     where the order of the list reflects the order of the citations in `response`.
-    Only cited subsections are included in the returned dict.
+    Only cited subsections in the response are included in the returned dict.
     Remap the Subsection.id value to be the user-friendly citation number for that citation.
     E.g., if `subsections` is a list with five entries, and `response` is a string like
     "Example (citation-3)(citation-1), another example (citation-1).", then this function will return
@@ -180,7 +191,7 @@ def remap_citation_ids(subsections: Sequence[Subsection], response: str) -> dict
             # Add a copy of the subsection with the id replaced by a new consecutive citation number
             citation = citation_map[citation_id]
             citations[citation_id] = factory.create_citation(
-                citation.chunk, citation.text, citation.text_headings
+                citation.chunk, citation.subsection_index, citation.text, citation.text_headings
             )
     if citations:
         logger.info(
@@ -208,6 +219,83 @@ def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection
     return re.sub(CITATION_PATTERN, replace_citation, response)
 
 
+def merge_contiguous_cited_subsections(
+    response: str, subsections: Sequence[Subsection]
+) -> Tuple[str, Sequence[Subsection]]:
+    subsection_dict: dict[str, Subsection] = {ss.id: ss for ss in subsections}
+    updated_subsections = {ss.id: ss for ss in subsections}
+    # logger.info(
+    #     "Merging any contiguous citations:\n  %s",
+    #     "\n  ".join([f"{ss.id} -> {ss.chunk.id}, {ss.subsection_index}" for ss in subsections]),
+    # )
+
+    def group_contiguous_cited_subsections(
+        multiple_citations_group: str,
+    ) -> Sequence[Sequence[Subsection]]:
+        citations = re.findall(CITATION_PATTERN, multiple_citations_group)
+        # Initialize looping variables based on the first citation
+        ss = subsection_dict[citations[0]]
+        curr_group = [ss]
+        contig_groups = [curr_group]
+        for citation_id in citations[1:]:
+            if citation_id not in subsection_dict:
+                logger.error(
+                    "LLM generated a citation for a reference (%s) that doesn't exist; ignoring.",
+                    citation_id,
+                )
+                continue
+
+            curr_ss = subsection_dict[citation_id]
+            if curr_ss.chunk == ss.chunk and curr_ss.subsection_index == ss.subsection_index + 1:
+                # This subsection is contiguous with the previous one
+                curr_group.append(curr_ss)
+            else:
+                # Create a new contiguous group
+                curr_group = [curr_ss]
+                contig_groups.append(curr_group)
+
+            # Update looping variable
+            ss = curr_ss
+        return contig_groups
+
+    def merge_citations(match: Match) -> str:
+        multiple_citations_group = match.group(1)
+        contig_groups = group_contiguous_cited_subsections(multiple_citations_group)
+
+        new_citation_strs = []
+        for contig_group in contig_groups:
+            if len(contig_group) == 1:
+                # Use the single citation as is
+                citation_id = contig_group[0].id
+                new_ss = subsection_dict[citation_id]
+            else:
+                # Merge the citations into a string of numbers so that it still matches CITATION_PATTERN
+                # concat_ids should be deterministic and unique to match the same repeated citations
+                concat_ids = "".join(
+                    [ss.id.removeprefix("citation-").zfill(4) for ss in contig_group]
+                )
+                citation_id = f"citation-{concat_ids}"
+                if citation_id in updated_subsections:
+                    new_ss = updated_subsections[citation_id]
+                else:
+                    logger.info("Merging %d citations into %s", len(contig_group), citation_id)
+                    new_ss = Subsection(
+                        id=citation_id,
+                        chunk=contig_group[0].chunk,
+                        subsection_index=contig_group[0].subsection_index,
+                        text="\n\n".join([ss.text for ss in contig_group]),
+                        text_headings=contig_group[0].text_headings,
+                    )
+
+            updated_subsections[new_ss.id] = new_ss
+            new_citation_strs.append(f" ({citation_id})")
+        return "".join(new_citation_strs)
+
+    # Find multiple citations that are listed together
+    new_response = re.sub(r"(( ?\(citation-\d+\)){2,})", merge_citations, response)
+    return (new_response, tuple(updated_subsections.values()))
+
+
 def move_citations_after_punctuation(response: str) -> str:
     def move_citation(match: Match) -> str:
         citations = match.group(1)
@@ -220,20 +308,27 @@ def move_citations_after_punctuation(response: str) -> str:
     return re.sub(r" *(( *\(citation-\d+\))+) *([\.\?\!])", move_citation, response).strip()
 
 
-@dataclass
-class ResponseWithSubsections:
+class ResponseWithSubsections(NamedTuple):
     response: str
     subsections: Sequence[Subsection]
 
 
-def simplify_citation_numbers(result: ResponseWithSubsections) -> ResponseWithSubsections:
+def simplify_citation_numbers(
+    response: str, subsections: Sequence[Subsection]
+) -> ResponseWithSubsections:
     """
     Returns the response with remapped `(citation-X)` strings and
     a list of subsections representing the citations.
     The returned subsections only contain citations used in the response
     and are ordered consecutively starting from 1.
     """
-    formatted_response = move_citations_after_punctuation(result.response)
-    remapped_citations = remap_citation_ids(result.subsections, formatted_response)
-    remapped_response = replace_citation_ids(formatted_response, remapped_citations)
+    formatted_response = move_citations_after_punctuation(response)
+
+    merged_subsection_response, merged_subsections = merge_contiguous_cited_subsections(
+        formatted_response, subsections
+    )
+
+    remapped_citations = remap_citation_ids(merged_subsections, merged_subsection_response)
+    remapped_response = replace_citation_ids(merged_subsection_response, remapped_citations)
+
     return ResponseWithSubsections(remapped_response, tuple(remapped_citations.values()))
