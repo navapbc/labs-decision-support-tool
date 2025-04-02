@@ -103,6 +103,26 @@ WebSockets offer two-way communication, good for real-time interactive applicati
        │                         │                         │
 ```
 
+## Considerations
+
+### Handling Temporary Internet Issues
+
+- Use SSE's `Last-Event-ID` header for reconnection handling, allowing clients to resume from where they left off during a temporary disconnection
+- Server should buffer recent events for each session to support reconnection, ensuring no loss of information during brief connectivity issues
+- Client should implement robust reconnection logic with appropriate backoff strategies
+
+### Citations Returned in Streaming Responses
+
+- Stream raw text with citation placeholders (e.g., `(citation-XXX)`) via `message` events
+- Send complete citation data in a final `done` event after the full response is generated
+- Client-side processing will replace citation placeholders with properly formatted references using the citation data
+- This approach maintains fast streaming of text content while preserving the citation functionality
+
+### Other Considerations
+
+- Support client-initiated cancellation of in-progress streams
+- Implement server-side state management for active SSE connections
+
 ## Links
 
 Jira Tickets:
