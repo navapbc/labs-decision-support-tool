@@ -37,6 +37,7 @@ mistletoe = "^1.4.0"
 nutree = "^0.9.0"
 html2text = "^2024.2.26"
 asyncpg = "^0.30.0"
+beautifulsoup4 = "^4.13.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"

@@ -52,12 +52,6 @@ def format_response(
     config: FormattingConfig,
     attributes: MessageAttributesT,
 ) -> str:
-    # formatted_response = move_citations_after_punctuation(raw_response)
-    # merged_subsection_response, merged_subsections = merge_contiguous_cited_subsections(
-    #     formatted_response, subsections
-    # )
-    # remapped_citations = remap_citation_ids(merged_subsections, merged_subsection_response)
-
     result = simplify_citation_numbers(raw_response, subsections)
     citations_html, map_of_accordion_ids = _create_accordion_html(config, result.subsections)
 
