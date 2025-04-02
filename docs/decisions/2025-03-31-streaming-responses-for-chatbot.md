@@ -103,6 +103,40 @@ WebSockets offer two-way communication, good for real-time interactive applicati
        │                         │                         │
 ```
 
+### Reconnection Flow using "Last-Event-ID" for Interupted Connections
+
+```
+┌─────────────┐           ┌─────────────┐           ┌──────────────┐
+│             │           │             │           │              │
+│   Client    │           │   Server    │           │  Event       │
+│  Browser    │           │  FastAPI    │           │  Buffer      │
+│             │           │             │           │              │
+└─────────────┘           └─────────────┘           └──────────────┘
+       │                         │                         │
+       │  1. Initial SSE Connect │                         │
+       │─────────────────────────►                         │
+       │                         │                         │
+       │  2. Events (id: 1,2,3)  │                         │
+       │◄─────────────────────────                         │
+       │                         │  3. Store Events        │
+       │                         │────────────────────────►│
+       │                         │                         │
+       │                         │                         │
+       │    X CONNECTION LOST X  │                         │
+       │                         │                         │
+       │  4. Reconnect with      │                         │
+       │     Last-Event-ID: 3    │                         │
+       │─────────────────────────►                         │
+       │                         │  5. Retrieve events     │
+       │                         │     after id 3          │
+       │                         │◄────────────────────────│
+       │                         │                         │
+       │  6. Resume with events  │                         │
+       │     (id: 4,5,6...)      │                         │
+       │◄─────────────────────────                         │
+       │                         │                         │
+```
+
 ## Considerations
 
 ### Handling Temporary Internet Issues
