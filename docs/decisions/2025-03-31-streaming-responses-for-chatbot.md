@@ -159,6 +159,8 @@ WebSockets offer two-way communication, good for real-time interactive applicati
 
 ## Links
 
+- [Ensuring Reliable Streaming with Server-Sent Events](https://ithy.com/article/sse-streaming-retries-v0p7rdp1)
+
 Jira Tickets:
   - [Spike: investigate options for supporting intermittent connections](https://navalabs.atlassian.net/browse/DST-842)
   - [Enable streaming responses](https://navalabs.atlassian.net/browse/DST-846)
