@@ -70,6 +70,9 @@ def ingest_json(
 ) -> None:
     json_items = load_json_items(db_session, json_filepath, config.doc_attribs, skip_db, resume)
 
+    # Skip empty json items
+    json_items = [item for item in json_items if item != {}]
+
     if config.prep_json_item:
         for item in json_items:
             config.prep_json_item(item)
