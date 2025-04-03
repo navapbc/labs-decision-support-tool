@@ -45,6 +45,11 @@ class TargetElementType(Enum):
 # 42-431_2_Noncitizen_Status.htm, 42-200_Property.htm use all these as bullets
 BULLETS = ["·", "•", "Ø", "o", "§"]
 
+URLS_TO_SKIP = [
+    # From 2016, mostly out-of-date. We see this page getting cited more often than Benefits Info Hub, which is up-to-date
+    "https://epolicy.dpss.lacounty.gov/epolicy/epolicy/server/general/projects_responsive/ePolicyMaster/mergedProjects/Medi-Cal/Medi-Cal/Coverage_for_Immigrants/Coverage_for_Immigrants.htm",
+]
+
 
 class LA_PolicyManualSpider(scrapy.Spider):
     name = "la_policy_spider"
@@ -115,6 +120,10 @@ class LA_PolicyManualSpider(scrapy.Spider):
 
     def parse_page(self, response: Response) -> dict[str, str]:
         "Parses content pages; return value is add to file set by scrape_la_policy.OUTPUT_JSON"
+        if response.url in URLS_TO_SKIP:
+            self.logger.info("Skipping URL %s", response.url)
+            return {}
+
         assert isinstance(response, HtmlResponse)
         url = response.url
         title = response.xpath("head/title/text()").get("").strip()
