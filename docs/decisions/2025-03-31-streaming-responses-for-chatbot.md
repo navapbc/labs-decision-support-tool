@@ -16,17 +16,17 @@ Implementing streaming responses addresses these issues by providing immediate v
 ## Decision Drivers
 
 * User experience (responsiveness, feedback, and engagement)
-* Reliabile connection to the chatbot
+* Reliability of connection to the chatbot
 * Implementation effort for both Nava and third-party clients
 * Maintainability
 
-## Considered Options
+## Solution Options
 
 ### Polling
 
-- Handles intermittent connectivity through retry logic
+- Handles intermittent connectivity through client-side retry logic
 - Introduces latency dependent on polling intervals  
-- Requires writing logic for managing accumulated response chunks and state.
+- Requires writing client-side logic for managing accumulated response chunks and state.
 
 ### Server-Sent Events (SSE)
 
@@ -36,7 +36,7 @@ Implementing streaming responses addresses these issues by providing immediate v
 
 ### WebSockets
 
-- Supports two-way real-time communication
+- Supports two-way real-time communication, though we don't anticipate the client sending any additional message besides the user's queries
 - Flexible for interactive applications
 - More complex to implement and manage.  
 
