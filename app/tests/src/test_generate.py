@@ -113,6 +113,64 @@ def test_generate(monkeypatch):
     assert generate("gpt-4o", PROMPT, "some query") == expected_response
 
 
+import json
+import pdb
+from pprint import pprint
+
+import boto3
+import litellm
+from litellm import completion, get_supported_openai_params
+
+
+# import botocore.client.Bedrock
+def test_generate__bedrock_llm():
+    os.environ["AWS_ACCESS_KEY_ID"] = "..."
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "..."
+    # client = boto3.client("bedrock", region_name="us-east-1")
+    # fm = client.list_foundation_models()
+    # pprint(fm)
+    # with open("fm.json", "w") as f:
+    #     json.dump(fm, f, indent=4)
+    # pdb.set_trace()
+
+    system_prompt = PROMPT
+    query = "tell me a joke"
+
+    # arn:aws:bedrock:us-east-1:654654379445:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0
+    # us.anthropic.claude-3-5-sonnet-20240620-v1:0
+    llm = "bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+
+    # https://github.com/BerriAI/litellm/issues/8851#issue-2882577760
+    # anthropic.claude-3-7-sonnet-20250219-v1:0
+    # response = generate(llm, PROMPT, query)
+
+    messages = [
+        {
+            "content": system_prompt,
+            "role": "system",
+        }
+    ]
+    messages.append({"content": query, "role": "user"})
+
+    params = get_supported_openai_params(
+        model="gemini-1.5-pro-preview-0215", custom_llm_provider="bedrock"
+    )
+
+    litellm._turn_on_debug()
+    # llm0 = "bedrock/anthropic.claude-3-sonnet-20240229-v1:0"
+    # messages0 = [{"content": "Hello, how are you?", "role": "user"}]
+    # response = completion(model=llm0, messages=messages0, **params)
+
+    from src.chat_engine import ImagineLA_MessageAttributes
+
+    response_format = ImagineLA_MessageAttributes
+    pdb.set_trace()
+    response = completion(
+        model=llm, messages=messages, temperature=0.0, response_format=response_format
+    )
+    answer = response["choices"][0]["message"]["content"]
+
+
 def test_generate_with_history(monkeypatch):
     monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
     history = [
