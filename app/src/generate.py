@@ -3,6 +3,8 @@ import logging
 import os
 from typing import Any, TypeVar
 
+import boto3
+import botocore.exceptions
 from litellm import completion
 from pydantic import BaseModel
 
@@ -23,6 +25,15 @@ def get_models() -> dict[str, str]:
         models |= {"OpenAI GPT-4o": "gpt-4o"}
     if "ANTHROPIC_API_KEY" in os.environ:
         models |= {"Anthropic Claude 3.5 Sonnet": "claude-3-5-sonnet-20240620"}
+    if _has_aws_access():
+        # If you get "You don't have access to the model with the specified model ID." error,
+        # remember to request access to Bedrock models ...aws.amazon.com/bedrock/home?region=us-east-1#/modelaccess
+        models |= {
+            # Append 'us.' to the model - https://github.com/BerriAI/litellm/issues/8851
+            "Bedrock Claude 3.7 Sonnet": "bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            # Only add models that support 'response_format' and 'json_schema' - https://docs.litellm.ai/docs/completion/json_mode#check-model-support
+            # Otherwise update the code to use some other method to get structured output
+        }
     if "OLLAMA_HOST" in os.environ:
         import ollama
 
@@ -32,6 +43,19 @@ def get_models() -> dict[str, str]:
         }
         models |= ollama_models
     return models
+
+
+def _has_aws_access() -> bool:
+    # LiteLLM requires these env variables to access Bedrock models - https://docs.litellm.ai/docs/providers/bedrock
+    if "AWS_ACCESS_KEY_ID" not in os.environ or "AWS_SECRET_ACCESS_KEY" not in os.environ:
+        return False
+    if "AWS_REGION" not in os.environ and "AWS_DEFAULT_REGION" in os.environ:
+        os.environ["AWS_REGION"] = os.environ["AWS_DEFAULT_REGION"]
+    try:
+        boto3.client("sts").get_caller_identity()
+        return True
+    except botocore.exceptions.ClientError:
+        return False
 
 
 ChatHistory = list[dict[str, str]]
