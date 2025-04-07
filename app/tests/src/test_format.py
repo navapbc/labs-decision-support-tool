@@ -59,6 +59,12 @@ def test_format_response(chunks_with_scores):
         == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
     )
 
+    # Test nested list formatting
+    assert (
+        format_response([], "List intro sentence: \n\n1. number 1\n   - subitem 1\n   - subitem 2", config, msg_attribs)
+        == "<div><p>List intro sentence: </p>\n<ol>\n<li>number 1<ul>\n<li>subitem 1</li>\n<li>subitem 2</li>\n</ul>\n</li>\n</ol></div>"
+    )
+
     # Test real citations
     html = format_response(
         subsections, "Some real citations: (citation-1) (citation-2)", config, msg_attribs
