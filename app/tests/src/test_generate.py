@@ -76,13 +76,13 @@ def ollama_model_list():
 
 
 def test_get_models(monkeypatch):
+    if "AWS_ACCESS_KEY_ID" in os.environ:
+        monkeypatch.delenv("AWS_ACCESS_KEY_ID")
     if "OPENAI_API_KEY" in os.environ:
         monkeypatch.delenv("OPENAI_API_KEY")
     if "OLLAMA_HOST" in os.environ:
         monkeypatch.delenv("OLLAMA_HOST")
-    assert get_models() == {
-        "Bedrock Claude 3.7 Sonnet": "bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-    }
+    assert get_models() == {}
 
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
     assert get_models()["OpenAI GPT-4o"] == "gpt-4o"
