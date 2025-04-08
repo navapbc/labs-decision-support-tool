@@ -33,32 +33,62 @@ Implementing streaming responses addresses these issues by providing immediate v
 - Immediate/event-driven updates provide a responsive user experience
 - Built-in browser support simplifies client-side implementation 
 - Straightforward server-side implementation
+- Built-in reconnection handling through the Last-Event-ID header, client automatically uses this
+- Supported by all major browsers (Chrome, Firefox, Safari, Edge, Opera), with the exception of Internet Explorer
+- One TCP connection per client (vs. one per tab)
+- When used over HTTP/2, supports up to 100 simultaneous connections by default; over HTTP/1, limited to 6 connections per browser, which could impact multi-tab usage
 
 ### WebSockets
 
 - Supports two-way real-time communication, though we don't anticipate the client sending any additional message besides the user's queries
 - Flexible for interactive applications
-- More complex to implement and manage.  
+- Implementation:
+  - Setting up WebSocket routes and managing WebSocket connections in application code
+  - Handle WebSocket-specific exception cases not present in HTTP endpoints
+  - Reconnection logic (no built-in mechanism like Last-Event-ID in SSE)
+  - Message sequences for recovery after disconnections need to be tracked
+  - Client-side code for connection management and reconnection (retry logic, but [socket.io](https://socket.io/docs/v4/client-api/#event-reconnect) does this)
+- Supported across browsers (including IE!), most chat apps do use WS including [Chainlit](https://docs.chainlit.io/deploy/overview#account-for-websockets)
 
 ## Decision Outcome
 
-We chose Server-Sent Events (SSE) because it provides an event-driven approach to streaming responses with relatively low implementation complexity. SSE allows the server to push partial responses to the client as they become available, providing visual feedback that is engaging to users.
+Server-Sent Events (SSE) is a likely candidate because it provides an event-based approach to streaming responses with relatively low implementation complexity. SSE allows the server to push partial responses (like chunks of text from the LLM or server status updates) to the client as they become available, providing visual feedback that is engaging to users. If we want two-way event messaging, use WebSockets.
 
-Polling achieves similar UX results with periodic fetching accumulated response chunks from the server. But this approach introduces latency dependent on polling intervals and requires additional logic to manage state and retries. While LiteLLM supports asynchronous streaming, polling would require managing accumulated chunks and intervals.
+Polling achieves similar UX results but with different trade-offs.
+1. Client makes periodic requests to check for new content at specific time intervals
+2. Consider polling interval - too frequent > unnecessary server load, too infrequent > noticeable latency
+3. Client manages accumulated response chunks by storing and concatenating them in the correct order
+4. With LiteLLM, while the server-side would use streaming capabilities internally, the client would need additional code to handle polling frequency, manage timeouts, and process the accumulated chunks into a coherent response
 
-WebSockets offer two-way communication, good for real-time interactive applications. But WebSockets introduce more components to maintain for our current use case, requiring explicit connection management and reconnection handling.
+WebSockets offer two-way communication, which is beneficial for real-time interactive applications like chat apps. FastAPI does provide WebSocket support, but implementation for our use case would still require more setup work than SSE.
+1. Reconnection logic, as WebSockets don't have a built-in Last-Event-ID equivalent
+2. Need an [Upgrade mechanism](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Protocol_upgrade_mechanism) to switch from HTTP to WS protocol
+2. Session state tracking to manage where to resume after disconnections
+3. Client-side code to manage connection states and handle reconnection
+
+In contrast, SSE uses standard HTTP connections with several advantages:
+1. Built-in reconnections with Last-Event-ID header
+2. EventSource API in browsers manages connection states and reconnection
+3. You can use server implementation with FastAPI EventSourceResponse that handles SSE-specific formatting
+4. Standard HTTP semantics make it easier to work with existing proxies and infrastructure
+
+While both approaches could be implemented using FastAPI, SSE reconnection handling and client-side implementation with EventSource make it suitable for a one-way streaming use case.
 
 ### Positive Consequences
 
+These are true for all streaming options:
 * Real-time streaming of partial responses increases user engagement
 * Users get immediate feedback that the system is working, rather than waiting for a complete response
 * LiteLLM and FastAPI have existing support for streaming
-* Low implementation effort
 
-### Negative Consequences
+SSE-specific:
+* Lower implementation effort than WS
+* EventSource API and Last-Event-ID header in browsers manages connection states and reconnection
 
-- Requires client-side updates to support SSE connections (same for other all options).
-- SSE connections are limited to one-way communication (server-to-client only).
+### Negative Consequences for SSE
+
+- SSE connections are limited to one-way communication (server-to-client only)
+- Connection limits may affect users with multiple tabs (6 connections per browser on HTTP/1, 100 on HTTP/2)
 
 ## Requirements
 
@@ -137,6 +167,60 @@ WebSockets offer two-way communication, good for real-time interactive applicati
        │                         │                         │
 ```
 
+In step 5, we can use an in-memory buffer to store recent event chunks for each active session. When a client reconnects with a Last-Event-ID header, server checks the buffer to retrieve all events that occurred after the specified ID. This allows the client to resume from where it left off without missing events.
+
+#### Implementation Example
+
+**Client-side with EventSource:**
+```javascript
+// Each browser tab creates its own unique connection
+const eventSource = new EventSource('/query_sse?session_id=<unique_session_id>');
+
+eventSource.onmessage = (event) => {
+  // process incoming chunks as they arrive
+  appendToResponse(event.data);
+};
+
+eventSource.onerror = (error) => {
+  console.log('Connection error, browser reconnects');
+};
+```
+
+**Server-side with EventSourceResponse:**
+```python
+# One dictionary entry per chat session (session_id; eg a user has multiple tabs open)
+event_buffers = {}  # session_id -> list of (event_id, data) tuples
+
+@app.get('/query_sse')
+async def query_sse_endpoint(request):
+    session_id = request.session_id
+    last_event_id = request.headers.get("Last-Event-ID")
+    
+    # create event source response
+    async def event_generator():
+        # Send missed events
+        if last_event_id and session_id in event_buffers:
+            for event_id, data in event_buffers[session_id]:
+                if int(event_id) > int(last_event_id):
+                    yield f"id: {event_id}\ndata: {data}\n\n"
+        
+        # initialize if needed
+        if session_id not in event_buffers:
+            event_buffers[session_id] = []
+        
+        # stream new chunks from LLM
+        current_id = len(event_buffers[session_id])
+        async for chunk in llm_streaming_response():
+            # store in buffer for potential reconnection
+            event_buffers[session_id].append((current_id, chunk))
+            
+            # send to client
+            yield f"id: {current_id}\ndata: {chunk}\n\n"
+            current_id += 1
+    
+    return EventSourceResponse(event_generator())
+```
+
 ## Considerations
 
 ### Handling Temporary Internet Issues
@@ -152,10 +236,29 @@ WebSockets offer two-way communication, good for real-time interactive applicati
 - Client-side processing will replace citation placeholders with properly formatted references using the citation data
 - This approach maintains fast streaming of text content while preserving the citation functionality
 
+### Server-Side State Management for Multiple Instances
+
+If we were to deploy across multiple server instances, we need a way to maintai the event buffer required for reconnection. We have two primary approaches:
+
+#### Sticky Sessions
+
+- Configure load balancer (NGINX, AWS ELB, etc.) to route client to same server instance for entire session
+- We can use `ip_hash` or cookies for sessions
+- Allows us to use the in-memory event buffers with no cross-instance tracking/coordination
+- Drawback: If a server instance fails or is updated, the client loses event history
+
+#### Shared Storage (e.g. with Redis)
+
+- Shared memory store for event buffers
+- Server instances all connect to same Redis instance/cluster
+- Client side can reconnect to server instance and still retrieve missed events
+- Requires setting up Redis instance
+
+Start with sticky sessions for development and testing, then implementing Redis approach 
+
 ### Other Considerations
 
 - Support client-initiated cancellation of in-progress streams
-- Implement server-side state management for active SSE connections
 
 ## Links
 
