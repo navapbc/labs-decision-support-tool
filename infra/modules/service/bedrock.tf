@@ -21,7 +21,6 @@ data "aws_iam_policy_document" "bedrock" {
 }
 
 resource "aws_iam_role_policy_attachment" "bedrock" {
-  count      = 1
   role       = aws_iam_role.app_service.name
   policy_arn = aws_iam_policy.bedrock.arn
 }
