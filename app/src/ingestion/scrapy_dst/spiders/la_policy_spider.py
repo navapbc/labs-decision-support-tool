@@ -118,11 +118,11 @@ class LA_PolicyManualSpider(scrapy.Spider):
             self.logger.debug("URL for %r => %s", name, page_url)
             yield response.follow(page_url, callback=self.parse_page)
 
-    def parse_page(self, response: Response) -> dict[str, str]:
+    def parse_page(self, response: Response) -> dict[str, str] | None:
         "Parses content pages; return value is add to file set by scrape_la_policy.OUTPUT_JSON"
         if response.url in URLS_TO_SKIP:
             self.logger.info("Skipping URL %s", response.url)
-            return {}
+            return None
 
         assert isinstance(response, HtmlResponse)
         url = response.url
@@ -1088,7 +1088,7 @@ def to_markdown(html: str, base_url: Optional[str] = None) -> str:
 
     # Ill-formatted lists causes markdown chunking error (44-220_Emergency_Aid.htm)
     # Remove bullet before "Note:" text
-    markdown = re.sub(r"^ *\* \*\*_Note_\*\*", "**_Note_**", markdown, flags=re.MULTILINE)
+    markdown = re.sub(r"^ *\* \*\* *_Note_\*\*", "**_Note_**", markdown, flags=re.MULTILINE)
 
     # Consolidate newlines
     markdown = re.sub(r"\n\n+", "\n\n", markdown)
