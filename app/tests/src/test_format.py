@@ -1,4 +1,5 @@
 import re
+from textwrap import dedent
 
 from src.citations import CitationFactory, split_into_subsections
 from src.format import FormattingConfig, _get_breadcrumb_html, format_response
@@ -57,6 +58,28 @@ def test_format_response(chunks_with_scores):
     assert (
         format_response([], "List intro sentence: \n- item 1\n- item 2", config, msg_attribs)
         == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
+    )
+
+    # Test nested list formatting
+    assert (
+        format_response(
+            [],
+            "List intro sentence: \n\n1. number 1\n   - subitem 1\n   - subitem 2",
+            config,
+            msg_attribs,
+        )
+        == dedent(
+            """
+            <div><p>List intro sentence: </p>
+            <ol>
+            <li>number 1<ul>
+            <li>subitem 1</li>
+            <li>subitem 2</li>
+            </ul>
+            </li>
+            </ol></div>
+            """
+        ).strip()
     )
 
     # Test real citations
