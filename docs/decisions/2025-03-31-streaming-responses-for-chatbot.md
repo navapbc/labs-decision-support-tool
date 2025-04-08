@@ -32,15 +32,13 @@ Implementing streaming responses addresses these issues by providing immediate v
 
 - Immediate/event-driven updates provide a responsive user experience
 - Built-in browser support simplifies client-side implementation 
-- Straightforward server-side implementation
-- Built-in reconnection handling through the Last-Event-ID header, client automatically uses this
+- Built-in reconnection handling through the Last-Event-ID header (note: this is only useful for network blips but not for disconnections where the user refreshes the page)
 - Supported by all major browsers (Chrome, Firefox, Safari, Edge, Opera), with the exception of Internet Explorer
-- One TCP connection per client (vs. one per tab)
 - When used over HTTP/2, supports up to 100 simultaneous connections by default; over HTTP/1, limited to 6 connections per browser, which could impact multi-tab usage
 
 ### WebSockets
 
-- Supports two-way real-time communication, though we don't anticipate the client sending any additional message besides the user's queries
+- Two-way real-time communication
 - Flexible for interactive applications
 - Implementation:
   - Setting up WebSocket routes and managing WebSocket connections in application code
@@ -60,13 +58,13 @@ Polling achieves similar UX results but with different trade-offs.
 3. Client manages accumulated response chunks by storing and concatenating them in the correct order
 4. With LiteLLM, while the server-side would use streaming capabilities internally, the client would need additional code to handle polling frequency, manage timeouts, and process the accumulated chunks into a coherent response
 
-WebSockets offer two-way communication, which is beneficial for real-time interactive applications like chat apps. FastAPI does provide WebSocket support, but implementation for our use case would still require more setup work than SSE.
+WebSockets offer two-way communication, which is beneficial for real-time interactive applications like chat apps. FastAPI does also provide WebSocket support. Worth noting:
 1. Reconnection logic, as WebSockets don't have a built-in Last-Event-ID equivalent
 2. Need an [Upgrade mechanism](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Protocol_upgrade_mechanism) to switch from HTTP to WS protocol
 2. Session state tracking to manage where to resume after disconnections
 3. Client-side code to manage connection states and handle reconnection
 
-In contrast, SSE uses standard HTTP connections with several advantages:
+In contrast, SSE uses standard HTTP connections
 1. Built-in reconnections with Last-Event-ID header
 2. EventSource API in browsers manages connection states and reconnection
 3. You can use server implementation with FastAPI EventSourceResponse that handles SSE-specific formatting
@@ -74,97 +72,96 @@ In contrast, SSE uses standard HTTP connections with several advantages:
 
 While both approaches could be implemented using FastAPI, SSE reconnection handling and client-side implementation with EventSource make it suitable for a one-way streaming use case.
 
-### Positive Consequences
-
-These are true for all streaming options:
-* Real-time streaming of partial responses increases user engagement
-* Users get immediate feedback that the system is working, rather than waiting for a complete response
-* LiteLLM and FastAPI have existing support for streaming
-
-SSE-specific:
-* Lower implementation effort than WS
-* EventSource API and Last-Event-ID header in browsers manages connection states and reconnection
-
-### Negative Consequences for SSE
-
-- SSE connections are limited to one-way communication (server-to-client only)
-- Connection limits may affect users with multiple tabs (6 connections per browser on HTTP/1, 100 on HTTP/2)
-
 ## Requirements
 
 ### Server-Side
 
-- Add an SSE endpoint (`/query_sse`) using FastAPI's `EventSourceResponse`.
-- Modify existing LLM query logic to yield response chunks as they become available.
-- Standardize event structure (`message`, `done`, `error`) for client-side handling.
-- Implement robust error handling to gracefully manage exceptions.
+- Add an SSE endpoint (`/query_sse`) using FastAPI's `EventSourceResponse`
+- Modify existing LLM query logic to yield response chunks as they become available
+- Standardize event structure (`message`, `done`, `error`) for client-side handling
+- Implement robust error handling to gracefully manage exceptions
 
 ### Client-Side
 
-- Initiate SSE connection using browser's `EventSource` API.
-- Handle incoming events (`message`, `done`, `error`) and progressively render partial responses.
-- Manage connection lifecycle, including error handling and reconnection logic.
-- Maintain existing non-streaming request mechanism as fallback.
+- Initiate SSE connection using browser's `EventSource` API
+- Handle incoming events (`message`, `done`, `error`) and progressively render partial responses
+- Manage connection lifecycle, including error handling and reconnection logic
+- Maintain existing non-streaming request mechanism as fallback
 
 ### Proposed Framework
 
 ```
-┌─────────────┐           ┌─────────────┐           ┌─────────────┐
-│             │           │             │           │             │
-│   Client    │ SSE Conn. │   Server    │ Streaming │    LLM      │
-│  Browser/   │◄──────────┤  FastAPI    │◄──────────┤  Service    │
-│   App       │           │  Endpoint   │           │ (LiteLLM)   │
-│             │           │             │           │             │
-└─────────────┘           └─────────────┘           └─────────────┘
-       │                         │                         │
-       │  1. Establish SSE       │                         │
-       │     (GET /query_sse)    │                         │
-       │─────────────────────────►                         │
-       │                         │  2. Call LLM service    │
-       │                         │     (stream=True)       │
-       │                         │────────────────────────►│
-       │                         │                         │
-       │                         │  3. Receive LLM chunks  │
-       │                         │◄────────────────────────│
-       │                         │                         │
-       │  4. Receive SSE events  │                         │
-       │     ('message', 'done') │                         │
-       │◄─────────────────────────                         │
-       │                         │                         │
+Client (Browser)                Server                   LLM Service
+    |                             |                          |
+    |-- 1. HTTP POST /query ----->|                          |
+    |   (question payload)        |                          |
+    |                             |-- 2. Request ----------->|
+    |                             |                          |
+    |                             |<-- 3. Start streaming ---|
+    |                             |   response chunks        |
+    |<-- 4. Opens SSE connection -|                          |
+    |   (200 OK,                  |                          |
+    |    Content-Type:            |                          |
+    |    text/event-stream)       |                          |
+    |                             |                          |
+    |<-- 5. event: chunk ---------|<-- streaming chunks -----|
+    |    data: partial_response   |                          |
+    |                             |                          |
+    |<-- 6. event: chunk ---------|<-- streaming chunks -----|
+    |    data: partial_response   |                          |
+    |                             |                          |
+    |<-- 7. event: chunk ---------|<-- streaming chunks -----|
+    |    data: partial_response   |                          |
+    |                             |                          |
+    |<-- 8. event: done ----------|<-- completion signal ----|
+    |    data: final_chunk        |                          |
+    |                             |                          |
+    |--- 9. Connection closed --->|                          |
+    |   (client closes after      |                          |
+    |    complete response)       |                          |
+
 ```
 
 ### Reconnection Flow using "Last-Event-ID" for Interupted Connections
 
 ```
-┌─────────────┐           ┌─────────────┐           ┌──────────────┐
-│             │           │             │           │              │
-│   Client    │           │   Server    │           │  Event       │
-│  Browser    │           │  FastAPI    │           │  Buffer      │
-│             │           │             │           │              │
-└─────────────┘           └─────────────┘           └──────────────┘
-       │                         │                         │
-       │  1. Initial SSE Connect │                         │
-       │─────────────────────────►                         │
-       │                         │                         │
-       │  2. Events (id: 1,2,3)  │                         │
-       │◄─────────────────────────                         │
-       │                         │  3. Store Events        │
-       │                         │────────────────────────►│
-       │                         │                         │
-       │                         │                         │
-       │    X CONNECTION LOST X  │                         │
-       │                         │                         │
-       │  4. Reconnect with      │                         │
-       │     Last-Event-ID: 3    │                         │
-       │─────────────────────────►                         │
-       │                         │  5. Retrieve events     │
-       │                         │     after id 3          │
-       │                         │◄────────────────────────│
-       │                         │                         │
-       │  6. Resume with events  │                         │
-       │     (id: 4,5,6...)      │                         │
-       │◄─────────────────────────                         │
-       │                         │                         │
+Client (Browser)                Server                   LLM Service
+    |                             |                          |
+    |-- 1. HTTP POST /query ----->|                          |
+    |   (question payload)        |                          |
+    |                             |-- 2. Request ----------->|
+    |                             |                          |
+    |                             |<-- 3. Start streaming ---|
+    |<-- 4. Opens SSE connection -|                          |
+    |   (200 OK,                  |                          |
+    |    Content-Type:            |                          |
+    |    text/event-stream)       |                          |
+    |                             |                          |
+    |<-- 5. event: chunk (id: 1) -|<-- streaming chunks -----|
+    |    data: partial_response   |                          |
+    |                             |                          |
+    |<-- 6. event: chunk (id: 2) -|<-- streaming chunks -----|
+    |    data: partial_response   |                          |
+    |                             |                          |
+    X---- CONNECTION LOST --------X                          |
+    |                             |--- Buffers events ------>|
+    |                             |    (id: 3, 4...)         |
+    |                             |                          |
+    |-- 7. Reconnect SSE -------->|                          |
+    |   (with Last-Event-ID: 2)   |                          |
+    |                             |                          |
+    |<-- 8. Resume from id: 3 ----|<-- continues streaming --|
+    |    data: missed_chunks      |                          |
+    |                             |                          |
+    |<-- 9. event: chunk (id: 5) -|<-- streaming chunks -----|
+    |    data: more_content       |                          |
+    |                             |                          |
+    |<-- 10. event: done ---------|<-- completion signal ----|
+    |     data: final_chunk       |                          |
+    |                             |                          |
+    |--- 11. Connection closed -->|                          |
+    |    (client closes after     |                          |
+    |     "done" message)         |                          |
 ```
 
 In step 5, we can use an in-memory buffer to store recent event chunks for each active session. When a client reconnects with a Last-Event-ID header, server checks the buffer to retrieve all events that occurred after the specified ID. This allows the client to resume from where it left off without missing events.
@@ -225,7 +222,7 @@ async def query_sse_endpoint(request):
 
 ### Handling Temporary Internet Issues
 
-- Use SSE's `Last-Event-ID` header for reconnection handling, allowing clients to resume from where they left off during a temporary disconnection
+- Use SSE's `Last-Event-ID` header for reconnection handling, allowing clients to resume from where they left off during a temporary disconnection (like a network blip, but not for disconnections where the user refreshes the page)
 - Server should buffer recent events for each session to support reconnection, ensuring no loss of information during brief connectivity issues
 - Client should implement robust reconnection logic with appropriate backoff strategies
 
