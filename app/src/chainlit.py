@@ -24,7 +24,6 @@ from src.util import literalai_util as lai
 logger = logging.getLogger(__name__)
 
 
-# TODO: Update chat_api.py to use ChainlitPolyDataLayer
 @cl.data_layer
 def get_data_layer() -> ChainlitPolyDataLayer:
     return ChainlitPolyDataLayer()
