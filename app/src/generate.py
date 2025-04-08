@@ -46,12 +46,17 @@ def get_models() -> dict[str, str]:
 
 
 def _has_aws_access() -> bool:
+    env = os.environ.get("ENVIRONMENT", "local")
+    if env != "local":
+        return True
+
     # LiteLLM requires these env variables to access Bedrock models - https://docs.litellm.ai/docs/providers/bedrock
     if "AWS_ACCESS_KEY_ID" not in os.environ or "AWS_SECRET_ACCESS_KEY" not in os.environ:
         return False
     if "AWS_REGION" not in os.environ and "AWS_DEFAULT_REGION" in os.environ:
         os.environ["AWS_REGION"] = os.environ["AWS_DEFAULT_REGION"]
     try:
+        # Check credentials are valid
         boto3.client("sts").get_caller_identity()
         return True
     except botocore.exceptions.ClientError:
