@@ -43,6 +43,8 @@ class FormattingConfig:
 def to_html(text: str) -> str:
     # markdown expects '\n' before the start of a list
     corrected_text = re.sub(r"^([\-\+\*]) ", "\n- ", text, flags=re.MULTILINE, count=1)
+    # markdown expect 4 spaces before a nested list item; LLMs often use 3 spaces
+    corrected_text = re.sub(r"^   ([\-\+\*]) ", "    - ", corrected_text, flags=re.MULTILINE)
     return markdown.markdown(corrected_text)
 
 
