@@ -203,17 +203,25 @@ def remap_citation_ids(subsections: Sequence[Subsection], response: str) -> dict
     return citations
 
 
+def remove_unknown_citation_ids(response: str, subsections: Sequence[Subsection]) -> str:
+    subsection_dict: dict[str, Subsection] = {ss.id: ss for ss in subsections}
+
+    def replace_unknown_id(match: Match) -> str:
+        citation_id = match.group(1)
+        if citation_id not in subsection_dict:
+            logger.warning("Removing unknown %r", citation_id)
+            return ""
+        return f"({citation_id})"
+
+    return re.sub(CITATION_PATTERN, replace_unknown_id, response)
+
+
 def replace_citation_ids(response: str, remapped_citations: dict[str, Subsection]) -> str:
     """Replace (citation-XX) in response with (citation-YY), where XX is the original citation ID
     and YY is the remapped citation ID"""
 
     def replace_with_new_id(match: Match) -> str:
         citation_id = match.group(1)
-        if citation_id not in remapped_citations:
-            logger.error(
-                "LLM generated a citation for a reference (%s) that doesn't exist.", citation_id
-            )
-            return ""
         return "(citation-" + remapped_citations[citation_id].id + ")"
 
     return re.sub(CITATION_PATTERN, replace_with_new_id, response)
@@ -238,13 +246,6 @@ def merge_contiguous_cited_subsections(
         curr_group = [ss]
         contig_groups = [curr_group]
         for citation_id in citations[1:]:
-            if citation_id not in subsection_dict:
-                logger.error(
-                    "LLM generated a citation for a reference (%s) that doesn't exist; ignoring.",
-                    citation_id,
-                )
-                continue
-
             curr_ss = subsection_dict[citation_id]
             if curr_ss.chunk == ss.chunk and curr_ss.subsection_index == ss.subsection_index + 1:
                 # This subsection is contiguous with the previous one
@@ -322,7 +323,8 @@ def simplify_citation_numbers(
     The returned subsections only contain citations used in the response
     and are ordered consecutively starting from 1.
     """
-    formatted_response = move_citations_after_punctuation(response)
+    cleaned_response = remove_unknown_citation_ids(response, subsections)
+    formatted_response = move_citations_after_punctuation(cleaned_response)
 
     merged_subsection_response, merged_subsections = merge_contiguous_cited_subsections(
         formatted_response, subsections

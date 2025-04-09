@@ -15,6 +15,7 @@ from src.app_config import app_config
 from src.batch_process import batch_process
 from src.chainlit_data import ChainlitPolyDataLayer
 from src.chat_engine import ChatEngineInterface, OnMessageResult
+from src.citations import simplify_citation_numbers
 from src.evaluation import literalai_exporter
 from src.format import format_response
 from src.generate import ChatHistory, MessageAttributesT, get_models
@@ -53,6 +54,7 @@ async def start() -> None:
     engine = _init_chat_engine(engine_id)
     if not engine:
         await cl.Message(
+            type="system_message",
             author="backend",
             metadata={"engine": engine_id},
             content=f"Available engines: {chat_engine.available_engines()}",
@@ -65,6 +67,7 @@ async def start() -> None:
     if query_values:
         logger.warning("Unused URL query parameters: %r", query_values)
         await cl.Message(
+            type="system_message",
             author="backend",
             metadata={"url": url},
             content=f"Unused URL query parameters: {query_values}",
@@ -72,11 +75,15 @@ async def start() -> None:
 
     user = cl.user_session.get("user")
     chat_profile = cl.user_session.get("chat_profile")
-    await cl.Message(
+    intro_msg = cl.Message(
+        type="system_message",  # Use system_message type so that cl.chat_context.get()[0].role="system"
         author="backend",
         metadata={"engine": engine_id, "settings": settings},
         content=f"{engine.name} started {f'for {user}' if user else ''} (using {chat_profile!r} profile)",
-    ).send()
+    )
+    # Exclude the intro message from the chat history
+    cl.chat_context.remove(intro_msg)
+    await intro_msg.send()
 
 
 def url_query_values(url: str) -> dict[str, str]:
@@ -118,6 +125,7 @@ async def update_settings(settings: dict[str, Any]) -> Any:
     for setting_id, value in settings.items():
         setattr(engine, setting_id, value)
     await cl.Message(
+        type="system_message",
         author="backend",
         metadata=settings,
         content="Settings updated for this session.",
@@ -184,36 +192,34 @@ _WIDGET_FACTORIES = {
 }
 
 
-# TODO: Try cl.chat_context.to_openai() to get the conversation in OpenAI format
 def extract_raw_chat_history(messages: list[cl.Message]) -> ChatHistory:
     raw_chat_history: ChatHistory = []
     for message in messages:
-        if message.type == "assistant_message":
+        if message.type == "system_message":  # Exclude system messages from the chat history
+            continue
+
+        if message.type == "assistant_message":  # This is the default cl.Message type
+            raw_response = message.metadata.get("raw_response", None) if message.metadata else None
             # Response to the user's query
             raw_chat_history.append(
                 {
                     "role": "assistant",
-                    "content": (
-                        message.metadata["raw_response"]
-                        if message.metadata and "raw_response" in message.metadata
-                        else message.content
-                    ),
+                    "content": raw_response or message.content,
                 }
             )
         elif message.type == "user_message":
             # User's query
             raw_chat_history.append({"role": "user", "content": message.content})
-        else:
-            logger.warning("Unexpected message type: %s: %r", message.type, message.content)
     return raw_chat_history
 
 
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
     logger.info("Received: %r", message.content)
-    chat_context = cl.chat_context.get()
-    # chat_context has the user query as the last item; exclude it from the chat history
-    chat_history = extract_raw_chat_history(chat_context[:-1])
+    # Do not use cl.chat_context.to_openai() since we want to use the raw_response, not the html formatted Message.content
+    # When this is called, chat_context has the submitted user query as the last item; exclude it from the chat history
+    chat_history = extract_raw_chat_history(cl.chat_context.get()[:-1])
+    logger.info("Chat history: %s", pprint.pformat(chat_history, indent=4))
 
     engine: chat_engine.ChatEngineInterface = cl.user_session.get("chat_engine")
 
@@ -222,15 +228,22 @@ async def on_message(message: cl.Message) -> None:
 
     try:
         result = await asyncify(lambda: engine.on_message(message.content, chat_history))()
+
+        # Simplify citation numbers in the response
+        final_result = simplify_citation_numbers(result.response, result.subsections)
+        result.response = final_result.response
+        result.subsections = final_result.subsections
+
         logger.info("Raw response: %s", result.response)
         msg_content = format_response(
             subsections=result.subsections,
-            raw_response=result.response,
+            response=result.response,
             config=engine.formatting_config,
             attributes=result.attributes,
         )
 
         await cl.Message(
+            type="assistant_message",
             content=msg_content,
             metadata=_get_retrieval_metadata(result),
         ).send()
@@ -239,6 +252,7 @@ async def on_message(message: cl.Message) -> None:
             await _msg_attributes(result.attributes)
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
+            type="system_message",
             author="backend",
             metadata={"error_class": err.__class__.__name__, "error": str(err)},
             content=f"{err.__class__.__name__}: {err}",
@@ -276,6 +290,7 @@ def _get_retrieval_metadata(result: OnMessageResult) -> dict:
 async def _msg_attributes(attributes: MessageAttributesT) -> None:
     json_dump = pprint.pformat(attributes.model_dump(), indent=4)
     await cl.Message(
+        type="system_message",
         content=f"```\n{json_dump}\n```",
     ).send()
 
@@ -310,11 +325,13 @@ async def special_command(msg_text: str) -> bool:
                 await _export_lai(start_date, end_date)
         except ValueError as e:
             await cl.Message(
+                type="system_message",
                 author="backend",
                 content=f"Date parsing error: {e}",
             ).send()
         except IndexError as e:
             await cl.Message(
+                type="system_message",
                 author="backend",
                 content=f"Error: {e}.  Specify both start and end timestamps.",
             ).send()
@@ -325,6 +342,7 @@ async def special_command(msg_text: str) -> bool:
 @cl.step(name="batch processing", type="tool")
 async def _batch_proccessing(file: AskFileResponse) -> None:
     await cl.Message(
+        type="system_message",
         author="backend",
         content="Received file, processing...",
     ).send()
@@ -344,6 +362,7 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
 
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
+            type="system_message",
             author="backend",
             metadata={"error_class": err.__class__.__name__, "error": str(err)},
             content=f"batch_process: {err.__class__.__name__}: {err}",
@@ -354,6 +373,7 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
 @cl.step(name="export Literal AI question-answer pairs", type="tool")
 async def _export_lai(start_date: datetime, end_date: datetime) -> None:
     await cl.Message(
+        type="system_message",
         author="backend",
         content=f"Exporting QA pairs from {start_date} up to {end_date} ...",
     ).send()
@@ -382,6 +402,7 @@ async def _export_lai(start_date: datetime, end_date: datetime) -> None:
 
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
+            type="system_message",
             author="backend",
             metadata={"error_class": err.__class__.__name__, "error": str(err)},
             content=f"export_lai: {err.__class__.__name__}: {err}",

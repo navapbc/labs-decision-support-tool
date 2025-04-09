@@ -7,7 +7,7 @@ from typing import Match, Sequence
 
 import markdown
 
-from src.citations import CITATION_PATTERN, simplify_citation_numbers
+from src.citations import CITATION_PATTERN
 from src.db.models.document import Chunk, Document, Subsection
 from src.generate import MessageAttributesT
 
@@ -50,12 +50,11 @@ def to_html(text: str) -> str:
 
 def format_response(
     subsections: Sequence[Subsection],
-    raw_response: str,
+    response: str,
     config: FormattingConfig,
     attributes: MessageAttributesT,
 ) -> str:
-    result = simplify_citation_numbers(raw_response, subsections)
-    citations_html, map_of_accordion_ids = _create_accordion_html(config, result.subsections)
+    citations_html, map_of_accordion_ids = _create_accordion_html(config, subsections)
 
     html_response = []
     if alert_msg := getattr(attributes, "alert_message", None):
@@ -66,9 +65,7 @@ def format_response(
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a list in html_response
     html_response.append(
-        to_html(
-            _add_citation_links(result.response, result.subsections, config, map_of_accordion_ids)
-        )
+        to_html(_add_citation_links(response, subsections, config, map_of_accordion_ids))
     )
 
     if citations_html:
