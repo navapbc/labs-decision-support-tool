@@ -37,14 +37,24 @@ class FormattingConfig:
         return chunk.document.source if chunk.document.source else "#"
 
     def format_accordion_body(self, citation_body: str) -> str:
-        return to_html(citation_body)
+        return citation_body
 
 
 def to_html(text: str) -> str:
     # markdown expects '\n' before the start of a list
-    corrected_text = re.sub(r"^([\-\+\*]) ", "\n- ", text, flags=re.MULTILINE, count=1)
-    # markdown expect 4 spaces before a nested list item; LLMs often use 3 spaces
-    corrected_text = re.sub(r"^   ([\-\+\*]) ", "    - ", corrected_text, flags=re.MULTILINE)
+    corrected_text = re.sub(
+        r"((?:^|\n)(?!\s*([-*+]|\d+\.)\s).+?)\n([ \t]*([-*+]|\d+\.)\s+)",
+        # Explanation of the regex:
+        # (?:^|\n) — Start of string or start of a line
+        # (?!\s*([-*+]|\d+\.)\s) — Negative lookahead to exclude lines that already start like a list item
+        # .+? — The remaining paragraph content before the list
+        # \n([ \t]*([-*+]|\d+\.)\s+) — Captures the newline before the first list item
+        r"\1\n\n\3",
+        text,
+        flags=re.MULTILINE,
+    )
+    # markdown expect 4 spaces before a nested list item; LLMs often use 2 or 3 spaces
+    corrected_text = re.sub(r"^ {2,3}([\-\+\*]) ", "    - ", corrected_text, flags=re.MULTILINE)
     return markdown.markdown(corrected_text)
 
 
