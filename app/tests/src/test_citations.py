@@ -11,6 +11,7 @@ from src.citations import (
     move_citations_after_punctuation,
     remap_citation_ids,
     replace_citation_ids,
+    simplify_citation_numbers,
     split_into_subsections,
     tree_based_chunk_splitter,
 )
@@ -155,7 +156,6 @@ def test_tree_based_chunk_splitter():
 
 def test_replace_citation_ids():
     assert replace_citation_ids("No citations", {}) == "No citations"
-    assert replace_citation_ids("Hallucinated.(citation-1)", {}) == "Hallucinated."
 
     remapped_citations = {
         "citation-4": Subsection("1", ChunkFactory.build(), 0, ""),
@@ -286,3 +286,15 @@ def test_merge_contiguous_cited_subsections(subsections):
     assert remapped_subsections["3"].text == citation_aboutA.text
     assert remapped_subsections["4"].text == contig_subsection.text
     assert remapped_subsections["5"].text == subsection.text
+
+
+def test_simplify_citation_numbers(subsections):
+    # Test empty response
+    result = simplify_citation_numbers("", subsections)
+    assert result.response == ""
+    assert len(result.subsections) == 0
+
+    # Test non-existent citation
+    result = simplify_citation_numbers("Non-existent citation: (citation-0)", [])
+    assert result.response == "Non-existent citation:"
+    assert len(result.subsections) == 0

@@ -1,26 +1,16 @@
 import re
 from textwrap import dedent
 
-from src.citations import CitationFactory, split_into_subsections
+from src.db.models.document import Subsection
 from src.format import FormattingConfig, _get_breadcrumb_html, format_response
 from src.generate import MessageAttributes
-from src.retrieve import retrieve_with_scores
-from tests.src.test_retrieve import _create_chunks
-
-
-def _get_chunks_with_scores():
-    _create_chunks()
-    return retrieve_with_scores("Very tiny words.", retrieval_k=2, retrieval_k_min_score=0.0)
+from tests.src.db.models.factories import ChunkFactory
 
 
 def _unique_accordion_ids(html):
     return set(
         [html[m.start() + 4 : m.end() - 1] for m in re.finditer(" id=accordion-\\d*>", html)]
     )
-
-
-def to_subsections(chunks_with_scores):
-    return split_into_subsections([c.chunk for c in chunks_with_scores], factory=CitationFactory())
 
 
 def test__get_breadcrumb_html():
@@ -41,23 +31,43 @@ def test__get_breadcrumb_html():
 
 
 def test_format_response(chunks_with_scores):
-    subsections = to_subsections(chunks_with_scores)
-
     config = FormattingConfig()
     msg_attribs = MessageAttributes(needs_context=True, translated_message="")
     # Test empty response
-    assert format_response(subsections, "", config, msg_attribs) == "<div></div>"
-
-    # Test non-existent citation
-    assert (
-        format_response([], "Non-existent citation: (citation-0)", config, msg_attribs)
-        == "<div><p>Non-existent citation: </p></div>"
-    )
+    assert format_response([], "", config, msg_attribs) == "<div></div>"
 
     # Test markdown list formatting
     assert (
-        format_response([], "List intro sentence: \n- item 1\n- item 2", config, msg_attribs)
-        == "<div><p>List intro sentence: </p>\n<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul></div>"
+        format_response(
+            [],
+            dedent(
+                """
+                List intro sentence:
+                - item 1
+                - item 2
+
+                List intro sentence:
+                - item 1
+                - item 2
+                """
+            ).strip(),
+            config,
+            msg_attribs,
+        )
+        == dedent(
+            """
+            <div><p>List intro sentence:</p>
+            <ul>
+            <li>item 1</li>
+            <li>item 2</li>
+            </ul>
+            <p>List intro sentence:</p>
+            <ul>
+            <li>item 1</li>
+            <li>item 2</li>
+            </ul></div>
+            """
+        ).strip()
     )
 
     # Test nested list formatting
@@ -82,7 +92,11 @@ def test_format_response(chunks_with_scores):
         ).strip()
     )
 
-    # Test real citations
+    # Test with citations
+    subsections = [
+        Subsection("1", ChunkFactory.build(), 0, ""),
+        Subsection("2", ChunkFactory.build(), 1, ""),
+    ]
     html = format_response(
         subsections, "Some real citations: (citation-1) (citation-2)", config, msg_attribs
     )
