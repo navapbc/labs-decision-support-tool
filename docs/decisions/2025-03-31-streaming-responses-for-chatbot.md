@@ -43,7 +43,7 @@ Implementing streaming responses addresses these issues by providing immediate v
 - Implementation:
   - Setting up WebSocket routes and managing WebSocket connections in application code
   - Handle WebSocket-specific exception cases not present in HTTP endpoints
-  - Reconnection logic (no built-in mechanism like Last-Event-ID in SSE)
+  - Reconnection logic (needs a resumption call like `socket.resume()` with a tracked last event id)
   - Message sequences for recovery after disconnections need to be tracked
   - Client-side code for connection management and reconnection (retry logic, but [socket.io](https://socket.io/docs/v4/client-api/#event-reconnect) does this)
 - Supported across browsers (including IE!), most chat apps do use WS including [Chainlit](https://docs.chainlit.io/deploy/overview#account-for-websockets)
@@ -60,7 +60,7 @@ Polling achieves similar UX results but with different trade-offs.
 
 WebSockets offer two-way communication, which is beneficial for real-time interactive applications like chat apps. FastAPI does also provide WebSocket support. Worth noting:
 1. Reconnection logic, as WebSockets don't have a built-in Last-Event-ID equivalent
-2. Need an [Upgrade mechanism](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Protocol_upgrade_mechanism) to switch from HTTP to WS protocol
+2. Browser framework handles [upgrade mechanism](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Protocol_upgrade_mechanism) to switch from HTTP to WS protocol
 2. Session state tracking to manage where to resume after disconnections
 3. Client-side code to manage connection states and handle reconnection
 
@@ -68,7 +68,6 @@ In contrast, SSE uses standard HTTP connections
 1. Built-in reconnections with Last-Event-ID header
 2. EventSource API in browsers manages connection states and reconnection
 3. You can use server implementation with FastAPI EventSourceResponse that handles SSE-specific formatting
-4. Standard HTTP semantics make it easier to work with existing proxies and infrastructure
 
 While both approaches could be implemented using FastAPI, SSE reconnection handling and client-side implementation with EventSource make it suitable for a one-way streaming use case.
 
@@ -82,11 +81,10 @@ While both approaches could be implemented using FastAPI, SSE reconnection handl
 - Implement robust error handling to gracefully manage exceptions
 
 ### Client-Side
-
+- POST request to `/query` to initiate LLM processing
 - Initiate SSE connection using browser's `EventSource` API
 - Handle incoming events (`message`, `done`, `error`) and progressively render partial responses
-- Manage connection lifecycle, including error handling and reconnection logic
-- Maintain existing non-streaming request mechanism as fallback
+- Optional: manage connection lifecycle, including error handling and reconnection logic
 
 ### Proposed Framework
 
@@ -122,7 +120,7 @@ Client (Browser)                Server                   LLM Service
 
 ```
 
-### Reconnection Flow using "Last-Event-ID" for Interupted Connections
+### Reconnection Flow using "Last-Event-ID" for Interupted Connections (Optional)
 
 ```
 Client (Browser)                Server                   LLM Service
@@ -164,67 +162,101 @@ Client (Browser)                Server                   LLM Service
     |     "done" message)         |                          |
 ```
 
-In step 5, we can use an in-memory buffer to store recent event chunks for each active session. When a client reconnects with a Last-Event-ID header, server checks the buffer to retrieve all events that occurred after the specified ID. This allows the client to resume from where it left off without missing events.
+In step 7, we can use an in-memory buffer to store recent event chunks for each active session. When a client reconnects with a Last-Event-ID header, server checks the buffer to retrieve all events that occurred after the specified ID. This allows the client to resume from where it left off without missing events.
 
 #### Implementation Example
 
 **Client-side with EventSource:**
 ```javascript
-// Each browser tab creates its own unique connection
-const eventSource = new EventSource('/query_sse?session_id=<unique_session_id>');
+// Step 1: Submit the question via POST request
+async function submitQuestion(question) {
+  
+  try {
+    // POST the question to the server
+    const response = await fetch('/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: question })
+    });
+    
+    const data = await response.json();
+    
+    // Step 4: Open SSE connection to receive streaming response
+    if (data.status === 'processing') {
+      startSSEConnection();
+    }
+  } catch (error) {
+    console.error('Error submitting question:', error);
+    setLoading(false);
+  }
+}
 
-eventSource.onmessage = (event) => {
-  // process incoming chunks as they arrive
-  appendToResponse(event.data);
-};
-
-eventSource.onerror = (error) => {
-  console.log('Connection error, browser reconnects');
-};
+// Function to establish the SSE connection
+function startSSEConnection() {
+  
+  // Create SSE connection
+  const eventSource = new EventSource('/query_sse');
+  
+  // Step 5-7: Process incoming chunks
+  eventSource.onmessage = (event) => {
+    // Process and append chunk to the response area
+    appendToResponse(event.data);
+  };
+  
+  // Step 8: Handle the "done" event
+  eventSource.addEventListener('done', (event) => {
+    // Process final chunk if needed
+    appendToResponse(event.data);
+    
+    // Step 9: Close the connection
+    eventSource.close();
+    setLoading(false);
+  });
+  
+  // Handle errors
+  eventSource.onerror = (error) => {
+    console.error('SSE connection error:', error);
+    eventSource.close();
+  };
+}
 ```
 
 **Server-side with EventSourceResponse:**
 ```python
-# One dictionary entry per chat session (session_id; eg a user has multiple tabs open)
-event_buffers = {}  # session_id -> list of (event_id, data) tuples
-
-@app.get('/query_sse')
-async def query_sse_endpoint(request):
-    session_id = request.session_id
-    last_event_id = request.headers.get("Last-Event-ID")
+@app.post("/query")
+async def query_endpoint(request: Request):
+    # Step 1: Extract question from request body
+    data = await request.json()
+    question = data.get("question")
     
-    # create event source response
+    # Step 2: Start LLM processing
+    return {"status": "processing"}
+
+@app.get("/query_sse")
+async def query_sse_endpoint(request: Request):
+    # Step 4: Open SSE connection
     async def event_generator():
-        # Send missed events
-        if last_event_id and session_id in event_buffers:
-            for event_id, data in event_buffers[session_id]:
-                if int(event_id) > int(last_event_id):
-                    yield f"id: {event_id}\ndata: {data}\n\n"
-        
-        # initialize if needed
-        if session_id not in event_buffers:
-            event_buffers[session_id] = []
-        
-        # stream new chunks from LLM
-        current_id = len(event_buffers[session_id])
+        # Step 3 & 5-7: Stream chunks from LLM
         async for chunk in llm_streaming_response():
-            # store in buffer for potential reconnection
-            event_buffers[session_id].append((current_id, chunk))
-            
-            # send to client
-            yield f"id: {current_id}\ndata: {chunk}\n\n"
-            current_id += 1
+            if chunk.is_final:
+                # Step 8: Send final chunk with "done" event type
+                yield {
+                    "event": "done",
+                    "data": chunk.text
+                }
+            else:
+                # Send regular chunk
+                yield {
+                    "data": chunk.text
+                }
     
     return EventSourceResponse(event_generator())
+
+async def llm_streaming_response():
+    # Implementation to get streaming response from LiteLLM client
 ```
 
 ## Considerations
-
-### Handling Temporary Internet Issues
-
-- Use SSE's `Last-Event-ID` header for reconnection handling, allowing clients to resume from where they left off during a temporary disconnection (like a network blip, but not for disconnections where the user refreshes the page)
-- Server should buffer recent events for each session to support reconnection, ensuring no loss of information during brief connectivity issues
-- Client should implement robust reconnection logic with appropriate backoff strategies
 
 ### Citations Returned in Streaming Responses
 
@@ -233,7 +265,12 @@ async def query_sse_endpoint(request):
 - Client-side processing will replace citation placeholders with properly formatted references using the citation data
 - This approach maintains fast streaming of text content while preserving the citation functionality
 
-### Server-Side State Management for Multiple Instances
+### Handling Temporary Internet Issues (We'll treat this separately from streaming implementation)
+
+- Use SSE's `Last-Event-ID` header for reconnection handling, allowing clients to resume from where they left off during a temporary disconnection (like a network blip, but not for disconnections where the user refreshes the page)
+- Server should buffer recent events for each session to support reconnection, ensuring no loss of information during brief connectivity issues
+
+### Server-Side State Management for Multiple Instances (Out of scope for MVP)
 
 If we were to deploy across multiple server instances, we need a way to maintai the event buffer required for reconnection. We have two primary approaches:
 
