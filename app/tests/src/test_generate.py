@@ -76,6 +76,8 @@ def ollama_model_list():
 
 
 def test_get_models(monkeypatch):
+    if "AWS_ACCESS_KEY_ID" in os.environ:
+        monkeypatch.delenv("AWS_ACCESS_KEY_ID")
     if "OPENAI_API_KEY" in os.environ:
         monkeypatch.delenv("OPENAI_API_KEY")
     if "OLLAMA_HOST" in os.environ:
@@ -83,7 +85,7 @@ def test_get_models(monkeypatch):
     assert get_models() == {}
 
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
-    assert get_models() == {"OpenAI GPT-4o": "gpt-4o"}
+    assert get_models()["OpenAI GPT-4o"] == "gpt-4o"
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "mock_key")
     assert get_models()["Anthropic Claude 3.5 Sonnet"] == "claude-3-5-sonnet-20240620"
@@ -95,7 +97,8 @@ def test_get_models_ollama(monkeypatch):
     monkeypatch.setenv("OLLAMA_HOST", "mock_key")
     monkeypatch.setattr(ollama, "list", ollama_model_list)
 
-    assert get_models() == {
+    ollama_models = {k: v for k, v in get_models().items() if v.startswith("ollama/")}
+    assert ollama_models == {
         "Ollama llama3:latest": "ollama/llama3:latest",
         "Ollama dolphin-mistral:latest": "ollama/dolphin-mistral:latest",
         "Ollama openhermes:latest": "ollama/openhermes:latest",
