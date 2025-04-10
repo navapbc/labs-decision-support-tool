@@ -435,13 +435,9 @@ async def test_run_query__unknown_citation(subsections, caplog):
                 subsections=subsections,
             )
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         query_response, _metadata = await run_query(MockChatEngine(), "My question")
-        assert any(
-            text
-            == "LLM generated a citation for a reference (citation-44) that doesn't exist; ignoring."
-            for text in caplog.messages
-        )
+        assert "Removing unknown 'citation-44'" in caplog.messages
 
     assert query_response.response_text == "Response from LLM (citation-1)"
     assert len(query_response.citations) == 1

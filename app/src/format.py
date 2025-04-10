@@ -7,7 +7,7 @@ from typing import Match, Sequence
 
 import markdown
 
-from src.citations import CITATION_PATTERN, simplify_citation_numbers
+from src.citations import CITATION_PATTERN
 from src.db.models.document import Chunk, Document, Subsection
 from src.generate import MessageAttributesT
 
@@ -37,25 +37,34 @@ class FormattingConfig:
         return chunk.document.source if chunk.document.source else "#"
 
     def format_accordion_body(self, citation_body: str) -> str:
-        return to_html(citation_body)
+        return citation_body
 
 
 def to_html(text: str) -> str:
     # markdown expects '\n' before the start of a list
-    corrected_text = re.sub(r"^([\-\+\*]) ", "\n- ", text, flags=re.MULTILINE, count=1)
-    # markdown expect 4 spaces before a nested list item; LLMs often use 3 spaces
-    corrected_text = re.sub(r"^   ([\-\+\*]) ", "    - ", corrected_text, flags=re.MULTILINE)
+    corrected_text = re.sub(
+        r"((?:^|\n)(?!\s*([-*+]|\d+\.)\s).+?)\n([ \t]*([-*+]|\d+\.)\s+)",
+        # Explanation of the regex:
+        # (?:^|\n) — Start of string or start of a line
+        # (?!\s*([-*+]|\d+\.)\s) — Negative lookahead to exclude lines that already start like a list item
+        # .+? — The remaining paragraph content before the list
+        # \n([ \t]*([-*+]|\d+\.)\s+) — Captures the newline before the first list item
+        r"\1\n\n\3",
+        text,
+        flags=re.MULTILINE,
+    )
+    # markdown expect 4 spaces before a nested list item; LLMs often use 2 or 3 spaces
+    corrected_text = re.sub(r"^ {2,3}([\-\+\*]) ", "    - ", corrected_text, flags=re.MULTILINE)
     return markdown.markdown(corrected_text)
 
 
 def format_response(
     subsections: Sequence[Subsection],
-    raw_response: str,
+    response: str,
     config: FormattingConfig,
     attributes: MessageAttributesT,
 ) -> str:
-    result = simplify_citation_numbers(raw_response, subsections)
-    citations_html, map_of_accordion_ids = _create_accordion_html(config, result.subsections)
+    citations_html, map_of_accordion_ids = _create_accordion_html(config, subsections)
 
     html_response = []
     if alert_msg := getattr(attributes, "alert_message", None):
@@ -66,9 +75,7 @@ def format_response(
     # This heading is important to prevent Chainlit from embedding citations_html
     # as the next part of a list in html_response
     html_response.append(
-        to_html(
-            _add_citation_links(result.response, result.subsections, config, map_of_accordion_ids)
-        )
+        to_html(_add_citation_links(response, subsections, config, map_of_accordion_ids))
     )
 
     if citations_html:
