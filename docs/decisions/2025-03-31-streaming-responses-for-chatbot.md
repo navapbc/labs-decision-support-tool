@@ -91,33 +91,40 @@ While both approaches could be implemented using FastAPI, SSE reconnection handl
 ```
 Client (Browser)                Server                   LLM Service
     |                             |                          |
-    |-- 1. HTTP POST /query ----->|                          |
+    |-- 1. HTTP POST /query_init->|                          |
     |   (question payload)        |                          |
-    |                             |-- 2. Request ----------->|
+    |                             |--- 2. Save question ---->|
+    |                             |   & generate message_id  |
     |                             |                          |
-    |                             |<-- 3. Start streaming ---|
-    |                             |   response chunks        |
-    |<-- 4. Opens SSE connection -|                          |
+    |<-- 3. Returns message_id ---|                          |
+    |   (200 OK, JSON response)   |                          |
+    |                             |                          |
+    |-- 4. GET /query_stream?id= >|                          |
+    |   (with message_id)         |                          |
+    |                             |--- 5. Start LLM request->|
+    |                             |                          |
+    |<-- 7. Opens SSE connection -|<-- 6. Start streaming ---|
     |   (200 OK,                  |                          |
-    |    Content-Type:            |                          |
     |    text/event-stream)       |                          |
     |                             |                          |
-    |<-- 5. event: chunk ---------|<-- streaming chunks -----|
+    |<-- 8. event: chunk ---------|<-- streaming chunks -----|
     |    data: partial_response   |                          |
     |                             |                          |
-    |<-- 6. event: chunk ---------|<-- streaming chunks -----|
+    |<-- 9. event: chunk ---------|<-- streaming chunks -----|
     |    data: partial_response   |                          |
     |                             |                          |
-    |<-- 7. event: chunk ---------|<-- streaming chunks -----|
+    |<-- 10. event: chunk ---------|<-- streaming chunks -----|
     |    data: partial_response   |                          |
     |                             |                          |
-    |<-- 8. event: done ----------|<-- completion signal ----|
+    |<-- 11. event: done ---------|<-- completion signal ----|
     |    data: final_chunk        |                          |
     |                             |                          |
-    |--- 9. Connection closed --->|                          |
+    |                             |-- 12. Save complete -----|
+    |                             |    response to database  |
+    |                             |                          |
+    |--- 13. Connection closed -->|                          |
     |   (client closes after      |                          |
     |    complete response)       |                          |
-
 ```
 
 ### Reconnection Flow using "Last-Event-ID" for Interupted Connections (Optional)
@@ -125,55 +132,65 @@ Client (Browser)                Server                   LLM Service
 ```
 Client (Browser)                Server                   LLM Service
     |                             |                          |
-    |-- 1. HTTP POST /query ----->|                          |
+    |-- 1. HTTP POST /query_init->|                          |
     |   (question payload)        |                          |
-    |                             |-- 2. Request ----------->|
+    |                             |--- 2. Save question ---->|
+    |                             |   & generate message_id  |
     |                             |                          |
-    |                             |<-- 3. Start streaming ---|
-    |<-- 4. Opens SSE connection -|                          |
+    |<-- 3. Returns message_id ---|                          |
+    |   (200 OK, JSON response)   |                          |
+    |                             |                          |
+    |-- 4. GET /query_stream?id= >|                          |
+    |   (with message_id)         |                          |
+    |                             |--- 5. Start LLM request->|
+    |                             |                          |
+    |<-- 7. Opens SSE connection -|<-- 6. Start streaming ---|
     |   (200 OK,                  |                          |
-    |    Content-Type:            |                          |
     |    text/event-stream)       |                          |
     |                             |                          |
-    |<-- 5. event: chunk (id: 1) -|<-- streaming chunks -----|
+    |<-- 8. event: chunk (id: 1) -|<-- streaming chunks -----|
     |    data: partial_response   |                          |
     |                             |                          |
-    |<-- 6. event: chunk (id: 2) -|<-- streaming chunks -----|
+    |<-- 9. event: chunk (id: 2) -|<-- streaming chunks -----|
     |    data: partial_response   |                          |
     |                             |                          |
     X---- CONNECTION LOST --------X                          |
     |                             |--- Buffers events ------>|
     |                             |    (id: 3, 4...)         |
     |                             |                          |
-    |-- 7. Reconnect SSE -------->|                          |
-    |   (with Last-Event-ID: 2)   |                          |
+    |-- 10. Reconnect SSE -------->|                          |
+    |   (with Last-Event-ID: 2    |                          |
+    |    to /query_stream?id=...) |                          |
     |                             |                          |
-    |<-- 8. Resume from id: 3 ----|<-- continues streaming --|
+    |<-- 11. Resume from id: 3 ---|<-- continues streaming --|
     |    data: missed_chunks      |                          |
     |                             |                          |
-    |<-- 9. event: chunk (id: 5) -|<-- streaming chunks -----|
+    |<-- 12. event: chunk (id: 5)-|<-- streaming chunks -----|
     |    data: more_content       |                          |
     |                             |                          |
-    |<-- 10. event: done ---------|<-- completion signal ----|
+    |<-- 13. event: done ---------|<-- completion signal ----|
     |     data: final_chunk       |                          |
     |                             |                          |
-    |--- 11. Connection closed -->|                          |
+    |                             |-- 14. Save complete -----|
+    |                             |    response to database  |
+    |                             |                          |
+    |--- 15. Connection closed -->|                          |
     |    (client closes after     |                          |
     |     "done" message)         |                          |
 ```
 
-In step 7, we can use an in-memory buffer to store recent event chunks for each active session. When a client reconnects with a Last-Event-ID header, server checks the buffer to retrieve all events that occurred after the specified ID. This allows the client to resume from where it left off without missing events.
+We can use an in-memory buffer to store recent event chunks for each active message. When a client reconnects with a Last-Event-ID header, server checks the buffer to retrieve all events that occurred after the specified ID. This allows the client to resume from where it left off without missing events.
 
 #### Implementation Example
 
 **Client-side with EventSource:**
 ```javascript
-// Step 1: Submit the question via POST request
+// Client submits the question via POST request
 async function submitQuestion(question) {
   
   try {
     // POST the question to the server
-    const response = await fetch('/query', {
+    const response = await fetch('/query_init', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: question })
@@ -181,36 +198,30 @@ async function submitQuestion(question) {
     
     const data = await response.json();
     
-    // Step 4: Open SSE connection to receive streaming response
+    // Client opens the SSE connection to receive streaming response
     if (data.status === 'processing') {
       startSSEConnection();
     }
   } catch (error) {
     console.error('Error submitting question:', error);
-    setLoading(false);
   }
 }
 
-// Function to establish the SSE connection
-function startSSEConnection() {
+// Client establishes the SSE connection
+function startSSEConnection(messageId) {
   
   // Create SSE connection
-  const eventSource = new EventSource('/query_sse');
+  const eventSource = new EventSource(`/query_stream?id=${messageId}`);
   
-  // Step 5-7: Process incoming chunks
   eventSource.onmessage = (event) => {
     // Process and append chunk to the response area
     appendToResponse(event.data);
   };
   
-  // Step 8: Handle the "done" event
   eventSource.addEventListener('done', (event) => {
     // Process final chunk if needed
     appendToResponse(event.data);
-    
-    // Step 9: Close the connection
     eventSource.close();
-    setLoading(false);
   });
   
   // Handle errors
@@ -223,29 +234,46 @@ function startSSEConnection() {
 
 **Server-side with EventSourceResponse:**
 ```python
-@app.post("/query")
-async def query_endpoint(request: Request):
-    # Step 1: Extract question from request body
+@router.post("/query_init")
+async def query_init_endpoint(request: Request):
     data = await request.json()
     question = data.get("question")
     
-    # Step 2: Start LLM processing
-    return {"status": "processing"}
+    request_step = chainlit.Message(
+        content=question,
+        type="user_message",
+        metadata={...}
+    ).to_dict()
 
-@app.get("/query_sse")
-async def query_sse_endpoint(request: Request):
-    # Step 4: Open SSE connection
+    message_id = request_step.get("id")
+
+    # Async function to store the question in the database
+    await store_question(message_id, question)
+
+    return {"status": "processing", "message_id": message_id}
+
+@router.get("/query_stream")
+async def query_stream_endpoint(request: Request, id: str):
+    # SSE connection is opened by the browser when the client makes the GET request
+
+    # Async function to get the question from the database
+    question = await get_question(id)
+
     async def event_generator():
-        # Step 3 & 5-7: Stream chunks from LLM
-        async for chunk in llm_streaming_response():
+        # Stream chunks from LLM
+        async for chunk in llm_streaming_response(question):
+            full_response += chunk.text
             if chunk.is_final:
-                # Step 8: Send final chunk with "done" event type
+                # Async function to save the final response to the database
+                await save_response(id, full_response)
+
+                # Send final chunk with "done" event type
                 yield {
                     "event": "done",
                     "data": chunk.text
                 }
             else:
-                # Send regular chunk
+                # Send partial response chunk
                 yield {
                     "data": chunk.text
                 }
@@ -253,7 +281,7 @@ async def query_sse_endpoint(request: Request):
     return EventSourceResponse(event_generator())
 
 async def llm_streaming_response():
-    # Implementation to get streaming response from LiteLLM client
+    #  LiteLLM client.completion(..., stream=True)
 ```
 
 ## Considerations
