@@ -33,7 +33,7 @@ Implementing streaming responses addresses these issues by providing immediate v
 - Immediate/event-driven updates provide a responsive user experience
 - Built-in browser support simplifies client-side implementation 
 - Built-in reconnection handling through the Last-Event-ID header (note: this is only useful for network blips but not for disconnections where the user refreshes the page)
-- Supported by all major browsers (Chrome, Firefox, Safari, Edge, Opera), with the exception of Internet Explorer
+- Supported by all major browsers (Chrome, Firefox, Safari, Edge, Opera), with the exception of Internet Explorer ([1](https://sii.pl/blog/en/server-side-events-implementation-and-highlights/), [2](https://www.lambdatest.com/web-technologies/eventsource))
 - When used over HTTP/2, supports up to 100 simultaneous connections by default; over HTTP/1, limited to 6 connections per browser, which could impact multi-tab usage
 
 ### WebSockets
@@ -74,17 +74,16 @@ While both approaches could be implemented using FastAPI, SSE reconnection handl
 ## Requirements
 
 ### Server-Side
-
-- Add an SSE endpoint (`/query_sse`) using FastAPI's `EventSourceResponse`
-- Modify existing LLM query logic to yield response chunks as they become available
+- Add a POST endpoint (`/query_init`) to save the question and generate a message_id
+- Add a GET endpoint (`/query_stream?id=`) to start the LLM request and stream the response chunks
 - Standardize event structure (`message`, `done`, `error`) for client-side handling
-- Implement robust error handling to gracefully manage exceptions
+- Async functions to store and retrieve question and full response from database
+- Optional: manage connection lifecycle, including error handling and reconnection logic
 
 ### Client-Side
-- POST request to `/query` to initiate LLM processing
-- Initiate SSE connection using browser's `EventSource` API
-- Handle incoming events (`message`, `done`, `error`) and progressively render partial responses
-- Optional: manage connection lifecycle, including error handling and reconnection logic
+- submitQuestion function to submit the question and initiate the SSE connection
+- handleSSEConnection function for SSE connection lifecycle (opening, closing, errors)
+- Client handles incoming events (`message`, `done`, `error`) and progressively renders partial responses
 
 ### Proposed Framework
 
@@ -113,7 +112,7 @@ Client (Browser)                Server                   LLM Service
     |<-- 9. event: chunk ---------|<-- streaming chunks -----|
     |    data: partial_response   |                          |
     |                             |                          |
-    |<-- 10. event: chunk ---------|<-- streaming chunks -----|
+    |<-- 10. event: chunk --------|<-- streaming chunks -----|
     |    data: partial_response   |                          |
     |                             |                          |
     |<-- 11. event: done ---------|<-- completion signal ----|
@@ -200,7 +199,7 @@ async function submitQuestion(question) {
     
     // Client opens the SSE connection to receive streaming response
     if (data.status === 'processing') {
-      startSSEConnection();
+      handleSSEConnection(data.message_id);
     }
   } catch (error) {
     console.error('Error submitting question:', error);
@@ -208,7 +207,7 @@ async function submitQuestion(question) {
 }
 
 // Client establishes the SSE connection
-function startSSEConnection(messageId) {
+function handleSSEConnection(messageId) {
   
   // Create SSE connection
   const eventSource = new EventSource(`/query_stream?id=${messageId}`);
