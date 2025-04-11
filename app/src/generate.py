@@ -83,7 +83,7 @@ def generate(
             "role": "system",
         }
     ]
-    logger.info("Using system prompt: %s", system_prompt)
+    logger.debug("Using system prompt: %s", system_prompt)
 
     if context_text:
         messages.append(
