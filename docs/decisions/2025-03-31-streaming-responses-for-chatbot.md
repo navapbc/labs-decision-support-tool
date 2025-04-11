@@ -155,10 +155,10 @@ Client (Browser)                Server                   LLM Service
     |    data: partial_response   |                          |
     |                             |                          |
     X---- CONNECTION LOST --------X                          |
-    |                             |--- Buffers events ------>|
+    |                             |<-- Buffers events -------|
     |                             |    (id: 3, 4...)         |
     |                             |                          |
-    |-- 10. Reconnect SSE -------->|                          |
+    |-- 10. Reconnect SSE ------->|                          |
     |   (with Last-Event-ID: 2    |                          |
     |    to /query_stream?id=...) |                          |
     |                             |                          |
