@@ -11,6 +11,7 @@ import contentful
 from rich_text_renderer import RichTextRenderer
 
 ENVIRONMENT_ID = "master"  # Default environment ID
+PAGES_DIR =  os.path.join("src", "ingestion", "imagine_la", "pages")
 
 
 def main():
@@ -43,7 +44,8 @@ def main():
             # Some stray entries may not have the required fields
             # E.g., "Introduction" -- they aren't benefit programs
             # even though they're listed as such, so can be ignored
-            if fields.get("faq", None) is None:
+            # Others end in "test" (heuristic, not confirmed with Imagine LA)
+            if fields.get("faq", None) is None or fields["route"].endswith("test"):
                 continue
 
             benefit_program = {
@@ -74,9 +76,9 @@ def main():
         benefit_program["rendered_faq"] = rendered_faqs
 
     # 3. Save the rendered FAQs to an HTML file
-    os.makedirs("pages", exist_ok=True)
+    os.makedirs(PAGES_DIR, exist_ok=True)
     for benefit_program in benefit_programs:
-        filepath = os.path.join("pages", {benefit_program["route"]} + ".html")
+        filepath = os.path.join(PAGES_DIR, benefit_program["route"] + ".html")
         with open(filepath, "w", encoding="utf-8") as file:
             file.write(f"<h1>{benefit_program['name']}</h1>\n")
             file.write(f"<p>{benefit_program['description']}</p>\n\n")

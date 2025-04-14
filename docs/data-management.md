@@ -74,7 +74,7 @@ make scrapy-runner args="la_policy --debug"
 For manual ingestion, you can use the make commands directly:
 
 ```bash
-make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California FILEPATH=src/ingestion/imagine_la/scrape/pages
+make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California FILEPATH=src/ingestion/imagine_la/pages
 ```
 
 ```bash

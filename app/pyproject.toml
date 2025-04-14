@@ -82,6 +82,7 @@ literalai-tagger = "src.util.literalai_util:tag_threads"
 
 scrape-edd-web = "src.ingestion.scrape_edd_web:main"
 ingest-imagine-la = "src.ingestion.imagine_la.ingest:main"
+scrape-imagine-la = "src.ingestion.imagine_la.scrape:main"
 scrape-la-policy = "src.ingestion.scrape_la_policy:main"
 
 scrapy-runner = "src.ingestion.scrapy_runner:main"
