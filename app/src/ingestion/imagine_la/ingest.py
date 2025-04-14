@@ -43,36 +43,14 @@ def _parse_html(
         file_contents = file.read()
     soup = BeautifulSoup(file_contents, "html.parser")
 
-    h2 = soup.find("h2")
-    assert isinstance(h2, PageElement)
-    doc_attribs["name"] = h2.text.strip()
+    h1 = soup.find("h1")
+    assert isinstance(h1, PageElement)
+    doc_attribs["name"] = h1.text.strip()
     # Get filename and strip ".html" to get the source URL
     doc_attribs["source"] = common_base_url + file_path.split("/")[-1][:-5]
     document = Document(**doc_attribs)
 
-    # Extract accordions
-    accordion_data: dict[str, str] = {}
-    for item in soup.find_all("div", class_="chakra-accordion__item"):
-        assert isinstance(item, Tag)
-        heading_button = item.find("button", class_="chakra-accordion__button")
-        heading = None
-        if heading_button:
-            assert isinstance(heading_button, Tag)
-            p_tag = heading_button.find("p", class_="chakra-text")
-            assert isinstance(p_tag, Tag)
-            heading = p_tag.text.strip()
-
-        body_div = item.find("div", class_="chakra-collapse")
-        assert isinstance(body_div, Tag)
-        body_html = body_div.decode_contents() if body_div else None
-
-        if heading and body_html:
-            accordion_data[heading] = body_html
-
-    # Convert to markdown
-    content = f"# {document.name}\n\n"
-    for heading, body in accordion_data.items():
-        content += f"## {heading}\n\n{md(body)}\n\n"
+    content = md(file_contents)
 
     assert document.source
     file_path = create_file_path(md_base_dir, common_base_url, document.source)
