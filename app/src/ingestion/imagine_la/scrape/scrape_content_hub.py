@@ -1,90 +1,91 @@
-# /// script
-# dependencies = [
-#   "install-playwright",
-#   "playwright",
-# ]
-# ///
-# (This comment enables `uv run` to automatically create a virtual environment)
-
 """
 This script renders the child pages of the ImagineLA content hub
 and saves them to .html files in the `pages` subdirectory.
-
-It is intended to be run locally: the HTML files can later be added
-to S3 to ingest them into a deployed environment's database.
-
-You can either install the above dependences with pip, e.g.,
-`pip install -r requirements.txt` before running with
-`python scrape_content_hub.py`, or run this with
-`uv run --no-project scrape_content_hub.py` to have an environment
-automatically created for you.
 """
 
+# Python script to export all Contentful content entries as JSON (fixed version)
 import os
 import sys
 
-from install_playwright import install
-from playwright.sync_api import sync_playwright
+import contentful
+from rich_text_renderer import RichTextRenderer
 
-if len(sys.argv) != 3:
-    print("You need to pass the root URL and password as command line arguments.")
-    print("E.g.: uv run scrape_content_hub.py <root_url> <password>")
-    quit()
-
-root_url, password = sys.argv[1:]
+ENVIRONMENT_ID = "master"  # Default environment ID
 
 
-p = sync_playwright().start()
-install(p.chromium)
-browser = p.chromium.launch()
+def main():
+    # 0. Instantiate the Contentful client
+    space_id = os.getenv("CONTENT_HUB_SPACE_ID", None)
+    access_token = os.getenv("CONTENT_HUB_ACCESS_TOKEN", None)
 
-page = browser.new_page()
-page.goto(root_url)
+    if space_id is None:
+        print("Please set the CONTENT_HUB_SPACE_ID environment variable.")
+        sys.exit(1)
 
-# Wait for the password field and enter credentials
-password_field = page.wait_for_selector("#password", timeout=10_000)
-if not password_field:
-    print("Password field not found.")
-    quit()
-password_field.fill(password)
-password_field.press("Enter")
-page.wait_for_load_state("networkidle")
-print("Logged in")
+    if access_token is None:
+        print("Please set the CONTENT_HUB_ACCESS_TOKEN environment variable.")
+        sys.exit(1)
 
-# Wait for the page to load by ensuring an element (e.g., an <h2> tag) is present
-page.wait_for_selector("h2", timeout=10_000)
+    client = contentful.Client(
+        space_id=space_id, access_token=access_token, environment=ENVIRONMENT_ID
+    )
 
-learn_more_buttons = page.locator('button:has-text("Learn more")')
-content_hub_pages: dict[str, str] = {}
+    # 1. Get all of the benefit programs covered
+    benefit_programs = []
+    offset = 0
+    limit = 1000  # Contentful max pagination limit
+    while True:
+        entries = client.entries({"content_type": "benefit", "limit": limit, "skip": offset})
 
-root_url_prefix = root_url if root_url.endswith("/") else root_url + "/"
-for index in range(learn_more_buttons.count()):
+        for entry in entries:
+            fields = entry.fields()
 
-    # Expand all the accordions on the page
-    # so that we can click into the buttons beneath them
-    accordions = page.locator(".chakra-accordion__button[aria-expanded='false']")
-    while accordions.count() > 0:
-        accordions.first.click()
+            # Some stray entries may not have the required fields
+            # E.g., "Introduction" -- they aren't benefit programs
+            # even though they're listed as such, so can be ignored
+            if fields.get("faq", None) is None:
+                continue
 
-    with page.expect_navigation() as navigation:
-        learn_more_buttons.nth(index).click()
-        page.wait_for_load_state("networkidle")
+            benefit_program = {
+                "name": fields["name"],
+                "route": fields["route"],
+                "description": fields["description"],
+                "faq": fields["faq"],
+            }
+            benefit_programs.append(benefit_program)
 
-    page.wait_for_selector("h2", timeout=10_000)
-    page_path = page.url.removeprefix(root_url_prefix)
-    print(f"Scraped page: {page_path}")
+        offset += limit
 
-    content_hub_pages[page_path] = page.content()
+        if len(entries) < limit:
+            break
 
-    page.go_back()
-    page.wait_for_load_state("networkidle")
+    # 2. For each benefit program, render its FAQs
+    html_renderer = RichTextRenderer()
+    for benefit_program in benefit_programs:
+        rendered_faqs = []
+        for faq in benefit_program["faq"]:
+            fields = faq.fields()
+            rendered_faq = {
+                "question": faq.fields()["question"],
+                "answer": html_renderer.render(faq.fields()["answer"]),
+            }
+            rendered_faqs.append(rendered_faq)
 
-# Write the files to the `pages` directory
-os.makedirs("pages", exist_ok=True)
+        benefit_program["rendered_faq"] = rendered_faqs
 
-for filename, content in content_hub_pages.items():
-    filepath = os.path.join("pages", f"{filename}.html")
-    with open(filepath, "w", encoding="utf-8") as file:
-        file.write(content)
+    # 3. Save the rendered FAQs to an HTML file
+    os.makedirs("pages", exist_ok=True)
+    for benefit_program in benefit_programs:
+        filepath = os.path.join("pages", {benefit_program["route"]} + ".html")
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write(f"<h1>{benefit_program['name']}</h1>\n")
+            file.write(f"<p>{benefit_program['description']}</p>\n\n")
+            for faq in benefit_program["rendered_faq"]:
+                file.write(f"<h2>{faq['question']}</h2>\n")
+                file.write(f"{faq['answer']}\n\n")
 
-print("HTML files generated in the 'pages' directory.")
+    print("HTML files generated in the 'pages' directory.")
+
+
+if __name__ == "__main__":
+    main()
