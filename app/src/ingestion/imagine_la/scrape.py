@@ -14,7 +14,7 @@ ENVIRONMENT_ID = "master"  # Default environment ID
 PAGES_DIR = os.path.join("src", "ingestion", "imagine_la", "pages")
 
 
-def main():
+def main() -> None:
     # 0. Instantiate the Contentful client
     space_id = os.getenv("CONTENT_HUB_SPACE_ID", None)
     access_token = os.getenv("CONTENT_HUB_ACCESS_TOKEN", None)
