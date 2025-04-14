@@ -11,7 +11,7 @@ import contentful
 from rich_text_renderer import RichTextRenderer
 
 ENVIRONMENT_ID = "master"  # Default environment ID
-PAGES_DIR =  os.path.join("src", "ingestion", "imagine_la", "pages")
+PAGES_DIR = os.path.join("src", "ingestion", "imagine_la", "pages")
 
 
 def main():

@@ -3,8 +3,8 @@ import sys
 from typing import Optional, Sequence
 
 from bs4 import BeautifulSoup
-from bs4.element import PageElement, Tag
-from markdownify import markdownify as md
+from bs4.element import PageElement
+from markdownify import markdownify
 from smart_open import open
 
 from src.adapters import db
@@ -50,7 +50,10 @@ def _parse_html(
     doc_attribs["source"] = common_base_url + file_path.split("/")[-1][:-5]
     document = Document(**doc_attribs)
 
-    content = md(file_contents)
+    content = markdownify(
+        file_contents,
+        heading_style="ATX",
+    )
 
     assert document.source
     file_path = create_file_path(md_base_dir, common_base_url, document.source)

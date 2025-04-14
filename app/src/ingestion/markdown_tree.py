@@ -964,7 +964,7 @@ def _add_intro_attrib(node: Node) -> bool:
             # ThematicBreak example: horizontal rule
             pass
         else:
-            raise ValueError(f"{node.data_id} Unexpected prev node type: {prev_node.id_string}")
+            raise ValueError(f"{node.data_id} Unexpected prev node type: {prev_node.data_type}")
     return False
 
 
