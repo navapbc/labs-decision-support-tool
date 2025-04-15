@@ -35,9 +35,6 @@ Accordion 21 Body\n\n
 ## Accordion 22 Heading\n\n
 Accordion 22 Body"""
 
-    #'# Document 1\n\n\n## Accordion 11 Heading\n\n\nAccordion 11 Body\n\n\n## Accordion 12 Heading\n\n\nAccordion 12 Body\n\n'
-    #'# Document 1\n\n\n## Accordion 11 Heading\n\n\n# Accordion 11 Body\n\n\n# ## Accordion 12 Heading\n\n\n# Accordion 12 Body\n\n
-
     with TemporaryDirectory(suffix="imagine_la_md") as md_base_dir:
         with caplog.at_level(logging.INFO):
             config = IngestConfig(
