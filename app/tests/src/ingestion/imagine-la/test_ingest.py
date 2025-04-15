@@ -23,25 +23,20 @@ def s3_html(mock_s3_bucket_resource):
 def test__ingest_content_hub(caplog, app_config, db_session, s3_html, file_location):
     db_session.execute(delete(Document))
 
-    doc_1_content = """# Document 1
-
-## Accordion 11 Heading
-
-Accordion 11 Body
-
-## Accordion 12 Heading
-
+    doc_1_content = """# Document 1\n\n
+## Accordion 11 Heading\n\n
+Accordion 11 Body\n\n
+## Accordion 12 Heading\n\n
 Accordion 12 Body"""
 
-    doc_2_content = """# Document 2
-
-## Accordion 21 Heading
-
-Accordion 21 Body
-
-## Accordion 22 Heading
-
+    doc_2_content = """# Document 2\n\n
+## Accordion 21 Heading\n\n
+Accordion 21 Body\n\n
+## Accordion 22 Heading\n\n
 Accordion 22 Body"""
+
+    #'# Document 1\n\n\n## Accordion 11 Heading\n\n\nAccordion 11 Body\n\n\n## Accordion 12 Heading\n\n\nAccordion 12 Body\n\n'
+    #'# Document 1\n\n\n## Accordion 11 Heading\n\n\n# Accordion 11 Body\n\n\n# ## Accordion 12 Heading\n\n\n# Accordion 12 Body\n\n
 
     with TemporaryDirectory(suffix="imagine_la_md") as md_base_dir:
         with caplog.at_level(logging.INFO):
@@ -73,7 +68,7 @@ Accordion 22 Body"""
 
         chunks = db_session.execute(select(Chunk).order_by(Chunk.content)).scalars().all()
         assert len(chunks) == 2
-        assert chunks[0].content == doc_1_content
+        assert chunks[0].content == doc_1_content.replace("\n\n\n", "\n\n")
         assert chunks[0].document == documents[0]
-        assert chunks[1].content == doc_2_content
+        assert chunks[1].content == doc_2_content.replace("\n\n\n", "\n\n")
         assert chunks[1].document == documents[1]
