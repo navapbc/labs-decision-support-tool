@@ -66,20 +66,18 @@ def _has_aws_access() -> bool:
 ChatHistory = list[dict[str, str]]
 
 
-def generate(
-    llm: str,
+def _prepare_messages(
     system_prompt: str,
     query: str,
     context_text: str | None = None,
     chat_history: ChatHistory | None = None,
-) -> str:
+) -> list[dict[str, str]]:
     """
-    Returns a string response from an LLM model, based on a query input.
+    Prepares the messages list for LLM completion, used by both streaming and non-streaming functions.
     """
     messages = [
         {
             "content": system_prompt,
-            # System message for high-level framing that governs the assistant response
             "role": "system",
         }
     ]
@@ -97,7 +95,22 @@ def generate(
         messages.extend(chat_history)
 
     messages.append({"content": query, "role": "user"})
+    return messages
+
+
+def generate(
+    llm: str,
+    system_prompt: str,
+    query: str,
+    context_text: str | None = None,
+    chat_history: ChatHistory | None = None,
+) -> str:
+    """
+    Returns a string response from an LLM model, based on a query input.
+    """
+    messages = _prepare_messages(system_prompt, query, context_text, chat_history)
     logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
+    
     response = completion(
         model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
     )
@@ -115,28 +128,9 @@ def generate_streaming(
     """
     Returns a generator that yields chunks of the response from an LLM model.
     """
-    messages = [
-        {
-            "content": system_prompt,
-            "role": "system",
-        }
-    ]
-    logger.debug("Using system prompt for streaming: %s", system_prompt)
-
-    if context_text:
-        messages.append(
-            {
-                "content": f"Use the following context to answer the question: {context_text}",
-                "role": "system",
-            },
-        )
-
-    if chat_history:
-        messages.extend(chat_history)
-
-    messages.append({"content": query, "role": "user"})
-    
+    messages = _prepare_messages(system_prompt, query, context_text, chat_history)
     logger.debug("Streaming from %s for query: %s with context:\n%s", llm, query, context_text)
+    
     response_stream = completion(
         model=llm, 
         messages=messages, 
@@ -160,28 +154,9 @@ async def generate_streaming_async(
     """
     Returns an async generator that yields chunks of the response from an LLM model.
     """
-    messages = [
-        {
-            "content": system_prompt,
-            "role": "system",
-        }
-    ]
-    logger.debug("Using system prompt for async streaming: %s", system_prompt)
-
-    if context_text:
-        messages.append(
-            {
-                "content": f"Use the following context to answer the question: {context_text}",
-                "role": "system",
-            },
-        )
-
-    if chat_history:
-        messages.extend(chat_history)
-
-    messages.append({"content": query, "role": "user"})
-    
+    messages = _prepare_messages(system_prompt, query, context_text, chat_history)
     logger.debug("Async streaming from %s for query: %s with context:\n%s", llm, query, context_text)
+    
     response_stream = completion(
         model=llm, 
         messages=messages, 
