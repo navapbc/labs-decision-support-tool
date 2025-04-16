@@ -12,13 +12,16 @@ import uuid
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Coroutine, Generator, Optional, Sequence
+from pathlib import Path
+from typing import Any, AsyncGenerator, Coroutine, Generator, Optional, Sequence, Union
 
 from asyncer import asyncify
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse
 from lazify import LazyProxy
 from pydantic import BaseModel
 from sqlalchemy import select
+from sse_starlette.sse import EventSourceResponse
 
 import chainlit as cl
 from chainlit.context import init_http_context as cl_init_context
@@ -70,6 +73,16 @@ async def healthcheck(request: Request) -> HealthCheck:
     logger.info(request.headers)
     healthcheck_response = await health(request)
     return healthcheck_response
+
+
+@router.get("/streaming-test", response_class=HTMLResponse)
+async def streaming_test() -> str:
+    """Serve the streaming test HTML page"""
+    html_path = Path(__file__).parent.parent / "streaming-test.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Streaming test page not found")
+    
+    return html_path.read_text()
 
 
 # region: ===================  Session Management ===================
@@ -358,6 +371,20 @@ class QueryRequest(BaseModel):
     beneficiary_id: Optional[str] = None
 
 
+class QueryInitRequest(BaseModel):
+    session_id: str
+    new_session: bool
+    question: str
+    user_id: str
+    agency_id: Optional[str] = None
+    beneficiary_id: Optional[str] = None
+
+
+class QueryInitResponse(BaseModel):
+    status: str = "processing"
+    message_id: str
+
+
 class Citation(BaseModel):
     citation_id: str
     source_id: str
@@ -480,7 +507,211 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
-def _validate_chat_history(request: QueryRequest, chat_history: ChatHistory) -> None:
+# New endpoints for Streaming API
+
+@router.post("/query_init")
+async def query_init(request: QueryInitRequest) -> QueryInitResponse:
+    """
+    Initializes a streaming query by storing the question and creating a message_id.
+    Returns the message_id that the client will use to fetch the streaming response.
+    """
+    with db_session_context_var() as db_session:
+        user_meta = {}
+        if request.agency_id is not None:
+            user_meta["agency_id"] = request.agency_id
+        if request.beneficiary_id is not None:
+            user_meta["beneficiary_id"] = request.beneficiary_id
+
+        session = await _init_chat_session(
+            request.user_id, request.session_id, user_meta, request.new_session
+        )
+
+        # Load history to validate
+        chat_history = _load_chat_history(session.user_session)
+        _validate_chat_history(request, chat_history)
+
+        # Create chainlit message for the question
+        thread_name = request.question.strip().splitlines()[0] if request.new_session else None
+        request_step = cl.Message(
+            author=session.user_session.user_id,
+            content=request.question,
+            type="user_message",
+            metadata={
+                "user_id": session.user_session.user_id,
+                "user_uuid": session.user_uuid,
+                "request": {
+                    "message": request.question,
+                    "user_id": request.user_id,
+                    "agency_id": request.agency_id,
+                    "session_id": request.session_id,
+                    "new_session": request.new_session,
+                    "beneficiary_id": request.beneficiary_id
+                },
+                "language": None,
+                "showInput": None,
+                "waitForAnswer": False
+            },
+        ).to_dict()
+
+        # Persist the question message
+        data_layer = cl_get_data_layer()
+        await data_layer.create_step(request_step)
+        if thread_name:
+            await data_layer.update_thread(thread_id=request_step["threadId"], name=thread_name)
+
+        # Store the question in the database
+        with db_session.begin():
+            db_session.add(
+                ChatMessage(session_id=request.session_id, role="user", content=request.question)
+            )
+
+        # The message_id is used to refer to this specific question/answer pair
+        message_id = request_step["id"]
+
+        return QueryInitResponse(status="processing", message_id=message_id)
+
+
+@router.get("/query_stream")
+async def query_stream(request: Request, id: str, user_id: str, session_id: str):
+    """
+    Streams the response for a query initiated with query_init.
+    Uses Server-Sent Events (SSE) to stream the response chunks to the client.
+    """
+    with db_session_context_var() as db_session:
+        # Get session information
+        session = await _init_chat_session(user_id, session_id, new_session=False)
+        chat_history = _load_chat_history(session.user_session)
+        engine = get_chat_engine(session)
+
+        # Retrieve the question from the database
+        with db_session.begin():
+            question = db_session.scalars(
+                select(ChatMessage)
+                .where(ChatMessage.session_id == session_id)
+                .order_by(ChatMessage.created_at.desc())
+                .limit(1)
+            ).first()
+
+            if not question or question.role != "user":
+                raise HTTPException(status_code=404, detail="Question not found")
+
+        # Prepare response placeholder for storing the full response
+        full_response = ""
+        
+        # We need to retrieve the subsections for citations, but without making a separate LLM call
+        subsections = []
+        retrieval_done = False
+        
+        # Create an SSE generator that streams chunks
+        async def event_generator():
+            nonlocal full_response, subsections, retrieval_done
+            
+            try:
+                # Get the alert_message by analyzing the user message
+                # This needs to be done before generating the response
+                attributes = await asyncify(
+                    lambda: engine.analyze_message(question.content)
+                )()
+                
+                alert_message = getattr(attributes, "alert_message", None)
+                
+                # If there's an alert message, send it first
+                if INCLUDE_ALERT_IN_RESPONSE and alert_message:
+                    yield {
+                        "event": "alert",
+                        "data": alert_message
+                    }
+                
+                # If we need context, retrieve it ourselves to avoid duplicate retrieval
+                if getattr(attributes, "needs_context", True):
+                    # This mirrors the logic in on_message_streaming but captures the subsections
+                    question_for_retrieval = getattr(attributes, "translated_message", "") or question.content
+                    
+                    # Retrieve context (same as in chat_engine.py)
+                    chunks_with_scores = await asyncify(lambda: engine.retrieve_context(question_for_retrieval))()
+                    chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+                    subsections = await asyncify(lambda: engine.prepare_subsections(chunks))()
+                    retrieval_done = True
+                
+                # Stream the response using the engine's streaming method
+                async for chunk in engine.on_message_streaming(question.content, chat_history):
+                    if await request.is_disconnected():
+                        # Client disconnected, stop streaming
+                        break
+                    
+                    full_response += chunk
+                    
+                    # Send the chunk
+                    yield {
+                        "event": "chunk",
+                        "data": chunk
+                    }
+                
+                # After streaming is complete, we need to process citations
+                # Process the citations from the subsections - use our cached subsections if available
+                from src.citations import simplify_citation_numbers
+                
+                # If we didn't retrieve context earlier, we need to do it now
+                if not retrieval_done:
+                    # Use a lightweight method to get subsections
+                    question_for_retrieval = getattr(attributes, "translated_message", "") or question.content
+                    chunks_with_scores = await asyncify(lambda: engine.retrieve_context(question_for_retrieval))()
+                    chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+                    subsections = await asyncify(lambda: engine.prepare_subsections(chunks))()
+                
+                # Process citations with the cached response and subsections
+                final_result = simplify_citation_numbers(full_response.strip(), subsections)
+                
+                # Extract citations from the result
+                citations = [Citation.from_subsection(subsection) for subsection in final_result.subsections]
+                
+                # Create response step in the same format as the regular query endpoint
+                response_step = cl.Message(
+                    content=full_response.strip(),
+                    type="assistant_message",
+                    parent_id=id,  # This is the request_step id passed in from query_init
+                    metadata={
+                        "citations": [c.model_dump() for c in citations],
+                        "chat_history": chat_history,
+                        "attributes": attributes.model_dump(),
+                        "language": None,
+                        "showInput": None,
+                        "waitForAnswer": False
+                    }
+                ).to_dict()
+                
+                # Persist the step
+                await cl_get_data_layer().create_step(response_step)
+                
+                # Send a done event with citations - convert to JSON string for SSE compatibility
+                import json
+                citations_json = json.dumps([c.model_dump() for c in citations])
+                yield {
+                    "event": "done",
+                    "data": citations_json
+                }
+                
+                # Save the complete response to the database
+                with db_session.begin():
+                    db_session.add(
+                        ChatMessage(
+                            session_id=session_id,
+                            role="assistant",
+                            content=full_response.strip()
+                        )
+                    )
+                
+            except Exception as e:
+                logger.exception("Error during streaming: %s", e)
+                yield {
+                    "event": "error",
+                    "data": str(e)
+                }
+                
+        return EventSourceResponse(event_generator())
+                
+
+def _validate_chat_history(request: Union[QueryRequest, QueryInitRequest], chat_history: ChatHistory) -> None:
     if request.new_session and chat_history:
         raise HTTPException(
             status_code=409,

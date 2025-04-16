@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, TypeVar
+from typing import Any, AsyncGenerator, Generator, TypeVar
 
 import boto3
 import botocore.exceptions
@@ -103,6 +103,96 @@ def generate(
     )
 
     return response["choices"][0]["message"]["content"]
+
+
+def generate_streaming(
+    llm: str,
+    system_prompt: str,
+    query: str,
+    context_text: str | None = None,
+    chat_history: ChatHistory | None = None,
+) -> Generator[str, None, None]:
+    """
+    Returns a generator that yields chunks of the response from an LLM model.
+    """
+    messages = [
+        {
+            "content": system_prompt,
+            "role": "system",
+        }
+    ]
+    logger.debug("Using system prompt for streaming: %s", system_prompt)
+
+    if context_text:
+        messages.append(
+            {
+                "content": f"Use the following context to answer the question: {context_text}",
+                "role": "system",
+            },
+        )
+
+    if chat_history:
+        messages.extend(chat_history)
+
+    messages.append({"content": query, "role": "user"})
+    
+    logger.debug("Streaming from %s for query: %s with context:\n%s", llm, query, context_text)
+    response_stream = completion(
+        model=llm, 
+        messages=messages, 
+        stream=True,  # Enable streaming
+        **completion_args(llm), 
+        temperature=app_config.temperature
+    )
+
+    for chunk in response_stream:
+        if content := chunk.choices[0].delta.content:
+            yield content
+
+
+async def generate_streaming_async(
+    llm: str,
+    system_prompt: str,
+    query: str,
+    context_text: str | None = None,
+    chat_history: ChatHistory | None = None,
+) -> AsyncGenerator[str, None]:
+    """
+    Returns an async generator that yields chunks of the response from an LLM model.
+    """
+    messages = [
+        {
+            "content": system_prompt,
+            "role": "system",
+        }
+    ]
+    logger.debug("Using system prompt for async streaming: %s", system_prompt)
+
+    if context_text:
+        messages.append(
+            {
+                "content": f"Use the following context to answer the question: {context_text}",
+                "role": "system",
+            },
+        )
+
+    if chat_history:
+        messages.extend(chat_history)
+
+    messages.append({"content": query, "role": "user"})
+    
+    logger.debug("Async streaming from %s for query: %s with context:\n%s", llm, query, context_text)
+    response_stream = completion(
+        model=llm, 
+        messages=messages, 
+        stream=True,  # Enable streaming
+        **completion_args(llm), 
+        temperature=app_config.temperature
+    )
+
+    for chunk in response_stream:
+        if content := chunk.choices[0].delta.content:
+            yield content
 
 
 def completion_args(llm: str) -> dict[str, Any]:
