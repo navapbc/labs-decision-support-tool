@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import io
 import logging
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -16,7 +17,8 @@ async def batch_process(file_path: str, engine: ChatEngineInterface) -> str:
     # Convert file contents to clean UTF-8
     content = convert_to_utf8(file_path)
 
-    reader = csv.DictReader(content.splitlines())
+    csv_file = io.StringIO(content)
+    reader = csv.DictReader(csv_file)
 
     if not reader.fieldnames or "question" not in reader.fieldnames:
         raise ValueError("CSV file must contain a 'question' column.")
@@ -66,6 +68,7 @@ def _process_question(
 ) -> dict[str, str | None]:
     try:
         logger.info("Processing question %i: %s...", index, question[:50])
+        logger.info("Question contains newlines: " + str("\n" in question))
         result = engine.on_message(question=question, chat_history=[])
         final_result = simplify_citation_numbers(result.response, result.subsections)
 
