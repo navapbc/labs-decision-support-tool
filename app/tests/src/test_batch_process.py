@@ -14,9 +14,7 @@ def engine():
 
 @pytest.fixture
 def sample_csv(tmp_path):
-    csv_content = (
-        "question,metadata\n" "What is AI?,some metadata\n" "Second question,other metadata"
-    )
+    csv_content = 'question,metadata\nWhat is AI?,some metadata\n"Second question\nacross lines",other metadata'
     csv_path = tmp_path / "questions.csv"
     csv_path.write_text(csv_content)
     return str(csv_path)
@@ -51,7 +49,7 @@ async def test_batch_process(monkeypatch, sample_csv, engine):
         assert f.read() == (
             "question,metadata,answer,field_2,field_3\n"
             "What is AI?,some metadata,Answer to What is AI?,value_2,\n"
-            "Second question,other metadata,Answer to Second question,,value_3\n"
+            '"Second question\nacross lines",other metadata,Answer to Second question,,value_3\n'
         )
 
 
