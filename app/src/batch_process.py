@@ -68,7 +68,6 @@ def _process_question(
 ) -> dict[str, str | None]:
     try:
         logger.info("Processing question %i: %s...", index, question[:50])
-        logger.info("Question contains newlines: " + str("\n" in question))
         result = engine.on_message(question=question, chat_history=[])
         final_result = simplify_citation_numbers(result.response, result.subsections)
 
