@@ -13,6 +13,9 @@ ingest_imagine_la() {
         echo "Using scraped html files created today"
     fi
 
+    [ -n "$CONTENT_HUB_SPACE_ID" ] || { echo "CONTENT_HUB_SPACE_ID is not set!"; exit 31; }
+    [ -n "$CONTENT_HUB_ACCESS_TOKEN" ] || { echo "CONTENT_HUB_ACCESS_TOKEN is not set!"; exit 31; }
+    
     # Scrape the website
     make scrape-imagine-la 2>&1 | tee logs/${DATASET_ID}-1scrape.log
     if grep -E 'make:.*Error|log_count/ERROR' "logs/${DATASET_ID}-1scrape.log"; then
