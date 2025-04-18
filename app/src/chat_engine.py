@@ -1,10 +1,10 @@
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence
+from typing import AsyncGenerator, Optional, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
-from src.db.models.document import ChunkWithScore, Subsection
+from src.db.models.document import Chunk, ChunkWithScore, Subsection
 from src.format import FormattingConfig
 from src.generate import (
     ChatHistory,
@@ -12,6 +12,7 @@ from src.generate import (
     MessageAttributesT,
     analyze_message,
     generate,
+    generate_streaming_async,
 )
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
@@ -90,6 +91,65 @@ class ChatEngineInterface(ABC):
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> OnMessageResult:
         pass
+        
+    @abstractmethod
+    async def on_message_streaming(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> AsyncGenerator[str, None]:
+        """
+        Streaming version of on_message that yields response chunks as an async generator.
+        This allows for streaming responses to the client with the same logical flow as on_message.
+        """
+        pass
+        
+    def analyze_message(
+        self, question: str
+    ) -> MessageAttributesT:
+        """
+        Analyzes the user message to determine if context is needed.
+        
+        This method is extracted from the on_message flow to support streaming
+        responses where we need to analyze the message first, then stream the response.
+        """
+        return analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
+    
+    def retrieve_context(
+        self, question_for_retrieval: str
+    ) -> Sequence[ChunkWithScore]:
+        """
+        Retrieves context (chunks with scores) for a given query.
+        
+        This method is extracted from the _build_response_with_context flow to
+        support streaming responses where we need to get context before streaming.
+        """
+        return retrieve_with_scores(
+            question_for_retrieval,
+            retrieval_k=self.retrieval_k if hasattr(self, 'retrieval_k') else 8,
+            retrieval_k_min_score=self.retrieval_k_min_score if hasattr(self, 'retrieval_k_min_score') else 0.45,
+            datasets=self.datasets if hasattr(self, 'datasets') else [],
+        )
+    
+    def prepare_subsections(
+        self, chunks: Sequence[Chunk]
+    ) -> Sequence[Subsection]:
+        """
+        Prepares subsections from chunks.
+        
+        This method is extracted from the _build_response_with_context flow to
+        support streaming responses.
+        """
+        return split_into_subsections(chunks, factory=CitationFactory())
+    
+    def create_context_text(
+        self, subsections: Sequence[Subsection]
+    ) -> str:
+        """
+        Creates context text from subsections.
+        
+        This method is extracted from the _build_response_with_context flow to
+        support streaming responses.
+        """
+        return create_prompt_context(subsections)
 
 
 def available_engines() -> list[str]:
@@ -149,6 +209,62 @@ class BaseEngine(ChatEngineInterface):
             return self._build_response_with_context(question, attributes, chat_history)
 
         return self._build_response(question, attributes, chat_history)
+        
+    async def on_message_streaming(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> AsyncGenerator[str, None]:
+        """
+        Streaming version of on_message that yields response chunks as an async generator.
+        Follows the same logical flow as on_message.
+        """
+        # Analyze the message first (same as non-streaming)
+        start_time = time.perf_counter()
+        attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
+        system_prompt_1_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
+        )
+        
+        # Determine if context is needed (same as non-streaming)
+        if attributes.needs_context:
+            # Get retrieval question (same as _build_response_with_context)
+            question_for_retrieval = attributes.translated_message or question
+            
+            # Retrieve context (same as _build_response_with_context)
+            start_time = time.perf_counter()
+            chunks_with_scores = retrieve_with_scores(
+                question_for_retrieval,
+                retrieval_k=self.retrieval_k,
+                retrieval_k_min_score=self.retrieval_k_min_score,
+                datasets=self.datasets,
+            )
+            retrieval_duration = time.perf_counter() - start_time
+            logger.info(f"Vector retrieval took {retrieval_duration:.2f} seconds")
+            
+            # Prepare context (same as _build_response_with_context)
+            chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+            subsections = split_into_subsections(chunks, factory=CitationFactory())
+            context_text = create_prompt_context(subsections)
+            
+            # Generate streaming response with context
+            async for chunk in generate_streaming_async(
+                self.llm,
+                self.system_prompt_2,
+                question,
+                context_text,
+                chat_history,
+            ):
+                yield chunk
+        else:
+            # Generate streaming response without context
+            async for chunk in generate_streaming_async(
+                self.llm,
+                self.system_prompt_2,
+                question,
+                None,
+                chat_history,
+            ):
+                yield chunk
 
     def _build_response(
         self,
@@ -423,8 +539,8 @@ Example question:
 Can my client get Unemployment and disability at the same time?
 
 Example Answer:
-No, your client can’t get Unemployment Insurance (UI) and State Disability Insurance (SDI) at the same time. (citation-1)
-They need to choose the one that works best for their situation. If they’re not sure which one to apply for, \
+No, your client can't get Unemployment Insurance (UI) and State Disability Insurance (SDI) at the same time. (citation-1)
+They need to choose the one that works best for their situation. If they're not sure which one to apply for, \
 they can apply for both, and the state will check if they qualify for either one. (citation-2) (citation-3)"""
 
     def on_message(
@@ -451,3 +567,70 @@ they can apply for both, and the state will check if they qualify for either one
             return self._build_response_with_context(question, attributes, chat_history)
 
         return self._build_response(question, attributes, chat_history)
+        
+    async def on_message_streaming(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> AsyncGenerator[str, None]:
+        """
+        Streaming version of on_message for ImagineLaEngine.
+        Handles the same logic flow as the non-streaming version but yields response chunks.
+        """
+        # Start timing system_prompt_1
+        start_time = time.perf_counter()
+        attributes = analyze_message(
+            self.llm, self.system_prompt_1, question, response_format=ImagineLA_MessageAttributes
+        )
+        system_prompt_1_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
+        )
+        
+        # Format alert message the same way as non-streaming version
+        if attributes.alert_message:
+            attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
+        
+        # Handle canned responses - return the entire response at once
+        if attributes.canned_response:
+            yield attributes.canned_response
+            return
+            
+        # Determine if context is needed
+        if attributes.needs_context:
+            # Get retrieval question
+            question_for_retrieval = attributes.translated_message or question
+            
+            # Retrieve context
+            start_time = time.perf_counter()
+            chunks_with_scores = retrieve_with_scores(
+                question_for_retrieval,
+                retrieval_k=self.retrieval_k,
+                retrieval_k_min_score=self.retrieval_k_min_score,
+                datasets=self.datasets,
+            )
+            retrieval_duration = time.perf_counter() - start_time
+            logger.info(f"Vector retrieval took {retrieval_duration:.2f} seconds")
+            
+            # Prepare context
+            chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+            subsections = split_into_subsections(chunks, factory=CitationFactory())
+            context_text = create_prompt_context(subsections)
+            
+            # Stream response with context
+            async for chunk in generate_streaming_async(
+                self.llm,
+                self.system_prompt_2,
+                question,
+                context_text,
+                chat_history,
+            ):
+                yield chunk
+        else:
+            # Stream response without context
+            async for chunk in generate_streaming_async(
+                self.llm,
+                self.system_prompt_2,
+                question,
+                None,
+                chat_history,
+            ):
+                yield chunk
