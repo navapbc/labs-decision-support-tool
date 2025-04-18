@@ -6,16 +6,18 @@ ingest_imagine_la() {
     check_preconditions "$DATASET_ID"
 
     # Move previous scraped html files if it's not from today
-    if [ -d "src/ingestion/imagine_la/scrape/pages" ] && ! [ -d "src/ingestion/imagine_la/scrape/pages-$TODAY" ]; then
+    if [ -d "src/ingestion/imagine_la/pages" ] && ! [ -d "src/ingestion/imagine_la/pages-$TODAY" ]; then
         echo "Clearing scraped html files"
-        mv -iv "src/ingestion/imagine_la/scrape/pages"{,-$TODAY}
+        mv -iv "src/ingestion/imagine_la/pages"{,-$TODAY}
     else
         echo "Using scraped html files created today"
     fi
 
-    [ "$CONTENTHUB_PASSWORD" ] || { echo "CONTENTHUB_PASSWORD is not set!"; exit 31; }
+    [ -n "$CONTENT_HUB_SPACE_ID" ] || { echo "CONTENT_HUB_SPACE_ID is not set!"; exit 31; }
+    [ -n "$CONTENT_HUB_ACCESS_TOKEN" ] || { echo "CONTENT_HUB_ACCESS_TOKEN is not set!"; exit 31; }
+    
     # Scrape the website
-    make scrape-imagine-la CONTENTHUB_PASSWORD=$CONTENTHUB_PASSWORD 2>&1 | tee logs/${DATASET_ID}-1scrape.log
+    make scrape-imagine-la 2>&1 | tee logs/${DATASET_ID}-1scrape.log
     if grep -E 'make:.*Error|log_count/ERROR' "logs/${DATASET_ID}-1scrape.log"; then
         echo "ERROR: Scraping failed. Check logs/${DATASET_ID}-1scrape.log"
         exit 33
@@ -27,7 +29,7 @@ ingest_imagine_la() {
     if [ -z "$SKIP_LOCAL_INGEST" ]; then
         # Save markdown files and ingest into DB
         make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California \
-            FILEPATH=src/ingestion/imagine_la/scrape/pages 2>&1 | tee logs/${DATASET_ID}-2ingest.log
+            FILEPATH=src/ingestion/imagine_la/pages 2>&1 | tee logs/${DATASET_ID}-2ingest.log
         if [ $? -ne 0 ] || grep -E 'make:.*Error' "logs/${DATASET_ID}-2ingest.log"; then
             echo "ERROR: ingest-runner failed. Check logs/${DATASET_ID}-2ingest.log"
             exit 32
@@ -110,8 +112,8 @@ collect_stats(){
     local INGEST_STATS=$(grep -E "Running with args|DONE splitting|Finished ingesting" "logs/${DATASET_ID}-2ingest.log")
     local SCRAPE_STATS=$(grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log")
     local HTML_COUNT=0
-    if [ -d "src/ingestion/imagine_la/scrape/pages" ]; then
-        HTML_COUNT=$(ls src/ingestion/imagine_la/scrape/pages | wc -l)
+    if [ -d "src/ingestion/imagine_la/pages" ]; then
+        HTML_COUNT=$(ls src/ingestion/imagine_la/pages | wc -l)
     fi
 
     # Parse ingest stats
@@ -161,9 +163,9 @@ echo_stats(){
     local DATASET_ID="$1"
     echo "------ $DATASET_ID ----------------"
     if [ "$DATASET_ID" == "imagine_la" ]; then
-        ls -ld src/ingestion/imagine_la/scrape/pages
+        ls -ld src/ingestion/imagine_la/pages
         echo "HTML files scraped: "
-        ls src/ingestion/imagine_la/scrape/pages | wc -l
+        ls src/ingestion/imagine_la/pages | wc -l
     else
         grep -E 'log_count|item_scraped_count|request_depth|downloader/|httpcache/' "logs/${DATASET_ID}-1scrape.log"
     fi
@@ -197,7 +199,7 @@ echo_cmds(){
         {
         echo "# $DATASET_ID: Upload to S3"
         local S3_HTML_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/imagine_la-${TODAY}"
-        echo "aws s3 sync \"app/src/ingestion/imagine_la/scrape/pages/\" \"$S3_HTML_DIR/\""
+        echo "aws s3 sync \"app/src/ingestion/imagine_la/pages/\" \"$S3_HTML_DIR/\""
         echo "aws s3 cp \"app/logs/${DATASET_ID}-${TODAY}_stats.json\" \"${S3_HTML_DIR}/stats/${TODAY}_stats.json\""
 
         echo "# $DATASET_ID: Ingest"

@@ -21,10 +21,11 @@ To refresh all data sources at once, use the refresh-ingestion.sh script from wi
 
 This will scrape and ingest data from all supported sources except for 'ssa' (which requires manual scraping). The script only modifies the local database. To update the database in the respective deployment environments, the script generates 2 other scripts in the top-level directory: `refresh-dev-*.sh` and `refresh-prod-*.sh`, which should be reviewed before running.
 
-Note that for the imagine_la dataset, you'll need to set the CONTENTHUB_PASSWORD environment variable:
+Note that for the imagine_la dataset, you'll need to set the CONTENT_HUB_ACCESS_TOKEN and CONTENT_HUB_SPACE_ID environment variables:
 
 ```bash
-export CONTENTHUB_PASSWORD="your_password_here"
+export CONTENT_HUB_SPACE_ID="space_id_here"
+export CONTENT_HUB_ACCESS_TOKEN="access_token_here"
 ./refresh-ingestion.sh all
 ```
 
@@ -39,7 +40,7 @@ To refresh a specific data source, specify the dataset ID:
 For the imagine_la dataset:
 
 ```bash
-CONTENTHUB_PASSWORD="your_password_here" ./refresh-ingestion.sh imagine_la
+CONTENT_HUB_SPACE_ID="space_id_here" CONTENT_HUB_ACCESS_TOKEN="access_token_here" ./refresh-ingestion.sh imagine_la
 ```
 
 Available datasets include: imagine_la, ca_ftb, ca_public_charge, ca_wic, covered_ca, irs, edd, la_policy, and ssa.
@@ -59,7 +60,7 @@ make scrapy-runner args="dataset_id --debug"
 For the imagine_la dataset:
 
 ```bash
-make scrape-imagine-la CONTENTHUB_PASSWORD=your_password_here
+make scrape-imagine-la CONTENT_HUB_SPACE_ID="space_id_here" CONTENT_HUB_ACCESS_TOKEN="access_token_here"
 ```
 
 For la_policy, which requires dynamic content scraping:
@@ -74,7 +75,7 @@ make scrapy-runner args="la_policy --debug"
 For manual ingestion, you can use the make commands directly:
 
 ```bash
-make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California FILEPATH=src/ingestion/imagine_la/scrape/pages
+make ingest-imagine-la DATASET_ID="Benefits Information Hub" BENEFIT_PROGRAM=mixed BENEFIT_REGION=California FILEPATH=src/ingestion/imagine_la/pages
 ```
 
 ```bash
