@@ -205,27 +205,18 @@ class BaseEngine(ChatEngineInterface):
 
         return self._build_response(question, attributes, chat_history)
 
-    async def on_message_streaming(
-        self, question: str, chat_history: Optional[ChatHistory] = None
-    ) -> Coroutine[Any, Any, AsyncGenerator[str, None]]:
-        """
-        Streaming version of on_message that yields response chunks as an async generator.
-        Follows the same logical flow as on_message.
-        """
-        # Analyze the message first (same as non-streaming)
-        start_time = time.perf_counter()
-        attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
-        system_prompt_1_duration = time.perf_counter() - start_time
-        logger.info(
-            f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
-        )
-
-        # Determine if context is needed (same as non-streaming)
+    async def _build_streaming_response(
+        self,
+        question: str,
+        attributes: MessageAttributesT,
+        chat_history: Optional[ChatHistory] = None,
+    ) -> AsyncGenerator[str, None]:
+        """Helper method to build a streaming response with or without context"""
         if attributes.needs_context:
-            # Get retrieval question (same as _build_response_with_context)
+            # Get retrieval question
             question_for_retrieval = attributes.translated_message or question
 
-            # Retrieve context (same as _build_response_with_context)
+            # Retrieve context
             start_time = time.perf_counter()
             chunks_with_scores = retrieve_with_scores(
                 question_for_retrieval,
@@ -236,13 +227,13 @@ class BaseEngine(ChatEngineInterface):
             retrieval_duration = time.perf_counter() - start_time
             logger.info(f"Vector retrieval took {retrieval_duration:.2f} seconds")
 
-            # Prepare context (same as _build_response_with_context)
+            # Prepare context
             chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
             subsections = split_into_subsections(chunks, factory=CitationFactory())
             context_text = create_prompt_context(subsections)
 
-            # Generate streaming response with context
-            return self._create_context_stream(
+            # Stream response with context
+            return await self._create_context_stream(
                 self.llm,
                 self.system_prompt_2,
                 question,
@@ -250,14 +241,31 @@ class BaseEngine(ChatEngineInterface):
                 chat_history,
             )
         else:
-            # Generate streaming response without context
-            return self._create_context_stream(
+            # Stream response without context
+            return await self._create_context_stream(
                 self.llm,
                 self.system_prompt_2,
                 question,
                 None,
                 chat_history,
             )
+
+    async def on_message_streaming(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> Coroutine[Any, Any, AsyncGenerator[str, None]]:
+        """
+        Streaming version of on_message that yields response chunks as an async generator.
+        Follows the same logical flow as on_message.
+        """
+        # Start timing system_prompt_1
+        start_time = time.perf_counter()
+        attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
+        system_prompt_1_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
+        )
+
+        return self._build_streaming_response(question, attributes, chat_history)
 
     def _create_context_stream(
         self,
@@ -610,49 +618,12 @@ they can apply for both, and the state will check if they qualify for either one
         # Handle canned responses - return the entire response at once
         if attributes.canned_response:
 
-            async def canned_coroutine() -> AsyncGenerator[str, None]:
-                async def canned_generator() -> AsyncGenerator[str, None]:
-                    yield attributes.canned_response
+            async def canned_generator() -> AsyncGenerator[str, None]:
+                yield attributes.canned_response
 
+            async def canned_coroutine() -> AsyncGenerator[str, None]:
                 return canned_generator()
 
             return canned_coroutine()
 
-        # Determine if context is needed
-        if attributes.needs_context:
-            # Get retrieval question
-            question_for_retrieval = attributes.translated_message or question
-
-            # Retrieve context
-            start_time = time.perf_counter()
-            chunks_with_scores = retrieve_with_scores(
-                question_for_retrieval,
-                retrieval_k=self.retrieval_k,
-                retrieval_k_min_score=self.retrieval_k_min_score,
-                datasets=self.datasets,
-            )
-            retrieval_duration = time.perf_counter() - start_time
-            logger.info(f"Vector retrieval took {retrieval_duration:.2f} seconds")
-
-            # Prepare context
-            chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-            subsections = split_into_subsections(chunks, factory=CitationFactory())
-            context_text = create_prompt_context(subsections)
-
-            # Stream response with context
-            return self._create_context_stream(
-                self.llm,
-                self.system_prompt_2,
-                question,
-                context_text,
-                chat_history,
-            )
-        else:
-            # Stream response without context
-            return self._create_context_stream(
-                self.llm,
-                self.system_prompt_2,
-                question,
-                None,
-                chat_history,
-            )
+        return self._build_streaming_response(question, attributes, chat_history)

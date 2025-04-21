@@ -601,17 +601,12 @@ async def query_stream(
         # Prepare response placeholder for storing the full response
         full_response: str = ""
 
-        # We need to retrieve the subsections for citations, but without making a separate LLM call
-        subsections: list[Subsection] = []
-        retrieval_done: bool = False
-
         # Create an SSE generator that streams chunks
         async def event_generator() -> AsyncGenerator[dict[str, str], None]:
-            nonlocal full_response, subsections, retrieval_done
+            nonlocal full_response
 
             try:
                 # Get the alert_message by analyzing the user message
-                # This needs to be done before generating the response
                 attributes = await asyncify(lambda: engine.analyze_message(question.content))()
 
                 alert_message = getattr(attributes, "alert_message", None)
@@ -620,49 +615,27 @@ async def query_stream(
                 if INCLUDE_ALERT_IN_RESPONSE and alert_message:
                     yield {"event": "alert", "data": alert_message}
 
-                # If we need context, retrieve it ourselves to avoid duplicate retrieval
-                if getattr(attributes, "needs_context", True):
-                    # This mirrors the logic in on_message_streaming but captures the subsections
-                    question_for_retrieval = (
-                        getattr(attributes, "translated_message", "") or question.content
-                    )
-
-                    # Retrieve context (same as in chat_engine.py)
-                    chunks_with_scores = await asyncify(
-                        lambda: engine.retrieve_context(question_for_retrieval)
-                    )()
-                    chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-                    subsections = list(await asyncify(lambda: engine.prepare_subsections(chunks))())
-                    retrieval_done = True
-
                 # Stream the response using the engine's streaming method
-                coroutine_result = await engine.on_message_streaming(question.content, chat_history)
-                generator = await coroutine_result
-                async for chunk in generator:
+                generator = await engine.on_message_streaming(question.content, chat_history)
+                generator_result = await generator
+                async for chunk in generator_result:
                     if await request.is_disconnected():
                         # Client disconnected, stop streaming
                         break
 
                     full_response += chunk
-
-                    # Send the chunk
                     yield {"event": "chunk", "data": chunk}
 
-                # After streaming is complete, we need to process citations
-                # Process the citations from the subsections - use our cached subsections if available
-                from src.citations import simplify_citation_numbers
-
-                # If we didn't retrieve context earlier, we need to do it now
-                if not retrieval_done:
-                    # Use a lightweight method to get subsections
-                    question_for_retrieval = (
-                        getattr(attributes, "translated_message", "") or question.content
+                # After streaming is complete, process citations
+                # Get subsections from the engine's context
+                subsections = await asyncify(
+                    lambda: engine.prepare_subsections(
+                        [
+                            chunk_with_score.chunk
+                            for chunk_with_score in engine.retrieve_context(question.content)
+                        ]
                     )
-                    chunks_with_scores = await asyncify(
-                        lambda: engine.retrieve_context(question_for_retrieval)
-                    )()
-                    chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-                    subsections = list(await asyncify(lambda: engine.prepare_subsections(chunks))())
+                )()
 
                 # Process citations with the cached response and subsections
                 final_result = simplify_citation_numbers(full_response.strip(), subsections)
@@ -745,6 +718,7 @@ async def run_query(
         response_msg = f"{alert_msg}\n\n{final_result.response}"
     else:
         response_msg = final_result.response
+
     return (
         QueryResponse(
             response_text=response_msg,
