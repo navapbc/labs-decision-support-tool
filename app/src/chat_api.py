@@ -601,53 +601,47 @@ async def query_stream(
         # Create an SSE generator that streams chunks
         async def event_generator() -> AsyncGenerator[dict[str, str], None]:
             try:
-                # Get the streaming generator, attributes, and subsections
-                question_content = question.content if question else ""
+                question_content = question.content
+
+                # Start streaming process
                 response_generator, attributes, subsections = await engine.on_message_streaming(
                     question_content, chat_history
                 )
 
-                # Get alert message if it exists
+                # Send alert if present
                 alert_message = getattr(attributes, "alert_message", None)
-
-                # If there's an alert message, send it first
                 if INCLUDE_ALERT_IN_RESPONSE and alert_message:
                     yield {"event": "alert", "data": alert_message}
 
-                # Stream the response chunks and collect the full response
+                # Stream response chunks
                 full_response = ""
                 async for chunk in response_generator:
                     if await request.is_disconnected():
-                        # Client disconnected, stop streaming
                         break
-
                     full_response += chunk
                     yield {"event": "chunk", "data": chunk}
 
-                # Use run_query with streaming=True to get the final response with citations
+                # Process final response with citations
                 query_response, meta = await run_query(
                     engine, question_content, chat_history, streaming=True
                 )
 
-                # Create response step with the same metadata shape as non-streaming endpoint
-                response_step = cl.Message(
-                    content=full_response.strip(),
-                    type="assistant_message",
-                    parent_id=id,
-                    metadata={
-                        "citations": [c.model_dump() for c in query_response.citations],
-                        "chat_history": chat_history,
-                        **meta,
-                    },
-                ).to_dict()
+                # Persist response in data layer and database
+                await cl_get_data_layer().create_step(
+                    cl.Message(
+                        content=full_response.strip(),
+                        type="assistant_message",
+                        parent_id=id,
+                        metadata={
+                            "citations": [c.model_dump() for c in query_response.citations],
+                            "chat_history": chat_history,
+                            **meta,
+                        },
+                    ).to_dict()
+                )
 
-                # Persist the step
-                await cl_get_data_layer().create_step(response_step)
-
-                # Send a done event with the full response model
+                # Send complete response and save to database
                 yield {"event": "done", "data": query_response.json()}
-
-                # Save the complete response to the database
                 with db_session.begin():
                     db_session.add(
                         ChatMessage(
