@@ -97,12 +97,6 @@ class ChatEngineInterface(ABC):
     async def on_message_streaming(
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
-        """
-        Streaming version of on_message that returns a tuple of:
-        1. An async generator that yields response chunks
-        2. Message attributes
-        3. Subsections for citation handling
-        """
         pass
 
 
@@ -167,12 +161,6 @@ class BaseEngine(ChatEngineInterface):
     async def on_message_streaming(
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
-        """
-        Streaming version of on_message that returns a tuple of:
-        1. An async generator that yields response chunks
-        2. Message attributes
-        3. Subsections for citation handling
-        """
         # Start timing system_prompt_1
         start_time = time.perf_counter()
         attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
@@ -538,10 +526,6 @@ they can apply for both, and the state will check if they qualify for either one
     async def on_message_streaming(
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> tuple[AsyncGenerator[str, None], ImagineLA_MessageAttributes, Sequence[Subsection]]:
-        """
-        Streaming version of on_message for ImagineLaEngine.
-        Returns a tuple containing the response generator, attributes, and subsections for citations.
-        """
         # Start timing system_prompt_1
         start_time = time.perf_counter()
         attributes = analyze_message(
@@ -565,7 +549,6 @@ they can apply for both, and the state will check if they qualify for either one
             empty_subsections: Sequence[Subsection] = []
             return canned_generator(), attributes, empty_subsections
 
-        # Reuse BaseEngine's streaming response implementation
         generator, _, subsections = await self._build_streaming_response(
             question, attributes, chat_history
         )

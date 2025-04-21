@@ -507,9 +507,6 @@ async def query(request: QueryRequest) -> QueryResponse:
     return response
 
 
-# New endpoints for Streaming API
-
-
 @router.post("/query_init")
 async def query_init(request: QueryInitRequest) -> QueryInitResponse:
     """
@@ -675,7 +672,6 @@ async def run_query(
     logger.info("Received: '%s' with history: %s", question, chat_history)
 
     if streaming:
-        # For streaming, we get the generator, attributes and subsections
         response_generator, attributes, subsections = await engine.on_message_streaming(
             question, chat_history
         )
@@ -685,7 +681,6 @@ async def run_query(
         async for chunk in response_generator:
             full_response += chunk
 
-        # Process the final response similar to non-streaming
         final_result = simplify_citation_numbers(full_response.strip(), subsections)
         logger.info("Response: %s", final_result.response)
         citations = [
@@ -694,7 +689,6 @@ async def run_query(
 
         alert_msg = getattr(attributes, "alert_message", None)
     else:
-        # Non-streaming case remains the same
         result = await asyncify(lambda: engine.on_message(question, chat_history))()
         final_result = simplify_citation_numbers(result.response, result.subsections)
         logger.info("Response: %s", final_result.response)
