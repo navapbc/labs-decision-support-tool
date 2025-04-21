@@ -1,7 +1,7 @@
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Any, AsyncGenerator, Coroutine, Optional, Sequence
+from typing import AsyncGenerator, Optional, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, Subsection
@@ -96,7 +96,7 @@ class ChatEngineInterface(ABC):
     @abstractmethod
     async def on_message_streaming(
         self, question: str, chat_history: Optional[ChatHistory] = None
-    ) -> Coroutine[Any, Any, tuple[AsyncGenerator[str, None], Any, Sequence[Subsection]]]:
+    ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
         """
         Streaming version of on_message that returns a tuple of:
         1. An async generator that yields response chunks
@@ -166,9 +166,7 @@ class BaseEngine(ChatEngineInterface):
 
     async def on_message_streaming(
         self, question: str, chat_history: Optional[ChatHistory] = None
-    ) -> Coroutine[
-        Any, Any, tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]
-    ]:
+    ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
         """
         Streaming version of on_message that returns a tuple of:
         1. An async generator that yields response chunks
@@ -183,12 +181,8 @@ class BaseEngine(ChatEngineInterface):
             f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
         )
 
-        async def coroutine() -> (
-            tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]
-        ):
-            return await self._build_streaming_response(question, attributes, chat_history)
-
-        return coroutine()
+        # Directly return the result of _build_streaming_response
+        return await self._build_streaming_response(question, attributes, chat_history)
 
     def _build_response(
         self,
@@ -543,11 +537,7 @@ they can apply for both, and the state will check if they qualify for either one
 
     async def on_message_streaming(
         self, question: str, chat_history: Optional[ChatHistory] = None
-    ) -> Coroutine[
-        Any,
-        Any,
-        tuple[AsyncGenerator[str, None], ImagineLA_MessageAttributes, Sequence[Subsection]],
-    ]:
+    ) -> tuple[AsyncGenerator[str, None], ImagineLA_MessageAttributes, Sequence[Subsection]]:
         """
         Streaming version of on_message for ImagineLaEngine.
         Returns a tuple containing the response generator, attributes, and subsections for citations.
@@ -566,23 +556,17 @@ they can apply for both, and the state will check if they qualify for either one
         if attributes.alert_message:
             attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
 
-        async def coroutine() -> (
-            tuple[AsyncGenerator[str, None], ImagineLA_MessageAttributes, Sequence[Subsection]]
-        ):
-            # Handle canned responses - return the entire response at once with empty subsections
-            if attributes.canned_response:
+        # Handle canned responses - return the entire response at once with empty subsections
+        if attributes.canned_response:
 
-                async def canned_generator() -> AsyncGenerator[str, None]:
-                    yield attributes.canned_response
+            async def canned_generator() -> AsyncGenerator[str, None]:
+                yield attributes.canned_response
 
-                return canned_generator(), attributes, []
+            empty_subsections: Sequence[Subsection] = []
+            return canned_generator(), attributes, empty_subsections
 
-            # We can reuse BaseEngine._build_streaming_response since ImagineLA_MessageAttributes is a subclass of MessageAttributes
-            # The type system doesn't recognize that _build_streaming_response would return ImagineLA_MessageAttributes
-            # if we pass ImagineLA_MessageAttributes, so we need to cast the result back
-            generator, _, subsections = await self._build_streaming_response(
-                question, attributes, chat_history
-            )
-            return generator, attributes, subsections
-
-        return coroutine()
+        # Reuse BaseEngine's streaming response implementation
+        generator, _, subsections = await self._build_streaming_response(
+            question, attributes, chat_history
+        )
+        return generator, attributes, subsections

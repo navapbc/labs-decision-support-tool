@@ -35,7 +35,7 @@ from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Subsection
-from src.generate import ChatHistory, MessageAttributes
+from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
 from src.util.string_utils import format_highlighted_uri
 
@@ -607,12 +607,10 @@ async def query_stream(
 
             try:
                 # Get the streaming generator, attributes, and subsections
-                streaming_coroutine: Coroutine[
-                    Any,
-                    Any,
-                    tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]],
-                ] = await engine.on_message_streaming(question.content, chat_history)
-                response_generator, attributes, subsections = await streaming_coroutine
+                question_content = question.content if question else ""
+                response_generator, attributes, subsections = await engine.on_message_streaming(
+                    question_content, chat_history
+                )
 
                 # Get alert message if it exists (similar to run_query)
                 alert_message = getattr(attributes, "alert_message", None)
