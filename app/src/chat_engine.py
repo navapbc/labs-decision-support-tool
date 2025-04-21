@@ -268,6 +268,7 @@ class BaseEngine(ChatEngineInterface):
         chat_history: Optional[ChatHistory],
     ) -> Coroutine[Any, Any, AsyncGenerator[str, None]]:
         """Helper method to create a streaming response"""
+
         async def coroutine() -> AsyncGenerator[str, None]:
             async def generator() -> AsyncGenerator[str, None]:
                 async for chunk in generate_streaming_async(
@@ -278,7 +279,9 @@ class BaseEngine(ChatEngineInterface):
                     chat_history,
                 ):
                     yield chunk
+
             return generator()
+
         return coroutine()
 
     def _build_response(
@@ -606,10 +609,13 @@ they can apply for both, and the state will check if they qualify for either one
 
         # Handle canned responses - return the entire response at once
         if attributes.canned_response:
+
             async def canned_coroutine() -> AsyncGenerator[str, None]:
                 async def canned_generator() -> AsyncGenerator[str, None]:
                     yield attributes.canned_response
+
                 return canned_generator()
+
             return canned_coroutine()
 
         # Determine if context is needed

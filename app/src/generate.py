@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, AsyncGenerator, Generator, TypeVar
+from typing import Any, AsyncGenerator, TypeVar
 
 import boto3
 import botocore.exceptions
@@ -116,32 +116,6 @@ def generate(
     )
 
     return response["choices"][0]["message"]["content"]
-
-
-def generate_streaming(
-    llm: str,
-    system_prompt: str,
-    query: str,
-    context_text: str | None = None,
-    chat_history: ChatHistory | None = None,
-) -> Generator[str, None, None]:
-    """
-    Returns a generator that yields chunks of the response from an LLM model.
-    """
-    messages = _prepare_messages(system_prompt, query, context_text, chat_history)
-    logger.debug("Streaming from %s for query: %s with context:\n%s", llm, query, context_text)
-
-    response_stream = completion(
-        model=llm,
-        messages=messages,
-        stream=True,  # Enable streaming
-        **completion_args(llm),
-        temperature=app_config.temperature,
-    )
-
-    for chunk in response_stream:
-        if content := chunk.choices[0].delta.content:
-            yield content
 
 
 async def generate_streaming_async(
