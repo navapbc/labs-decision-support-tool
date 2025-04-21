@@ -164,55 +164,6 @@ class BaseEngine(ChatEngineInterface):
 
         return self._build_response(question, attributes, chat_history)
 
-    async def _build_streaming_response(
-        self,
-        question: str,
-        attributes: MessageAttributes,
-        chat_history: Optional[ChatHistory] = None,
-    ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
-        """Helper method to build a streaming response with or without context"""
-        subsections: Sequence[Subsection] = []
-
-        if attributes.needs_context:
-            # Get retrieval question
-            question_for_retrieval = attributes.translated_message or question
-
-            # Retrieve context - this is the same code used in _build_response_with_context
-            start_time = time.perf_counter()
-            chunks_with_scores = retrieve_with_scores(
-                question_for_retrieval,
-                retrieval_k=self.retrieval_k,
-                retrieval_k_min_score=self.retrieval_k_min_score,
-                datasets=self.datasets,
-            )
-            retrieval_duration = time.perf_counter() - start_time
-            logger.info(f"Vector retrieval took {retrieval_duration:.2f} seconds")
-
-            # Prepare context
-            chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-            subsections = split_into_subsections(chunks, factory=CitationFactory())
-            context_text = create_prompt_context(subsections)
-
-            # Stream response with context
-            generator = await self._create_context_stream(
-                self.llm,
-                self.system_prompt_2,
-                question,
-                context_text,
-                chat_history,
-            )
-            return generator, attributes, subsections
-        else:
-            # Stream response without context
-            generator = await self._create_context_stream(
-                self.llm,
-                self.system_prompt_2,
-                question,
-                None,
-                chat_history,
-            )
-            return generator, attributes, subsections
-
     async def on_message_streaming(
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> Coroutine[
@@ -236,31 +187,6 @@ class BaseEngine(ChatEngineInterface):
             tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]
         ):
             return await self._build_streaming_response(question, attributes, chat_history)
-
-        return coroutine()
-
-    def _create_context_stream(
-        self,
-        llm: str,
-        system_prompt: str,
-        question: str,
-        context_text: Optional[str],
-        chat_history: Optional[ChatHistory],
-    ) -> Coroutine[Any, Any, AsyncGenerator[str, None]]:
-        """Helper method to create a streaming response"""
-
-        async def coroutine() -> AsyncGenerator[str, None]:
-            async def generator() -> AsyncGenerator[str, None]:
-                async for chunk in generate_streaming_async(
-                    llm,
-                    system_prompt,
-                    question,
-                    context_text,
-                    chat_history,
-                ):
-                    yield chunk
-
-            return generator()
 
         return coroutine()
 
@@ -331,6 +257,55 @@ class BaseEngine(ChatEngineInterface):
             chunks_with_scores=chunks_with_scores,
             subsections=subsections,
         )
+
+    async def _build_streaming_response(
+        self,
+        question: str,
+        attributes: MessageAttributes,
+        chat_history: Optional[ChatHistory] = None,
+    ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
+        """Helper method to build a streaming response with or without context"""
+        subsections: Sequence[Subsection] = []
+
+        if attributes.needs_context:
+            # Get retrieval question
+            question_for_retrieval = attributes.translated_message or question
+
+            # Retrieve context - this is the same code used in _build_response_with_context
+            start_time = time.perf_counter()
+            chunks_with_scores = retrieve_with_scores(
+                question_for_retrieval,
+                retrieval_k=self.retrieval_k,
+                retrieval_k_min_score=self.retrieval_k_min_score,
+                datasets=self.datasets,
+            )
+            retrieval_duration = time.perf_counter() - start_time
+            logger.info(f"Vector retrieval took {retrieval_duration:.2f} seconds")
+
+            # Prepare context
+            chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+            subsections = split_into_subsections(chunks, factory=CitationFactory())
+            context_text = create_prompt_context(subsections)
+
+            # Stream response with context
+            generator = generate_streaming_async(
+                self.llm,
+                self.system_prompt_2,
+                question,
+                context_text,
+                chat_history,
+            )
+            return generator, attributes, subsections
+        else:
+            # Stream response without context
+            generator = generate_streaming_async(
+                self.llm,
+                self.system_prompt_2,
+                question,
+                None,
+                chat_history,
+            )
+            return generator, attributes, subsections
 
 
 class CaEddWebEngine(BaseEngine):
@@ -591,23 +566,18 @@ they can apply for both, and the state will check if they qualify for either one
         if attributes.alert_message:
             attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
 
-        # Handle canned responses - return the entire response at once with empty subsections
-        if attributes.canned_response:
-
-            async def canned_generator() -> AsyncGenerator[str, None]:
-                yield attributes.canned_response
-
-            async def canned_coroutine() -> (
-                tuple[AsyncGenerator[str, None], ImagineLA_MessageAttributes, Sequence[Subsection]]
-            ):
-                return canned_generator(), attributes, []
-
-            return canned_coroutine()
-
-        # We can reuse BaseEngine._build_streaming_response since ImagineLA_MessageAttributes is a subclass of MessageAttributes
         async def coroutine() -> (
             tuple[AsyncGenerator[str, None], ImagineLA_MessageAttributes, Sequence[Subsection]]
         ):
+            # Handle canned responses - return the entire response at once with empty subsections
+            if attributes.canned_response:
+
+                async def canned_generator() -> AsyncGenerator[str, None]:
+                    yield attributes.canned_response
+
+                return canned_generator(), attributes, []
+
+            # We can reuse BaseEngine._build_streaming_response since ImagineLA_MessageAttributes is a subclass of MessageAttributes
             # The type system doesn't recognize that _build_streaming_response would return ImagineLA_MessageAttributes
             # if we pass ImagineLA_MessageAttributes, so we need to cast the result back
             generator, _, subsections = await self._build_streaming_response(
