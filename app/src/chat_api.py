@@ -81,7 +81,7 @@ async def streaming_test() -> str:
     html_path = Path(__file__).parent.parent / "streaming-test.html"
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Streaming test page not found")
-    
+
     return html_path.read_text()
 
 
@@ -509,6 +509,7 @@ async def query(request: QueryRequest) -> QueryResponse:
 
 # New endpoints for Streaming API
 
+
 @router.post("/query_init")
 async def query_init(request: QueryInitRequest) -> QueryInitResponse:
     """
@@ -545,11 +546,11 @@ async def query_init(request: QueryInitRequest) -> QueryInitResponse:
                     "agency_id": request.agency_id,
                     "session_id": request.session_id,
                     "new_session": request.new_session,
-                    "beneficiary_id": request.beneficiary_id
+                    "beneficiary_id": request.beneficiary_id,
                 },
                 "language": None,
                 "showInput": None,
-                "waitForAnswer": False
+                "waitForAnswer": False,
             },
         ).to_dict()
 
@@ -572,7 +573,9 @@ async def query_init(request: QueryInitRequest) -> QueryInitResponse:
 
 
 @router.get("/query_stream")
-async def query_stream(request: Request, id: str, user_id: str, session_id: str):
+async def query_stream(
+    request: Request, id: str, user_id: str, session_id: str
+) -> EventSourceResponse:
     """
     Streams the response for a query initiated with query_init.
     Uses Server-Sent Events (SSE) to stream the response chunks to the client.
@@ -596,75 +599,79 @@ async def query_stream(request: Request, id: str, user_id: str, session_id: str)
                 raise HTTPException(status_code=404, detail="Question not found")
 
         # Prepare response placeholder for storing the full response
-        full_response = ""
-        
+        full_response: str = ""
+
         # We need to retrieve the subsections for citations, but without making a separate LLM call
-        subsections = []
-        retrieval_done = False
-        
+        subsections: list[Subsection] = []
+        retrieval_done: bool = False
+
         # Create an SSE generator that streams chunks
-        async def event_generator():
+        async def event_generator() -> AsyncGenerator[dict[str, str], None]:
             nonlocal full_response, subsections, retrieval_done
-            
+
             try:
                 # Get the alert_message by analyzing the user message
                 # This needs to be done before generating the response
-                attributes = await asyncify(
-                    lambda: engine.analyze_message(question.content)
-                )()
-                
+                attributes = await asyncify(lambda: engine.analyze_message(question.content))()
+
                 alert_message = getattr(attributes, "alert_message", None)
-                
+
                 # If there's an alert message, send it first
                 if INCLUDE_ALERT_IN_RESPONSE and alert_message:
-                    yield {
-                        "event": "alert",
-                        "data": alert_message
-                    }
-                
+                    yield {"event": "alert", "data": alert_message}
+
                 # If we need context, retrieve it ourselves to avoid duplicate retrieval
                 if getattr(attributes, "needs_context", True):
                     # This mirrors the logic in on_message_streaming but captures the subsections
-                    question_for_retrieval = getattr(attributes, "translated_message", "") or question.content
-                    
+                    question_for_retrieval = (
+                        getattr(attributes, "translated_message", "") or question.content
+                    )
+
                     # Retrieve context (same as in chat_engine.py)
-                    chunks_with_scores = await asyncify(lambda: engine.retrieve_context(question_for_retrieval))()
+                    chunks_with_scores = await asyncify(
+                        lambda: engine.retrieve_context(question_for_retrieval)
+                    )()
                     chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-                    subsections = await asyncify(lambda: engine.prepare_subsections(chunks))()
+                    subsections = list(await asyncify(lambda: engine.prepare_subsections(chunks))())
                     retrieval_done = True
-                
+
                 # Stream the response using the engine's streaming method
-                async for chunk in engine.on_message_streaming(question.content, chat_history):
+                coroutine_result = await engine.on_message_streaming(question.content, chat_history)
+                generator = await coroutine_result
+                async for chunk in generator:
                     if await request.is_disconnected():
                         # Client disconnected, stop streaming
                         break
-                    
+
                     full_response += chunk
-                    
+
                     # Send the chunk
-                    yield {
-                        "event": "chunk",
-                        "data": chunk
-                    }
-                
+                    yield {"event": "chunk", "data": chunk}
+
                 # After streaming is complete, we need to process citations
                 # Process the citations from the subsections - use our cached subsections if available
                 from src.citations import simplify_citation_numbers
-                
+
                 # If we didn't retrieve context earlier, we need to do it now
                 if not retrieval_done:
                     # Use a lightweight method to get subsections
-                    question_for_retrieval = getattr(attributes, "translated_message", "") or question.content
-                    chunks_with_scores = await asyncify(lambda: engine.retrieve_context(question_for_retrieval))()
+                    question_for_retrieval = (
+                        getattr(attributes, "translated_message", "") or question.content
+                    )
+                    chunks_with_scores = await asyncify(
+                        lambda: engine.retrieve_context(question_for_retrieval)
+                    )()
                     chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
-                    subsections = await asyncify(lambda: engine.prepare_subsections(chunks))()
-                
+                    subsections = list(await asyncify(lambda: engine.prepare_subsections(chunks))())
+
                 # Process citations with the cached response and subsections
                 final_result = simplify_citation_numbers(full_response.strip(), subsections)
-                
+
                 # Extract citations from the result
-                citations = [Citation.from_subsection(subsection) for subsection in final_result.subsections]
-                
+                citations = [
+                    Citation.from_subsection(subsection) for subsection in final_result.subsections
+                ]
+
                 # Create response step in the same format as the regular query endpoint
                 response_step = cl.Message(
                     content=full_response.strip(),
@@ -676,42 +683,37 @@ async def query_stream(request: Request, id: str, user_id: str, session_id: str)
                         "attributes": attributes.model_dump(),
                         "language": None,
                         "showInput": None,
-                        "waitForAnswer": False
-                    }
+                        "waitForAnswer": False,
+                    },
                 ).to_dict()
-                
+
                 # Persist the step
                 await cl_get_data_layer().create_step(response_step)
-                
+
                 # Send a done event with citations - convert to JSON string for SSE compatibility
                 import json
+
                 citations_json = json.dumps([c.model_dump() for c in citations])
-                yield {
-                    "event": "done",
-                    "data": citations_json
-                }
-                
+                yield {"event": "done", "data": citations_json}
+
                 # Save the complete response to the database
                 with db_session.begin():
                     db_session.add(
                         ChatMessage(
-                            session_id=session_id,
-                            role="assistant",
-                            content=full_response.strip()
+                            session_id=session_id, role="assistant", content=full_response.strip()
                         )
                     )
-                
+
             except Exception as e:
                 logger.exception("Error during streaming: %s", e)
-                yield {
-                    "event": "error",
-                    "data": str(e)
-                }
-                
-        return EventSourceResponse(event_generator())
-                
+                yield {"event": "error", "data": str(e)}
 
-def _validate_chat_history(request: Union[QueryRequest, QueryInitRequest], chat_history: ChatHistory) -> None:
+        return EventSourceResponse(event_generator())
+
+
+def _validate_chat_history(
+    request: Union[QueryRequest, QueryInitRequest], chat_history: ChatHistory
+) -> None:
     if request.new_session and chat_history:
         raise HTTPException(
             status_code=409,
