@@ -35,7 +35,7 @@ from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Subsection
-from src.generate import ChatHistory
+from src.generate import ChatHistory, MessageAttributes
 from src.healthcheck import HealthCheck, health
 from src.util.string_utils import format_highlighted_uri
 
@@ -606,19 +606,23 @@ async def query_stream(
             nonlocal full_response
 
             try:
-                # Get the alert_message by analyzing the user message
-                attributes = await asyncify(lambda: engine.analyze_message(question.content))()
+                # Get the streaming generator, attributes, and subsections
+                streaming_coroutine: Coroutine[
+                    Any,
+                    Any,
+                    tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]],
+                ] = await engine.on_message_streaming(question.content, chat_history)
+                response_generator, attributes, subsections = await streaming_coroutine
 
+                # Get alert message if it exists (similar to run_query)
                 alert_message = getattr(attributes, "alert_message", None)
 
                 # If there's an alert message, send it first
                 if INCLUDE_ALERT_IN_RESPONSE and alert_message:
                     yield {"event": "alert", "data": alert_message}
 
-                # Stream the response using the engine's streaming method
-                generator = await engine.on_message_streaming(question.content, chat_history)
-                generator_result = await generator
-                async for chunk in generator_result:
+                # Stream the response chunks
+                async for chunk in response_generator:
                     if await request.is_disconnected():
                         # Client disconnected, stop streaming
                         break
@@ -626,21 +630,10 @@ async def query_stream(
                     full_response += chunk
                     yield {"event": "chunk", "data": chunk}
 
-                # After streaming is complete, process citations
-                # Get subsections from the engine's context
-                subsections = await asyncify(
-                    lambda: engine.prepare_subsections(
-                        [
-                            chunk_with_score.chunk
-                            for chunk_with_score in engine.retrieve_context(question.content)
-                        ]
-                    )
-                )()
-
                 # Process citations with the cached response and subsections
                 final_result = simplify_citation_numbers(full_response.strip(), subsections)
 
-                # Extract citations from the result
+                # Extract citations from the result (same as run_query)
                 citations = [
                     Citation.from_subsection(subsection) for subsection in final_result.subsections
                 ]
