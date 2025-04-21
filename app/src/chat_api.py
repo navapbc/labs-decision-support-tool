@@ -598,13 +598,8 @@ async def query_stream(
             if not question or question.role != "user":
                 raise HTTPException(status_code=404, detail="Question not found")
 
-        # Prepare response placeholder for storing the full response
-        full_response: str = ""
-
         # Create an SSE generator that streams chunks
         async def event_generator() -> AsyncGenerator[dict[str, str], None]:
-            nonlocal full_response
-
             try:
                 # Get the streaming generator, attributes, and subsections
                 question_content = question.content if question else ""
@@ -612,14 +607,15 @@ async def query_stream(
                     question_content, chat_history
                 )
 
-                # Get alert message if it exists (similar to run_query)
+                # Get alert message if it exists
                 alert_message = getattr(attributes, "alert_message", None)
 
                 # If there's an alert message, send it first
                 if INCLUDE_ALERT_IN_RESPONSE and alert_message:
                     yield {"event": "alert", "data": alert_message}
 
-                # Stream the response chunks
+                # Stream the response chunks and collect the full response
+                full_response = ""
                 async for chunk in response_generator:
                     if await request.is_disconnected():
                         # Client disconnected, stop streaming
@@ -628,37 +624,28 @@ async def query_stream(
                     full_response += chunk
                     yield {"event": "chunk", "data": chunk}
 
-                # Process citations with the cached response and subsections
-                final_result = simplify_citation_numbers(full_response.strip(), subsections)
+                # Use run_query with streaming=True to get the final response with citations
+                query_response, meta = await run_query(
+                    engine, question_content, chat_history, streaming=True
+                )
 
-                # Extract citations from the result (same as run_query)
-                citations = [
-                    Citation.from_subsection(subsection) for subsection in final_result.subsections
-                ]
-
-                # Create response step in the same format as the regular query endpoint
+                # Create response step with the same metadata shape as non-streaming endpoint
                 response_step = cl.Message(
                     content=full_response.strip(),
                     type="assistant_message",
-                    parent_id=id,  # This is the request_step id passed in from query_init
+                    parent_id=id,
                     metadata={
-                        "citations": [c.model_dump() for c in citations],
+                        "citations": [c.model_dump() for c in query_response.citations],
                         "chat_history": chat_history,
-                        "attributes": attributes.model_dump(),
-                        "language": None,
-                        "showInput": None,
-                        "waitForAnswer": False,
+                        **meta,
                     },
                 ).to_dict()
 
                 # Persist the step
                 await cl_get_data_layer().create_step(response_step)
 
-                # Send a done event with citations - convert to JSON string for SSE compatibility
-                import json
-
-                citations_json = json.dumps([c.model_dump() for c in citations])
-                yield {"event": "done", "data": citations_json}
+                # Send a done event with the full response model
+                yield {"event": "done", "data": query_response.json()}
 
                 # Save the complete response to the database
                 with db_session.begin():
@@ -695,15 +682,44 @@ INCLUDE_ALERT_IN_RESPONSE = True
 
 
 async def run_query(
-    engine: ChatEngineInterface, question: str, chat_history: Optional[ChatHistory] = None
+    engine: ChatEngineInterface,
+    question: str,
+    chat_history: Optional[ChatHistory] = None,
+    *,
+    streaming: bool = False,
 ) -> tuple[QueryResponse, dict[str, Any]]:
     logger.info("Received: '%s' with history: %s", question, chat_history)
-    result = await asyncify(lambda: engine.on_message(question, chat_history))()
-    final_result = simplify_citation_numbers(result.response, result.subsections)
-    logger.info("Response: %s", final_result.response)
-    citations = [Citation.from_subsection(subsection) for subsection in final_result.subsections]
 
-    alert_msg = getattr(result.attributes, "alert_message", None)
+    if streaming:
+        # For streaming, we get the generator, attributes and subsections
+        response_generator, attributes, subsections = await engine.on_message_streaming(
+            question, chat_history
+        )
+
+        # Collect the full response from the generator
+        full_response = ""
+        async for chunk in response_generator:
+            full_response += chunk
+
+        # Process the final response similar to non-streaming
+        final_result = simplify_citation_numbers(full_response.strip(), subsections)
+        logger.info("Response: %s", final_result.response)
+        citations = [
+            Citation.from_subsection(subsection) for subsection in final_result.subsections
+        ]
+
+        alert_msg = getattr(attributes, "alert_message", None)
+    else:
+        # Non-streaming case remains the same
+        result = await asyncify(lambda: engine.on_message(question, chat_history))()
+        final_result = simplify_citation_numbers(result.response, result.subsections)
+        logger.info("Response: %s", final_result.response)
+        citations = [
+            Citation.from_subsection(subsection) for subsection in final_result.subsections
+        ]
+
+        alert_msg = getattr(result.attributes, "alert_message", None)
+        attributes = result.attributes
 
     if INCLUDE_ALERT_IN_RESPONSE and alert_msg:
         response_msg = f"{alert_msg}\n\n{final_result.response}"
@@ -716,7 +732,7 @@ async def run_query(
             alert_message=alert_msg,
             citations=citations,
         ),
-        {"attributes": result.attributes.model_dump()},
+        {"attributes": attributes.model_dump()},
     )
 
 
