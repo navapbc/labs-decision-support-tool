@@ -540,17 +540,7 @@ async def query_init(request: QueryInitRequest) -> QueryInitResponse:
             metadata={
                 "user_id": session.user_session.user_id,
                 "user_uuid": session.user_uuid,
-                "request": {
-                    "message": request.question,
-                    "user_id": request.user_id,
-                    "agency_id": request.agency_id,
-                    "session_id": request.session_id,
-                    "new_session": request.new_session,
-                    "beneficiary_id": request.beneficiary_id,
-                },
-                "language": None,
-                "showInput": None,
-                "waitForAnswer": False,
+                "request": request.__dict__,
             },
         ).to_dict()
 
