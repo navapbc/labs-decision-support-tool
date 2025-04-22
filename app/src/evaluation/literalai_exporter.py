@@ -3,7 +3,7 @@ import csv
 import logging
 import sys
 from datetime import datetime
-from typing import Any, IO, NamedTuple, Optional
+from typing import IO, Any, NamedTuple, Optional
 
 from literalai import Step, Thread
 

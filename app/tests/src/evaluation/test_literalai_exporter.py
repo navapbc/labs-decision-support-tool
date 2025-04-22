@@ -59,7 +59,7 @@ def test_convert_to_qa_rows_and_save_csv(caplog):
     csv_lines = mock_csv_file.readlines()
     assert (
         csv_lines[0]
-        == "User ID,Date,Question,Response,LiteralAI Thread,Agency ID,Session ID,Program,Citation Links,Citation Sources,Has Chat History,Thread ID,Timestamp\r\n"
+        == "User ID,Date,Question,Response,LiteralAI Thread,Agency ID,Session ID,Program,Citation Links,Citation Sources,Has Chat History,Thread ID,Timestamp,Feedback Scores,Feedback Comments\r\n"
     )
 
     for line in csv_lines[1:]:
