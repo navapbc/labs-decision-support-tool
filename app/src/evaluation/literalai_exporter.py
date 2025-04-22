@@ -65,8 +65,8 @@ class QARow(NamedTuple):
             "Has Chat History": str(self.has_chat_history),
             "Thread ID": self.thread_id,
             "Timestamp": self.timestamp,
-            "Feedback Scores": self.scores[0] if len(self.scores) == 1 else self.scores,
-            "Feedback Comments": self.comments[0] if len(self.comments) == 1 else self.comments,
+            "Feedback Scores": self.scores[0] if len(self.scores) == 1 else self.scores or "",
+            "Feedback Comments": self.comments[0] if len(self.comments) == 1 else self.comments or "",
         }
 
     @classmethod
