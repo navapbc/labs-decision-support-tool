@@ -33,9 +33,9 @@ class QARow(NamedTuple):
     # benefit_program
     program: Optional[str]
     # links to citations in the order they are referenced in the answer
-    citation_links: Optional[str]
+    citation_links: list[str]
     # dataset and document name/title for each citation
-    citation_sources: Optional[str]
+    citation_sources: list[str]
     # another clue to signal that the QA pair follows another QA pair in the same thread
     has_chat_history: bool
     # Feedback score values
@@ -60,8 +60,8 @@ class QARow(NamedTuple):
             "Agency ID": self.agency_id,
             "Session ID": self.session_id,
             "Program": self.program if self.program else "",
-            "Citation Links": self.citation_links if self.citation_links else "",
-            "Citation Sources": self.citation_sources if self.citation_sources else "",
+            "Citation Links": "\n".join(self.citation_links) if self.citation_links else "",
+            "Citation Sources": "\n".join(self.citation_sources) if self.citation_sources else "",
             "Has Chat History": str(self.has_chat_history),
             "Thread ID": self.thread_id,
             "Timestamp": self.timestamp,
@@ -107,13 +107,11 @@ class QARow(NamedTuple):
             question=question_step.output["content"],
             answer=answer_step.output["content"],
             program=attribs["benefit_program"] if attribs else None,
-            citation_links=("\n".join(c["uri"] for c in citations) if citations else None),
+            citation_links=[c["uri"] for c in citations] if citations else [],
             citation_sources=(
-                "\n".join(
-                    f"{c.get('source_dataset', '')}: {c.get('source_name', '')}" for c in citations
-                )
+                [f"{c.get('source_dataset', '')}: {c.get('source_name', '')}" for c in citations]
                 if citations
-                else None
+                else []
             ),
             has_chat_history=bool(answer_step.metadata.get("chat_history", None)),
             scores=[s.value for s in answer_step.scores] if answer_step.scores else [],
