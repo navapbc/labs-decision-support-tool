@@ -3,7 +3,7 @@ import csv
 import logging
 import sys
 from datetime import datetime
-from typing import IO, NamedTuple, Optional
+from typing import Any, IO, NamedTuple, Optional
 
 from literalai import Step, Thread
 
@@ -38,6 +38,10 @@ class QARow(NamedTuple):
     citation_sources: Optional[str]
     # another clue to signal that the QA pair follows another QA pair in the same thread
     has_chat_history: bool
+    # Feedback score values
+    scores: list[float]
+    # Feedback comments
+    comments: list[str]
 
     @property
     def lai_link(self) -> str:
@@ -46,7 +50,7 @@ class QARow(NamedTuple):
             f"threads/{self.thread_id}?currentStepId={self.question_id}"
         )
 
-    def to_csv_dict(self) -> dict[str, str]:
+    def to_csv_dict(self) -> dict[str, Any]:
         return {
             "User ID": self.user_id,
             "Date": datetime.fromisoformat(self.timestamp).strftime("%m/%d/%Y"),
@@ -61,6 +65,8 @@ class QARow(NamedTuple):
             "Has Chat History": str(self.has_chat_history),
             "Thread ID": self.thread_id,
             "Timestamp": self.timestamp,
+            "Feedback Scores": self.scores[0] if len(self.scores) == 1 else self.scores,
+            "Feedback Comments": self.comments[0] if len(self.comments) == 1 else self.comments,
         }
 
     @classmethod
@@ -110,6 +116,8 @@ class QARow(NamedTuple):
                 else None
             ),
             has_chat_history=bool(answer_step.metadata.get("chat_history", None)),
+            scores=[s.value for s in answer_step.scores] if answer_step.scores else [],
+            comments=[s.comment or "" for s in answer_step.scores] if answer_step.scores else [],
         )
 
 
@@ -166,10 +174,3 @@ def main() -> None:  # pragma: no cover
     qa_rows = convert_to_qa_rows(project_id, threads)
     with open(f"{project_id}-lai_pairs.csv", "w", encoding="utf-8") as f:
         save_csv(qa_rows, f)
-
-    scores = lai.query_scores_between(start_date, end_date)
-    with open(f"{project_id}-lai_scores.csv", "w", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=scores[0].__dict__.keys())
-        writer.writeheader()
-        for score in scores:
-            writer.writerow(score.__dict__)
