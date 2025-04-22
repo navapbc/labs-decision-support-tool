@@ -1,10 +1,11 @@
 import os
 
 import ollama
+import pytest
 
 from src.chat_engine import PROMPT
 from src.citations import create_prompt_context, split_into_subsections
-from src.generate import generate, get_models
+from src.generate import generate, generate_streaming_async, get_models
 from tests.mock import mock_completion
 
 
@@ -154,3 +155,31 @@ def test_generate_with_context_with_score(monkeypatch, chunks_with_scores):
         + '", "role": "system"}, {"content": "some query", "role": "user"}]'
     )
     assert generate("gpt-4o", PROMPT, "some query", context_text) == expected_response
+
+
+@pytest.mark.asyncio
+async def test_generate_streaming_async(monkeypatch):
+    monkeypatch.setattr("src.generate.completion", mock_completion.mock_completion)
+
+    # Collect the streamed chunks
+    result = []
+    async for piece in generate_streaming_async(
+        llm="gpt-4o",
+        system_prompt=PROMPT,
+        query="some query",
+        context_text="context",
+        chat_history=[{"role": "user", "content": "hi"}],
+    ):
+        result.append(piece)
+
+    # Join chunks to verify complete response matches expected format
+    complete_response = "".join(result)
+    expected_response = (
+        'Called gpt-4o with [{"content": "'
+        + PROMPT
+        + '", "role": "system"}, '
+        + '{"content": "Use the following context to answer the question: context", "role": "system"}, '
+        + '{"content": "hi", "role": "user"}, '
+        + '{"content": "some query", "role": "user"}]'
+    )
+    assert complete_response == expected_response
