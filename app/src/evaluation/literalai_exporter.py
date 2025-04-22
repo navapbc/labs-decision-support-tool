@@ -66,7 +66,9 @@ class QARow(NamedTuple):
             "Thread ID": self.thread_id,
             "Timestamp": self.timestamp,
             "Feedback Scores": self.scores[0] if len(self.scores) == 1 else self.scores or "",
-            "Feedback Comments": self.comments[0] if len(self.comments) == 1 else self.comments or "",
+            "Feedback Comments": (
+                self.comments[0] if len(self.comments) == 1 else self.comments or ""
+            ),
         }
 
     @classmethod
