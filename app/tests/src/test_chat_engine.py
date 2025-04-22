@@ -1,3 +1,5 @@
+import pytest
+
 from src import chat_engine
 from src.chat_engine import CaEddWebEngine, ImagineLA_MessageAttributes, ImagineLaEngine
 
@@ -101,3 +103,70 @@ def test_on_message_Imagine_LA_needs_context_False(monkeypatch):
     assert result.attributes.benefit_program == "CalFresh"
     assert result.attributes.alert_message.startswith("**Policy update**: ")
     assert result.attributes.alert_message.endswith("\n\nThe rest of this answer may be outdated.")
+
+
+@pytest.mark.asyncio
+async def test_on_message_streaming_Imagine_LA_canned_response(monkeypatch):
+    monkeypatch.setattr(
+        chat_engine,
+        "analyze_message",
+        lambda *_, **_kw: ImagineLA_MessageAttributes(
+            needs_context=True,
+            translated_message="",
+            benefit_program="",
+            canned_response="This is a canned response",
+            alert_message="",
+        ),
+    )
+
+    engine = chat_engine.create_engine("imagine-la")
+    generator, attributes, subsections = await engine.on_message_streaming("What is AI?")
+
+    # For canned responses, we should get the exact response in a single chunk
+    chunks = []
+    async for chunk in generator:
+        chunks.append(chunk)
+
+    assert chunks == ["This is a canned response"]
+    assert not attributes.benefit_program
+    assert not attributes.alert_message
+    assert not subsections
+
+
+@pytest.mark.asyncio
+async def test_on_message_streaming_Imagine_LA_with_context(monkeypatch):
+    monkeypatch.setattr(
+        chat_engine,
+        "analyze_message",
+        lambda *_, **_kw: ImagineLA_MessageAttributes(
+            needs_context=True,
+            translated_message="",
+            benefit_program="CalFresh",
+            canned_response="",
+            alert_message="Some alert message",
+        ),
+    )
+
+    # Mock the streaming generator to return known chunks
+    async def mock_generate_streaming(*args, **kwargs):
+        chunks = ["First chunk", " second chunk", " final chunk"]
+        for chunk in chunks:
+            yield chunk
+
+    monkeypatch.setattr(chat_engine, "generate_streaming_async", mock_generate_streaming)
+    # Mock retrieval to return empty results (but still exercise the code path)
+    monkeypatch.setattr(chat_engine, "retrieve_with_scores", lambda *_, **_kw: [])
+
+    engine = chat_engine.create_engine("imagine-la")
+    generator, attributes, subsections = await engine.on_message_streaming("What is AI?")
+
+    # Collect and verify streamed chunks
+    chunks = []
+    async for chunk in generator:
+        chunks.append(chunk)
+
+    assert chunks == ["First chunk", " second chunk", " final chunk"]
+    assert attributes.benefit_program == "CalFresh"
+    assert attributes.alert_message.startswith("**Policy update**: ")
+    assert attributes.alert_message.endswith("\n\nThe rest of this answer may be outdated.")
+    assert subsections == []  # Empty because we mocked retrieve_with_scores to return []
