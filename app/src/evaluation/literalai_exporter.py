@@ -143,7 +143,7 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
 
 
 def save_csv(qa_pairs: list[QARow], csv_file: IO) -> None:
-    fields = list(qa_pairs[0].to_csv_dict().keys())
+    fields = list(qa_pairs[0].to_csv_dict().keys()) if qa_pairs else []
     writer = csv.DictWriter(csv_file, fieldnames=fields)
     writer.writeheader()
     for pair in qa_pairs:
@@ -166,3 +166,10 @@ def main() -> None:  # pragma: no cover
     qa_rows = convert_to_qa_rows(project_id, threads)
     with open(f"{project_id}-lai_pairs.csv", "w", encoding="utf-8") as f:
         save_csv(qa_rows, f)
+
+    scores = lai.query_scores_between(start_date, end_date)
+    with open(f"{project_id}-lai_scores.csv", "w", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=scores[0].__dict__.keys())
+        writer.writeheader()
+        for score in scores:
+            writer.writerow(score.__dict__)

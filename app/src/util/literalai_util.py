@@ -8,7 +8,7 @@ import sys
 from datetime import datetime
 from typing import Any, Callable
 
-from literalai import LiteralClient, Thread, User
+from literalai import LiteralClient, Score, Thread, User
 from literalai.my_types import PaginatedResponse
 from literalai.observability.filter import Filter, OrderBy
 from smart_open import open as smart_open
@@ -39,6 +39,15 @@ def get_threads(filters: list[Filter]) -> list[Thread]:
     )
 
 
+# Note that all score attributes are already included when querying threads
+def get_scores(filters: list[Filter]) -> list[Score]:
+    logger.info("Query filter: %r", filters)
+    order_by: OrderBy = OrderBy(column="createdAt", direction="ASC")
+    return get_all_entities(
+        lambda client, after: client.api.get_scores(filters=filters, order_by=order_by, after=after)
+    )
+
+
 def get_users(filters: list[Filter]) -> list[User]:
     return get_all_entities(
         lambda lai_client, after: lai_client.api.get_users(filters=filters, after=after)
@@ -62,7 +71,19 @@ def get_all_entities[T](api_call: Callable[[LiteralClient, Any], PaginatedRespon
 
 
 def query_threads_between(start_date: datetime, end_date: datetime) -> list[Thread]:
-    return get_threads(filter_between(start_date, end_date))
+    threads = get_threads(filter_between(start_date, end_date))
+    save_entities(
+        threads, f"threads-{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}"
+    )
+    return threads
+
+
+def query_scores_between(start_date: datetime, end_date: datetime) -> list[Score]:
+    scores = get_scores(filter_between(start_date, end_date))
+    save_entities(
+        scores, f"scores-{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}"
+    )
+    return scores
 
 
 def filter_between(start_date: datetime, end_date: datetime) -> list[Filter]:
@@ -93,16 +114,14 @@ def tag_threads_by_user(
         logger.info("Tagged thread %r with %r", th.id, new_tag)
 
 
-def save_entities(
-    entities: list[Thread] | list[User], basefilename: str
-) -> None:  # pragma: no cover
+def save_entities[T](entities: list[T] | list[User], basefilename: str) -> None:  # pragma: no cover
     with open(f"{basefilename}.pickle", "wb") as file:
         logger.info("Saving to %s.pickle", basefilename)
         pickle.dump(entities, file)
     with open(f"{basefilename}.json", "w", encoding="utf-8") as f:
         # Also save as JSON for readability and in case the Thread object changes
         logger.info("Saving to %s.json", basefilename)
-        dicts = [e.to_dict() for e in entities]
+        dicts = [e.to_dict() for e in entities if hasattr(e, "to_dict")]
         f.write(json.dumps(dicts, indent=2))
 
 
