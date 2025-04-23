@@ -49,12 +49,7 @@ class QARow(NamedTuple):
             f"https://cloud.getliteral.ai/projects/{self.project_id}/logs/"
             f"threads/{self.thread_id}?currentStepId={self.question_id}"
         )
-    def _format_list(self, items: list[Any]) -> Any:
-        if not items:
-            return ""
-        if len(items) == 1:
-            return items[0]
-        return items
+
     def to_csv_dict(self) -> dict[str, Any]:
         return {
             "User ID": self.user_id,
@@ -70,11 +65,16 @@ class QARow(NamedTuple):
             "Has Chat History": str(self.has_chat_history),
             "Thread ID": self.thread_id,
             "Timestamp": self.timestamp,
-            "Feedback Scores": self.scores[0] if len(self.scores) == 1 else self.scores or "",
-            "Feedback Comments": (
-                self.comments[0] if len(self.comments) == 1 else self.comments or ""
-            ),
+            "Feedback Scores": self._simplify_list(self.scores),
+            "Feedback Comments": self._simplify_list(self.comments),
         }
+
+    def _simplify_list(self, items: list[Any]) -> Any:
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        return items
 
     @classmethod
     def from_lai_thread(
