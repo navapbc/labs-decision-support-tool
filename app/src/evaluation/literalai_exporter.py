@@ -3,7 +3,7 @@ import csv
 import logging
 import sys
 from datetime import datetime
-from typing import IO, NamedTuple, Optional
+from typing import IO, Any, NamedTuple, Optional
 
 from literalai import Step, Thread
 
@@ -33,11 +33,15 @@ class QARow(NamedTuple):
     # benefit_program
     program: Optional[str]
     # links to citations in the order they are referenced in the answer
-    citation_links: Optional[str]
+    citation_links: list[str]
     # dataset and document name/title for each citation
-    citation_sources: Optional[str]
+    citation_sources: list[str]
     # another clue to signal that the QA pair follows another QA pair in the same thread
     has_chat_history: bool
+    # Feedback score values
+    scores: list[float]
+    # Feedback comments
+    comments: list[str]
 
     @property
     def lai_link(self) -> str:
@@ -46,7 +50,7 @@ class QARow(NamedTuple):
             f"threads/{self.thread_id}?currentStepId={self.question_id}"
         )
 
-    def to_csv_dict(self) -> dict[str, str]:
+    def to_csv_dict(self) -> dict[str, Any]:
         return {
             "User ID": self.user_id,
             "Date": datetime.fromisoformat(self.timestamp).strftime("%m/%d/%Y"),
@@ -56,12 +60,21 @@ class QARow(NamedTuple):
             "Agency ID": self.agency_id,
             "Session ID": self.session_id,
             "Program": self.program if self.program else "",
-            "Citation Links": self.citation_links if self.citation_links else "",
-            "Citation Sources": self.citation_sources if self.citation_sources else "",
+            "Citation Links": "\n".join(self.citation_links) if self.citation_links else "",
+            "Citation Sources": "\n".join(self.citation_sources) if self.citation_sources else "",
             "Has Chat History": str(self.has_chat_history),
             "Thread ID": self.thread_id,
             "Timestamp": self.timestamp,
+            "Feedback Scores": self._simplify_list(self.scores),
+            "Feedback Comments": self._simplify_list(self.comments),
         }
+
+    def _simplify_list(self, items: list[Any]) -> Any:
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        return items
 
     @classmethod
     def from_lai_thread(
@@ -101,15 +114,15 @@ class QARow(NamedTuple):
             question=question_step.output["content"],
             answer=answer_step.output["content"],
             program=attribs["benefit_program"] if attribs else None,
-            citation_links=("\n".join(c["uri"] for c in citations) if citations else None),
+            citation_links=[c["uri"] for c in citations] if citations else [],
             citation_sources=(
-                "\n".join(
-                    f"{c.get('source_dataset', '')}: {c.get('source_name', '')}" for c in citations
-                )
+                [f"{c.get('source_dataset', '')}: {c.get('source_name', '')}" for c in citations]
                 if citations
-                else None
+                else []
             ),
             has_chat_history=bool(answer_step.metadata.get("chat_history", None)),
+            scores=[s.value for s in answer_step.scores] if answer_step.scores else [],
+            comments=[s.comment or "" for s in answer_step.scores] if answer_step.scores else [],
         )
 
 
@@ -143,7 +156,7 @@ def convert_to_qa_rows(project_id: str, threads: list[Thread]) -> list[QARow]:
 
 
 def save_csv(qa_pairs: list[QARow], csv_file: IO) -> None:
-    fields = list(qa_pairs[0].to_csv_dict().keys())
+    fields = list(qa_pairs[0].to_csv_dict().keys()) if qa_pairs else []
     writer = csv.DictWriter(csv_file, fieldnames=fields)
     writer.writeheader()
     for pair in qa_pairs:
