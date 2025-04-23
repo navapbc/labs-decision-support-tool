@@ -12,12 +12,10 @@ import uuid
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, AsyncGenerator, Coroutine, Generator, Optional, Sequence, Union
+from typing import Any, AsyncGenerator, Coroutine, Generator, Optional, Sequence
 
 from asyncer import asyncify
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
 from lazify import LazyProxy
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -73,16 +71,6 @@ async def healthcheck(request: Request) -> HealthCheck:
     logger.info(request.headers)
     healthcheck_response = await health(request)
     return healthcheck_response
-
-
-@router.get("/streaming-test", response_class=HTMLResponse)
-async def streaming_test() -> str:
-    """Serve the streaming test HTML page"""
-    html_path = Path(__file__).parent.parent / "streaming-test.html"
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail="Streaming test page not found")
-
-    return html_path.read_text()
 
 
 # region: ===================  Session Management ===================
@@ -371,15 +359,6 @@ class QueryRequest(BaseModel):
     beneficiary_id: Optional[str] = None
 
 
-class QueryInitRequest(BaseModel):
-    session_id: str
-    new_session: bool
-    question: str
-    user_id: str
-    agency_id: Optional[str] = None
-    beneficiary_id: Optional[str] = None
-
-
 class QueryInitResponse(BaseModel):
     status: str = "processing"
     message_id: str
@@ -433,37 +412,46 @@ def get_chat_engine(session: ChatSession) -> ChatEngineInterface:
     return engine
 
 
+async def prepare_query_session(
+    request: QueryRequest,
+) -> tuple[ChatSession, Optional[str], StepDict]:
+    """Prepares a query session with all necessary setup for both query and query_init endpoints."""
+    user_meta = {}
+    if request.agency_id is not None:
+        user_meta["agency_id"] = request.agency_id
+    if request.beneficiary_id is not None:
+        user_meta["beneficiary_id"] = request.beneficiary_id
+
+    session = await _init_chat_session(
+        request.user_id, request.session_id, user_meta, request.new_session
+    )
+
+    # Only if new session, set the thread name
+    thread_name = request.message.strip().splitlines()[0] if request.new_session else None
+    request_step = cl.Message(
+        author=session.user_session.user_id,
+        content=request.message,
+        type="user_message",
+        metadata={
+            "user_id": session.user_session.user_id,
+            "user_uuid": session.user_uuid,
+            "request": request.__dict__,
+        },
+    ).to_dict()
+
+    return session, thread_name, request_step
+
+
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
     with db_session_context_var() as db_session:
         start_time = time.perf_counter()
 
-        user_meta = {}
-        if request.agency_id is not None:
-            user_meta["agency_id"] = request.agency_id
-        if request.beneficiary_id is not None:
-            user_meta["beneficiary_id"] = request.beneficiary_id
+        session, thread_name, request_step = await prepare_query_session(request)
 
-        session = await _init_chat_session(
-            request.user_id, request.session_id, user_meta, request.new_session
-        )
-
-        # Load history BEFORE adding the new message to the DB
+        # Load and validate chat history
         chat_history = _load_chat_history(session.user_session)
-        _validate_chat_history(request, chat_history)
-
-        # Only if new session, set the LiteralAI thread name; don't want the thread name to change otherwise
-        thread_name = request.message.strip().splitlines()[0] if request.new_session else None
-        request_step = cl.Message(
-            author=session.user_session.user_id,
-            content=request.message,
-            type="user_message",
-            metadata={
-                "user_id": session.user_session.user_id,
-                "user_uuid": session.user_uuid,
-                "request": request.__dict__,
-            },
-        ).to_dict()
+        _validate_chat_history(request.session_id, request.new_session, chat_history)
 
         async def process_request() -> tuple[QueryResponse, StepDict]:
             engine = get_chat_engine(session)
@@ -508,38 +496,13 @@ async def query(request: QueryRequest) -> QueryResponse:
 
 
 @router.post("/query_init")
-async def query_init(request: QueryInitRequest) -> QueryInitResponse:
+async def query_init(request: QueryRequest) -> QueryInitResponse:
     """
     Initializes a streaming query by storing the question and creating a message_id.
     Returns the message_id that the client will use to fetch the streaming response.
     """
     with db_session_context_var() as db_session:
-        user_meta = {}
-        if request.agency_id is not None:
-            user_meta["agency_id"] = request.agency_id
-        if request.beneficiary_id is not None:
-            user_meta["beneficiary_id"] = request.beneficiary_id
-
-        session = await _init_chat_session(
-            request.user_id, request.session_id, user_meta, request.new_session
-        )
-
-        # Load history to validate
-        chat_history = _load_chat_history(session.user_session)
-        _validate_chat_history(request, chat_history)
-
-        # Create chainlit message for the question
-        thread_name = request.question.strip().splitlines()[0] if request.new_session else None
-        request_step = cl.Message(
-            author=session.user_session.user_id,
-            content=request.question,
-            type="user_message",
-            metadata={
-                "user_id": session.user_session.user_id,
-                "user_uuid": session.user_uuid,
-                "request": request.__dict__,
-            },
-        ).to_dict()
+        session, thread_name, request_step = await prepare_query_session(request)
 
         # Persist the question message
         data_layer = cl_get_data_layer()
@@ -550,7 +513,7 @@ async def query_init(request: QueryInitRequest) -> QueryInitResponse:
         # Store the question in the database
         with db_session.begin():
             db_session.add(
-                ChatMessage(session_id=request.session_id, role="user", content=request.question)
+                ChatMessage(session_id=request.session_id, role="user", content=request.message)
             )
 
         # The message_id is used to refer to this specific question/answer pair
@@ -570,20 +533,15 @@ async def query_stream(
     with db_session_context_var() as db_session:
         # Get session information
         session = await _init_chat_session(user_id, session_id, new_session=False)
+
+        # Load and validate chat history
         chat_history = _load_chat_history(session.user_session)
+        _validate_chat_history(session_id, False, chat_history)
+
         engine = get_chat_engine(session)
 
         # Retrieve the question from the database
-        with db_session.begin():
-            question = db_session.scalars(
-                select(ChatMessage)
-                .where(ChatMessage.session_id == session_id)
-                .order_by(ChatMessage.created_at.desc())
-                .limit(1)
-            ).first()
-
-            if not question or question.role != "user":
-                raise HTTPException(status_code=404, detail="Question not found")
+        question = _get_latest_user_message(db_session, session_id)
 
         # Create an SSE generator that streams chunks
         async def event_generator() -> AsyncGenerator[dict[str, str], None]:
@@ -648,19 +606,34 @@ async def query_stream(
         return EventSourceResponse(event_generator())
 
 
-def _validate_chat_history(
-    request: Union[QueryRequest, QueryInitRequest], chat_history: ChatHistory
-) -> None:
-    if request.new_session and chat_history:
+def _validate_chat_history(session_id: str, new_session: bool, chat_history: ChatHistory) -> None:
+    """Validates that the chat history is consistent with the session state."""
+    if new_session and chat_history:
         raise HTTPException(
             status_code=409,
-            detail=f"Cannot start a new session with an existing chat_history: {request.session_id}",
+            detail=f"Cannot start a new session with an existing chat_history: {session_id}",
         )
-    if not request.new_session and not chat_history:
+    if not new_session and not chat_history:
         raise HTTPException(
             status_code=409,
-            detail=f"Chat history for existing session not found: {request.session_id}",
+            detail=f"Chat history for existing session not found: {session_id}",
         )
+
+
+def _get_latest_user_message(db_session: db.Session, session_id: str) -> ChatMessage:
+    """Retrieves the latest user message from the database for the given session."""
+    with db_session.begin():
+        message = db_session.scalars(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == session_id)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(1)
+        ).first()
+
+        if not message or message.role != "user":
+            raise HTTPException(status_code=404, detail="User message not found")
+
+    return message
 
 
 # Temporarily True until API client handles alert_message field
