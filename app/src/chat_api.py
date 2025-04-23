@@ -613,10 +613,13 @@ async def query_stream(
                     engine, question_content, chat_history, streaming=True
                 )
 
+                # Send the remapped final response so client can update displayed text
+                yield {"event": "remapped_response", "data": query_response.response_text}
+
                 # Persist response in data layer and database
                 await cl_get_data_layer().create_step(
                     cl.Message(
-                        content=full_response.strip(),
+                        content=query_response.response_text,
                         type="assistant_message",
                         parent_id=id,
                         metadata={
@@ -632,7 +635,9 @@ async def query_stream(
                 with db_session.begin():
                     db_session.add(
                         ChatMessage(
-                            session_id=session_id, role="assistant", content=full_response.strip()
+                            session_id=session_id,
+                            role="assistant",
+                            content=query_response.response_text,
                         )
                     )
 
