@@ -49,7 +49,12 @@ class QARow(NamedTuple):
             f"https://cloud.getliteral.ai/projects/{self.project_id}/logs/"
             f"threads/{self.thread_id}?currentStepId={self.question_id}"
         )
-
+    def _format_list(self, items: list[Any]) -> Any:
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        return items
     def to_csv_dict(self) -> dict[str, Any]:
         return {
             "User ID": self.user_id,
