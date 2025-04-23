@@ -577,7 +577,7 @@ async def test_query_stream_basic(async_client, monkeypatch, db_session):
     # Initialize streaming query
     init_response = await async_client.post(
         "/api/query_init",
-        json={"user_id": "user1", "session_id": "session1", "new_session": True, "question": "Hi"},
+        json={"user_id": "user1", "session_id": "session1", "new_session": True, "message": "Hi"},
     )
     assert init_response.status_code == 200
     message_id = init_response.json()["message_id"]
@@ -631,7 +631,7 @@ async def test_query_stream_with_alert(async_client, monkeypatch, db_session):
             "user_id": "user2",
             "session_id": "session2",
             "new_session": True,
-            "question": "Hello",
+            "message": "Hello",
         },
     )
     assert init_response.status_code == 200
