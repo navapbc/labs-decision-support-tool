@@ -12,12 +12,10 @@ import uuid
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, AsyncGenerator, Coroutine, Generator, Optional, Sequence, Union
 
 from asyncer import asyncify
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
 from lazify import LazyProxy
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -73,16 +71,6 @@ async def healthcheck(request: Request) -> HealthCheck:
     logger.info(request.headers)
     healthcheck_response = await health(request)
     return healthcheck_response
-
-
-@router.get("/streaming-test", response_class=HTMLResponse)
-async def streaming_test() -> str:
-    """Serve the streaming test HTML page"""
-    html_path = Path(__file__).parent.parent / "streaming-test.html"
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail="Streaming test page not found")
-
-    return html_path.read_text()
 
 
 # region: ===================  Session Management ===================
