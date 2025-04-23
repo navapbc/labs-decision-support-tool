@@ -114,7 +114,7 @@ def tag_threads_by_user(
         logger.info("Tagged thread %r with %r", th.id, new_tag)
 
 
-def save_entities[T](entities: list[T] | list[User], basefilename: str) -> None:  # pragma: no cover
+def save_entities[T](entities: list[T], basefilename: str) -> None:  # pragma: no cover
     with open(f"{basefilename}.pickle", "wb") as file:
         logger.info("Saving to %s.pickle", basefilename)
         pickle.dump(entities, file)
