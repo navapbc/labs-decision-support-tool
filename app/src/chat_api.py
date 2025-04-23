@@ -414,7 +414,7 @@ def get_chat_engine(session: ChatSession) -> ChatEngineInterface:
 
 async def prepare_query_session(
     request: QueryRequest,
-) -> tuple[ChatSession, ChatHistory, Optional[str], StepDict]:
+) -> tuple[ChatSession, Optional[str], StepDict]:
     """Prepares a query session with all necessary setup for both query and query_init endpoints."""
     user_meta = {}
     if request.agency_id is not None:
@@ -425,10 +425,6 @@ async def prepare_query_session(
     session = await _init_chat_session(
         request.user_id, request.session_id, user_meta, request.new_session
     )
-
-    # Load history BEFORE adding the new message to the DB
-    chat_history = _load_chat_history(session.user_session)
-    _validate_chat_history(request, chat_history)
 
     # Only if new session, set the thread name
     thread_name = request.message.strip().splitlines()[0] if request.new_session else None
@@ -443,7 +439,7 @@ async def prepare_query_session(
         },
     ).to_dict()
 
-    return session, chat_history, thread_name, request_step
+    return session, thread_name, request_step
 
 
 @router.post("/query")
@@ -451,7 +447,11 @@ async def query(request: QueryRequest) -> QueryResponse:
     with db_session_context_var() as db_session:
         start_time = time.perf_counter()
 
-        session, chat_history, thread_name, request_step = await prepare_query_session(request)
+        session, thread_name, request_step = await prepare_query_session(request)
+
+        # Load and validate chat history
+        chat_history = _load_chat_history(session.user_session)
+        _validate_chat_history(request.session_id, request.new_session, chat_history)
 
         async def process_request() -> tuple[QueryResponse, StepDict]:
             engine = get_chat_engine(session)
@@ -502,7 +502,7 @@ async def query_init(request: QueryRequest) -> QueryInitResponse:
     Returns the message_id that the client will use to fetch the streaming response.
     """
     with db_session_context_var() as db_session:
-        session, chat_history, thread_name, request_step = await prepare_query_session(request)
+        session, thread_name, request_step = await prepare_query_session(request)
 
         # Persist the question message
         data_layer = cl_get_data_layer()
@@ -533,7 +533,11 @@ async def query_stream(
     with db_session_context_var() as db_session:
         # Get session information
         session = await _init_chat_session(user_id, session_id, new_session=False)
+
+        # Load and validate chat history
         chat_history = _load_chat_history(session.user_session)
+        _validate_chat_history(session_id, False, chat_history)
+
         engine = get_chat_engine(session)
 
         # Retrieve the question from the database
@@ -602,22 +606,21 @@ async def query_stream(
         return EventSourceResponse(event_generator())
 
 
-def _validate_chat_history(
-    request: QueryRequest, chat_history: ChatHistory
-) -> None:
-    if request.new_session and chat_history:
+def _validate_chat_history(session_id: str, new_session: bool, chat_history: ChatHistory) -> None:
+    """Validates that the chat history is consistent with the session state."""
+    if new_session and chat_history:
         raise HTTPException(
             status_code=409,
-            detail=f"Cannot start a new session with an existing chat_history: {request.session_id}",
+            detail=f"Cannot start a new session with an existing chat_history: {session_id}",
         )
-    if not request.new_session and not chat_history:
+    if not new_session and not chat_history:
         raise HTTPException(
             status_code=409,
-            detail=f"Chat history for existing session not found: {request.session_id}",
+            detail=f"Chat history for existing session not found: {session_id}",
         )
 
 
-def _get_latest_user_message(db_session, session_id: str) -> ChatMessage:
+def _get_latest_user_message(db_session: db.Session, session_id: str) -> ChatMessage:
     """Retrieves the latest user message from the database for the given session."""
     with db_session.begin():
         message = db_session.scalars(
@@ -629,7 +632,7 @@ def _get_latest_user_message(db_session, session_id: str) -> ChatMessage:
 
         if not message or message.role != "user":
             raise HTTPException(status_code=404, detail="User message not found")
-    
+
     return message
 
 
