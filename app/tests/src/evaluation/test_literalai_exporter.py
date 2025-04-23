@@ -51,7 +51,7 @@ def test_convert_to_qa_rows_and_save_csv(caplog):
     with caplog.at_level(logging.INFO):
         qa_rows = convert_to_qa_rows("Test_Project_1234ABC", threads)
     assert len(qa_rows) == 3
-    assert f"Ignoring dangling step {dangling_step.id!r}"
+    assert f"Ignoring dangling step {dangling_step.id!r}" in caplog.text
 
     mock_csv_file = StringIO()
     save_csv(qa_rows, mock_csv_file)
