@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Streaming Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #response {
+            white-space: pre-wrap;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            min-height: 100px;
+            margin-top: 20px;
+        }
+        .alert-message {
+            background-color: #FFF3CD;
+            border: 1px solid #FFEEBA;
+            color: #856404;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .citation-container {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        .citation {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat Streaming Test</h1>
+    
+    <form id="chatForm">
+        <div>
+            <label for="userId">User ID:</label>
+            <input type="text" id="userId" value="test-user-123" required>
+        </div>
+        
+        <div>
+            <label for="sessionId">Session ID (auto-generated for new sessions):</label>
+            <input type="text" id="sessionId" value="test-session-123" required>
+        </div>
+        
+        <div>
+            <label for="newSession">New Session:</label>
+            <select id="newSession">
+                <option value="true" selected>Yes</option>
+                <option value="false">No</option>
+            </select>
+        </div>
+        
+        <div>
+            <label for="question">Question:</label>
+            <textarea id="question" rows="4" required>What benefits are available for low-income families in Los Angeles?</textarea>
+        </div>
+        
+        <button type="submit" id="submitBtn">Send Question</button>
+    </form>
+    
+    <div id="alertMessage" class="alert-message" style="display: none;"></div>
+    
+    <div>
+        <h3>Response:</h3>
+        <div id="response"></div>
+    </div>
+    
+    <div id="citationsContainer" class="citation-container" style="display: none;">
+        <h3>Citations:</h3>
+        <div id="citations"></div>
+    </div>
+    
+    <script>
+        document.getElementById('chatForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('userId').value;
+            let sessionId = document.getElementById('sessionId').value;
+            const newSession = document.getElementById('newSession').value === 'true';
+            const question = document.getElementById('question').value;
+            
+            // Generate a unique session ID if this is a new session
+            if (newSession) {
+                sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
+                document.getElementById('sessionId').value = sessionId;
+            }
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const responseDiv = document.getElementById('response');
+            const alertDiv = document.getElementById('alertMessage');
+            const citationsContainer = document.getElementById('citationsContainer');
+            const citationsDiv = document.getElementById('citations');
+            
+            // Clear previous response
+            responseDiv.textContent = '';
+            alertDiv.style.display = 'none';
+            citationsContainer.style.display = 'none';
+            citationsDiv.innerHTML = '';
+            
+            // Disable submit button during request
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+            
+            try {
+                // Step 1: Initialize the query to get a message_id
+                const initResponse = await fetch('/api/query_init', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        session_id: sessionId,
+                        new_session: newSession,
+                        question: question
+                    })
+                });
+                
+                if (!initResponse.ok) {
+                    throw new Error(`Query init failed: ${initResponse.status} ${initResponse.statusText}`);
+                }
+                
+                const initData = await initResponse.json();
+                const messageId = initData.message_id;
+                
+                responseDiv.textContent = 'Connecting to streaming response...';
+                
+                // Step 2: Connect to the streaming endpoint
+                const eventSource = new EventSource(`/api/query_stream?id=${messageId}&user_id=${userId}&session_id=${sessionId}`);
+                
+                // Handle alert messages
+                eventSource.addEventListener('alert', function(e) {
+                    alertDiv.textContent = e.data;
+                    alertDiv.style.display = 'block';
+                });
+                
+                // Handle streaming chunks
+                responseDiv.textContent = '';
+                eventSource.addEventListener('chunk', function(e) {
+                    responseDiv.textContent += e.data;
+                });
+                
+                // Handle remapped response with properly formatted citations
+                eventSource.addEventListener('remapped_response', function(e) {
+                    responseDiv.textContent = e.data;
+                });
+                
+                // Handle errors
+                eventSource.addEventListener('error', function(e) {
+                    console.error('SSE Error:', e);
+                    eventSource.close();
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Send Question';
+                    
+                    if (responseDiv.textContent === 'Connecting to streaming response...') {
+                        responseDiv.textContent = 'Error connecting to streaming response.';
+                    }
+                });
+                
+                // Handle completion
+                eventSource.addEventListener('done', function(e) {
+                    const citations = JSON.parse(e.data);
+                    
+                    // Display citations if available
+                    if (citations && citations.length > 0) {
+                        citationsContainer.style.display = 'block';
+                        
+                        citations.forEach(citation => {
+                            const citationDiv = document.createElement('div');
+                            citationDiv.className = 'citation';
+                            
+                            citationDiv.innerHTML = `
+                                <div><strong>${citation.citation_id}</strong> - ${citation.source_name}</div>
+                                <div>${citation.citation_text}</div>
+                                ${citation.uri ? `<div><a href="${citation.uri}" target="_blank">Source</a></div>` : ''}
+                            `;
+                            
+                            citationsDiv.appendChild(citationDiv);
+                        });
+                    }
+                    
+                    // Close the connection
+                    eventSource.close();
+                    
+                    // Re-enable the submit button
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Send Question';
+                });
+                
+            } catch (error) {
+                console.error('Error:', error);
+                responseDiv.textContent = `Error: ${error.message}`;
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Send Question';
+            }
+        });
+    </script>
+</body>
+</html> 
