@@ -542,3 +542,112 @@ async def test_api_post_feedback_fail(async_client, db_session):
     assert db_session.query(Thread).count() == 0
     assert db_session.query(Step).count() == 0
     assert db_session.query(Feedback).count() == 0
+
+
+# Add fixture to reset SSE AppStatus in tests
+@pytest.fixture(autouse=True)
+def reset_sse_starlette_appstatus_event():
+    from sse_starlette.sse import AppStatus
+
+    AppStatus.should_exit_event = None
+    # Fixture test from https://github.com/sysid/sse-starlette/issues/59#issuecomment-1961678665
+    # See more here: https://github.com/sysid/sse-starlette/tree/main?tab=readme-ov-file#using-pytest-to-test-sse-endpoints
+
+
+# Add tests for query_stream SSE endpoint
+@pytest.mark.asyncio
+async def test_query_stream_basic(async_client, monkeypatch, db_session):
+    # Mock engine to yield two chunks without alert
+    class MockEngine:
+        async def on_message_streaming(self, question, chat_history):
+            async def gen():
+                yield "hello "
+                yield "world"
+
+            attributes = MessageAttributes(needs_context=False, translated_message="")
+            return gen(), attributes, []
+
+    monkeypatch.setattr(chat_api, "get_chat_engine", lambda session: MockEngine())
+
+    async def mock_run_query(engine, question, chat_history, streaming=True):
+        return QueryResponse(response_text="final", alert_message=None, citations=[]), {}
+
+    monkeypatch.setattr(chat_api, "run_query", mock_run_query)
+
+    # Initialize streaming query
+    init_response = await async_client.post(
+        "/api/query_init",
+        json={"user_id": "user1", "session_id": "session1", "new_session": True, "message": "Hi"},
+    )
+    assert init_response.status_code == 200
+    message_id = init_response.json()["message_id"]
+
+    # Stream SSE events
+    url = f"/api/query_stream?id={message_id}&user_id=user1&session_id=session1"
+    async with async_client.stream("GET", url) as response:
+        assert response.status_code == 200
+        events = []
+        async for line in response.aiter_lines():
+            if line.strip():
+                events.append(line)
+
+    # Validate streamed events
+    assert "event: chunk" in events
+    assert "data: hello " in events
+    assert "data: world" in events
+    assert "event: done" in events
+    assert any("final" in line for line in events), f"Events: {events}"
+
+
+@pytest.mark.asyncio
+async def test_query_stream_with_alert(async_client, monkeypatch, db_session):
+    # Mock engine to yield an alert before chunks
+    class MockEngine:
+        async def on_message_streaming(self, question, chat_history):
+            async def gen():
+                yield "data1"
+
+            # Provide an attributes object with alert_message
+            attributes = ImagineLA_MessageAttributes(
+                needs_context=False,
+                translated_message="",
+                benefit_program="",
+                canned_response="",
+                alert_message="ALERT!",
+            )
+            return gen(), attributes, []
+
+    monkeypatch.setattr(chat_api, "get_chat_engine", lambda session: MockEngine())
+
+    async def mock_run_query(engine, question, chat_history, streaming=True):
+        return QueryResponse(response_text="done", alert_message="ALERT!", citations=[]), {}
+
+    monkeypatch.setattr(chat_api, "run_query", mock_run_query)
+
+    # Initialize streaming query
+    init_response = await async_client.post(
+        "/api/query_init",
+        json={
+            "user_id": "user2",
+            "session_id": "session2",
+            "new_session": True,
+            "message": "Hello",
+        },
+    )
+    assert init_response.status_code == 200
+    message_id = init_response.json()["message_id"]
+
+    # Stream SSE events
+    url = f"/api/query_stream?id={message_id}&user_id=user2&session_id=session2"
+    async with async_client.stream("GET", url) as response:
+        events = []
+        async for line in response.aiter_lines():
+            if line.strip():
+                events.append(line)
+
+    # Validate alert and chunk events
+    assert "event: alert" in events
+    assert "data: ALERT!" in events
+    assert "event: chunk" in events
+    assert "data: data1" in events
+    assert "event: done" in events

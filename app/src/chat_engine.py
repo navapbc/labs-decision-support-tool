@@ -1,7 +1,7 @@
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence
+from typing import AsyncGenerator, Optional, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, Subsection
@@ -12,6 +12,7 @@ from src.generate import (
     MessageAttributesT,
     analyze_message,
     generate,
+    generate_streaming_async,
 )
 from src.retrieve import retrieve_with_scores
 from src.util.class_utils import all_subclasses
@@ -64,6 +65,7 @@ class OnMessageResult:
 class ChatEngineInterface(ABC):
     engine_id: str
     name: str
+    llm: str = "gpt-4o"  # Default LLM to use
 
     # Configuration for formatting responses
     formatting_config: FormattingConfig
@@ -89,6 +91,12 @@ class ChatEngineInterface(ABC):
     def on_message(
         self, question: str, chat_history: Optional[ChatHistory] = None
     ) -> OnMessageResult:
+        pass
+
+    @abstractmethod
+    async def on_message_streaming(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
         pass
 
 
@@ -149,6 +157,20 @@ class BaseEngine(ChatEngineInterface):
             return self._build_response_with_context(question, attributes, chat_history)
 
         return self._build_response(question, attributes, chat_history)
+
+    async def on_message_streaming(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
+        # Start timing system_prompt_1
+        start_time = time.perf_counter()
+        attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
+        system_prompt_1_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
+        )
+
+        # Directly return the result of _build_streaming_response
+        return await self._build_streaming_response(question, attributes, chat_history)
 
     def _build_response(
         self,
@@ -217,6 +239,55 @@ class BaseEngine(ChatEngineInterface):
             chunks_with_scores=chunks_with_scores,
             subsections=subsections,
         )
+
+    async def _build_streaming_response(
+        self,
+        question: str,
+        attributes: MessageAttributes,
+        chat_history: Optional[ChatHistory] = None,
+    ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
+        """Helper method to build a streaming response with or without context"""
+        subsections: Sequence[Subsection] = []
+
+        if attributes.needs_context:
+            # Get retrieval question
+            question_for_retrieval = attributes.translated_message or question
+
+            # Retrieve context - this is the same code used in _build_response_with_context
+            start_time = time.perf_counter()
+            chunks_with_scores = retrieve_with_scores(
+                question_for_retrieval,
+                retrieval_k=self.retrieval_k,
+                retrieval_k_min_score=self.retrieval_k_min_score,
+                datasets=self.datasets,
+            )
+            retrieval_duration = time.perf_counter() - start_time
+            logger.info(f"Vector retrieval took {retrieval_duration:.2f} seconds")
+
+            # Prepare context
+            chunks = [chunk_with_score.chunk for chunk_with_score in chunks_with_scores]
+            subsections = split_into_subsections(chunks, factory=CitationFactory())
+            context_text = create_prompt_context(subsections)
+
+            # Stream response with context
+            generator = generate_streaming_async(
+                self.llm,
+                self.system_prompt_2,
+                question,
+                context_text,
+                chat_history,
+            )
+            return generator, attributes, subsections
+        else:
+            # Stream response without context
+            generator = generate_streaming_async(
+                self.llm,
+                self.system_prompt_2,
+                question,
+                None,
+                chat_history,
+            )
+            return generator, attributes, subsections
 
 
 class CaEddWebEngine(BaseEngine):
@@ -423,8 +494,8 @@ Example question:
 Can my client get Unemployment and disability at the same time?
 
 Example Answer:
-No, your client can’t get Unemployment Insurance (UI) and State Disability Insurance (SDI) at the same time. (citation-1)
-They need to choose the one that works best for their situation. If they’re not sure which one to apply for, \
+No, your client can't get Unemployment Insurance (UI) and State Disability Insurance (SDI) at the same time. (citation-1)
+They need to choose the one that works best for their situation. If they're not sure which one to apply for, \
 they can apply for both, and the state will check if they qualify for either one. (citation-2) (citation-3)"""
 
     def on_message(
@@ -451,3 +522,34 @@ they can apply for both, and the state will check if they qualify for either one
             return self._build_response_with_context(question, attributes, chat_history)
 
         return self._build_response(question, attributes, chat_history)
+
+    async def on_message_streaming(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> tuple[AsyncGenerator[str, None], ImagineLA_MessageAttributes, Sequence[Subsection]]:
+        # Start timing system_prompt_1
+        start_time = time.perf_counter()
+        attributes = analyze_message(
+            self.llm, self.system_prompt_1, question, response_format=ImagineLA_MessageAttributes
+        )
+        system_prompt_1_duration = time.perf_counter() - start_time
+        logger.info(
+            f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
+        )
+
+        # Format alert message the same way as non-streaming version
+        if attributes.alert_message:
+            attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
+
+        # Handle canned responses - return the entire response at once with empty subsections
+        if attributes.canned_response:
+
+            async def canned_generator() -> AsyncGenerator[str, None]:
+                yield attributes.canned_response
+
+            empty_subsections: Sequence[Subsection] = []
+            return canned_generator(), attributes, empty_subsections
+
+        generator, _, subsections = await self._build_streaming_response(
+            question, attributes, chat_history
+        )
+        return generator, attributes, subsections
