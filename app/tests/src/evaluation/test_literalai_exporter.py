@@ -1,7 +1,8 @@
+import csv
 import logging
 from io import StringIO
 
-from literalai import Step, Thread
+from literalai import Score, Step, Thread
 
 from src.evaluation.literalai_exporter import convert_to_qa_rows, save_csv
 
@@ -47,19 +48,18 @@ def append_dangling_step(thread: Thread):
 def test_convert_to_qa_rows_and_save_csv(caplog):
     threads = create_threads(3)
     dangling_step = append_dangling_step(threads[1])
-    project_id = "Test_Project_1234ABC"
     with caplog.at_level(logging.INFO):
-        qa_rows = convert_to_qa_rows(project_id, threads)
+        qa_rows = convert_to_qa_rows("Test_Project_1234ABC", threads)
     assert len(qa_rows) == 3
-    assert f"Ignoring dangling step {dangling_step.id!r}"
+    assert f"Ignoring dangling step {dangling_step.id!r}" in caplog.text
 
     mock_csv_file = StringIO()
     save_csv(qa_rows, mock_csv_file)
-    mock_csv_file.seek(0)
-    csv_lines = mock_csv_file.readlines()
+
+    csv_lines = mock_csv_file.getvalue().splitlines()
     assert (
         csv_lines[0]
-        == "User ID,Date,Question,Response,LiteralAI Thread,Agency ID,Session ID,Program,Citation Links,Citation Sources,Has Chat History,Thread ID,Timestamp\r\n"
+        == "User ID,Date,Question,Response,LiteralAI Thread,Agency ID,Session ID,Program,Citation Links,Citation Sources,Has Chat History,Thread ID,Timestamp,Feedback Scores,Feedback Comments"
     )
 
     for line in csv_lines[1:]:
@@ -68,3 +68,63 @@ def test_convert_to_qa_rows_and_save_csv(caplog):
         )
         # Check for metadata
         assert "Agency1,sesh1,prog1,,,False,th_" in line
+
+    # Check for empty feedback
+    csv_obj = next(csv.DictReader(mock_csv_file.getvalue().splitlines()))
+    assert csv_obj["Feedback Scores"] == ""
+    assert csv_obj["Feedback Comments"] == ""
+
+
+def test_one_feedback():
+    threads = create_threads(1)
+    assistant_step = threads[0].steps[1]
+    assistant_step.scores = [
+        Score(
+            name="user-feedback",
+            type="HUMAN",
+            value=1.0,
+            step_id=assistant_step.id,
+            dataset_experiment_item_id=None,
+            comment="Good job",
+            tags=None,
+        )
+    ]
+
+    qa_rows = convert_to_qa_rows("Test_Project_1234ABC", threads)
+    mock_csv_file = StringIO()
+    save_csv(qa_rows, mock_csv_file)
+    csv_obj = next(csv.DictReader(mock_csv_file.getvalue().splitlines()))
+    assert csv_obj["Feedback Scores"] == "1.0"
+    assert csv_obj["Feedback Comments"] == "Good job"
+
+
+def test_multiple_feedback():
+    threads = create_threads(1)
+    assistant_step = threads[0].steps[1]
+    assistant_step.scores = [
+        Score(
+            name="user-feedback",
+            type="HUMAN",
+            value=1.0,
+            step_id=assistant_step.id,
+            dataset_experiment_item_id=None,
+            comment="",
+            tags=None,
+        ),
+        Score(
+            name="user-feedback",
+            type="HUMAN",
+            value=0.0,
+            step_id=assistant_step.id,
+            dataset_experiment_item_id=None,
+            comment="Needs improvement",
+            tags=None,
+        ),
+    ]
+
+    qa_rows = convert_to_qa_rows("Test_Project_1234ABC", threads)
+    mock_csv_file = StringIO()
+    save_csv(qa_rows, mock_csv_file)
+    csv_obj = next(csv.DictReader(mock_csv_file.getvalue().splitlines()))
+    assert csv_obj["Feedback Scores"] == "[1.0, 0.0]"
+    assert csv_obj["Feedback Comments"] == "['', 'Needs improvement']"
