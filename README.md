@@ -34,16 +34,4 @@ The chatbot has a few special commands built in to support research and evaluati
 
 ## Deploying the application
 
-The pilot instance of the chatbot has two environments, `DEV` and `PROD`.
-
-Dev is a CD environment; merges to `main` automatically trigger deploys.
-
-Prod requires a manual deploy step:
- 1. On the [Releases page](https://github.com/navapbc/labs-decision-support-tool/releases), select `Draft a new release`
- 1. Under `Choose a tag`, create a new tag, bumping the version number as appropriate (e.g., `v1.4.0` if the previous version was `v1.3.0`)
- 1. Select `Generate release notes` to pre-populate the rest of the form. Adjust the notes as needed
- 1. Click `Publish release` 
- 1. [Select the Deploy App GitHub Action](https://github.com/navapbc/labs-decision-support-tool/actions/workflows/cd-app.yml)
- 1. Under `Environment to deploy to`, select `prod`
- 1. Under `Tag or branch or SHA to deploy`, enter the tag you created (e.g., `v1.4.0`)
- 1. Click `Run workflow` (do not change `Use workflow from`)
+See [Deployments and Releases](docs/releases.md) for information about cutting deployments to our production environment.
