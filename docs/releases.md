@@ -16,6 +16,8 @@ Prod requires a manual deploy step:
  1. Under `Tag or branch or SHA to deploy`, enter the tag you created (e.g., `v1.4.0`)
  1. Click `Run workflow` (do not change `Use workflow from`)
 
+We follow [semantic versioning](https://semver.org/) for version numbers.
+
 # Release Management
 
 There are a few makefile commands are used to automate cutting and deploying releases. We don't manually run the following on our pilot.
