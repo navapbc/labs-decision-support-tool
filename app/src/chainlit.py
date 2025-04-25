@@ -254,21 +254,13 @@ async def on_message(message: cl.Message) -> None:
         # Update the message with formatted content and metadata
         # See: https://docs.chainlit.io/api-reference/message#update-a-message
         msg.content = msg_content
-        msg.metadata = {
-            "system_prompt": engine.system_prompt_2,
-            "subsections": [
-                {
-                    "id": citations.id,
-                    "chunk.id": str(citations.chunk.id),
-                    "document.name": citations.chunk.document.name,
-                    "headings": citations.text_headings,
-                    "text": citations.text,
-                }
-                for citations in final_result.subsections
-            ],
-            "raw_response": final_result.response,
-            "attributes": attributes.model_dump(),
-        }
+        result = OnMessageResult(
+            response=final_result.response,
+            system_prompt=engine.system_prompt_2,
+            attributes=attributes,
+            subsections=final_result.subsections,
+        )
+        msg.metadata = _get_retrieval_metadata(result)
         await msg.update()
 
         if engine.show_msg_attributes:
