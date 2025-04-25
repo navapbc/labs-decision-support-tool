@@ -18,7 +18,7 @@ Prod requires a manual deploy step:
 
 # Release Management
 
-There are a few makefile commands that can be used to automate cutting and deploying releases. We don't use these on our pilot.
+There are a few makefile commands are used to automate cutting and deploying releases. We don't manually run the following on our pilot.
 
 ## Building a release
 
