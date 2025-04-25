@@ -31,3 +31,7 @@ To learn more about how to add additional data (or refresh existing data) in the
 ## Research and evaluation
 
 The chatbot has a few special commands built in to support research and evaluation. To learn more about batch processing and how to export user interaction logs, see [Special Commands](docs/special-commands.md).
+
+## Deploying the application
+
+See [Deployments and Releases](docs/releases.md) for information about cutting deployments to our production environment.
