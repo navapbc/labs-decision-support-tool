@@ -5,8 +5,6 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from asyncer import asyncify
-
 import chainlit as cl
 from chainlit.input_widget import InputWidget, Select, Slider, Switch, TextInput
 from chainlit.types import AskFileResponse
@@ -227,29 +225,46 @@ async def on_message(message: cl.Message) -> None:
         return
 
     try:
-        result = await asyncify(lambda: engine.on_message(message.content, chat_history))()
+        # Initial message
+        msg = cl.Message(content="")
 
-        # Simplify citation numbers in the response
-        final_result = simplify_citation_numbers(result.response, result.subsections)
-        result.response = final_result.response
-        result.subsections = final_result.subsections
-
-        logger.info("Raw response: %s", result.response)
-        msg_content = format_response(
-            subsections=result.subsections,
-            response=result.response,
-            config=engine.formatting_config,
-            attributes=result.attributes,
+        # Get response generator and metadata
+        response_generator, attributes, subsections = await engine.on_message_streaming(
+            message.content, chat_history
         )
 
-        await cl.Message(
-            type="assistant_message",
-            content=msg_content,
-            metadata=_get_retrieval_metadata(result),
-        ).send()
+        # Collect full response _while_ streaming
+        # See: https://docs.chainlit.io/api-reference/message#stream-a-message
+        full_response = ""
+        async for chunk in response_generator:
+            full_response += chunk
+            await msg.stream_token(chunk)
+
+        # When streaming complete, remap citations
+        final_result = simplify_citation_numbers(full_response, subsections)
+
+        # Format final response
+        msg_content = format_response(
+            subsections=final_result.subsections,
+            response=final_result.response,
+            config=engine.formatting_config,
+            attributes=attributes,
+        )
+
+        # Update the message with formatted content and metadata
+        # See: https://docs.chainlit.io/api-reference/message#update-a-message
+        msg.content = msg_content
+        result = OnMessageResult(
+            response=final_result.response,
+            system_prompt=engine.system_prompt_2,
+            attributes=attributes,
+            subsections=final_result.subsections,
+        )
+        msg.metadata = _get_retrieval_metadata(result)
+        await msg.update()
 
         if engine.show_msg_attributes:
-            await _msg_attributes(result.attributes)
+            await _msg_attributes(attributes)
     except Exception as err:  # pylint: disable=broad-exception-caught
         await cl.Message(
             type="system_message",
