@@ -1,8 +1,8 @@
 from functools import cached_property
 
-from sentence_transformers import SentenceTransformer
-
 from src.adapters import db
+from src.embeddings.model import EmbeddingModel
+from src.embeddings.mpnet import MPNetEmbedding
 from src.util.env_config import PydanticBaseEnvConfig
 
 
@@ -44,8 +44,8 @@ class AppConfig(PydanticBaseEnvConfig):
         return db.PostgresDBClient().get_session()
 
     @cached_property
-    def sentence_transformer(self) -> SentenceTransformer:
-        return SentenceTransformer(self.embedding_model)
+    def sentence_transformer(self) -> EmbeddingModel:
+        return MPNetEmbedding(self.embedding_model)
 
 
 app_config = AppConfig()
