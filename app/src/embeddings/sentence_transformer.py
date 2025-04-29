@@ -5,7 +5,7 @@ from src.embeddings.model import EmbeddingModel
 
 class SentenceTransformerEmbedding(EmbeddingModel):
     """
-    Implementation of EmbeddingModel that uses SentenceTransformer odels.
+    Implementation of EmbeddingModel that uses SentenceTransformer models.
     """
 
     def __init__(self, model_name: str):
