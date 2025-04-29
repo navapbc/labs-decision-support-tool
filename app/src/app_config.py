@@ -2,7 +2,7 @@ from functools import cached_property
 
 from src.adapters import db
 from src.embeddings.model import EmbeddingModel
-from src.embeddings.mpnet import MPNetEmbedding
+from app.src.embeddings.sentence_transformer import SentenceTransformerEmbedding
 from src.util.env_config import PydanticBaseEnvConfig
 
 
@@ -45,7 +45,7 @@ class AppConfig(PydanticBaseEnvConfig):
 
     @cached_property
     def sentence_transformer(self) -> EmbeddingModel:
-        return MPNetEmbedding(self.embedding_model)
+        return SentenceTransformerEmbedding(self.embedding_model)
 
 
 app_config = AppConfig()

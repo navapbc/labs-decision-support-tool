@@ -5,9 +5,9 @@ from sentence_transformers import SentenceTransformer
 from src.embeddings.model import EmbeddingModel
 
 
-class MPNetEmbedding(EmbeddingModel):
+class SentenceTransformerEmbedding(EmbeddingModel):
     """
-    Implementation of EmbeddingModel that uses SentenceTransformer with MPNet models.
+    Implementation of EmbeddingModel that uses SentenceTransformer odels.
     """
     
     def __init__(self, model_name: str):
