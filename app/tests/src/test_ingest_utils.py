@@ -17,7 +17,7 @@ from src.util.ingest_utils import (
     save_json,
     tokenize,
 )
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
+from app.tests.mock.mock_embedding_model import MockEmbeddingModel
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
@@ -192,7 +192,7 @@ def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_c
 
 
 def test__add_embeddings(app_config):
-    embedding_model = MockSentenceTransformer()
+    embedding_model = MockEmbeddingModel()
     chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)
     add_embeddings(chunks)
     for chunk in chunks:
@@ -201,7 +201,7 @@ def test__add_embeddings(app_config):
 
 
 def test__add_embeddings_with_texts_to_encode(app_config):
-    embedding_model = MockSentenceTransformer()
+    embedding_model = MockEmbeddingModel()
     chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)
     texts_to_encode = ["text1", "text2", "text3"]
     add_embeddings(chunks, texts_to_encode)

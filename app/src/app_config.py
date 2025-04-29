@@ -1,8 +1,8 @@
 from functools import cached_property
 
+from app.src.embeddings.sentence_transformer import SentenceTransformerEmbedding
 from src.adapters import db
 from src.embeddings.model import EmbeddingModel
-from app.src.embeddings.sentence_transformer import SentenceTransformerEmbedding
 from src.util.env_config import PydanticBaseEnvConfig
 
 

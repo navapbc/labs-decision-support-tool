@@ -3,7 +3,7 @@ from sqlalchemy import delete, select
 import src.adapters.db as db
 from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Chunk, Document
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
+from app.tests.mock.mock_embedding_model import MockEmbeddingModel
 from tests.src.db.models.factories import (
     ChatMessageFactory,
     ChunkFactory,
@@ -40,9 +40,9 @@ def test_chunk_factory(enable_factory_create, db_session: db.Session):
     assert chunk_db_record.id == chunk.id
     assert chunk_db_record.content == chunk.content
     assert chunk_db_record.tokens == len(
-        MockSentenceTransformer().tokenizer.tokenize(chunk.content)
+        MockEmbeddingModel().tokenizer.tokenize(chunk.content)
     )
-    assert chunk_db_record.mpnet_embedding == MockSentenceTransformer().encode(chunk.content)
+    assert chunk_db_record.mpnet_embedding == MockEmbeddingModel().encode(chunk.content)
 
 
 def test_user_session_factory(enable_factory_create, db_session: db.Session):

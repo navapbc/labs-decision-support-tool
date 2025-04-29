@@ -1,8 +1,8 @@
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
+from app.tests.mock.mock_embedding_model import MockEmbeddingModel
 
 
 def test_mock_sentence_transformer():
-    embedding_model = MockSentenceTransformer()
+    embedding_model = MockEmbeddingModel()
 
     assert embedding_model.max_seq_length == 512
     assert embedding_model.tokenizer.tokenize("Hello, world!") == ["Hello,", "world!"]
