@@ -1,4 +1,4 @@
-from src.embeddings.mock import MockEmbeddingModel
+from tests.mock.mock_embedding_model import MockEmbeddingModel
 
 
 def test_mock_embedding_model():
@@ -8,7 +8,6 @@ def test_mock_embedding_model():
     # Test properties
     assert isinstance(model.max_seq_length, int)
     assert model.max_seq_length > 0
-    assert hasattr(model.tokenizer, "tokenize")
 
     # Test single string encoding
     single_text = "This is a test sentence."

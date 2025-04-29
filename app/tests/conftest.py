@@ -12,7 +12,7 @@ from src.db import models
 from src.db.models.document import ChunkWithScore
 from src.util.local import load_local_env_vars
 from tests.lib import db_testing
-from app.tests.mock.mock_embedding_model import MockEmbeddingModel
+from tests.mock.mock_embedding_model import MockEmbeddingModel
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
 @pytest.fixture
 def app_config(monkeypatch, db_session):
     monkeypatch.setattr(AppConfig, "db_session", lambda _self: db_session)
-    monkeypatch.setattr(AppConfig, "sentence_transformer", MockEmbeddingModel())
+    monkeypatch.setattr(AppConfig, "embedding_model", MockEmbeddingModel())
 
 
 ####################

@@ -97,7 +97,7 @@ def s3_file(mock_s3_bucket_resource, sample_cards):
 @pytest.mark.parametrize("file_location", ["local", "s3"])
 def test__ingester__edd(caplog, app_config, db_session, local_file, s3_file, file_location):
     # Force a short max_seq_length to test chunking
-    app_config_for_test.sentence_transformer.max_seq_length = 47
+    app_config_for_test.embedding_model.max_seq_length = 47
 
     db_session.execute(delete(Document))
 

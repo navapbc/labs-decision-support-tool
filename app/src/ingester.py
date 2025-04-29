@@ -7,6 +7,7 @@ from typing import Optional, Sequence
 from smart_open import open as smart_open
 
 from src.adapters import db
+from src.app_config import app_config
 from src.db.models.document import Chunk, Document
 from src.ingestion.markdown_chunking import chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
@@ -18,7 +19,6 @@ from src.util.ingest_utils import (
     create_file_path,
     document_exists,
     load_or_save_doc_markdown,
-    tokenize,
 )
 from src.util.string_utils import remove_links
 
@@ -40,7 +40,8 @@ class Split:
             self.text_to_encode = text_to_encode
         else:
             self.text_to_encode = f"{context_str.strip()}\n\n" + remove_links(text)
-        self.token_count = len(tokenize(self.text_to_encode))
+
+        self.token_count = app_config.embedding_model.token_length(self.text_to_encode)
 
         # For debugging tree-based chunking
         self.chunk_id = ""

@@ -1,5 +1,3 @@
-from typing import List, Sequence, Union
-
 import tiktoken
 from openai import OpenAI
 
@@ -11,9 +9,7 @@ class OpenAIEmbedding(EmbeddingModel):
     Implementation of EmbeddingModel that uses OpenAI's embedding models.
     """
 
-    def __init__(
-        self, model_name: str = "text-embedding-3-small", api_key: str = None, base_url: str = None
-    ):
+    def __init__(self, model_name: str = "text-embedding-3-small"):
         """
         Initialize with OpenAI client and model name.
 
@@ -26,7 +22,7 @@ class OpenAIEmbedding(EmbeddingModel):
                       use the default OpenAI API URL.
         """
         self._model_name = model_name
-        self._client = OpenAI(api_key=api_key, base_url=base_url)
+        self._client = OpenAI()
         self._tokenizer = tiktoken.get_encoding(
             "cl100k_base"
         )  # Default encoding for text-embedding models
@@ -44,16 +40,15 @@ class OpenAIEmbedding(EmbeddingModel):
         }
         return model_limits.get(self._model_name, 8191)  # Default to 8191 if model not in the list
 
-    @property
-    def tokenizer(self):
+    def token_length(self, text: str) -> int:
         """
-        Returns the tokenizer used by the model.
+        Returns the number of tokens of the tokenized text.
         """
-        return self._tokenizer
+        return len(self._tokenizer.encode(text))
 
     def encode(
-        self, texts: Union[str, Sequence[str]], show_progress_bar: bool = False
-    ) -> Union[List[float], List[List[float]]]:
+        self, texts: str | list[str], show_progress_bar: bool = False
+    ) -> list[float] | list[list[float]]:
         """
         Encodes text(s) into embedding vector(s) using OpenAI's embedding API.
 

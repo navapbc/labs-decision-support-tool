@@ -20,7 +20,7 @@ import src.adapters.db as db
 import src.util.datetime_util as datetime_util
 from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Chunk, Document
-from app.tests.mock.mock_embedding_model import MockEmbeddingModel
+from tests.mock.mock_embedding_model import MockEmbeddingModel
 
 _db_session: Optional[db.Session] = None
 
@@ -82,9 +82,7 @@ class ChunkFactory(BaseFactory):
 
     document = factory.SubFactory(DocumentFactory)
     content = factory.LazyAttribute(lambda o: o.document.content)
-    tokens = factory.LazyAttribute(
-        lambda o: len(MockEmbeddingModel().tokenizer.tokenize(o.content))
-    )
+    tokens = factory.LazyAttribute(lambda o: MockEmbeddingModel().token_length(o.content))
     mpnet_embedding = factory.LazyAttribute(lambda o: MockEmbeddingModel().encode(o.content))
     headings = factory.Faker("words")
     num_splits = 1

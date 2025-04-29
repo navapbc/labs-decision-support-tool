@@ -1,12 +1,6 @@
 import math
-from typing import List, Sequence, Union
 
 from src.embeddings.model import EmbeddingModel
-
-
-class MockTokenizer:
-    def tokenize(self, text, **kwargs):
-        return text.split()
 
 
 class MockEmbeddingModel(EmbeddingModel):
@@ -22,7 +16,6 @@ class MockEmbeddingModel(EmbeddingModel):
             embedding_size: Size of the embedding vectors to generate
         """
         self._max_seq_length = 512
-        self._tokenizer = MockTokenizer()
         self._embedding_size = embedding_size
 
     @property
@@ -32,21 +25,27 @@ class MockEmbeddingModel(EmbeddingModel):
         """
         return self._max_seq_length
 
-    @property
-    def tokenizer(self):
+    @max_seq_length.setter
+    def max_seq_length(self, value: int):
         """
-        Returns the tokenizer used by the model.
+        Sets the maximum sequence length supported by the model.
         """
-        return self._tokenizer
+        self._max_seq_length = value
 
-    def _encode_one(self, text: str) -> List[float]:
+    def token_length(self, text: str) -> int:
+        """
+        Returns the number of tokens in the text.
+        """
+        return len(text.split())
+
+    def _encode_one(self, text: str) -> list[float]:
         """
         Encode a single text string into an embedding vector.
 
         The embedding vector is deterministically generated based on the average
         token length in the text.
         """
-        tokens = self.tokenizer.tokenize(text)
+        tokens = text.split()
         if not tokens:
             return [0.0] * self._embedding_size
 
@@ -60,8 +59,8 @@ class MockEmbeddingModel(EmbeddingModel):
         ] + [0.0] * (self._embedding_size - 2)
 
     def encode(
-        self, texts: Union[str, Sequence[str]], show_progress_bar: bool = False
-    ) -> Union[List[float], List[List[float]]]:
+        self, texts: str | list[str], show_progress_bar: bool = False
+    ) -> list[float] | list[list[float]]:
         """
         Encodes text(s) into embedding vector(s).
 

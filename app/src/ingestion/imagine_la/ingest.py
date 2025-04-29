@@ -20,7 +20,6 @@ from src.util.ingest_utils import (
     load_or_save_doc_markdown,
     process_and_ingest_sys_args,
     save_json,
-    tokenize,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,10 +27,10 @@ logger = logging.getLogger(__name__)
 
 class ImagineLaChunkingConfig(ChunkingConfig):
     def __init__(self) -> None:
-        super().__init__(app_config.sentence_transformer.max_seq_length)
+        super().__init__(app_config.embedding_model.max_seq_length)
 
     def text_length(self, text: str) -> int:
-        return len(tokenize(text))
+        return app_config.embedding_model.token_length(text)
 
 
 def _parse_html(

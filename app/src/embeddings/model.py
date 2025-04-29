@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import List, Sequence, Union
 
 
 class EmbeddingModel(ABC):
@@ -18,18 +17,17 @@ class EmbeddingModel(ABC):
         """
         pass
 
-    @property
     @abstractmethod
-    def tokenizer(self):
+    def token_length(self, text: str) -> int:
         """
-        Returns the tokenizer used by the model.
+        Returns the number of tokens of the input text.
         """
         pass
 
     @abstractmethod
     def encode(
-        self, texts: Union[str, Sequence[str]], show_progress_bar: bool = False
-    ) -> Union[List[float], List[List[float]]]:
+        self, texts: str | list[str], show_progress_bar: bool = False
+    ) -> list[float] | list[list[float]]:
         """
         Encodes text(s) into embedding vector(s).
 

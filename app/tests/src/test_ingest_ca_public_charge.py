@@ -79,7 +79,7 @@ def ca_public_charge_local_file(tmp_path, sample_markdown):
 
 
 def test_ingestion(caplog, app_config, db_session, ca_public_charge_local_file):
-    app_config_for_test.sentence_transformer.max_seq_length = 75
+    app_config_for_test.embedding_model.max_seq_length = 75
 
     db_session.execute(delete(Document))
 
