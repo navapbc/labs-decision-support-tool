@@ -3,6 +3,12 @@ from openai import OpenAI
 
 from src.embeddings.model import EmbeddingModel
 
+OPENAI_EMBEDDING_MODELS = [
+    "text-embedding-3-small",
+    "text-embedding-3-large",
+    "text-embedding-ada-002",
+]
+
 
 class OpenAIEmbedding(EmbeddingModel):
     """
@@ -33,12 +39,7 @@ class OpenAIEmbedding(EmbeddingModel):
         Returns the maximum sequence length supported by the model.
         """
 
-        model_limits = {
-            "text-embedding-3-small": 8191,
-            "text-embedding-3-large": 8191,
-            "text-embedding-ada-002": 8191,
-        }
-        return model_limits.get(self._model_name, 8191)  # Default to 8191 if model not in the list
+        return 8191
 
     def token_length(self, text: str) -> int:
         """
@@ -65,7 +66,7 @@ class OpenAIEmbedding(EmbeddingModel):
         single_input = isinstance(texts, str)
         input_texts = [texts] if single_input else list(texts)
 
-        response = self._client.embeddings.create(model=self._model_name, input=input_texts)
+        response = self._client.embeddings.create(model=self._model_name, input=input_texts)  # type: ignore
 
         embeddings = [data.embedding for data in response.data]
 

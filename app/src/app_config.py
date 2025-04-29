@@ -2,6 +2,7 @@ from functools import cached_property
 
 from src.adapters import db
 from src.embeddings.model import EmbeddingModel
+from src.embeddings.openai import OPENAI_EMBEDDING_MODELS, OpenAIEmbedding
 from src.embeddings.sentence_transformer import SentenceTransformerEmbedding
 from src.util.env_config import PydanticBaseEnvConfig
 
@@ -45,6 +46,9 @@ class AppConfig(PydanticBaseEnvConfig):
 
     @cached_property
     def embedding_model(self) -> EmbeddingModel:
+        if self.embedding_model_name in OPENAI_EMBEDDING_MODELS:
+            return OpenAIEmbedding(self.embedding_model_name)
+
         return SentenceTransformerEmbedding(self.embedding_model_name)
 
 
