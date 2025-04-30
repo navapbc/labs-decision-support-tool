@@ -1,7 +1,5 @@
 import asyncio
-import datetime
 import logging
-import uuid
 
 import pytest
 from fastapi import HTTPException
@@ -9,14 +7,13 @@ from fastapi.exceptions import RequestValidationError
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
-import chainlit as cl
 from chainlit import data as cl_data
-from chainlit.data.literalai import LiteralDataLayer
-from src import chainlit_data, chat_api
+from src import chat_api
 from src.chat_api import (
     ChatEngineSettings,
     ChatSession,
     QueryResponse,
+    app_config,
     get_chat_engine,
     router,
     run_query,
@@ -30,36 +27,18 @@ from tests.src.test_chainlit_data import clear_data_layer_data
 
 
 @pytest.fixture
-def mock_lai(monkeypatch):
-    # Set LITERAL_API_KEY to create a secondary data layer
+def no_literalai_data_layer(monkeypatch):
+    """
+    Disables the LiteralAI data layer by clearing the API key environment variable
+    and resetting the `literal_api_key_for_api` attribute in the app configuration.
+    This prevents unintentional creation of the data layer during tests.
+    """
     monkeypatch.setenv("LITERAL_API_KEY", "")
-
-    # Create mock for the secondary data layer
-    class MockLiteralAiDataLayer(LiteralDataLayer):
-        def __init__(self):
-            self.stored_user = None
-
-        async def create_user(self, user: cl.User):
-            self.stored_user = cl.PersistedUser(
-                id=str(uuid.uuid4()),
-                identifier=user.identifier,
-                metadata=user.metadata,
-                createdAt=str(datetime.datetime.now()),
-            )
-            return self.stored_user
-
-        async def get_user(self, identifier: str):
-            assert identifier == self.stored_user.identifier
-            return self.stored_user
-
-    # Create a no-op mock for the secondary data layer
-    monkeypatch.setattr(
-        chainlit_data, "get_literal_data_layer", lambda _key: MockLiteralAiDataLayer()
-    )
+    monkeypatch.setattr(app_config, "literal_api_key_for_api", "")
 
 
 @pytest.fixture
-def async_client(mock_lai, db_session):  # mock LiteralAI when testing API
+def async_client(no_literalai_data_layer, db_session):
     """
     The typical FastAPI TestClient creates its own event loop to handle requests,
     which led to issues when testing code that relies on asynchronous operations
