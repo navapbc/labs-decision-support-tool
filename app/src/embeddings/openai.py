@@ -22,10 +22,6 @@ class OpenAIEmbedding(EmbeddingModel):
         Args:
             model_name: Name of the OpenAI embedding model to use
                        (e.g., 'text-embedding-3-small')
-            api_key: Optional API key for OpenAI. If not provided, will use
-                     the OPENAI_API_KEY environment variable.
-            base_url: Optional base URL for the OpenAI API. If not provided, will
-                      use the default OpenAI API URL.
         """
         self._model_name = model_name
         self._client = OpenAI()
