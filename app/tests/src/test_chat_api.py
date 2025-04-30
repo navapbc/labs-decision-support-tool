@@ -13,6 +13,7 @@ import chainlit as cl
 from chainlit import data as cl_data
 from chainlit.data.literalai import LiteralDataLayer
 from src import chainlit_data, chat_api
+from src.app_config import app_config
 from src.chat_api import (
     ChatEngineSettings,
     ChatSession,
@@ -33,29 +34,32 @@ from tests.src.test_chainlit_data import clear_data_layer_data
 def mock_lai(monkeypatch):
     # Set LITERAL_API_KEY to create a secondary data layer
     monkeypatch.setenv("LITERAL_API_KEY", "")
+    monkeypatch.setattr(app_config, "literal_api_key_for_api", "")
 
     # Create mock for the secondary data layer
-    class MockLiteralAiDataLayer(LiteralDataLayer):
-        def __init__(self):
-            self.stored_user = None
+    # class MockLiteralAiDataLayer(LiteralDataLayer):
+    #     def __init__(self):
+    #         self.stored_user = None
 
-        async def create_user(self, user: cl.User):
-            self.stored_user = cl.PersistedUser(
-                id=str(uuid.uuid4()),
-                identifier=user.identifier,
-                metadata=user.metadata,
-                createdAt=str(datetime.datetime.now()),
-            )
-            return self.stored_user
+    #     async def create_user(self, user: cl.User):
+    #         self.stored_user = cl.PersistedUser(
+    #             id=str(uuid.uuid4()),
+    #             identifier=user.identifier,
+    #             metadata=user.metadata,
+    #             createdAt=str(datetime.datetime.now()),
+    #         )
+    #         return self.stored_user
 
-        async def get_user(self, identifier: str):
-            assert identifier == self.stored_user.identifier
-            return self.stored_user
+    #     async def get_user(self, identifier: str):
+    #         assert identifier == self.stored_user.identifier
+    #         return self.stored_user
 
-    # Create a no-op mock for the secondary data layer
-    monkeypatch.setattr(
-        chainlit_data, "get_literal_data_layer", lambda _key: MockLiteralAiDataLayer()
-    )
+    # # Create a no-op mock for the secondary data layer
+    # monkeypatch.setattr(
+    #     chainlit_data, "get_literal_data_layer", lambda _key: (_ for _ in ()).throw(NotImplementedError("Mock LiteralAI Data Layer not implemented"))
+    # )
+    print("mock_lai() called")
+    # import pdb; pdb.set_trace()
 
 
 @pytest.fixture
@@ -130,6 +134,9 @@ async def test_api_engines(async_client, db_session):
 
 @pytest.mark.asyncio
 async def test_api_engines__dbsession_contextvar(async_client, monkeypatch, db_session):
+    # dl = chat_api.cl_get_data_layer()
+    # dl.data_layers
+    # import pdb; pdb.set_trace()
     event = asyncio.Event()
     db_sessions = []
     orig_init_chat_session = chat_api._init_chat_session

@@ -42,6 +42,8 @@ logger = logging.getLogger(__name__)
 
 @cl.data_layer
 def chainlit_data_layer() -> ChainlitPolyDataLayer:
+    print("chainlit_data_layer() called")
+    # import pdb; pdb.set_trace()
     data_layers = None
     if app_config.literal_api_key_for_api:
         data_layers = [
