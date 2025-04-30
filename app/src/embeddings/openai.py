@@ -34,7 +34,7 @@ class OpenAIEmbedding(EmbeddingModel):
         """
         Returns the maximum sequence length supported by the model.
         """
-
+        # The models listed in OPENAI_EMBEDDING_MODELS all have this maximum.
         return 8191
 
     def token_length(self, text: str) -> int:
