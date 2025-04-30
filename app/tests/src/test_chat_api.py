@@ -28,6 +28,11 @@ from tests.src.test_chainlit_data import clear_data_layer_data
 
 @pytest.fixture
 def no_literalai_data_layer(monkeypatch):
+    """
+    Disables the LiteralAI data layer by clearing the API key environment variable
+    and resetting the `literal_api_key_for_api` attribute in the app configuration.
+    This prevents unintentional creation of the data layer during tests.
+    """
     monkeypatch.setenv("LITERAL_API_KEY", "")
     monkeypatch.setattr(app_config, "literal_api_key_for_api", "")
 
