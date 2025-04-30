@@ -1,11 +1,10 @@
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
+from tests.mock.mock_embedding_model import MockEmbeddingModel
 
 
 def test_mock_sentence_transformer():
-    embedding_model = MockSentenceTransformer()
+    embedding_model = MockEmbeddingModel()
 
     assert embedding_model.max_seq_length == 512
-    assert embedding_model.tokenizer.tokenize("Hello, world!") == ["Hello,", "world!"]
     assert len(embedding_model.encode("Hello, world!")) == 768
 
     # Test that we can compare similarity with dot product,

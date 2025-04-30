@@ -138,17 +138,6 @@ def start_ingestion(
     logger.info("Finished ingesting %r (%s)", config.dataset_label, config.scraper_dataset)
 
 
-def tokenize(text: str) -> list[str]:
-    """
-    The add_special_tokens argument is specified in PreTrainedTokenizerFast.encode_plus(), parent class of MPNetTokenizerFast.
-    It defaults to True for encode_plus() but defaults to False for .tokenize().
-    Setting add_special_tokens=True will add the special tokens CLS(0) and SEP(2) to the beginning and end of the input text.
-    """
-    tokenizer = app_config.sentence_transformer.tokenizer
-    # The add_special_tokens argument is valid for only PreTrainedTokenizerFast subclasses
-    return tokenizer.tokenize(text, add_special_tokens=True)
-
-
 def add_embeddings(
     chunks: Sequence[Chunk], texts_to_encode: Optional[Sequence[str]] = None
 ) -> None:
@@ -158,7 +147,7 @@ def add_embeddings(
     This allows us to create embeddings using text other than chunk.content.
     If the corresponding texts_to_encode element evaluates to False, then chunk.content is used instead.
     """
-    embedding_model = app_config.sentence_transformer
+    embedding_model = app_config.embedding_model
 
     if texts_to_encode:
         to_encode = [
@@ -173,8 +162,8 @@ def add_embeddings(
     embeddings = embedding_model.encode([text for text in to_encode], show_progress_bar=False)
 
     for chunk, embedding, text in zip(chunks, embeddings, to_encode, strict=True):
-        chunk.mpnet_embedding = embedding
-        token_len = len(tokenize(text))
+        chunk.mpnet_embedding = embedding  # type: ignore
+        token_len = embedding_model.token_length(text)
         if not chunk.tokens:
             chunk.tokens = token_len
         else:
@@ -221,7 +210,7 @@ def save_json(file_path: str, chunks: list[Chunk]) -> None:
         file.write("\n")
         for chunk in chunks:
             if not chunk.tokens:
-                chunk.tokens = len(tokenize(chunk.content))
+                chunk.tokens = app_config.embedding_model.token_length(chunk.content)
 
             file.write(f"---\nlength:   {chunk.tokens}\nheadings: {chunk.headings}\n---\n")
             file.write(chunk.content)
@@ -231,7 +220,7 @@ def save_json(file_path: str, chunks: list[Chunk]) -> None:
 
 class DefaultChunkingConfig(ChunkingConfig):
     def __init__(self) -> None:
-        super().__init__(app_config.sentence_transformer.max_seq_length)
+        super().__init__(app_config.embedding_model.max_seq_length)
 
     def text_length(self, text: str) -> int:
-        return len(tokenize(text))
+        return app_config.embedding_model.token_length(text)

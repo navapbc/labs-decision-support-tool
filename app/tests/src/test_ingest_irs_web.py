@@ -57,7 +57,7 @@ def irs_web_local_file(tmp_path, sample_markdown):
 
 def test_ingestion(caplog, app_config, db_session, irs_web_local_file):
     # Force a short max_seq_length to test chunking
-    app_config_for_test.sentence_transformer.max_seq_length = 47
+    app_config_for_test.embedding_model.max_seq_length = 47
 
     db_session.execute(delete(Document))
 

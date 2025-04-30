@@ -15,9 +15,8 @@ from src.util.ingest_utils import (
     drop_existing_dataset,
     process_and_ingest_sys_args,
     save_json,
-    tokenize,
 )
-from tests.mock.mock_sentence_transformer import MockSentenceTransformer
+from tests.mock.mock_embedding_model import MockEmbeddingModel
 from tests.src.db.models.factories import ChunkFactory, DocumentFactory
 
 
@@ -192,21 +191,21 @@ def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_c
 
 
 def test__add_embeddings(app_config):
-    embedding_model = MockSentenceTransformer()
+    embedding_model = MockEmbeddingModel()
     chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)
     add_embeddings(chunks)
     for chunk in chunks:
-        assert chunk.tokens == len(tokenize(chunk.content))
+        assert chunk.tokens == embedding_model.token_length(chunk.content)
         assert chunk.mpnet_embedding == embedding_model.encode(chunk.content)
 
 
 def test__add_embeddings_with_texts_to_encode(app_config):
-    embedding_model = MockSentenceTransformer()
+    embedding_model = MockEmbeddingModel()
     chunks = ChunkFactory.build_batch(3, tokens=None, mpnet_embedding=None)
     texts_to_encode = ["text1", "text2", "text3"]
     add_embeddings(chunks, texts_to_encode)
     for chunk, text in zip(chunks, texts_to_encode, strict=True):
-        assert chunk.tokens == len(tokenize(text))
+        assert chunk.tokens == embedding_model.token_length(text)
         assert chunk.mpnet_embedding == embedding_model.encode(text)
 
 

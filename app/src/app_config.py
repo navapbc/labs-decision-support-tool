@@ -1,8 +1,9 @@
 from functools import cached_property
 
-from sentence_transformers import SentenceTransformer
-
 from src.adapters import db
+from src.embeddings.model import EmbeddingModel
+from src.embeddings.openai import OPENAI_EMBEDDING_MODELS, OpenAIEmbedding
+from src.embeddings.sentence_transformer import SentenceTransformerEmbedding
 from src.util.env_config import PydanticBaseEnvConfig
 
 
@@ -26,7 +27,7 @@ class AppConfig(PydanticBaseEnvConfig):
     port: int = 8080
 
     # Used for ingestion (before chatbot application starts) and retrieval (during chatbot interactions)
-    embedding_model: str = "multi-qa-mpnet-base-cos-v1"
+    embedding_model_name: str = "multi-qa-mpnet-base-cos-v1"
 
     # Default chat engine
     chat_engine: str = "imagine-la"
@@ -44,8 +45,11 @@ class AppConfig(PydanticBaseEnvConfig):
         return db.PostgresDBClient().get_session()
 
     @cached_property
-    def sentence_transformer(self) -> SentenceTransformer:
-        return SentenceTransformer(self.embedding_model)
+    def embedding_model(self) -> EmbeddingModel:
+        if self.embedding_model_name in OPENAI_EMBEDDING_MODELS:
+            return OpenAIEmbedding(self.embedding_model_name)
+
+        return SentenceTransformerEmbedding(self.embedding_model_name)
 
 
 app_config = AppConfig()

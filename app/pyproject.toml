@@ -41,6 +41,7 @@ asyncpg = "^0.30.0"
 beautifulsoup4 = "^4.13.3"
 contentful = "^2.4.0"
 rich-text-renderer = "^0.2.8"
+tiktoken = "^0.9.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
@@ -147,5 +148,5 @@ markers = [
   "audit: mark a test as a security audit log test, to be run isolated from other tests"]
 
 [tool.coverage.run]
-omit = ["src/db/manage.py", "src/db/migrations/*.py", "src/db/migrations/versions/*.py", "src/chainlit.py", "src/app.py"]
+omit = ["src/db/manage.py", "src/db/migrations/*.py", "src/db/migrations/versions/*.py", "src/chainlit.py", "src/app.py", "src/embeddings/*"]
 

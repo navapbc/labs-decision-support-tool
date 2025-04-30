@@ -17,7 +17,7 @@ def retrieve_with_scores(
 ) -> Sequence[ChunkWithScore]:
     logger.info("Retrieving context for %r", query)
 
-    embedding_model = app_config.sentence_transformer
+    embedding_model = app_config.embedding_model
     query_embedding = embedding_model.encode(query, show_progress_bar=False)
 
     statement = select(Chunk, Chunk.mpnet_embedding.max_inner_product(query_embedding)).join(
