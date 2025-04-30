@@ -402,13 +402,24 @@ If the user's question is about these questions related to the benefit navigator
 - Or other kinds of support questions for the Benefit Navigator tool
 then set canned_response to: "To get support with that issue, select "Need help? Contact the support team" at the top of this chatbot to open a ticket with the operations team. You can also email us at [socialbenefithelp@imaginela.org](mailto:socialbenefithelp@imaginela.org)"
 
-If the user's question is about a referral link below, set canned_response to: \
+# Referral links section
+# Important: Be strict about when to use referral links
+# Only use a referral link if the user is explicitly asking how to obtain/access/find the exact resource described by one of the referral links below.
+# By default, prefer setting needs_context=True to search the knowledge base.
+# When uncertain, do not use referral links - set needs_context=True instead.
+
+For referral links below, only set canned_response to a referral link if:
+1. The user is explicitly asking how to obtain/access/find that specific resource (e.g., "How do I get an ID card?")
+2. and the question is narrowly about the process of obtaining that resource
+3. and the question does not appear to be about eligibility, benefits programs, or resources for specific populations
+
+If these criteria are met, then set canned_response to:
 "Here's a trusted link to learn more: [referral link title](referral link). \
 I can give more detail about the benefit programs and tax credits in the [Benefits Information Hub](https://benefitnavigator.web.app/contenthub)."
 
 Referral links: Format: [referral link title](referral link):
 - [Get an ID card](https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/)
-- [Get a Passport]: [https://travel.state.gov/content/travel/en/passports/need-passport/apply-in-person.html](https://travel.state.gov/content/travel/en/passports/need-passport/apply-in-person.html)
+- [Get a Passport](https://travel.state.gov/content/travel/en/passports/need-passport/apply-in-person.html)
 - [Request Birth Certificates](https://www.cdph.ca.gov/Programs/CHSI/Pages/Vital-Records-Obtaining-Certified-Copies-of-Birth-Records.aspx)
 - [Request a Social Security Number](https://www.ssa.gov/number-card/request-number-first-time)
 - [Request an ITIN](https://www.irs.gov/tin/itin/how-to-apply-for-an-itin)
@@ -428,6 +439,12 @@ Referral links: Format: [referral link title](referral link):
 - [Find LADWP contact info](https://www.ladwp.com/account/customer-service/customer-service-centers)
 - [Find Legal Aid](https://lafla.org/get-help/)
 - [See Federal Poverty Levels](https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines)
+
+# Examples to illustrate correct referral link decisions:
+# Question: "How do I get an ID card?" → Use referral link for "Get an ID card"
+# Question: "Where can I apply for a passport?" → Use referral link for "Get a Passport"
+# Question: "Where can foster youth find legal help?" → DO NOT use referral link, set needs_context=True
+# Question: "What benefits can immigrants get?" → DO NOT use referral link, set needs_context=True
 
 If the user's question is related to any of the following policy updates listed below, \
 set canned_response to empty string and set alert_message to one or more of the following text based on the user's question:
