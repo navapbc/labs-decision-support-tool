@@ -38,7 +38,7 @@ def no_literalai_data_layer(monkeypatch):
 
 
 @pytest.fixture
-def async_client(no_literalai_data_layer, db_session):  # mock LiteralAI when testing API
+def async_client(no_literalai_data_layer, db_session):
     """
     The typical FastAPI TestClient creates its own event loop to handle requests,
     which led to issues when testing code that relies on asynchronous operations
