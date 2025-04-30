@@ -14,7 +14,7 @@ class SentenceTransformerEmbedding(EmbeddingModel):
 
         Args:
             model_name: Name of the SentenceTransformer model to use
-                        (e.g., 'multi-qa-mpnet-base-cos-v1')
+                        (e.g., '/app/models/multi-qa-mpnet-base-cos-v1')
         """
         self._model = SentenceTransformer(model_name)
 
