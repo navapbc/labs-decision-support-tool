@@ -402,11 +402,7 @@ If the user's question is about these questions related to the benefit navigator
 - Or other kinds of support questions for the Benefit Navigator tool
 then set canned_response to: "To get support with that issue, select "Need help? Contact the support team" at the top of this chatbot to open a ticket with the operations team. You can also email us at [socialbenefithelp@imaginela.org](mailto:socialbenefithelp@imaginela.org)"
 
-# Precedence of canned_response:
-# 1. Coverage list of supported benefit programs
-# 2. Password reset instructions for the Benefit Navigator
-# 3. Benefit Navigator support issue instructions
-# Only if none of the above apply should you consider referral links
+If canned_response is not set by the above instructions, then consider referral links
 
 # Referral links section
 # Important: Be strict about when to use referral links
