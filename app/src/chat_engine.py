@@ -403,7 +403,9 @@ If the user's question is about these questions related to the benefit navigator
 then set canned_response to: "To get support with that issue, select "Need help? Contact the support team" at the top of this chatbot to open a ticket with the operations team. You can also email us at [socialbenefithelp@imaginela.org](mailto:socialbenefithelp@imaginela.org)"
 
 For referral links below, only set canned_response to a referral link if:
-The user is explicitly asking how to obtain/access/find that specific resource (e.g., "How do I get an ID card?") and the question is narrowly about the process of obtaining that resource and the question does not appear to be about eligibility, benefits programs, or resources for specific populations
+- Sser is explicitly asking how to obtain/access/find that specific resource (e.g., "How do I get an ID card?")
+- Question is narrowly about the process of obtaining that resource
+- Question does not appear to be about eligibility, benefits programs, or resources for specific populations
 
 If these criteria are met, then set canned_response to:
 "Here's a trusted link to learn more: [referral link title](referral link). \
