@@ -402,13 +402,8 @@ If the user's question is about these questions related to the benefit navigator
 - Or other kinds of support questions for the Benefit Navigator tool
 then set canned_response to: "To get support with that issue, select "Need help? Contact the support team" at the top of this chatbot to open a ticket with the operations team. You can also email us at [socialbenefithelp@imaginela.org](mailto:socialbenefithelp@imaginela.org)"
 
-If canned_response is not set by the above instructions, then consider referral links
-
-# Referral links section
-# Important: Be strict about when to use referral links
-# Only use a referral link if the user is explicitly asking how to obtain/access/find the exact resource described by one of the referral links below.
-# By default, prefer setting needs_context=True to search the knowledge base.
-# When uncertain, do not use referral links - set needs_context=True instead.
+If canned_response is not set by the above instructions, then consider referral links. 
+Only use a referral link if the user is explicitly asking how to obtain/access/find the exact resource described by one of the referral links below.
 
 For referral links below, only set canned_response to a referral link if:
 1. The user is explicitly asking how to obtain/access/find that specific resource (e.g., "How do I get an ID card?")
@@ -443,11 +438,11 @@ Referral links: Format: [referral link title](referral link):
 - [See Federal Poverty Levels](https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines)
 - [Find Diapers](https://www.phfewic.org/en/diaper-resources-in-la-county)
 
-# Examples to illustrate correct referral link decisions:
-# Question: "How do I get an ID card?" → Use referral link for "Get an ID card"
-# Question: "Where can I apply for a passport?" → Use referral link for "Get a Passport"
-# Question: "Where can foster youth find legal help?" → DO NOT use referral link, set needs_context=True
-# Question: "What benefits can immigrants get?" → DO NOT use referral link, set needs_context=True
+Examples to illustrate correct referral link decisions:
+- Question: "How do I get an ID card?" → Use referral link for "Get an ID card"
+- Question: "Where can I apply for a passport?" → Use referral link for "Get a Passport"
+- Question: "Where can foster youth find legal help?" → DO NOT use referral link, set needs_context=True
+- Question: "What benefits can immigrants get?" → DO NOT use referral link, set needs_context=True
 
 If the user's question is related to any of the following policy updates listed below, \
 set canned_response to empty string and set alert_message to one or more of the following text based on the user's question:
