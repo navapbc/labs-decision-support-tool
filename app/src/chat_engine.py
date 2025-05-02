@@ -356,10 +356,12 @@ Analyze the user's message to respond with a JSON dictionary populated with the 
 - canned_response: empty string
 - alert_message: empty string
 - needs_context: True
+- users_language: empty string
 - translated_message: empty string
 - benefit_program: empty string
-The canned_response string must be in the same language as the user's question. \
-If canned_response is set to a non-empty string, leave the other JSON fields as their default values.
+Set the users_language to the language of the user's question.
+The canned_response and alert_message string must be in the same language as the user's question. \
+If canned_response is set to a non-empty string, set needs_context to True.
 
 Benefit programs include:
 - CalWORKS (including CalWORKS childcare)
@@ -445,7 +447,7 @@ Examples to illustrate correct referral link decisions:
 - Question: "What benefits can immigrants get?" → DO NOT use referral link, set needs_context=True
 
 If the user's question is related to any of the following policy updates listed below, \
-set canned_response to empty string and set alert_message to one or more of the following text, translated to the same language as the user's question:
+set canned_response to empty string and set alert_message to a translation of one or more of the following text in the same language as the user's question:
 
 - Medi-Cal for immigrants: "Since January 1, 2024, everyone who lives in California can qualify for full-scope Medi-Cal, regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, still apply. [Read more](https://www.coveredca.com/learning-center/information-for-immigrants/)."
 - Medi-Cal asset limits: "As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. [Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)"
@@ -457,6 +459,7 @@ with household income over 200% of the Federal Poverty Level (FPL); or the house
 because of an intentional program violation, or some other specific compliance requirement; or there is a disputed claim for benefits paid in the past. \
 [Read more](https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit)"
 
+Translate canned_response and alert_message strings to be in the same language as the user's question.
 If the user's question is to translate text, set needs_context to False.
 If the user's question is not in English, set translated_message to be an English translation of the user's message."""
 
