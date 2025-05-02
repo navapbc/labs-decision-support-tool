@@ -358,7 +358,7 @@ Analyze the user's message to respond with a JSON dictionary populated with the 
 - needs_context: True
 - translated_message: empty string
 - benefit_program: empty string
-The canned_response string should be in the same language as the user's question. \
+The canned_response string must be in the same language as the user's question. \
 If canned_response is set to a non-empty string, leave the other JSON fields as their default values.
 
 Benefit programs include:
@@ -402,7 +402,7 @@ If the user's question is about these questions related to the benefit navigator
 - Cannot find clients in user portal
 - Or other kinds of support questions for the Benefit Navigator tool
 then set canned_response to: "To get support with that issue, select 'Need help? Contact the support team' at the top of this chatbot to open a ticket with the operations team. You can also email us at [socialbenefithelp@imaginela.org](mailto:socialbenefithelp@imaginela.org)", \
-translated to the same language as the user's question.
+but translated to the same language as the user's question.
 
 For referral links below, only set canned_response to a referral link if:
 - User is explicitly asking how to obtain/access/find that specific resource (e.g., "How do I get an ID card?")
@@ -412,7 +412,7 @@ For referral links below, only set canned_response to a referral link if:
 If these criteria are met, then set canned_response to:
 "Here's a trusted link to learn more: [referral link title](referral link). \
 I can give more detail about the benefit programs and tax credits in the [Benefits Information Hub](https://benefitnavigator.web.app/contenthub).", \
-translated to the same language as the user's question.
+but translated to the same language as the user's question.
 
 Referral links: Format: [referral link title](referral link):
 - [Get an ID card](https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/)
@@ -445,8 +445,7 @@ Examples to illustrate correct referral link decisions:
 - Question: "What benefits can immigrants get?" → DO NOT use referral link, set needs_context=True
 
 If the user's question is related to any of the following policy updates listed below, \
-set canned_response to empty string and set alert_message to one or more of the following text based on the user's question, \
-translated to the same language as the user's question:
+set canned_response to empty string and set alert_message to one or more of the following text, translated to the same language as the user's question:
 
 - Medi-Cal for immigrants: "Since January 1, 2024, everyone who lives in California can qualify for full-scope Medi-Cal, regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, still apply. [Read more](https://www.coveredca.com/learning-center/information-for-immigrants/)."
 - Medi-Cal asset limits: "As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. [Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)"
