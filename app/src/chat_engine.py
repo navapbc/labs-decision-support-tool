@@ -449,15 +449,19 @@ Examples to illustrate correct referral link decisions:
 If the user's question is related to any of the following policy updates listed below, \
 set canned_response to empty string and set alert_message to a translation of one or more of the following text in the same language as the user's question:
 
-- Medi-Cal for immigrants: "Since January 1, 2024, everyone who lives in California can qualify for full-scope Medi-Cal, regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, still apply. [Read more](https://www.coveredca.com/learning-center/information-for-immigrants/)."
-- Medi-Cal asset limits: "As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. [Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)"
-- CalFresh work requirements (ABAWDs, time limits): "California has a statewide waiver through October 31, 2025. \
-This means no ABAWDs living in California will have to meet the work requirement to keep receiving CalFresh benefits. ABAWDs who have lost their CalFresh benefits may reapply and continue to receive CalFresh if otherwise eligible. [Read more](https://www.cdss.ca.gov/inforesources/calfresh/abawd)"
-- Calfresh asset limits/resource limits: "California has dramatically modified its rules for 'categorical eligibility' in the CalFresh program, \
+- Medi-Cal for immigrants: "**Policy update**: Since January 1, 2024, everyone who lives in California can qualify for full-scope Medi-Cal, regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, still apply. [Read more](https://www.coveredca.com/learning-center/information-for-immigrants/).
+The rest of this answer may be outdated."
+- Medi-Cal asset limits: "**Policy update**: As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. [Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)
+The rest of this answer may be outdated."
+- CalFresh work requirements (ABAWDs, time limits): "**Policy update**: California has a statewide waiver through October 31, 2025. \
+This means no ABAWDs living in California will have to meet the work requirement to keep receiving CalFresh benefits. ABAWDs who have lost their CalFresh benefits may reapply and continue to receive CalFresh if otherwise eligible. [Read more](https://www.cdss.ca.gov/inforesources/calfresh/abawd)
+The rest of this answer may be outdated."
+- Calfresh asset limits/resource limits: "**Policy update**: California has dramatically modified its rules for 'categorical eligibility' in the CalFresh program, \
 such that asset limits have all but been removed. The only exceptions would be if either the household includes one or more members who are aged or disabled, \
 with household income over 200% of the Federal Poverty Level (FPL); or the household fits within a narrow group of cases where it has been disqualified \
 because of an intentional program violation, or some other specific compliance requirement; or there is a disputed claim for benefits paid in the past. \
-[Read more](https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit)"
+[Read more](https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit)
+The rest of this answer may be outdated."
 
 Translate canned_response and alert_message strings to be in the same language as the user's question.
 If the user's question is to translate text, set needs_context to False.
@@ -530,8 +534,8 @@ they can apply for both, and the state will check if they qualify for either one
             f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
         )
 
-        if attributes.alert_message:
-            attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
+        # if attributes.alert_message:
+        #     attributes.alert_message = attributes.alert_message
 
         if attributes.canned_response:
             return OnMessageResult(attributes.canned_response, self.system_prompt_1, attributes)
@@ -555,8 +559,8 @@ they can apply for both, and the state will check if they qualify for either one
         )
 
         # Format alert message the same way as non-streaming version
-        if attributes.alert_message:
-            attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
+        # if attributes.alert_message:
+        #     attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
 
         # Handle canned responses - return the entire response at once with empty subsections
         if attributes.canned_response:
