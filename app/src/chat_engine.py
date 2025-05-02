@@ -534,9 +534,6 @@ they can apply for both, and the state will check if they qualify for either one
             f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
         )
 
-        # if attributes.alert_message:
-        #     attributes.alert_message = attributes.alert_message
-
         if attributes.canned_response:
             return OnMessageResult(attributes.canned_response, self.system_prompt_1, attributes)
 
@@ -557,10 +554,6 @@ they can apply for both, and the state will check if they qualify for either one
         logger.info(
             f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
         )
-
-        # Format alert message the same way as non-streaming version
-        # if attributes.alert_message:
-        #     attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
 
         # Handle canned responses - return the entire response at once with empty subsections
         if attributes.canned_response:

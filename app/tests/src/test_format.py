@@ -32,7 +32,7 @@ def test__get_breadcrumb_html():
 
 def test_format_response(chunks_with_scores):
     config = FormattingConfig()
-    msg_attribs = MessageAttributes(needs_context=True, translated_message="")
+    msg_attribs = MessageAttributes(needs_context=True, users_language="en", translated_message="")
     # Test empty response
     assert format_response([], "", config, msg_attribs) == "<div></div>"
 

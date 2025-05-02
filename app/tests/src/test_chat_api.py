@@ -357,7 +357,7 @@ async def test_run_query__1_citation(subsections):
             return OnMessageResult(
                 "Response from LLM (citation-2)",
                 "Some system prompt",
-                MessageAttributes(needs_context=True, translated_message=""),
+                MessageAttributes(needs_context=True, users_language="en", translated_message=""),
                 chunks_with_scores=[],
                 subsections=subsections,
             )
@@ -379,20 +379,18 @@ async def test_run_query__2_citations(subsections):
                 "Some system prompt",
                 ImagineLA_MessageAttributes(
                     needs_context=True,
+                    users_language="en",
                     translated_message="",
                     benefit_program="CalFresh",
                     canned_response="",
-                    alert_message="**Policy update**: Some alert message.\n\nThe rest of this answer may be outdated.",
+                    alert_message="Some alert message.",
                 ),
                 chunks_with_scores=[],
                 subsections=subsections,
             )
 
     query_response, _metadata = await run_query(MockChatEngine(), "My question")
-    assert (
-        query_response.alert_message
-        == "**Policy update**: Some alert message.\n\nThe rest of this answer may be outdated."
-    )
+    assert query_response.alert_message == "Some alert message."
     assert (
         query_response.response_text
         == f"{query_response.alert_message}\n\nResponse from LLM (citation-1) (citation-2)"
@@ -409,7 +407,7 @@ async def test_run_query__unknown_citation(subsections, caplog):
             return OnMessageResult(
                 "Response from LLM (citation-2)(citation-44)",
                 "Some system prompt",
-                MessageAttributes(needs_context=True, translated_message=""),
+                MessageAttributes(needs_context=True, users_language="en", translated_message=""),
                 chunks_with_scores=[],
                 subsections=subsections,
             )
@@ -543,7 +541,9 @@ async def test_query_stream_basic(async_client, monkeypatch, db_session):
                 yield "hello "
                 yield "world"
 
-            attributes = MessageAttributes(needs_context=False, translated_message="")
+            attributes = MessageAttributes(
+                needs_context=False, users_language="en", translated_message=""
+            )
             return gen(), attributes, []
 
     monkeypatch.setattr(chat_api, "get_chat_engine", lambda session: MockEngine())
@@ -589,6 +589,7 @@ async def test_query_stream_with_alert(async_client, monkeypatch, db_session):
             # Provide an attributes object with alert_message
             attributes = ImagineLA_MessageAttributes(
                 needs_context=False,
+                users_language="en",
                 translated_message="",
                 benefit_program="",
                 canned_response="",
