@@ -21,7 +21,7 @@ def upgrade():
     op.alter_column(
         "chunk",
         "mpnet_embedding",
-        existing_type=Vector(dim=1024),
+        existing_type=Vector(dim=3072),
         type_=Vector(dim=768),
         existing_comment="MPNet embedding of the content",
         existing_nullable=False,
@@ -35,7 +35,7 @@ def downgrade():
         "chunk",
         "mpnet_embedding",
         existing_type=Vector(dim=768),
-        type_=Vector(dim=1024),
+        type_=Vector(dim=3072),
         existing_comment="MPNet embedding of the content",
         existing_nullable=False,
     )
