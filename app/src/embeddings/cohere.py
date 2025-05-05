@@ -1,5 +1,7 @@
-import cohere
 import time
+from enum import Enum
+
+import cohere
 
 from src.embeddings.model import EmbeddingModel
 
@@ -9,6 +11,11 @@ COHERE_EMBEDDING_MODELS = [
 
 MAX_RETRY_COUNT = 3
 MAX_RETRY_DELAY_SECONDS = 0.5
+
+
+class CohereInputType(Enum):
+    SEARCH_DOCUMENT = "search_document"
+    SEARCH_QUERY = "search_query"
 
 
 class CohereEmbedding(EmbeddingModel):
@@ -40,15 +47,17 @@ class CohereEmbedding(EmbeddingModel):
     def token_length(self, text: str) -> int:
         """
         Returns the number of tokens of the tokenized text.
-        
+
         Note: This is an approximation as Cohere's internal tokenization
         might differ from tiktoken's tokenization.
         """
         return len(self._client.tokenize(text=text, model=self._model_name).tokens)
 
     def encode(
-        self, texts: str | list[str], show_progress_bar: bool = False,
-        input_type="search_document"  # Other option is "search_query"
+        self,
+        texts: str | list[str],
+        show_progress_bar: bool = False,
+        input_type: CohereInputType = CohereInputType.SEARCH_DOCUMENT,
     ) -> list[float] | list[list[float]]:
         """
         Encodes text(s) into embedding vector(s) using Cohere's embedding API.
@@ -70,20 +79,19 @@ class CohereEmbedding(EmbeddingModel):
         while retry_count < MAX_RETRY_COUNT:
             try:
                 response = self._client.embed(
-                    texts=input_texts,
+                    texts=input_texts,  # type: ignore
                     model=self._model_name,
-                    input_type=input_type,
+                    input_type=input_type.value,
                     embedding_types=["float"],
                 )
-                break  # Exit loop if successful
+                break
             except Exception as e:
                 retry_count += 1
                 if retry_count >= MAX_RETRY_COUNT:
-                    raise e  # Re-raise exception if max retries reached
+                    raise e
                 time.sleep(MAX_RETRY_DELAY_SECONDS)
 
-        
         embeddings = response.embeddings.float_
 
         # Return single embedding if input was a single string
-        return embeddings[0] if single_input else embeddings
+        return embeddings[0] if single_input else embeddings  # type: ignore
