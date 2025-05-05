@@ -66,6 +66,7 @@ class CohereEmbedding(EmbeddingModel):
             texts: Text string or sequence of text strings to encode
             show_progress_bar: Whether to show a progress bar when encoding multiple texts
                               (Note: Not implemented for Cohere API calls)
+            input_type: The type of input text (e.g., CohereInputType.SEARCH_DOCUMENT)
 
         Returns:
             A single embedding vector (if texts is a string) or
