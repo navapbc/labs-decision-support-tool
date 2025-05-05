@@ -36,7 +36,7 @@ class Chunk(Base, IdMixin, TimestampMixin):
     content: Mapped[str] = mapped_column(comment="Content of the chunk")
     tokens: Mapped[int | None] = mapped_column(comment="Number of tokens in the content")
     mpnet_embedding: Mapped[np.ndarray] = mapped_column(
-        Vector(768), comment="MPNet embedding of the content"
+        Vector(1536), comment="MPNet embedding of the content"
     )
 
     document_id: Mapped[UUID] = mapped_column(ForeignKey("document.id", ondelete="CASCADE"))
