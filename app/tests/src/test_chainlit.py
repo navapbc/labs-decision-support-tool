@@ -31,7 +31,7 @@ def test__get_retrieval_metadata(chunks_with_scores):
     result = OnMessageResult(
         "Some response",
         system_prompt,
-        MessageAttributes(needs_context=True, translated_message=""),
+        MessageAttributes(needs_context=True, users_language="en", translated_message=""),
         chunks_with_scores=chunks_with_scores,
         subsections=subsections,
     )

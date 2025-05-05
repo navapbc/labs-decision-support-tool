@@ -61,6 +61,7 @@ def test_process_question(monkeypatch, engine):
         subsections=[Subsection("citation-1", chunk, 0, subsection_text)],
         attributes=ImagineLA_MessageAttributes(
             needs_context=True,
+            users_language="en",
             translated_message="",
             benefit_program="CalFresh",
             canned_response="",
@@ -78,6 +79,7 @@ def test_process_question(monkeypatch, engine):
         "citation_1_source": mock_result.subsections[0].chunk.document.source,
         "citation_1_text": subsection_text,
         "attrib__needs_context": True,
+        "attrib__users_language": "en",
         "attrib__translated_message": "",
         "attrib__benefit_program": "CalFresh",
         "attrib__alert_message": "Some alert message.",

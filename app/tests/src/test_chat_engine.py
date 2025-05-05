@@ -44,6 +44,7 @@ def test_on_message_Imagine_LA_canned_response(monkeypatch):
         "analyze_message",
         lambda *_, **_kw: ImagineLA_MessageAttributes(
             needs_context=True,
+            users_language="en",
             translated_message="",
             benefit_program="",
             canned_response="This is a canned response",
@@ -64,6 +65,7 @@ def test_on_message_Imagine_LA_alert_message(monkeypatch):
         "analyze_message",
         lambda *_, **_kw: ImagineLA_MessageAttributes(
             needs_context=True,
+            users_language="en",
             translated_message="",
             benefit_program="CalFresh",
             canned_response="",
@@ -77,8 +79,7 @@ def test_on_message_Imagine_LA_alert_message(monkeypatch):
     result = engine.on_message("What is AI?")
     assert result.response == "This is a generated response"
     assert result.attributes.benefit_program == "CalFresh"
-    assert result.attributes.alert_message.startswith("**Policy update**: ")
-    assert result.attributes.alert_message.endswith("\n\nThe rest of this answer may be outdated.")
+    assert result.attributes.alert_message == "Some alert message"
 
 
 def test_on_message_Imagine_LA_needs_context_False(monkeypatch):
@@ -87,6 +88,7 @@ def test_on_message_Imagine_LA_needs_context_False(monkeypatch):
         "analyze_message",
         lambda *_, **_kw: ImagineLA_MessageAttributes(
             needs_context=False,
+            users_language="en",
             translated_message="",
             benefit_program="CalFresh",
             canned_response="",
@@ -101,8 +103,7 @@ def test_on_message_Imagine_LA_needs_context_False(monkeypatch):
     assert not result.chunks_with_scores
     assert not result.subsections
     assert result.attributes.benefit_program == "CalFresh"
-    assert result.attributes.alert_message.startswith("**Policy update**: ")
-    assert result.attributes.alert_message.endswith("\n\nThe rest of this answer may be outdated.")
+    assert result.attributes.alert_message == "Some alert message"
 
 
 @pytest.mark.asyncio
@@ -112,6 +113,7 @@ async def test_on_message_streaming_Imagine_LA_canned_response(monkeypatch):
         "analyze_message",
         lambda *_, **_kw: ImagineLA_MessageAttributes(
             needs_context=True,
+            users_language="en",
             translated_message="",
             benefit_program="",
             canned_response="This is a canned response",
@@ -140,6 +142,7 @@ async def test_on_message_streaming_Imagine_LA_with_context(monkeypatch):
         "analyze_message",
         lambda *_, **_kw: ImagineLA_MessageAttributes(
             needs_context=True,
+            users_language="en",
             translated_message="",
             benefit_program="CalFresh",
             canned_response="",
@@ -167,6 +170,5 @@ async def test_on_message_streaming_Imagine_LA_with_context(monkeypatch):
 
     assert chunks == ["First chunk", " second chunk", " final chunk"]
     assert attributes.benefit_program == "CalFresh"
-    assert attributes.alert_message.startswith("**Policy update**: ")
-    assert attributes.alert_message.endswith("\n\nThe rest of this answer may be outdated.")
+    assert attributes.alert_message == "Some alert message"
     assert subsections == []  # Empty because we mocked retrieve_with_scores to return []

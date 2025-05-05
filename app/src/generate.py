@@ -155,6 +155,8 @@ def completion_args(llm: str) -> dict[str, Any]:
 class MessageAttributes(BaseModel):
     "'Message' refers to the user's message/question"
     needs_context: bool
+    # The language of the user's question
+    users_language: str
     # The user's message/question translated by the LLM so that RAG retrieval is in English
     translated_message: str
 

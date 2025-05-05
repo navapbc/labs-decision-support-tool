@@ -356,10 +356,12 @@ Analyze the user's message to respond with a JSON dictionary populated with the 
 - canned_response: empty string
 - alert_message: empty string
 - needs_context: True
+- users_language: empty string
 - translated_message: empty string
 - benefit_program: empty string
-The canned_response string should be in the same language as the user's question. \
-If canned_response is set to a non-empty string, leave the other JSON fields as their default values.
+Set the users_language to the language of the user's question.
+The canned_response and alert_message string must be in the same language as the user's question. \
+If canned_response is set to a non-empty string, set needs_context to True.
 
 Benefit programs include:
 - CalWORKS (including CalWORKS childcare)
@@ -386,7 +388,8 @@ Child and Dependent Care Tax Credit (CDCTC), California Renter's Credit, Califor
 Set benefit_program to the name of the in-scope benefit program that the user's question is about.
 
 If the user is trying to understand what benefit programs the chatbot supports, \
-set canned_response to a list that gives examples and describes categories for the in-scope benefit programs. \
+set canned_response to a list that gives examples and describes categories for the in-scope benefit programs,
+translated to the same language as the user's question. \
 Example prompts: "What do you know about?" "What info do you have?" "What can I ask you?" "What programs do you cover?" "What benefits do you cover?" "What topics do you know?"
 
 If the user's question is about how to reset their password for the Benefit Navigator, set canned_response to \
@@ -400,7 +403,8 @@ If the user's question is about these questions related to the benefit navigator
 - Cannot create or save reports
 - Cannot find clients in user portal
 - Or other kinds of support questions for the Benefit Navigator tool
-then set canned_response to: "To get support with that issue, select "Need help? Contact the support team" at the top of this chatbot to open a ticket with the operations team. You can also email us at [socialbenefithelp@imaginela.org](mailto:socialbenefithelp@imaginela.org)"
+then set canned_response to: "To get support with that issue, select 'Need help? Contact the support team' at the top of this chatbot to open a ticket with the operations team. You can also email us at [socialbenefithelp@imaginela.org](mailto:socialbenefithelp@imaginela.org)", \
+but translated to the same language as the user's question.
 
 For referral links below, only set canned_response to a referral link if:
 - User is explicitly asking how to obtain/access/find that specific resource (e.g., "How do I get an ID card?")
@@ -409,7 +413,8 @@ For referral links below, only set canned_response to a referral link if:
 
 If these criteria are met, then set canned_response to:
 "Here's a trusted link to learn more: [referral link title](referral link). \
-I can give more detail about the benefit programs and tax credits in the [Benefits Information Hub](https://benefitnavigator.web.app/contenthub)."
+I can give more detail about the benefit programs and tax credits in the [Benefits Information Hub](https://benefitnavigator.web.app/contenthub).", \
+but translated to the same language as the user's question.
 
 Referral links: Format: [referral link title](referral link):
 - [Get an ID card](https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/)
@@ -442,18 +447,23 @@ Examples to illustrate correct referral link decisions:
 - Question: "What benefits can immigrants get?" → DO NOT use referral link, set needs_context=True
 
 If the user's question is related to any of the following policy updates listed below, \
-set canned_response to empty string and set alert_message to one or more of the following text based on the user's question:
+set canned_response to empty string and set alert_message to a translation of one or more of the following text in the same language as the user's question:
 
-- Medi-Cal for immigrants: "Since January 1, 2024, everyone who lives in California can qualify for full-scope Medi-Cal, regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, still apply. [Read more](https://www.coveredca.com/learning-center/information-for-immigrants/)."
-- Medi-Cal asset limits: "As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. [Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)"
-- CalFresh work requirements (ABAWDs, time limits): "California has a statewide waiver through October 31, 2025. \
-This means no ABAWDs living in California will have to meet the work requirement to keep receiving CalFresh benefits. ABAWDs who have lost their CalFresh benefits may reapply and continue to receive CalFresh if otherwise eligible. [Read more](https://www.cdss.ca.gov/inforesources/calfresh/abawd)"
-- Calfresh asset limits/resource limits: "California has dramatically modified its rules for 'categorical eligibility' in the CalFresh program, \
+- Medi-Cal for immigrants: "**Policy update**: Since January 1, 2024, everyone who lives in California can qualify for full-scope Medi-Cal, regardless of immigration status. All other Medi-Cal eligibility rules, including income limits, still apply. [Read more](https://www.coveredca.com/learning-center/information-for-immigrants/).
+The rest of this answer may be outdated."
+- Medi-Cal asset limits: "**Policy update**: As of January 1, 2024, assets will no longer be counted to determine Medi-Cal eligibility. [Read more](https://www.dhcs.ca.gov/Get-Medi-Cal/Pages/asset-limits.aspx)
+The rest of this answer may be outdated."
+- CalFresh work requirements (ABAWDs, time limits): "**Policy update**: California has a statewide waiver through October 31, 2025. \
+This means no ABAWDs living in California will have to meet the work requirement to keep receiving CalFresh benefits. ABAWDs who have lost their CalFresh benefits may reapply and continue to receive CalFresh if otherwise eligible. [Read more](https://www.cdss.ca.gov/inforesources/calfresh/abawd)
+The rest of this answer may be outdated."
+- Calfresh asset limits/resource limits: "**Policy update**: California has dramatically modified its rules for 'categorical eligibility' in the CalFresh program, \
 such that asset limits have all but been removed. The only exceptions would be if either the household includes one or more members who are aged or disabled, \
 with household income over 200% of the Federal Poverty Level (FPL); or the household fits within a narrow group of cases where it has been disqualified \
 because of an intentional program violation, or some other specific compliance requirement; or there is a disputed claim for benefits paid in the past. \
-[Read more](https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit)"
+[Read more](https://calfresh.guide/how-many-resources-a-household-can-have/#:~:text=In%20California%2C%20if%20the%20household,recipients%20have%20a%20resource%20limit)
+The rest of this answer may be outdated."
 
+Translate canned_response and alert_message strings to be in the same language as the user's question.
 If the user's question is to translate text, set needs_context to False.
 If the user's question is not in English, set translated_message to be an English translation of the user's message."""
 
@@ -524,9 +534,6 @@ they can apply for both, and the state will check if they qualify for either one
             f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
         )
 
-        if attributes.alert_message:
-            attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
-
         if attributes.canned_response:
             return OnMessageResult(attributes.canned_response, self.system_prompt_1, attributes)
 
@@ -547,10 +554,6 @@ they can apply for both, and the state will check if they qualify for either one
         logger.info(
             f"System Prompt 1 (analyze_message) took {system_prompt_1_duration:.2f} seconds"
         )
-
-        # Format alert message the same way as non-streaming version
-        if attributes.alert_message:
-            attributes.alert_message = f"**Policy update**: {attributes.alert_message}\n\nThe rest of this answer may be outdated."
 
         # Handle canned responses - return the entire response at once with empty subsections
         if attributes.canned_response:
