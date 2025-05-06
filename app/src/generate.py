@@ -94,7 +94,7 @@ def _prepare_messages(
     if chat_history:
         messages.extend(chat_history)
 
-    messages.append({"content": query, "role": "user"})
+    messages.append({"content": query + " Write at a sixth grade reading level.", "role": "user"})
     return messages
 
 
