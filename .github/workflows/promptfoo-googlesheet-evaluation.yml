@@ -46,6 +46,7 @@ jobs:
         run: |
           npm install -g promptfoo
           npm install -g googleapis
+          npm install -g @actions/core @actions/github
 
       - name: Set up promptfoo cache
         uses: actions/cache@v4
@@ -67,8 +68,93 @@ jobs:
           };
           EOF
 
-      - name: Run promptfoo evaluation
+      - name: Process config file
         run: |
-          promptfoo eval --config app/promptfooconfig.ci.yaml
+          # Create a temporary copy of the config file
+          cp app/promptfooconfig.ci.yaml /tmp/promptfooconfig.processed.yaml
+          
+          # Replace placeholders with actual secret values
+          sed -i "s|GOOGLE_SHEET_INPUT_URL|${{ secrets.GOOGLE_SHEET_INPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
+          sed -i "s|GOOGLE_SHEET_OUTPUT_URL|${{ secrets.GOOGLE_SHEET_OUTPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
+          
+          # Debug output (redacting sensitive parts)
+          echo "Config file processed. Validating structure..."
+          grep -v "GOOGLE_SHEET" /tmp/promptfooconfig.processed.yaml | grep -i "url\|path"
+
+      - name: Run promptfoo evaluation
+        id: eval
+        run: |
+          # Add a JSON output file in addition to Google Sheets output
+          OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
+          # Run evaluation with share flag to get shareable URL, using the processed config
+          promptfoo eval --config /tmp/promptfooconfig.processed.yaml --share --output $OUTPUT_JSON_FILE
+          
+          # Extract evaluation ID and shareable URL if available
+          if [ -f "$OUTPUT_JSON_FILE" ]; then
+            EVAL_ID=$(jq -r '.evaluationId' $OUTPUT_JSON_FILE)
+            SHARE_URL=$(jq -r '.shareableUrl // ""' $OUTPUT_JSON_FILE)
+            
+            # Save as outputs
+            echo "eval_id=$EVAL_ID" >> $GITHUB_OUTPUT
+            echo "share_url=$SHARE_URL" >> $GITHUB_OUTPUT
+            
+            # Print the share URL for debugging
+            echo "Shareable URL: $SHARE_URL"
+          else
+            echo "No output JSON file was generated"
+          fi
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Create PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const evalId = '${{ steps.eval.outputs.eval_id }}';
+            const shareUrl = '${{ steps.eval.outputs.share_url }}';
+            
+            // Get the test results from the previous step
+            const fs = require('fs');
+            let stats = { successes: 0, failures: 0, total: 0 };
+            
+            try {
+              if (fs.existsSync('/tmp/promptfoo-output.json')) {
+                const outputData = JSON.parse(fs.readFileSync('/tmp/promptfoo-output.json', 'utf8'));
+                if (outputData.results && outputData.results.stats) {
+                  stats = outputData.results.stats;
+                }
+              }
+            } catch (error) {
+              console.error('Error parsing output file:', error);
+            }
+            
+            // Create the comment body
+            let body = `## Promptfoo Evaluation Results
+            
+            | Success | Failure | Total | Pass Rate |
+            |---------|---------|-------|-----------|
+            | ${stats.successes} | ${stats.failures} | ${stats.total || stats.successes + stats.failures} | ${((stats.successes / (stats.total || stats.successes + stats.failures)) * 100).toFixed(2)}% |
+            
+            `;
+            
+            // Add Google Sheet link
+            body += `[View detailed results in Google Sheets](${{ env.GOOGLE_SHEET_OUTPUT_URL }})\n\n`;
+            
+            // Add shareable link if available
+            if (shareUrl) {
+              body += `[View interactive evaluation results](${shareUrl})\n`;
+            } else {
+              body += `Run \`promptfoo view --id ${evalId}\` locally to view interactive results\n`;
+            }
+            
+            // Post comment to PR
+            const { data: comment } = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+            
+            console.log(`Created comment: ${comment.html_url}`);

@@ -20,8 +20,7 @@ providers:
 
 defaultTest:
   vars:
-    uniqueSessionId: file:///tmp/generateUniqueId.js # Use the tmp file we make in the GHA workflow
-    googleCredentials: "/tmp/gcp-creds.json"
+    uniqueSessionId: file:///tmp/generateUniqueId.js # Use the tmp script that we make in the GHA workflow
   options:
     timeout: 360000
 
@@ -30,8 +29,11 @@ evaluateOptions:
   delay: 1000
   showProgressBar: true
 
-# Read test cases from this sheet
-tests: https://docs.google.com/spreadsheets/d/1NWopeJjKy7eHq8D-VcIO7QtTDRD9agn9MAv7SQ6_hSY/edit?gid=711949508#gid=711949508
 
-# Create a new tab for each evaluation
-outputPath: https://docs.google.com/spreadsheets/d/1NWopeJjKy7eHq8D-VcIO7QtTDRD9agn9MAv7SQ6_hSY/edit 
+tests: {{env.GOOGLE_SHEET_INPUT_URL}}
+outputPath: {{env.GOOGLE_SHEET_OUTPUT_URL}}
+
+sharing:
+  enabled: true
+  includePromptSources: false
+  includeMetadata: true
