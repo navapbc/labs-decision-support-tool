@@ -32,8 +32,3 @@ evaluateOptions:
 
 tests: GOOGLE_SHEET_INPUT_URL
 outputPath: GOOGLE_SHEET_OUTPUT_URL
-
-sharing:
-  enabled: true
-  includePromptSources: false
-  includeMetadata: true

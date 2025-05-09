@@ -72,6 +72,15 @@ jobs:
           };
           EOF
 
+      - name: Authenticate with Promptfoo
+        if: ${{ secrets.PROMPTFOO_API_KEY != '' }}
+        run: |
+          # Authenticate with Promptfoo using the login command
+          promptfoo auth login --host https://api.promptfoo.app --api-key "${{ secrets.PROMPTFOO_API_KEY }}"
+          
+          # Verify authentication
+          promptfoo account
+
       - name: Process config file
         run: |
           # Create a temporary copy of the config file
@@ -90,13 +99,26 @@ jobs:
         run: |
           # Add a JSON output file in addition to Google Sheets output
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
+          
           # Run evaluation with share flag to get shareable URL, using the processed config
           promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}"
           
           # Extract evaluation ID and shareable URL if available
           if [ -f "${OUTPUT_JSON_FILE}" ]; then
-            EVAL_ID=$(jq -r '.evaluationId' "${OUTPUT_JSON_FILE}")
+            # Print the output file content for debugging
+            echo "Output JSON file content:"
+            cat "${OUTPUT_JSON_FILE}" | grep -v "sensitive"
+            
+            EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
             SHARE_URL=$(jq -r '.shareableUrl // ""' "${OUTPUT_JSON_FILE}")
+            
+            # Try to share the results if not already shared
+            if [ -z "${SHARE_URL}" ] && [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
+              echo "No shareable URL found, attempting to share evaluation..."
+              SHARE_RESULT=$(promptfoo share --id "${EVAL_ID}" --json || echo '{}')
+              SHARE_URL=$(echo "${SHARE_RESULT}" | jq -r '.shareableUrl // ""')
+              echo "Share result: ${SHARE_URL}"
+            fi
             
             # Save as outputs
             echo "eval_id=${EVAL_ID}" >> "${GITHUB_OUTPUT}"
@@ -109,6 +131,7 @@ jobs:
           fi
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PROMPTFOO_API_KEY: ${{ secrets.PROMPTFOO_API_KEY }}
 
       - name: Create PR comment
         if: github.event_name == 'pull_request'
@@ -147,11 +170,13 @@ jobs:
             // Add Google Sheet link
             body += `[View detailed results in Google Sheets](${googleSheetUrl})\n\n`;
             
-            // Add shareable link if available
-            if (shareUrl) {
-              body += `[View interactive evaluation results](${shareUrl})\n`;
-            } else {
+            // Add shareable link if available, matching the format in the TS example
+            if (shareUrl && shareUrl.length > 0) {
+              body += `**» [View eval results](${shareUrl}) «**\n`;
+            } else if (evalId && evalId !== 'null' && evalId !== 'unknown') {
               body += `Run \`promptfoo view --id ${evalId}\` locally to view interactive results\n`;
+            } else {
+              body += `**» View eval results in CI console «**\n`;
             }
             
             // Post comment to PR
