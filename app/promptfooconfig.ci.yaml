@@ -32,12 +32,3 @@ evaluateOptions:
 
 tests: GOOGLE_SHEET_INPUT_URL
 outputPath: GOOGLE_SHEET_OUTPUT_URL
-
-# Enhanced sharing configuration for CI
-sharing:
-  enabled: true
-  persist: true
-  includePromptSources: true
-  includeMetadata: true
-  includeModelResponses: true
-  includeCitations: true
