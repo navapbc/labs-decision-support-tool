@@ -39,7 +39,7 @@ jobs:
           # Ensure the JSON is properly formatted without escaping issues
           echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > /tmp/gcp-creds.json
           # Verify JSON is valid without printing content
-          jq -e . /tmp/gcp-creds.json > /dev/null || echo "Warning: Invalid JSON format in credentials"
+          jq -e . "/tmp/gcp-creds.json" > /dev/null || echo "Warning: Invalid JSON format in credentials"
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json" >> $GITHUB_ENV
 
       - name: Install promptfoo and googleapis
@@ -48,7 +48,7 @@ jobs:
           npm install -g googleapis
 
       - name: Set up promptfoo cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/promptfoo
           key: ${{ runner.os }}-promptfoo-v1-${{ github.sha }}
