@@ -37,10 +37,10 @@ jobs:
       - name: Set up Google Cloud credentials
         run: |
           # Ensure the JSON is properly formatted without escaping issues
-          echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > /tmp/gcp-creds.json
+          echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > "/tmp/gcp-creds.json"
           # Verify JSON is valid without printing content
           jq -e . "/tmp/gcp-creds.json" > /dev/null || echo "Warning: Invalid JSON format in credentials"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json" >> $GITHUB_ENV
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json" >> "${GITHUB_ENV}"
 
       - name: Install promptfoo and googleapis
         run: |
