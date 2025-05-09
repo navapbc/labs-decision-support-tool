@@ -107,7 +107,7 @@ Once authenticated, you can write evaluation results directly to your Google She
 description: 'Decision Support Tool Evaluation'
 # ... existing configuration ...
 
-# Input sheet for test cases
+# Input sheet for test cases (replace {sheetId} and {gid} with the actual sheet ID and gid)
 tests: https://docs.google.com/spreadsheets/d/{sheetId}/edit?gid={gid}
 
 # Option 1: Replace the existing tab for each evaluation including the gid (uncomment to use)

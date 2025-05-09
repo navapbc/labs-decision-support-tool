@@ -28,7 +28,7 @@ providers:
       transformResponse: "json ? json.response_text : ''"
       
 
-tests: https://docs.google.com/spreadsheets/d/{sheetId}/edit?gid={gid}
+tests: https://docs.google.com/spreadsheets/d/{sheetId}/edit?gid={gid} # Replace {sheetId} and {gid} with the actual sheet ID and gid
 
 # Default test configuration applied to all test cases
 defaultTest:
