@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+description: 'Decision Support Tool Evaluation (CI)'
+prompts:
+  - response
+providers:
+  # Use the hardcoded dev endpoint URL directly in CI
+  - id: "https://decision-support-tool-dev.navateam.com/api/query"
+    config:
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        chat_history: []
+        session_id: "{{uniqueSessionId}}"
+        new_session: true
+        message: "{{question}}"
+        user_id: "promptfoo-evaluator"
+      transformResponse: "json ? json.response_text : ''"
+
+defaultTest:
+  vars:
+    uniqueSessionId: file:///tmp/generateUniqueId.js # Use the tmp file we make in the GHA workflow
+    googleCredentials: "/tmp/gcp-creds.json"
+  options:
+    timeout: 360000
+
+evaluateOptions:
+  maxConcurrency: 3
+  delay: 1000
+  showProgressBar: true
+
+# Read test cases from this sheet
+tests: https://docs.google.com/spreadsheets/d/1NWopeJjKy7eHq8D-VcIO7QtTDRD9agn9MAv7SQ6_hSY/edit?gid=711949508#gid=711949508
+
+# Create a new tab for each evaluation
+outputPath: https://docs.google.com/spreadsheets/d/1NWopeJjKy7eHq8D-VcIO7QtTDRD9agn9MAv7SQ6_hSY/edit 

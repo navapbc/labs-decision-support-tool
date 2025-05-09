@@ -1,0 +1,74 @@
+name: 'Prompt Evaluation'
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/src/chat_api.py'
+      - 'app/src/chat_engine.py'
+      - 'app/src/generate.py'
+      - 'app/promptfooconfig.ci.yaml'
+      - 'docs/app/evaluation/generateUniqueId.js'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Set up Google Cloud credentials
+        run: |
+          # Ensure the JSON is properly formatted without escaping issues
+          echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > /tmp/gcp-creds.json
+          # Verify the JSON is valid
+          cat /tmp/gcp-creds.json | jq . || echo "Warning: Invalid JSON format in credentials"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json" >> $GITHUB_ENV
+
+      - name: Install promptfoo and googleapis
+        run: |
+          npm install -g promptfoo
+          npm install -g googleapis
+
+      - name: Set up promptfoo cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/promptfoo
+          key: ${{ runner.os }}-promptfoo-v1-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-promptfoo-v1-
+
+      - name: Create unique ID generator
+        run: |
+          cat > /tmp/generateUniqueId.js << 'EOF'
+          module.exports = function (varName, prompt, otherVars) {
+            // Generate a unique ID using timestamp and a random component
+            const uniqueId = 'promptfoo-eval-test-' + Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
+            return {
+              output: uniqueId
+            };
+          };
+          EOF
+
+      - name: Run promptfoo evaluation
+        run: |
+          promptfoo eval --config app/promptfooconfig.ci.yaml
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
