@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+# Decision Support Tool Evaluation Configuration
+# This configuration file is designed to work with promptfoo to evaluate our chatbot's responses
+# against a set of predefined test cases in a Google Sheet.
+
+description: 'Decision Support Tool Evaluation'
+
+prompts:
+  - response
+
+# Providers define the API endpoints to test against
+# See https://www.promptfoo.dev/docs/providers/http/ for more information on the generic HTTP provider
+providers:
+  # Configuration for local development environment
+  - id: local-chatbot
+    config:
+      url: http://localhost:8000/api/query
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        chat_history: []
+        session_id: "{{uniqueSessionId}}"  # Uses the uniqueSessionId variable from defaultTest.vars
+        new_session: true
+        message: "{{question}}"
+        user_id: "promptfoo-evaluator"
+      transformResponse: "json ? json.response_text : ''"
+      
+
+tests: https://docs.google.com/spreadsheets/d/{sheetId}/edit?gid={gid} # Replace {sheetId} and {gid} with the actual sheet ID and gid
+
+# Default test configuration applied to all test cases
+defaultTest:
+  # Define variables that should be available to all test cases
+  vars:
+    uniqueSessionId: file://generateUniqueId.js  # Path to JS file that generates unique IDs
+
+evaluateOptions:
+  maxConcurrency: 3
+  delay: 1000
+  showProgressBar: true
+
+# Option 1: Replace the existing tab for each evaluation including the gid (uncomment to use)
+# outputPath: https://docs.google.com/spreadsheets/d/{sheetId}/edit?gid={gid}
+
+# Option 2: Create a new tab for each evaluation excluding the gid (uncomment to use)
+# outputPath: https://docs.google.com/spreadsheets/d/{sheetId}/edit
