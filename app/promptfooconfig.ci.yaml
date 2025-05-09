@@ -30,8 +30,8 @@ evaluateOptions:
   showProgressBar: true
 
 
-tests: {{env.GOOGLE_SHEET_INPUT_URL}}
-outputPath: {{env.GOOGLE_SHEET_OUTPUT_URL}}
+tests: GOOGLE_SHEET_INPUT_URL
+outputPath: GOOGLE_SHEET_OUTPUT_URL
 
 sharing:
   enabled: true
