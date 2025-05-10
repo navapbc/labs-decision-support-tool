@@ -21,11 +21,11 @@ providers:
 defaultTest:
   vars:
     uniqueSessionId: file:///tmp/generateUniqueId.js # Use the tmp script that we make in the GHA workflow
+    rubric: "{{__expected1}}"
   options:
     timeout: 360000
 
 evaluateOptions:
-  maxConcurrency: 3
   delay: 1000
   showProgressBar: true
 

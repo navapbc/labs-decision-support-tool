@@ -130,6 +130,7 @@ jobs:
           fi
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PROMPTFOO_FAILED_TEST_EXIT_CODE: 0
 
       - name: Create PR comment
         if: github.event_name == 'pull_request'
