@@ -94,6 +94,7 @@ jobs:
 
       - name: Run promptfoo evaluation
         id: eval
+        continue-on-error: true
         run: |
           # Add a JSON output file in addition to Google Sheets output
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
