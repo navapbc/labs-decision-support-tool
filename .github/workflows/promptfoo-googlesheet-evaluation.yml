@@ -41,9 +41,7 @@ jobs:
 
       - name: Set up Google Cloud credentials
         run: |
-          # Ensure the JSON is properly formatted without escaping issues
           echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > "/tmp/gcp-creds.json"
-          # Verify JSON is valid without printing content
           jq -e . "/tmp/gcp-creds.json" > /dev/null || echo "Warning: Invalid JSON format in credentials"
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json" >> "${GITHUB_ENV}"
 
@@ -53,19 +51,10 @@ jobs:
           npm install -g googleapis
           npm install -g @actions/core @actions/github
 
-      - name: Set up promptfoo cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/promptfoo
-          key: ${{ runner.os }}-promptfoo-v1-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-promptfoo-v1-
-
       - name: Create unique ID generator
         run: |
           cat > /tmp/generateUniqueId.js << 'EOF'
           module.exports = function (varName, prompt, otherVars) {
-            // Generate a unique ID using timestamp and a random component
             const uniqueId = 'promptfoo-eval-test-' + Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
             return {
               output: uniqueId
@@ -83,12 +72,10 @@ jobs:
         run: |
           # Create a temporary copy of the config file
           cp app/promptfooconfig.ci.yaml /tmp/promptfooconfig.processed.yaml
-          
-          # Replace placeholders with actual secret values
+
           sed -i "s|GOOGLE_SHEET_INPUT_URL|${{ secrets.GOOGLE_SHEET_INPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
           sed -i "s|GOOGLE_SHEET_OUTPUT_URL|${{ secrets.GOOGLE_SHEET_OUTPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
           
-          # Debug output (redacting sensitive parts)
           echo "Config file processed. Validating structure..."
           grep -v "GOOGLE_SHEET" /tmp/promptfooconfig.processed.yaml | grep -i "url\|path"
 
@@ -96,34 +83,27 @@ jobs:
         id: eval
         continue-on-error: true
         run: |
-          # Add a JSON output file in addition to Google Sheets output
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
-          
-          # Run evaluation with share flag to get shareable URL, using the processed config
+
+          # Ruan evaluation with share flag to get shareable URL, using the processed config
           promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}"
-          
+
           # Extract evaluation ID and shareable URL if available
           if [ -f "${OUTPUT_JSON_FILE}" ]; then
-            # Print the output file content for debugging (fixing 'useless cat')
-            echo "Output JSON file content:"
-            grep -v "sensitive" "${OUTPUT_JSON_FILE}"
-            
+            echo "Output JSON file generated successfully"
+
             EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
             SHARE_URL=$(jq -r '.shareableUrl // ""' "${OUTPUT_JSON_FILE}")
-            
-            # Try to share the results if not already shared
+
             if [ -z "${SHARE_URL}" ] && [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
               echo "No shareable URL found, attempting to share evaluation..."
               SHARE_RESULT=$(promptfoo share --id "${EVAL_ID}" --json || echo '{}')
               SHARE_URL=$(echo "${SHARE_RESULT}" | jq -r '.shareableUrl // ""')
               echo "Share result: ${SHARE_URL}"
             fi
-            
-            # Save as outputs
+
             echo "eval_id=${EVAL_ID}" >> "${GITHUB_OUTPUT}"
             echo "share_url=${SHARE_URL}" >> "${GITHUB_OUTPUT}"
-            
-            # Print the share URL for debugging
             echo "Shareable URL: ${SHARE_URL}"
           else
             echo "No output JSON file was generated"
