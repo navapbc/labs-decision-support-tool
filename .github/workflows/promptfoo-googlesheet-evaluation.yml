@@ -47,7 +47,7 @@ jobs:
 
       - name: Install promptfoo and googleapis
         run: |
-          npm install -g promptfoo
+          npm install -g promptfoo --no-fund --no-audit --loglevel=error
           npm install -g googleapis
           npm install -g @actions/core @actions/github
 
@@ -86,7 +86,7 @@ jobs:
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
 
           # Ruan evaluation with share flag to get shareable URL, using the processed config
-          promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}"
+          promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}" --no-cache
 
           # Extract evaluation ID and shareable URL if available
           if [ -f "${OUTPUT_JSON_FILE}" ]; then
