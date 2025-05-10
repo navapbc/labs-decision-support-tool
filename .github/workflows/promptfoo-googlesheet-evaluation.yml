@@ -78,8 +78,6 @@ jobs:
         run: |
           # Authenticate with Promptfoo using the login command
           promptfoo auth login --host https://api.promptfoo.app --api-key "${PROMPTFOO_API_KEY}"
-          echo "Authentication completed. Checking auth status..."
-          promptfoo debug --auth
 
       - name: Process config file
         run: |
