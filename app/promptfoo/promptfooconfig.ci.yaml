@@ -19,7 +19,7 @@ providers:
 
 defaultTest:
   vars:
-    uniqueSessionId: file://promptfoo/generateUniqueId.js
+    uniqueSessionId: file:///tmp/generateUniqueId.js
   options:
     timeout: 360000
 

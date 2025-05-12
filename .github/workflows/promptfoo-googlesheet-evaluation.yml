@@ -75,7 +75,7 @@ jobs:
 
       - name: Process config file
         run: |
-          # Create a temporary copy of the config file
+          cp app/promptfoo/generateUniqueId.js /tmp/generateUniqueId.js
           cp app/promptfoo/promptfooconfig.ci.yaml /tmp/promptfooconfig.processed.yaml
 
           sed -i "s|GOOGLE_SHEET_INPUT_URL|${{ env.GOOGLE_SHEET_INPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
