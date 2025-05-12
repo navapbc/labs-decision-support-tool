@@ -4,8 +4,7 @@ description: 'Decision Support Tool Evaluation (CI)'
 prompts:
   - response
 providers:
-  # Use the hardcoded dev endpoint URL directly in CI
-  - id: "https://decision-support-tool-dev.navateam.com/api/query"
+  - id: CHATBOT_INSTANCE_URL
     config:
       method: POST
       headers:
@@ -27,7 +26,6 @@ defaultTest:
 evaluateOptions:
   delay: 1000
   showProgressBar: true
-
 
 tests: GOOGLE_SHEET_INPUT_URL
 outputPath: GOOGLE_SHEET_OUTPUT_URL

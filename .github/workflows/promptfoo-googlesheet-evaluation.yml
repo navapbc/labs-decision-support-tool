@@ -10,6 +10,23 @@ on:
       - 'app/src/generate.py'
       - 'app/promptfooconfig.ci.yaml'
       - 'docs/app/evaluation/generateUniqueId.js'
+  workflow_dispatch:
+    inputs:
+      input_sheet_url:
+        type: string
+        description: 'Google Sheet URL for test case inputs'
+        required: true
+        default: ${{ secrets.GOOGLE_SHEET_INPUT_URL }}
+      output_sheet_url:
+        type: string
+        description: 'Google Sheet URL for evaluation outputs'
+        required: true
+        default: ${{ secrets.GOOGLE_SHEET_OUTPUT_URL }}
+      chatbot_instance_url:
+        type: string
+        description: 'Chatbot API endpoint URL'
+        required: true
+        default: 'https://decision-support-tool-dev.navateam.com/api/query'
 
 jobs:
   evaluate:
@@ -19,9 +36,10 @@ jobs:
       contents: read
 
     env:
-      GOOGLE_SHEET_INPUT_URL: ${{ secrets.GOOGLE_SHEET_INPUT_URL }}
-      GOOGLE_SHEET_OUTPUT_URL: ${{ secrets.GOOGLE_SHEET_OUTPUT_URL }}
-      PROMPTFOO_API_KEY: ${{ secrets.PROMPTFOO_API_KEY }}
+      GOOGLE_SHEET_INPUT_URL: ${{ inputs.input_sheet_url }}
+      GOOGLE_SHEET_OUTPUT_URL: ${{ inputs.output_sheet_url }}
+      PROMPTFOO_API_KEY: ${{ secrets.PROMPTFOO_API_KEY || '' }}
+      CHATBOT_INSTANCE_URL: ${{ inputs.chatbot_instance_url }}
 
     steps:
       - name: Checkout code
@@ -73,11 +91,12 @@ jobs:
           # Create a temporary copy of the config file
           cp app/promptfooconfig.ci.yaml /tmp/promptfooconfig.processed.yaml
 
-          sed -i "s|GOOGLE_SHEET_INPUT_URL|${{ secrets.GOOGLE_SHEET_INPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
-          sed -i "s|GOOGLE_SHEET_OUTPUT_URL|${{ secrets.GOOGLE_SHEET_OUTPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
+          sed -i "s|GOOGLE_SHEET_INPUT_URL|${{ env.GOOGLE_SHEET_INPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
+          sed -i "s|GOOGLE_SHEET_OUTPUT_URL|${{ env.GOOGLE_SHEET_OUTPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
+          sed -i "s|CHATBOT_INSTANCE_URL|${{ env.CHATBOT_INSTANCE_URL }}|g" /tmp/promptfooconfig.processed.yaml
           
-          echo "Config file processed. Validating structure..."
-          grep -v "GOOGLE_SHEET" /tmp/promptfooconfig.processed.yaml | grep -i "url\|path"
+          echo "Config file processed, checking..."
+          grep -v "GOOGLE_SHEET\|CHATBOT_INSTANCE" /tmp/promptfooconfig.processed.yaml | grep -i "url\|path"
 
       - name: Run promptfoo evaluation
         id: eval
@@ -85,26 +104,29 @@ jobs:
         run: |
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
 
-          # Ruan evaluation with share flag to get shareable URL, using the processed config
-          promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}" --no-cache
+          if [ -n "$PROMPTFOO_API_KEY" ]; then
+            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}" --no-cache
+          else
+            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --output "${OUTPUT_JSON_FILE}" --no-cache
+          fi
 
-          # Extract evaluation ID and shareable URL if available
           if [ -f "${OUTPUT_JSON_FILE}" ]; then
             echo "Output JSON file generated successfully"
 
-            EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
-            SHARE_URL=$(jq -r '.shareableUrl // ""' "${OUTPUT_JSON_FILE}")
+            if [ -n "$PROMPTFOO_API_KEY" ]; then
+              EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
+              SHARE_URL=$(jq -r '.shareableUrl // ""' "${OUTPUT_JSON_FILE}")
 
-            if [ -z "${SHARE_URL}" ] && [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
-              echo "No shareable URL found, attempting to share evaluation..."
-              SHARE_RESULT=$(promptfoo share --id "${EVAL_ID}" --json || echo '{}')
-              SHARE_URL=$(echo "${SHARE_RESULT}" | jq -r '.shareableUrl // ""')
-              echo "Share result: ${SHARE_URL}"
+              if [ -z "${SHARE_URL}" ] && [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
+                echo "No shareable URL found, attempting to share evaluation..."
+                SHARE_RESULT=$(promptfoo share --id "${EVAL_ID}" --json || echo '{}')
+                SHARE_URL=$(echo "${SHARE_RESULT}" | jq -r '.shareableUrl // ""')
+                echo "Share result: ${SHARE_URL}"
+              fi
+
+              echo "eval_id=${EVAL_ID}" >> "${GITHUB_OUTPUT}"
+              echo "share_url=${SHARE_URL}" >> "${GITHUB_OUTPUT}"
             fi
-
-            echo "eval_id=${EVAL_ID}" >> "${GITHUB_OUTPUT}"
-            echo "share_url=${SHARE_URL}" >> "${GITHUB_OUTPUT}"
-            echo "Shareable URL: ${SHARE_URL}"
           else
             echo "No output JSON file was generated"
           fi
