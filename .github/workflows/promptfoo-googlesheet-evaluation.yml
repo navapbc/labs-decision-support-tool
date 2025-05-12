@@ -15,17 +15,15 @@ on:
       input_sheet_url:
         type: string
         description: 'Google Sheet URL for test case inputs'
-        required: true
-        default: ${{ secrets.GOOGLE_SHEET_INPUT_URL }}
+        required: false
       output_sheet_url:
         type: string
         description: 'Google Sheet URL for evaluation outputs'
-        required: true
-        default: ${{ secrets.GOOGLE_SHEET_OUTPUT_URL }}
+        required: false
       chatbot_instance_url:
         type: string
         description: 'Chatbot API endpoint URL'
-        required: true
+        required: false
         default: 'https://decision-support-tool-dev.navateam.com/api/query'
 
 jobs:
@@ -36,8 +34,8 @@ jobs:
       contents: read
 
     env:
-      GOOGLE_SHEET_INPUT_URL: ${{ inputs.input_sheet_url }}
-      GOOGLE_SHEET_OUTPUT_URL: ${{ inputs.output_sheet_url }}
+      GOOGLE_SHEET_INPUT_URL: ${{ inputs.input_sheet_url || secrets.GOOGLE_SHEET_INPUT_URL }}
+      GOOGLE_SHEET_OUTPUT_URL: ${{ inputs.output_sheet_url || secrets.GOOGLE_SHEET_OUTPUT_URL }}
       PROMPTFOO_API_KEY: ${{ secrets.PROMPTFOO_API_KEY || '' }}
       CHATBOT_INSTANCE_URL: ${{ inputs.chatbot_instance_url }}
 
