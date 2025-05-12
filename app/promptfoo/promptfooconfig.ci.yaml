@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+description: 'Decision Support Tool Evaluation (CI)'
+prompts:
+  - response
+providers:
+  - id: ${CHATBOT_INSTANCE_URL}
+    config:
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        chat_history: []
+        session_id: "{{uniqueSessionId}}"
+        new_session: true
+        message: "{{question}}"
+        user_id: "promptfoo-evaluator"
+      transformResponse: "json ? json.response_text : ''"
+
+defaultTest:
+  vars:
+    uniqueSessionId: file:///tmp/generateUniqueId.js
+  options:
+    timeout: 360000
+
+evaluateOptions:
+  delay: 1000
+  showProgressBar: true
+
+tests: ${GOOGLE_SHEET_INPUT_URL}
+outputPath: ${GOOGLE_SHEET_OUTPUT_URL} 

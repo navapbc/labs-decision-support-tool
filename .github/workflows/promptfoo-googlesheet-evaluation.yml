@@ -1,0 +1,174 @@
+name: 'Prompt Evaluation'
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/src/chat_api.py'
+      - 'app/src/chat_engine.py'
+      - 'app/src/generate.py'
+      - 'app/promptfoo/promptfooconfig.ci.yaml'
+      - 'app/promptfoo/generateUniqueId.js'
+  workflow_dispatch:
+    inputs:
+      input_sheet_url:
+        type: string
+        description: 'Google Sheet URL for test case inputs'
+        required: false
+      output_sheet_url:
+        type: string
+        description: 'Google Sheet URL for evaluation outputs'
+        required: false
+      chatbot_instance_url:
+        type: string
+        description: 'Chatbot API endpoint URL'
+        required: false
+        default: 'https://decision-support-tool-dev.navateam.com/api/query'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    env:
+      GOOGLE_SHEET_INPUT_URL: ${{ inputs.input_sheet_url || secrets.GOOGLE_SHEET_INPUT_URL }}
+      GOOGLE_SHEET_OUTPUT_URL: ${{ inputs.output_sheet_url || secrets.GOOGLE_SHEET_OUTPUT_URL }}
+      PROMPTFOO_API_KEY: ${{ secrets.PROMPTFOO_API_KEY || '' }}
+      CHATBOT_INSTANCE_URL: ${{ inputs.chatbot_instance_url || 'https://decision-support-tool-dev.navateam.com/api/query' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq gettext
+
+      - name: Set up Google Cloud credentials
+        run: |
+          echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > "/tmp/gcp-creds.json"
+          jq -e . "/tmp/gcp-creds.json" > /dev/null || echo "Warning: Invalid JSON format in credentials"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json" >> "${GITHUB_ENV}"
+
+      - name: Install promptfoo and googleapis
+        run: |
+          npm install -g promptfoo --no-fund --no-audit --loglevel=error
+          npm install -g googleapis
+          npm install -g @actions/core @actions/github
+
+      - name: Authenticate with Promptfoo
+        if: env.PROMPTFOO_API_KEY != ''
+        run: |
+          # Authenticate with Promptfoo using the login command
+          promptfoo auth login --host https://api.promptfoo.app --api-key "${PROMPTFOO_API_KEY}"
+
+      - name: Process config file
+        run: |
+          cp app/promptfoo/generateUniqueId.js /tmp/generateUniqueId.js
+          envsubst < app/promptfoo/promptfooconfig.ci.yaml > /tmp/promptfooconfig.processed.yaml
+          
+          echo "Config file processed, checking..."
+          grep -v "GOOGLE_SHEET\|CHATBOT_INSTANCE" /tmp/promptfooconfig.processed.yaml | grep -i "url\|path"
+
+      - name: Run promptfoo evaluation
+        id: eval
+        continue-on-error: true
+        run: |
+          OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
+
+          if [ -n "$PROMPTFOO_API_KEY" ]; then
+            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}" --no-cache
+          else
+            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --output "${OUTPUT_JSON_FILE}" --no-cache
+          fi
+
+          if [ -f "${OUTPUT_JSON_FILE}" ]; then
+            echo "Output JSON file generated successfully"
+
+            if [ -n "$PROMPTFOO_API_KEY" ]; then
+              EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
+              SHARE_URL=$(jq -r '.shareableUrl // ""' "${OUTPUT_JSON_FILE}")
+
+              if [ -z "${SHARE_URL}" ] && [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
+                echo "No shareable URL found, attempting to share evaluation..."
+                SHARE_RESULT=$(promptfoo share --id "${EVAL_ID}" --json || echo '{}')
+                SHARE_URL=$(echo "${SHARE_RESULT}" | jq -r '.shareableUrl // ""')
+                echo "Share result: ${SHARE_URL}"
+              fi
+
+              echo "eval_id=${EVAL_ID}" >> "${GITHUB_OUTPUT}"
+              echo "share_url=${SHARE_URL}" >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            echo "No output JSON file was generated"
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PROMPTFOO_FAILED_TEST_EXIT_CODE: 0
+
+      - name: Create PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const evalId = '${{ steps.eval.outputs.eval_id }}';
+            const shareUrl = '${{ steps.eval.outputs.share_url }}';
+            const googleSheetUrl = '${{ env.GOOGLE_SHEET_OUTPUT_URL }}';
+            
+            // Get the test results from the previous step
+            const fs = require('fs');
+            let stats = { successes: 0, failures: 0, total: 0 };
+            
+            try {
+              if (fs.existsSync('/tmp/promptfoo-output.json')) {
+                const outputData = JSON.parse(fs.readFileSync('/tmp/promptfoo-output.json', 'utf8'));
+                if (outputData.results && outputData.results.stats) {
+                  stats = outputData.results.stats;
+                }
+              }
+            } catch (error) {
+              console.error('Error parsing output file:', error);
+            }
+            
+            // Create the comment body
+            let body = `## Promptfoo Evaluation Results
+            
+            | Success | Failure | Total | Pass Rate |
+            |---------|---------|-------|-----------|
+            | ${stats.successes} | ${stats.failures} | ${stats.total || stats.successes + stats.failures} | ${((stats.successes / (stats.total || stats.successes + stats.failures)) * 100).toFixed(2)}% |
+            
+            `;
+            
+            // Add Google Sheet link
+            body += `[View detailed results in Google Sheets](${googleSheetUrl})\n\n`;
+            
+            // Add shareable link if available, matching the format in the TS example
+            if (shareUrl && shareUrl.length > 0) {
+              body += `**» [View eval results](${shareUrl}) «**\n`;
+            } else if (evalId && evalId !== 'null' && evalId !== 'unknown') {
+              body += `Run \`promptfoo view --id ${evalId}\` locally to view interactive results\n`;
+            } else {
+              body += `**» View eval results in CI console «**\n`;
+            }
+            
+            // Post comment to PR
+            const { data: comment } = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+            
+            console.log(`Created comment: ${comment.html_url}`);
