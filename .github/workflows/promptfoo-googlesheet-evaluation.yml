@@ -24,6 +24,7 @@ on:
         type: string
         description: 'Chatbot API endpoint URL'
         required: false
+        default: 'https://decision-support-tool-dev.navateam.com/api/query'
 
 jobs:
   evaluate:
