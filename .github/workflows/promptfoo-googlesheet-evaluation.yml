@@ -24,7 +24,6 @@ on:
         type: string
         description: 'Chatbot API endpoint URL'
         required: false
-        default: 'https://decision-support-tool-dev.navateam.com/api/query'
 
 jobs:
   evaluate:
@@ -37,7 +36,7 @@ jobs:
       GOOGLE_SHEET_INPUT_URL: ${{ inputs.input_sheet_url || secrets.GOOGLE_SHEET_INPUT_URL }}
       GOOGLE_SHEET_OUTPUT_URL: ${{ inputs.output_sheet_url || secrets.GOOGLE_SHEET_OUTPUT_URL }}
       PROMPTFOO_API_KEY: ${{ secrets.PROMPTFOO_API_KEY || '' }}
-      CHATBOT_INSTANCE_URL: ${{ inputs.chatbot_instance_url }}
+      CHATBOT_INSTANCE_URL: ${{ inputs.chatbot_instance_url || 'https://decision-support-tool-dev.navateam.com/api/query' }}
 
     steps:
       - name: Checkout code
