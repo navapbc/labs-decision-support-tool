@@ -204,7 +204,8 @@ echo_cmds(){
 
         echo "# $DATASET_ID: Ingest"
         local S3_HTML_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/imagine_la-${TODAY}"
-        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California\", \"$S3_HTML_DIR\"]'"
+        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-imagine-la\", \"Benefits Information Hub\", \"mixed\", \"California\", \"$S3_HTML_DIR\"]' &> ${DEPLOY_ENV}-task-${DATASET_ID}.log &"
+        echo "sleep 5"
         } >> $REFRESH_SH
     elif [ "$DATASET_ID" == "ssa" ]; then
         {
@@ -216,7 +217,8 @@ echo_cmds(){
         echo "aws s3 cp app/ssa_scrapings.json ${S3_SCRAPINGS_FILE}"
         echo "aws s3 sync app/ssa_extra_md ${S3_DIR}/ssa_extra_md"
         echo "# $DATASET_ID: Ingest"
-        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-runner\", \"ssa\", \"--json_input\", \"${S3_SCRAPINGS_FILE}\"]'"
+        echo "./bin/run-command app ${DEPLOY_ENV} '[\"ingest-runner\", \"ssa\", \"--json_input\", \"${S3_SCRAPINGS_FILE}\"]' &> ${DEPLOY_ENV}-task-${DATASET_ID}.log &"
+        echo "sleep 5"
         } >> $REFRESH_SH
     else
         {
@@ -230,15 +232,20 @@ echo_cmds(){
         local S3_DIR="s3://decision-support-tool-app-${DEPLOY_ENV}/${DATASET_ID}"
         local S3_SCRAPINGS_FILE="${S3_DIR}/${DATASET_ID}_scrapings-${TODAY}.json"
         if [ "$DATASET_ID" == "edd" ] || [ "$DATASET_ID" == "la_policy" ]; then
+            echo "{"
             echo "#   Dropping table first so ingestion can use --resume in subsequent runs"
             echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--drop-only\"]'"
             echo "#   Ingest with --resume since it's a large dataset and can fail due to resource limits"
+            echo "date"
             echo "while ! ./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\", \"--resume\"]'; do"
+            echo "   date"
             echo "   echo \"Resuming/retrying ...\""
             echo "done"
+            echo "} &> ${DEPLOY_ENV}-task-${DATASET_ID}.log &"
         else
-            echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]'"
+            echo "./bin/run-command app $DEPLOY_ENV '[\"ingest-runner\", \"$DATASET_ID\", \"--json_input\", \"$S3_SCRAPINGS_FILE\"]' &> ${DEPLOY_ENV}-task-${DATASET_ID}.log &"
         fi
+        echo "sleep 5"
         } >> $REFRESH_SH
     fi
 }
@@ -255,6 +262,33 @@ check_preconditions(){
         echo "Move or delete the file/folder(s) before running this script."
         exit 50
     fi
+}
+
+poll_until_finished() {
+    pushd ..
+    local PREFIX="$1-task"
+    local INCOMPLETE_TASKS="True"
+
+    echo ""
+    echo "## Completed:"
+    for L in $(grep -e "INFO - Finished ingesting" -l ${PREFIX}-*.log); do
+        echo ""
+        echo "$L:"
+        grep -E '(INFO - Ingesting from|INFO - Finished ingesting)' $L
+    done
+
+    while [ "$INCOMPLETE_TASKS" ]; do
+        echo ""
+        INCOMPLETE_TASKS="$(grep -e "INFO - Finished ingesting" -L ${PREFIX}-*.log)"
+        echo "## Waiting for incomplete tasks:"
+        for L in "$INCOMPLETE_TASKS"; do
+            echo ""
+            echo "$L:"
+            tail -n 4 "$L"
+        done
+        sleep 30
+    done
+    popd
 }
 
 if ! [ -e "refresh-ingestion.sh" ]; then
@@ -309,6 +343,13 @@ case "$1" in
         fi
         echo_cmds "$2"
         ;;
+    stats)
+        if [ -z "$2" ]; then
+            echo "Usage: '$0 stats <DATASET_ID>'"
+            exit 3
+        fi
+        echo_stats "$2"
+        ;;
     all)
         mkdir -p OLD_INGESTION-$TODAY
         mv -v *.zip *_md OLD_INGESTION-$TODAY/
@@ -326,13 +367,14 @@ case "$1" in
         done
         ingest_imagine_la
 
-        # Quickly create refresh script for prod
+        # The prior commands created a refresh script for dev
+        # The following quickly creates a refresh script for prod
         export DEPLOY_ENV=prod
         for DATASET_ID in $DATASETS imagine_la; do
             echo_cmds "$DATASET_ID"
         done
 
-        echo "=== Copy the following to Slack ==="
+        echo "=== Copy the following to Slack and compare counts with previous reingestions ==="
         for DATASET_ID in $DATASETS imagine_la; do
             echo_stats "$DATASET_ID"
         done
@@ -342,6 +384,9 @@ case "$1" in
         echo "- Upload the zip files to the 'Chatbot Knowledge Markdown' Google Drive folder."
         echo "- Review and run the refresh scripts (in the top-level folder): refresh-dev-${TODAY} and refresh-prod-${TODAY}."
         echo "- Restore local TF to dev environment: ./bin/terraform-init infra/app/service dev"
+        ;;
+    wait_until_done)
+        poll_until_finished "$DEPLOY_ENV"
         ;;
     *)
         scrape_and_ingest "$1"
