@@ -53,7 +53,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq
+          sudo apt-get install -y jq gettext
 
       - name: Set up Google Cloud credentials
         run: |
@@ -76,11 +76,7 @@ jobs:
       - name: Process config file
         run: |
           cp app/promptfoo/generateUniqueId.js /tmp/generateUniqueId.js
-          cp app/promptfoo/promptfooconfig.ci.yaml /tmp/promptfooconfig.processed.yaml
-
-          sed -i "s|GOOGLE_SHEET_INPUT_URL|${{ env.GOOGLE_SHEET_INPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
-          sed -i "s|GOOGLE_SHEET_OUTPUT_URL|${{ env.GOOGLE_SHEET_OUTPUT_URL }}|g" /tmp/promptfooconfig.processed.yaml
-          sed -i "s|CHATBOT_INSTANCE_URL|${{ env.CHATBOT_INSTANCE_URL }}|g" /tmp/promptfooconfig.processed.yaml
+          envsubst < app/promptfoo/promptfooconfig.ci.yaml > /tmp/promptfooconfig.processed.yaml
           
           echo "Config file processed, checking..."
           grep -v "GOOGLE_SHEET\|CHATBOT_INSTANCE" /tmp/promptfooconfig.processed.yaml | grep -i "url\|path"

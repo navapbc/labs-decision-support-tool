@@ -4,7 +4,7 @@ description: 'Decision Support Tool Evaluation (CI)'
 prompts:
   - response
 providers:
-  - id: CHATBOT_INSTANCE_URL
+  - id: ${CHATBOT_INSTANCE_URL}
     config:
       method: POST
       headers:
@@ -27,5 +27,5 @@ evaluateOptions:
   delay: 1000
   showProgressBar: true
 
-tests: GOOGLE_SHEET_INPUT_URL
-outputPath: GOOGLE_SHEET_OUTPUT_URL 
+tests: ${GOOGLE_SHEET_INPUT_URL}
+outputPath: ${GOOGLE_SHEET_OUTPUT_URL} 
