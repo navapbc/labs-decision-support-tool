@@ -19,7 +19,7 @@ providers:
 
 defaultTest:
   vars:
-    uniqueSessionId: file:///tmp/generateUniqueId.js # Use the tmp script that we make in the GHA workflow
+    uniqueSessionId: file://promptfoo/generateUniqueId.js
   options:
     timeout: 360000
 
@@ -28,4 +28,4 @@ evaluateOptions:
   showProgressBar: true
 
 tests: GOOGLE_SHEET_INPUT_URL
-outputPath: GOOGLE_SHEET_OUTPUT_URL
+outputPath: GOOGLE_SHEET_OUTPUT_URL 
