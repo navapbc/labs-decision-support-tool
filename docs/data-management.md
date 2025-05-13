@@ -13,6 +13,8 @@ The `./refresh-ingestion.sh` script automates most of the scraping and ingestion
 
 ### Refreshing all data sources
 
+Before refreshing, create a backup of the database -- see the "Backing up DB contents" section below.
+
 To refresh all data sources at once, use the refresh-ingestion.sh script from within `/app`:
 
 ```bash
@@ -23,10 +25,11 @@ export CONTENT_HUB_ACCESS_TOKEN="access_token_here"
 
 Note that for the imagine_la dataset, you'll need to set the `CONTENT_HUB_ACCESS_TOKEN` and `CONTENT_HUB_SPACE_ID` environment variables.
 
-The `./refresh-ingestion.sh` script will scrape and ingest data from all supported sources except for 'ssa' (which requires manual scraping). The script only modifies the local database. To update the database in the respective deployment environments, the script generates 2 other scripts in the top-level directory: `refresh-dev-*.sh` and `refresh-prod-*.sh`, which should be reviewed before running.
+The `./refresh-ingestion.sh` script will scrape and ingest data from all supported sources except for 'ssa' (which requires manual scraping). The script only modifies the local database. To update the database in the respective deployment environments, the script generates 2 other scripts in the top-level directory: `refresh-dev-*.sh` and `refresh-prod-*.sh`, which should be reviewed before running. These scripts will start ingestion of each dataset in parallel.
 
-After running `refresh-dev-*.sh`, to see the status and wait for ingestion to complete:
+About 10 minutes after running `refresh-dev-*.sh`, you can check the ingestion status and wait them to complete:
 ```bash
+cd app
 DEPLOY_ENV=dev ./refresh-ingestion.sh wait_until_done
 ```
 

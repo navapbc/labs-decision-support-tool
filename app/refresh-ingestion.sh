@@ -267,7 +267,6 @@ check_preconditions(){
 poll_until_finished() {
     pushd ..
     local PREFIX="$1-task"
-    local INCOMPLETE_TASKS="True"
 
     echo ""
     echo "## Completed:"
@@ -277,16 +276,23 @@ poll_until_finished() {
         grep -E '(INFO - Ingesting from|INFO - Finished ingesting)' $L
     done
 
+    local INCOMPLETE_TASKS="$(grep -e "INFO - Finished ingesting" -L ${PREFIX}-*.log)"
     while [ "$INCOMPLETE_TASKS" ]; do
         echo ""
-        INCOMPLETE_TASKS="$(grep -e "INFO - Finished ingesting" -L ${PREFIX}-*.log)"
         echo "## Waiting for incomplete tasks:"
-        for L in "$INCOMPLETE_TASKS"; do
+        for L in $INCOMPLETE_TASKS; do
             echo ""
             echo "$L:"
             tail -n 4 "$L"
         done
-        sleep 30
+        sleep 60
+        INCOMPLETE_TASKS="$(grep -e "INFO - Finished ingesting" -L ${PREFIX}-*.log)"
+    done
+
+    for L in $(grep -e "INFO - Finished ingesting" -l ${PREFIX}-*.log); do
+        echo ""
+        echo "$L:"
+        grep -E '(INFO - Ingesting from|INFO - Finished ingesting)' $L
     done
     popd
 }
@@ -383,6 +389,7 @@ case "$1" in
         echo "REMINDERS:"
         echo "- Upload the zip files to the 'Chatbot Knowledge Markdown' Google Drive folder."
         echo "- Review and run the refresh scripts (in the top-level folder): refresh-dev-${TODAY} and refresh-prod-${TODAY}."
+        echo "- Check ingestion status and wait for completion: DEPLOY_ENV=prod ./refresh-ingestion.sh wait_until_done"
         echo "- Restore local TF to dev environment: ./bin/terraform-init infra/app/service dev"
         ;;
     wait_until_done)

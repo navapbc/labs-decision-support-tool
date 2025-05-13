@@ -35,4 +35,6 @@ app/Makefile.local
 
 # Local refresh-ingestion-created scripts
 /refresh-*.sh
+/dev-task-*.log
+/prod-task-*.log
 
