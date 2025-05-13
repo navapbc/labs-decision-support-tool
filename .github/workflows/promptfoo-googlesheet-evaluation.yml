@@ -89,7 +89,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PROMPTFOO_FAILED_TEST_EXIT_CODE: 0
         run: |
-          # Validate required credentials
           if [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
             echo "Error: Google credentials file not found at $GOOGLE_APPLICATION_CREDENTIALS"
             exit 1
@@ -105,6 +104,30 @@ jobs:
             exit 1
           fi
 
+          echo "Input Sheet URL: $GOOGLE_SHEET_INPUT_URL"
+          echo "Output Sheet URL: $GOOGLE_SHEET_OUTPUT_URL"
+
+          node -e "
+            const {google} = require('googleapis');
+            const auth = new google.auth.GoogleAuth({
+              scopes: ['https://www.googleapis.com/auth/spreadsheets']
+            });
+            auth.getClient().then(client => {
+              console.log('Successfully authenticated with Google');
+              const sheets = google.sheets({version: 'v4', auth: client});
+              // Extract spreadsheet ID from URL
+              const url = new URL('$GOOGLE_SHEET_OUTPUT_URL');
+              const path = url.pathname.split('/');
+              const spreadsheetId = path[3];
+              return sheets.spreadsheets.get({spreadsheetId});
+            }).then(response => {
+              console.log('Successfully accessed Google Sheet:', response.data.properties.title);
+            }).catch(error => {
+              console.error('Error accessing Google Sheet:', error);
+              process.exit(1);
+            });
+          "
+
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
 
           if [ -n "$PROMPTFOO_API_KEY" ]; then
@@ -116,8 +139,15 @@ jobs:
           if [ -f "${OUTPUT_JSON_FILE}" ]; then
             echo "Output JSON file generated successfully"
 
+            # Get the evaluation ID from the output file
+            EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
+
+            if [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
+              echo "Exporting results to Google Sheets..."
+              promptfoo export "${EVAL_ID}" --output "${GOOGLE_SHEET_OUTPUT_URL}"
+            fi
+
             if [ -n "$PROMPTFOO_API_KEY" ]; then
-              EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
               SHARE_URL=$(jq -r '.shareableUrl // ""' "${OUTPUT_JSON_FILE}")
 
               if [ -z "${SHARE_URL}" ] && [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
