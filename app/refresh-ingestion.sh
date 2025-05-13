@@ -387,7 +387,7 @@ case "$1" in
 
         echo ""
         echo "REMINDERS:"
-        echo "- Upload the zip files to the 'Chatbot Knowledge Markdown' Google Drive folder."
+        echo "- Upload the zip files to the ['Chatbot Knowledge Markdown' Google Drive folder](https://drive.google.com/drive/folders/1ZLWC2HdWKqprvIcd_6Y_M_ekJmABeONk)."
         echo "- Review and run the refresh scripts (in the top-level folder): refresh-dev-${TODAY} and refresh-prod-${TODAY}."
         echo "- Check ingestion status and wait for completion: DEPLOY_ENV=prod ./refresh-ingestion.sh wait_until_done"
         echo "- Restore local TF to dev environment: ./bin/terraform-init infra/app/service dev"
