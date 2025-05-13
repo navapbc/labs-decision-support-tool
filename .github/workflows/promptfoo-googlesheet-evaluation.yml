@@ -107,27 +107,6 @@ jobs:
           echo "Input Sheet URL: $GOOGLE_SHEET_INPUT_URL"
           echo "Output Sheet URL: $GOOGLE_SHEET_OUTPUT_URL"
 
-          node -e "
-            const {google} = require('googleapis');
-            const auth = new google.auth.GoogleAuth({
-              scopes: ['https://www.googleapis.com/auth/spreadsheets']
-            });
-            auth.getClient().then(client => {
-              console.log('Successfully authenticated with Google');
-              const sheets = google.sheets({version: 'v4', auth: client});
-              // Extract spreadsheet ID from URL
-              const url = new URL('$GOOGLE_SHEET_OUTPUT_URL');
-              const path = url.pathname.split('/');
-              const spreadsheetId = path[3];
-              return sheets.spreadsheets.get({spreadsheetId});
-            }).then(response => {
-              console.log('Successfully accessed Google Sheet:', response.data.properties.title);
-            }).catch(error => {
-              console.error('Error accessing Google Sheet:', error);
-              process.exit(1);
-            });
-          "
-
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
 
           if [ -n "$PROMPTFOO_API_KEY" ]; then
