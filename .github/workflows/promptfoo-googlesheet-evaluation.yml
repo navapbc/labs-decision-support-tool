@@ -59,8 +59,6 @@ jobs:
         run: |
           echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > "/tmp/gcp-creds.json"
           jq -e . "/tmp/gcp-creds.json" > /dev/null || echo "Warning: Invalid JSON format in credentials"
-          echo "Credentials info:"
-          jq -r '{"type": .type, "project_id": .project_id, "client_email": .client_email}' /tmp/gcp-creds.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json" >> "${GITHUB_ENV}"
 
       - name: Install promptfoo and googleapis
@@ -104,9 +102,6 @@ jobs:
             exit 1
           fi
 
-          echo "Input Sheet URL: $GOOGLE_SHEET_INPUT_URL"
-          echo "Output Sheet URL: $GOOGLE_SHEET_OUTPUT_URL"
-
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
 
           if [ -n "$PROMPTFOO_API_KEY" ]; then
@@ -118,7 +113,6 @@ jobs:
           if [ -f "${OUTPUT_JSON_FILE}" ]; then
             echo "Output JSON file generated successfully"
 
-            # Get the evaluation ID from the output file
             EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
 
             if [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
