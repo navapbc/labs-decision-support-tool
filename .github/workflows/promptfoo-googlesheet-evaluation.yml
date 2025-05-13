@@ -76,6 +76,12 @@ jobs:
       - name: Process config file
         run: |
           cp app/promptfoo/generateUniqueId.js /tmp/generateUniqueId.js
+          
+          # Export environment variables without quotes for envsubst
+          export GOOGLE_SHEET_INPUT_URL=$(echo $GOOGLE_SHEET_INPUT_URL | tr -d "'")
+          export GOOGLE_SHEET_OUTPUT_URL=$(echo $GOOGLE_SHEET_OUTPUT_URL | tr -d "'")
+          export CHATBOT_INSTANCE_URL=$(echo $CHATBOT_INSTANCE_URL | tr -d "'")
+          
           envsubst < app/promptfoo/promptfooconfig.ci.yaml > /tmp/promptfooconfig.processed.yaml
           
           echo "Config file processed, checking..."
@@ -83,8 +89,27 @@ jobs:
 
       - name: Run promptfoo evaluation
         id: eval
-        continue-on-error: true
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-creds.json
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PROMPTFOO_FAILED_TEST_EXIT_CODE: 0
         run: |
+          # Validate required credentials
+          if [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+            echo "Error: Google credentials file not found at $GOOGLE_APPLICATION_CREDENTIALS"
+            exit 1
+          fi
+
+          if ! jq -e . "$GOOGLE_APPLICATION_CREDENTIALS" > /dev/null 2>&1; then
+            echo "Error: Invalid JSON format in Google credentials file"
+            exit 1
+          fi
+
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Error: OPENAI_API_KEY environment variable is not set"
+            exit 1
+          fi
+
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
 
           if [ -n "$PROMPTFOO_API_KEY" ]; then
@@ -113,9 +138,6 @@ jobs:
           else
             echo "No output JSON file was generated"
           fi
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PROMPTFOO_FAILED_TEST_EXIT_CODE: 0
 
       - name: Create PR comment
         if: github.event_name == 'pull_request'
