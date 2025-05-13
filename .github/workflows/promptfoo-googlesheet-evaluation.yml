@@ -59,6 +59,8 @@ jobs:
         run: |
           echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > "/tmp/gcp-creds.json"
           jq -e . "/tmp/gcp-creds.json" > /dev/null || echo "Warning: Invalid JSON format in credentials"
+          echo "Credentials info:"
+          jq -r '{"type": .type, "project_id": .project_id, "client_email": .client_email}' /tmp/gcp-creds.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json" >> "${GITHUB_ENV}"
 
       - name: Install promptfoo and googleapis
@@ -76,14 +78,7 @@ jobs:
       - name: Process config file
         run: |
           cp app/promptfoo/generateUniqueId.js /tmp/generateUniqueId.js
-          
-          # Export environment variables without quotes for envsubst
-          export GOOGLE_SHEET_INPUT_URL=$(echo $GOOGLE_SHEET_INPUT_URL | tr -d "'")
-          export GOOGLE_SHEET_OUTPUT_URL=$(echo $GOOGLE_SHEET_OUTPUT_URL | tr -d "'")
-          export CHATBOT_INSTANCE_URL=$(echo $CHATBOT_INSTANCE_URL | tr -d "'")
-          
           envsubst < app/promptfoo/promptfooconfig.ci.yaml > /tmp/promptfooconfig.processed.yaml
-          
           echo "Config file processed, checking..."
           grep -v "GOOGLE_SHEET\|CHATBOT_INSTANCE" /tmp/promptfooconfig.processed.yaml | grep -i "url\|path"
 
