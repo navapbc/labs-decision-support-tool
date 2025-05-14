@@ -10,6 +10,7 @@ on:
       - 'app/src/generate.py'
       - 'app/promptfoo/promptfooconfig.ci.yaml'
       - 'app/promptfoo/generateUniqueId.js'
+      - '.github/workflows/promptfoo-googlesheet-evaluation.yml'
   workflow_dispatch:
     inputs:
       input_sheet_url:
