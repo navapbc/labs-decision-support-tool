@@ -14,7 +14,7 @@ See [this sheet for a minimal example](https://docs.google.com/spreadsheets/d/1x
 1. Copy the URL of the Google Sheet you've created, e.g., `https://docs.google.com/spreadsheets/d/1xpOBO7FnRgmgILYwn0gj_LGqqdpi-E5cfQxdgscw21s/edit?gid=0#gid=0`
 1. Go to the [Prompt Evaluation GitHub action](https://github.com/navapbc/labs-decision-support-tool/actions/workflows/promptfoo-googlesheet-evaluation.yml).
 1. Click "Run workflow":
-![Run workflow button in Github Actions](promptfoo-evaluations-run-workflow.png)
+![Run workflow button in GitHub Actions](promptfoo-evaluations-run-workflow.png)
 1. Paste in the Google Sheet URL into both the  `Google Sheet URL for test case inputs` and `Google Sheet URL for evaluation outputs` fields. Leave `Use workflow from` and `Chatbot API endpoint URL` set to their defaults. Additional detail about these is below in Advanced Usage.
 1. Click `Run workflow`. The page will not refresh immediately. If you refresh, you should see your workflow in the list with a yellow icon indicating that it's running: 
 ![Example list of running workflows](promptfoo-evaluation-running-workflows.png)
