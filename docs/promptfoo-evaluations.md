@@ -5,7 +5,7 @@ We use [Promptfoo](https://promptfoo.dev) to automatically evaluate the chatbot'
 ## How to run evaluations against a Google Sheet
 
 1. Create a new Google Sheet ([sheets.new](https://sheets.new)) 
-2. Create three columns: `capability`, `question`, and `__expected1`.
+2. Create three columns: `capability`, `question`, and `__expected`.
   - `capability` should describe what you'd like to test, e.g., "It refuses to answer out of scope questions"
   - `question` is the input that will be sent to the chatbot, e.g., "How do I apply for PFML in Massachusetts?"
   - `__expected` is the assertion used to access the chatbot's output, e.g., `contains:Sorry, I can't answer that.`
