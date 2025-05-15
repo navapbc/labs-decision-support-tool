@@ -10,6 +10,7 @@ on:
       - 'app/src/generate.py'
       - 'app/promptfoo/promptfooconfig.ci.yaml'
       - 'app/promptfoo/generateUniqueId.js'
+      - '.github/workflows/promptfoo-googlesheet-evaluation.yml'
   workflow_dispatch:
     inputs:
       input_sheet_url:
@@ -103,32 +104,27 @@ jobs:
           fi
 
           OUTPUT_JSON_FILE="/tmp/promptfoo-output.json"
+          EVAL_OUTPUT_FILE="/tmp/promptfoo-output.txt"
 
           if [ -n "$PROMPTFOO_API_KEY" ]; then
-            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}" --no-cache
+            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}" --no-cache | tee "${EVAL_OUTPUT_FILE}"
           else
-            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --output "${OUTPUT_JSON_FILE}" --no-cache
+            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --output "${OUTPUT_JSON_FILE}" --no-cache | tee "${EVAL_OUTPUT_FILE}"
           fi
 
           if [ -f "${OUTPUT_JSON_FILE}" ]; then
             echo "Output JSON file generated successfully"
 
-            EVAL_ID=$(jq -r '.evaluationId // "unknown"' "${OUTPUT_JSON_FILE}")
-
-            if [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
+            EVAL_ID=$(grep -o 'https://www.promptfoo.app/eval/[^[:space:]]*' "${EVAL_OUTPUT_FILE}" | sed 's|.*/||')
+            
+            if [ -n "${EVAL_ID}" ]; then
+              echo "Found evaluation ID: ${EVAL_ID}"
               echo "Exporting results to Google Sheets..."
               promptfoo export "${EVAL_ID}" --output "${GOOGLE_SHEET_OUTPUT_URL}"
             fi
 
             if [ -n "$PROMPTFOO_API_KEY" ]; then
-              SHARE_URL=$(jq -r '.shareableUrl // ""' "${OUTPUT_JSON_FILE}")
-
-              if [ -z "${SHARE_URL}" ] && [ "${EVAL_ID}" != "unknown" ] && [ "${EVAL_ID}" != "null" ]; then
-                echo "No shareable URL found, attempting to share evaluation..."
-                SHARE_RESULT=$(promptfoo share --id "${EVAL_ID}" --json || echo '{}')
-                SHARE_URL=$(echo "${SHARE_RESULT}" | jq -r '.shareableUrl // ""')
-                echo "Share result: ${SHARE_URL}"
-              fi
+              SHARE_URL=$(grep -o 'https://www.promptfoo.app/eval/[^[:space:]]*' "${EVAL_OUTPUT_FILE}")
 
               echo "eval_id=${EVAL_ID}" >> "${GITHUB_OUTPUT}"
               echo "share_url=${SHARE_URL}" >> "${GITHUB_OUTPUT}"
