@@ -26,7 +26,7 @@ See [this sheet for a minimal example](https://docs.google.com/spreadsheets/d/1x
 
 ### Run workflow from
 
-You can change the `Run workflow from` dropdown to select a branch that GitHub will use for executing the action. If you are not an engineer, you should ignore this option and always leave it set to `main`.
+You can change the `Run workflow from` dropdown to select a branch that GitHub will use for executing the action. If you are not certain that you need to adjust this setting, you should leave it set to `main`. Note that changing this option only changes the branch that the workflow .yaml is run from. It does not change the code (e.g., prompt) of the chatbot that is evaluated.
 
 ### Chatbot API endpoint URL
 
