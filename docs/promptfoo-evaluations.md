@@ -20,7 +20,7 @@ See [this sheet for a minimal example](https://docs.google.com/spreadsheets/d/1x
     - If there is a non-zero `gid` at the end of the URL for your `Google Sheet URL for evaluation outputs`, that tab within your Google Sheet will be **overwritten**. To prevent this, edit it out of the URL, e.g., converting `https://docs.google.com/spreadsheets/d/1xpOBO7FnRgmgILYwn0gj_LGqqdpi-E5cfQxdgscw21s/edit?gid=1234#gid=12345` to `https://docs.google.com/spreadsheets/d/1xpOBO7FnRgmgILYwn0gj_LGqqdpi-E5cfQxdgscw21s/edit`.
 1. Click `Run workflow`. The page will refresh in a few seconds or you can refresh manually. Once refreshed, you should see your workflow in the list with a yellow icon indicating that it's running: 
 ![Example list of running workflows](promptfoo-evaluation-running-workflows.png)
-1. After about three to five minutes, the workflow should finish running (the icon will change to a green checkmark.) The results of your evaluation will be in the Google Sheet.
+1. After about three to five minutes, the workflow should finish running (indicated by a green checkmark icon). The results of your evaluation will be in the Google Sheet.
 
 ## Advanced usage
 
