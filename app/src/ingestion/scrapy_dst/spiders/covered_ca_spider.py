@@ -137,6 +137,8 @@ class CoveredCaliforniaSpider(scrapy.Spider):
         for body in body_sel:
             md = to_markdown(body.get(), response.url)
             assert md
+            if body.css("table"):
+                self.logger.warning("Ignored table formatting for: %r", md)
             markdowns.append(md)
         markdown = "\n\n".join(markdowns)
         return {
@@ -192,6 +194,11 @@ def to_markdown(html: Optional[str], base_url: Optional[str] = None) -> str:
     # 0 for no wrapping
     h2t.body_width = 0
     h2t.wrap_links = False
+
+    # Page https://www.coveredca.com/support/before-you-buy/copays-deductibles-coinsurance/
+    # (unintentionally?) wrapped the main text in a single-cell table,
+    # which result in markdown with text followed by `---`, which causes the text to be interpreted as heading
+    h2t.ignore_tables = True
 
     if base_url:
         h2t.baseurl = base_url
