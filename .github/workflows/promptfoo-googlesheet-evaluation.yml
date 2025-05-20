@@ -10,6 +10,7 @@ on:
       - 'app/src/generate.py'
       - 'app/promptfoo/promptfooconfig.ci.yaml'
       - 'app/promptfoo/generateUniqueId.js'
+      - 'app/promptfoo/readability_assessment.py'
       - '.github/workflows/promptfoo-googlesheet-evaluation.yml'
   workflow_dispatch:
     inputs:
@@ -54,7 +55,12 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq gettext
+          sudo apt-get install -y jq gettext python3-pip
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install textdescriptives spacy
+          python3 -m spacy download en_core_web_sm
 
       - name: Set up Google Cloud credentials
         run: |
@@ -77,6 +83,7 @@ jobs:
       - name: Process config file
         run: |
           cp app/promptfoo/generateUniqueId.js /tmp/generateUniqueId.js
+          cp app/promptfoo/readability_assessment.py /tmp/readability_assessment.py
           envsubst < app/promptfoo/promptfooconfig.ci.yaml > /tmp/promptfooconfig.processed.yaml
           echo "Config file processed, checking..."
           grep -v "GOOGLE_SHEET\|CHATBOT_INSTANCE" /tmp/promptfooconfig.processed.yaml | grep -i "url\|path"
@@ -134,7 +141,7 @@ jobs:
           fi
 
       - name: Create PR comment
-        if: github.event_name == 'pull_request'
+        if: github.event.name == 'pull_request'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

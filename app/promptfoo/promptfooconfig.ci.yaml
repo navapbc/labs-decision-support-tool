@@ -22,6 +22,9 @@ defaultTest:
     uniqueSessionId: file:///tmp/generateUniqueId.js
   options:
     timeout: 360000
+  assert:
+    - type: python
+      value: file://tmp/readability_assessment.py
 
 evaluateOptions:
   delay: 1000
