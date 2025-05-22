@@ -25,7 +25,7 @@ def _calculate_readability_metrics(metrics_df) -> Dict[str, float]:
         "avg_grade_level": avg_grade_level
     }
 
-def get_assert(output: str) -> Union[bool, float, Dict[str, Any]]:
+def get_assert(output: str, context: Any = None) -> Union[bool, float, Dict[str, Any]]:
     print("=== TEXTDESCRIPTIVES READABILITY ASSESSMENT STARTING ===")
     print(f"Output to assess: {output}")
     
