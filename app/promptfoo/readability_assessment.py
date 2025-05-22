@@ -2,11 +2,30 @@ from typing import Dict, Union, Any
 import textdescriptives as td
 import numpy as np
 
-def get_assert(output: str, context) -> Union[bool, float, Dict[str, Any]]:
-    """
-    Assess the readability of the output text using TextDescriptives instead of py-readability-metrics.
-    Returns a GradingResult with component scores for different readability metrics.
-    """
+# Readability thresholds
+MAX_GRADE_LEVEL = 12.0  # Maximum acceptable grade level (high school)
+MIN_FLESCH_EASE = 50.0  # Minimum acceptable Flesch Reading Ease score
+
+def _calculate_readability_metrics(metrics_df) -> Dict[str, float]:
+    # Extract the readability metrics and convert from numpy types to Python native types
+    flesch_reading_ease = float(metrics_df["flesch_reading_ease"].iloc[0])
+    flesch_kincaid_grade = float(metrics_df["flesch_kincaid_grade"].iloc[0])
+    gunning_fog = float(metrics_df["gunning_fog"].iloc[0])
+    coleman_liau_index = float(metrics_df["coleman_liau_index"].iloc[0])
+    
+    # Calculate average grade level
+    grade_levels = [flesch_kincaid_grade, gunning_fog, coleman_liau_index]
+    avg_grade_level = sum(grade_levels) / len(grade_levels)
+    
+    return {
+        "flesch_kincaid_grade": flesch_kincaid_grade,
+        "flesch_ease": flesch_reading_ease,
+        "gunning_fog_grade": gunning_fog,
+        "coleman_liau_grade": coleman_liau_index,
+        "avg_grade_level": avg_grade_level
+    }
+
+def get_assert(output: str) -> Union[bool, float, Dict[str, Any]]:
     print("=== TEXTDESCRIPTIVES READABILITY ASSESSMENT STARTING ===")
     print(f"Output to assess: {output}")
     
@@ -25,19 +44,10 @@ def get_assert(output: str, context) -> Union[bool, float, Dict[str, Any]]:
             metrics=["readability"]
         )
         
-        # Extract the readability metrics and convert from numpy types to Python native types
-        flesch_reading_ease = float(metrics_df["flesch_reading_ease"].iloc[0])
-        flesch_kincaid_grade = float(metrics_df["flesch_kincaid_grade"].iloc[0])
-        gunning_fog = float(metrics_df["gunning_fog"].iloc[0])
-        coleman_liau_index = float(metrics_df["coleman_liau_index"].iloc[0])
-        
-        # Set thresholds for readability
-        MAX_GRADE_LEVEL = 12.0  # Maximum acceptable grade level (high school)
-        MIN_FLESCH_EASE = 50.0  # Minimum acceptable Flesch Reading Ease score
-        
-        # Calculate average grade level from metrics
-        grade_levels = [flesch_kincaid_grade, gunning_fog, coleman_liau_index]
-        avg_grade_level = sum(grade_levels) / len(grade_levels)
+        # Get readability metrics
+        metrics = _calculate_readability_metrics(metrics_df)
+        flesch_reading_ease = metrics["flesch_ease"]
+        avg_grade_level = metrics["avg_grade_level"]
         
         # Determine if the text passes readability requirements
         passes_grade_level = bool(avg_grade_level <= MAX_GRADE_LEVEL)
@@ -49,23 +59,6 @@ def get_assert(output: str, context) -> Union[bool, float, Dict[str, Any]]:
         
         # Overall score is average of both metrics
         overall_score = float((grade_level_score + flesch_ease_score) / 2)
-        
-        # Ensure all values are standard Python types, not numpy types
-        def numpy_to_python(obj):
-            if isinstance(obj, np.integer):
-                return int(obj)
-            elif isinstance(obj, np.floating):
-                return float(obj)
-            elif isinstance(obj, np.ndarray):
-                return obj.tolist()
-            elif isinstance(obj, np.bool_):
-                return bool(obj)
-            elif isinstance(obj, dict):
-                return {k: numpy_to_python(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [numpy_to_python(i) for i in obj]
-            else:
-                return obj
         
         # Return comprehensive grading result
         result = {
@@ -84,25 +77,16 @@ def get_assert(output: str, context) -> Union[bool, float, Dict[str, Any]]:
                     'reason': f'Flesch Reading Ease (target ≥ {MIN_FLESCH_EASE}): {flesch_reading_ease:.1f}'
                 }
             ],
-            'namedScores': {
-                'flesch_kincaid_grade': flesch_kincaid_grade,
-                'flesch_ease': flesch_reading_ease,
-                'gunning_fog_grade': gunning_fog,
-                'coleman_liau_grade': coleman_liau_index,
-                'avg_grade_level': avg_grade_level
-            }
+            'namedScores': metrics
         }
-        
-        # Convert any remaining numpy types to Python native types
-        result = numpy_to_python(result)
         
         print("Assessment result:", result)
         return result
         
     except Exception as e:
-        print(f"Error in readability assessment: {str(e)}")
+        print(f"Error in readability assessment: {e}")
         return {
             'pass': False,
-            'score': 0.0,
-            'reason': f'Error in readability assessment: {str(e)}'
+            'score': -1.0,  # Negative score indicates error processing input
+            'reason': f'Error in readability assessment: {e}'
         } 
