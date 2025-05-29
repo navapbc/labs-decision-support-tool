@@ -61,6 +61,7 @@ def test_question(test_document):
         "question": "test question?",
         "answer": "test answer",
         "document_name": test_document.name,
+        "document_id": str(test_document.id),
         "dataset": test_document.dataset,
         "chunk_id": str(chunk.id),
         "content_hash": content_hash,
@@ -83,6 +84,8 @@ def test_process_retrieved_chunks_found(test_document, test_question):
     assert result.correct_chunk_retrieved is True
     assert result.rank_if_found == 1
     assert result.retrieval_time_ms == 100.5
+    assert result.correct_document_retrieved is True
+    assert result.document_rank_if_found == 1
 
     # Verify expected chunk
     assert isinstance(result.expected_chunk, ExpectedChunk)
@@ -90,6 +93,7 @@ def test_process_retrieved_chunks_found(test_document, test_question):
     assert result.expected_chunk.source == test_question["dataset"]
     assert result.expected_chunk.chunk_id == test_question["chunk_id"]
     assert result.expected_chunk.content == test_question["expected_chunk_content"]
+    assert result.expected_chunk.document_id == test_question["document_id"]
 
     # Verify retrieved chunks
     assert len(result.retrieved_chunks) == 1
@@ -98,6 +102,7 @@ def test_process_retrieved_chunks_found(test_document, test_question):
     assert retrieved.chunk_id == str(chunk.id)
     assert retrieved.score == 0.85
     assert retrieved.content == chunk.content
+    assert retrieved.document_id == str(chunk.document_id)
 
 
 def test_process_retrieved_chunks_not_found(test_document, test_question):
@@ -139,22 +144,42 @@ def test_process_retrieved_chunks_empty():
     assert result.expected_chunk.content == ""
 
 
+def test_process_retrieved_chunks_document_found_chunk_not_found(test_document, test_question):
+    """Test processing when correct document is found but specific chunk is not."""
+    different_chunk = ChunkFactory.build(
+        document=test_document,
+        content="different content from same document",
+        id=uuid.uuid4(),
+    )
+    different_chunk.document_id = test_document.id
+
+    retrieved_chunks = [ChunkWithScore(chunk=different_chunk, score=0.85)]
+
+    result = process_retrieved_chunks(test_question, retrieved_chunks, 100.5)
+
+    assert result.correct_chunk_retrieved is False
+    assert result.rank_if_found is None
+
+    assert result.correct_document_retrieved is True
+    assert result.document_rank_if_found == 1
+
+    assert len(result.retrieved_chunks) == 1
+    assert result.retrieved_chunks[0].document_id == str(test_document.id)
+
+
 def test_batch_process_results(test_document, test_question, enable_factory_create, db_session):
     """Test batch processing of results."""
     questions = [test_question]
     k = 1
 
-    # Create a simple retrieval function that returns the document's chunk
     def retrieval_func(query: str, k: int):
         chunk = test_document.chunks[0]
         return [ChunkWithScore(chunk=chunk, score=0.85)]
 
-    # Process results without mocking
     results = batch_process_results(questions, retrieval_func, k)
 
-    # Verify results
     assert len(results) == 1
     assert isinstance(results[0], EvaluationResult)
     assert results[0].question == test_question["question"]
-    assert results[0].retrieval_time_ms > 0  # Should have actual timing
+    assert results[0].retrieval_time_ms > 0
     assert results[0].correct_chunk_retrieved is True

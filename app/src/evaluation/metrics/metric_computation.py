@@ -16,10 +16,13 @@ from src.evaluation.data_models import (
 def compute_dataset_metrics(results: List[EvaluationResult]) -> DatasetMetrics:
     """Compute metrics for a specific dataset."""
     if not results:
-        return DatasetMetrics(recall_at_k=0.0, sample_size=0, avg_score_incorrect=0.0)
+        return DatasetMetrics(
+            recall_at_k=0.0, sample_size=0, avg_score_incorrect=0.0, document_recall_at_k=0.0
+        )
 
     total = len(results)
     correct = sum(1 for r in results if r.correct_chunk_retrieved)
+    correct_documents = sum(1 for r in results if r.correct_document_retrieved)
 
     # Compute average score for incorrect retrievals
     incorrect_results = [r for r in results if not r.correct_chunk_retrieved]
@@ -31,7 +34,10 @@ def compute_dataset_metrics(results: List[EvaluationResult]) -> DatasetMetrics:
     avg_score_incorrect = float(np.mean(incorrect_scores)) if incorrect_scores else 0.0
 
     return DatasetMetrics(
-        recall_at_k=correct / total, sample_size=total, avg_score_incorrect=avg_score_incorrect
+        recall_at_k=correct / total,
+        sample_size=total,
+        avg_score_incorrect=avg_score_incorrect,
+        document_recall_at_k=correct_documents / total,
     )
 
 
@@ -96,9 +102,13 @@ def compute_metrics_summary(results: List[EvaluationResult], batch_id: str) -> M
         timestamp=results[0].timestamp if results else "",
         overall_metrics={
             "recall_at_k": overall.recall_at_k,
+            "document_recall_at_k": overall.document_recall_at_k,
             "mean_retrieval_time_ms": float(avg_time),
             "total_questions": len(results),
             "successful_retrievals": len(results) - incorrect_analysis.incorrect_retrievals_count,
+            "successful_document_retrievals": sum(
+                1 for r in results if r.correct_document_retrieved
+            ),
         },
         dataset_metrics=dataset_metrics,
         incorrect_analysis=incorrect_analysis,
