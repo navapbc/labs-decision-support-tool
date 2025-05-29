@@ -53,16 +53,22 @@ def process_retrieved_chunks(
         chunk_id=question.get("chunk_id", ""),
         content_hash=question.get("content_hash", ""),
         content=question.get("expected_chunk_content", ""),
+        document_id=str(question.get("document_id", "")),
     )
 
     # Process retrieved chunks
     processed_chunks = []
     content_hashes = []
+    document_ids = []
 
     for chunk in retrieved_chunks:
         content = chunk.chunk.content
         content_hash = md5(content.encode("utf-8"), usedforsecurity=False).hexdigest()
         content_hashes.append(content_hash)
+
+        # Extract document ID from the chunk
+        document_id = str(chunk.chunk.document_id)
+        document_ids.append(document_id)
 
         processed_chunks.append(
             RetrievedChunk(
@@ -70,6 +76,7 @@ def process_retrieved_chunks(
                 score=chunk.score,
                 content=content,
                 content_hash=content_hash,
+                document_id=document_id,
             )
         )
 
@@ -80,6 +87,12 @@ def process_retrieved_chunks(
     rank_if_found = None
     if correct_chunk_retrieved:
         rank_if_found = content_hashes.index(expected_chunk.content_hash) + 1
+
+    correct_document_retrieved = expected_chunk.document_id in document_ids
+
+    document_rank_if_found = None
+    if correct_document_retrieved:
+        document_rank_if_found = document_ids.index(expected_chunk.document_id) + 1
 
     # Generate a stable UUID for this QA pair if one isn't provided
     qa_pair_id = question.get("id") or generate_qa_pair_id(
@@ -98,6 +111,8 @@ def process_retrieved_chunks(
         retrieval_time_ms=retrieval_time_ms,
         retrieved_chunks=processed_chunks,
         dataset=expected_chunk.source,
+        correct_document_retrieved=correct_document_retrieved,
+        document_rank_if_found=document_rank_if_found,
     )
 
 

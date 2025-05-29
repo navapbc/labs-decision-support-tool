@@ -44,6 +44,7 @@ class ExpectedChunk:
     chunk_id: str
     content_hash: str
     content: str  # The actual text content of the chunk
+    document_id: str
 
 
 @dataclass
@@ -54,6 +55,7 @@ class RetrievedChunk:
     score: float
     content: str
     content_hash: str  # Hash of chunk content for verification
+    document_id: str
 
 
 @dataclass
@@ -70,6 +72,10 @@ class EvaluationResult:
     retrieved_chunks: List[RetrievedChunk]
     dataset: str  # Dataset name for this QA pair
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    correct_document_retrieved: bool = (
+        False  # Whether the correct document was found in top k results
+    )
+    document_rank_if_found: Optional[int] = None
 
 
 @dataclass
@@ -79,6 +85,7 @@ class DatasetMetrics:
     recall_at_k: float  # Whether the correct chunk was found in top k results
     sample_size: int
     avg_score_incorrect: float  # Average similarity score for incorrect retrievals in this dataset
+    document_recall_at_k: float
 
 
 @dataclass

@@ -2,7 +2,6 @@
 
 import json
 import os
-from datetime import datetime
 
 import pytest
 
@@ -55,22 +54,31 @@ def test_evaluation_result():
         chunk_id="chunk123",
         content_hash="hash456",
         content="test content",
+        document_id="doc456",
     )
-    retrieved_chunk = RetrievedChunk(
-        chunk_id="chunk123",
-        score=0.85,
-        content="test content",
-        content_hash="hash456",
-    )
+
+    retrieved_chunks = [
+        RetrievedChunk(
+            chunk_id="chunk123",
+            score=0.85,
+            content="test content",
+            content_hash="hash456",
+            document_id="doc456",
+        )
+    ]
+
     return EvaluationResult(
         qa_pair_id="qa123",
         question="test question?",
         expected_answer="test answer",
         expected_chunk=expected,
+        retrieved_chunks=retrieved_chunks,
         correct_chunk_retrieved=True,
         rank_if_found=1,
         retrieval_time_ms=100.5,
-        retrieved_chunks=[retrieved_chunk],
+        timestamp="2024-01-01T00:00:00Z",
+        correct_document_retrieved=True,
+        document_rank_if_found=1,
         dataset="test_dataset",
     )
 
@@ -83,21 +91,26 @@ def test_metrics_summary():
             recall_at_k=0.75,
             sample_size=10,
             avg_score_incorrect=0.45,
+            document_recall_at_k=0.85,
         )
     }
+
     incorrect_analysis = IncorrectRetrievalsAnalysis(
         incorrect_retrievals_count=2,
         avg_score_incorrect=0.45,
         datasets_with_incorrect_retrievals=["test_dataset"],
     )
+
     return MetricsSummary(
-        batch_id="batch123",
-        timestamp=datetime.now().isoformat(),
+        batch_id="test_batch",
+        timestamp="2024-01-01T00:00:00Z",
         overall_metrics={
             "recall_at_k": 0.75,
+            "document_recall_at_k": 0.85,
             "mean_retrieval_time_ms": 100.5,
             "total_questions": 10,
             "successful_retrievals": 8,
+            "successful_document_retrievals": 9,
         },
         dataset_metrics=dataset_metrics,
         incorrect_analysis=incorrect_analysis,
