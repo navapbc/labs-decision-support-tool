@@ -26,6 +26,8 @@ defaultTest:
 evaluateOptions:
   delay: 1000
   showProgressBar: true
+
+commandLineOptions:
   maxConcurrency: 1
 
 tests: $GOOGLE_SHEET_INPUT_URL
