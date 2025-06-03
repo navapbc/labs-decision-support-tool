@@ -30,4 +30,4 @@ You can change the `Run workflow from` dropdown to select a branch that GitHub w
 
 ### Chatbot API endpoint URL
 
-By default, the version of the chatbot that is evaluated is our DEV instance. You can manually change this to, for example, evaluate a different version of the chatbot's prompt in a preview environment, e.g., `https://p-310-app-dev-652842717.us-east-1.elb.amazonaws.com/api/query`.
+By default, the version of the chatbot that is evaluated is our DEV instance. You can manually change this to, for example, evaluate a different version of the chatbot's prompt in a preview environment, e.g., `http://p-310-app-dev-652842717.us-east-1.elb.amazonaws.com/api/query` (without SSL since the certificate will fail due to having a different domain name).
