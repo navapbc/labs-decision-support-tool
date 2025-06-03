@@ -26,6 +26,7 @@ defaultTest:
 evaluateOptions:
   delay: 1000
   showProgressBar: true
+  maxConcurrency: 1
 
 tests: $GOOGLE_SHEET_INPUT_URL
 outputPath: $GOOGLE_SHEET_OUTPUT_URL
