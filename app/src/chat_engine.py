@@ -335,6 +335,7 @@ class ImagineLaEngine(BaseEngine):
     ]
 
     engine_id: str = "imagine-la"
+    llm: str = "bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
     name: str = "SBN Chat Engine"
     datasets = [
         "CA EDD",
