@@ -85,8 +85,8 @@ jobs:
           cp app/promptfoo/generateUniqueId.js /tmp/generateUniqueId.js
           cp app/promptfoo/readability_assessment.py /tmp/readability_assessment.py
 
-          echo "Using Google Sheet input URL: $GOOGLE_SHEET_INPUT_URL"
-          echo "Using Google Sheet output URL: $GOOGLE_SHEET_OUTPUT_URL"
+          echo "Using Google Sheet input URL: $(echo "$GOOGLE_SHEET_INPUT_URL" | grep -o 'spreadsheets.*')"
+          echo "Using Google Sheet output URL: $(echo "$GOOGLE_SHEET_OUTPUT_URL" | grep -o 'spreadsheets.*')"
           echo "Using Chatbot instance URL: $CHATBOT_INSTANCE_URL"
           envsubst < app/promptfoo/promptfooconfig.ci.yaml > /tmp/promptfooconfig.processed.yaml
           echo "Config file processed, checking..."
