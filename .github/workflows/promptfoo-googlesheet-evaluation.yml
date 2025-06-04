@@ -118,9 +118,9 @@ jobs:
           EVAL_OUTPUT_FILE="/tmp/promptfoo-output.txt"
 
           if [ -n "$PROMPTFOO_API_KEY" ]; then
-            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}" --no-cache | tee "${EVAL_OUTPUT_FILE}"
+            promptfoo eval --max-concurrency 1 --config "/tmp/promptfooconfig.processed.yaml" --share --output "${OUTPUT_JSON_FILE}" --no-cache | tee "${EVAL_OUTPUT_FILE}"
           else
-            promptfoo eval --config "/tmp/promptfooconfig.processed.yaml" --output "${OUTPUT_JSON_FILE}" --no-cache | tee "${EVAL_OUTPUT_FILE}"
+            promptfoo eval --max-concurrency 1 --config "/tmp/promptfooconfig.processed.yaml" --output "${OUTPUT_JSON_FILE}" --no-cache | tee "${EVAL_OUTPUT_FILE}"
           fi
 
           if [ -f "${OUTPUT_JSON_FILE}" ]; then
