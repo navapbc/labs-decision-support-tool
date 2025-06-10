@@ -28,7 +28,7 @@ A very simple [docker-compose.yml](/docker-compose.yml) has been included to sup
 1. Set up an (empty) local secrets file: `touch .env` and copy the provided example Docker override: `cp ../docker-compose.override.yml.example ../docker-compose.override.yml`
 2. Make sure you have git lfs installed by running: `brew install git-lfs` and then `git lfs install`
 3. Download the embedding model into the `models` directory: `git clone https://huggingface.co/sentence-transformers/multi-qa-mpnet-base-cos-v1 models/multi-qa-mpnet-base-cos-v1`
-4. Add the environment variable `OPENAI_API_KEY`  to your local .env file and refer to the Nava Labs 1Password for its value
+4. Add the environment variable `OPENAI_API_KEY` to your local `.env` file and refer to the Nava Labs 1Password for its value
 4. Run `make init start` to build the image and start the container.
 5. Navigate to `localhost:8000/chat` to access the Chainlit UI.
 6. Run `make run-logs` to see the logs of the running application container
