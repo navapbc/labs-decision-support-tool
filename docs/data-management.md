@@ -23,9 +23,7 @@ export CONTENT_HUB_ACCESS_TOKEN="access_token_here"
 ./refresh-ingestion.sh all
 ```
 
-Note that for the imagine_la dataset, you'll need to set the `CONTENT_HUB_ACCESS_TOKEN` and `CONTENT_HUB_SPACE_ID` environment variables.
-
-These values MUST be set in your .env file in order for the data ingestion to run properly in Docker
+Note that for the `imagine_la` dataset, you'll need to set the `CONTENT_HUB_ACCESS_TOKEN` and `CONTENT_HUB_SPACE_ID` environment variables in your .env file in order for the data ingestion to run properly in Docker.
 
 The `./refresh-ingestion.sh` script will scrape and ingest data from all supported sources except for 'ssa' (which requires manual scraping). The script only modifies the local database. To update the database in the respective deployment environments, the script generates 2 other scripts in the top-level directory: `refresh-dev-*.sh` and `refresh-prod-*.sh`, which should be reviewed before running. These scripts will start ingestion of each dataset in parallel.
 
