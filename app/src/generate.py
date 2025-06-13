@@ -111,7 +111,7 @@ def _prepare_messages(
 
     messages.append({"content": query, "role": "user"})
     if readability_constraints:
-        messages.append({"content": readability_constraints, "role":"system"}) # TODO MRH test as role: assistant, system,
+        messages.append({"content": readability_constraints, "role":"assistant"}) # TODO MRH test as role: assistant, system,
 
     return messages
 
