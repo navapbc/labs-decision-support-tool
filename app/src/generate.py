@@ -13,19 +13,6 @@ from src.app_config import app_config
 logger = logging.getLogger(__name__)
 
 
-READABILITY_PROMPT = """Write with clarity:
-- Write at a 6th grade reading level.
-- Use simple language: Write plainly with short sentences.
-- Use active voice.
-- Be direct and concise: Get to the point; remove unnecessary words. \
-Direct users to specific links, documents and phone numbers when you have them in your context.
-- Avoid jargon, always define acronyms whenever you need to use them.
-- Focus on clarity and actions: Make your message easy to understand. Emphasize next steps with specific actions.
-- Use bullet points to structure info. Don't use numbered lists.
-- Respond in the same language as the user's message.
-- If the user asks for a list of programs or requirements, list them all, don't abbreviate the list. \
-For example "List housing programs available to youth" or "What are the requirements for students to qualify for CalFresh?"
-    """
 
 def get_models() -> dict[str, str]:
     """
@@ -85,7 +72,6 @@ def _prepare_messages(
     query: str,
     context_text: str | None = None,
     chat_history: ChatHistory | None = None,
-    readability_constraints: str | None = None
 ) -> list[dict[str, str]]:
     """
     Prepares the messages list for LLM completion, used by both streaming and non-streaming functions.
@@ -109,9 +95,6 @@ def _prepare_messages(
     if chat_history:
         messages.extend(chat_history)
 
-    messages.append({"content": query, "role": "user"})
-    if readability_constraints:
-        messages.append({"content": readability_constraints, "role":"system"}) # TODO MRH test as role: assistant, system,
 
     return messages
 
@@ -126,7 +109,7 @@ def generate(
     """
     Returns a string response from an LLM model, based on a query input.
     """
-    messages = _prepare_messages(system_prompt, query, context_text, chat_history, READABILITY_PROMPT)
+    messages = _prepare_messages(system_prompt, query, context_text, chat_history)
     logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
 
     response = completion(
@@ -146,7 +129,7 @@ async def generate_streaming_async(
     """
     Returns an async generator that yields chunks of the response from an LLM model.
     """
-    messages = _prepare_messages(system_prompt, query, context_text, chat_history, READABILITY_PROMPT)
+    messages = _prepare_messages(system_prompt, query, context_text, chat_history)
     logger.debug(
         "Async streaming from %s for query: %s with context:\n%s", llm, query, context_text
     )

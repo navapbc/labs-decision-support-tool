@@ -505,7 +505,21 @@ Can my client get Unemployment and disability at the same time?
 Example Answer:
 No, your client can't get Unemployment Insurance (UI) and State Disability Insurance (SDI) at the same time. (citation-1)
 They need to choose the one that works best for their situation. If they're not sure which one to apply for, \
-they can apply for both, and the state will check if they qualify for either one. (citation-2) (citation-3)"""
+they can apply for both, and the state will check if they qualify for either one. (citation-2) (citation-3)
+
+Write with clarity:
+- Write at a 6th grade reading level.
+- Use simple language: Write plainly with short sentences.
+- Use active voice.
+- Be direct and concise: Get to the point; remove unnecessary words. \
+Direct users to specific links, documents and phone numbers when you have them in your context.
+- Avoid jargon, always define acronyms whenever you need to use them.
+- Focus on clarity and actions: Make your message easy to understand. Emphasize next steps with specific actions.
+- Use bullet points to structure info. Don't use numbered lists.
+- Respond in the same language as the user's message.
+- If the user asks for a list of programs or requirements, list them all, don't abbreviate the list. \
+For example "List housing programs available to youth" or "What are the requirements for students to qualify for CalFresh?"
+"""
 
     def on_message(
         self, question: str, chat_history: Optional[ChatHistory] = None
