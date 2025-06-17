@@ -12,6 +12,7 @@ from src.app_config import app_config
 
 logger = logging.getLogger(__name__)
 
+
 def get_models() -> dict[str, str]:
     """
     Returns a dictionary of the available models, based on
