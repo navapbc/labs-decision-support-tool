@@ -110,7 +110,7 @@ def test_qa_storage(qa_pairs, tmp_path):
 
 
 def test_run_generation_basic(
-    mock_completion_response, tmp_path, enable_factory_create, db_session
+    mock_completion_response, tmp_path, enable_factory_create, db_session, app_config
 ):
     """Test basic run_generation functionality."""
     output_dir = tmp_path / "qa_output"
@@ -147,7 +147,7 @@ def test_run_generation_basic(
 
 
 def test_run_generation_with_dataset_filter(
-    mock_completion_response, tmp_path, enable_factory_create, db_session
+    mock_completion_response, tmp_path, enable_factory_create, db_session, app_config
 ):
     """Test run_generation with dataset filter."""
     output_dir = tmp_path / "qa_output"
@@ -261,7 +261,7 @@ def test_save_qa_pairs(qa_pairs, tmp_path):
 
 
 def test_run_generation_with_version(
-    mock_completion_response, tmp_path, enable_factory_create, db_session
+    mock_completion_response, tmp_path, enable_factory_create, db_session, app_config
 ):
     """Test run_generation with version parameter."""
     output_dir = tmp_path / "qa_output"
@@ -301,7 +301,9 @@ def test_run_generation_with_version(
             assert pair.version.llm_model == version.llm_model
 
 
-def test_run_generation_invalid_sample_fraction(tmp_path, enable_factory_create, db_session):
+def test_run_generation_invalid_sample_fraction(
+    tmp_path, enable_factory_create, db_session, app_config
+):
     """Test run_generation with invalid sample fraction values."""
     output_dir = tmp_path / "qa_output"
     llm_model = "gpt-4o-mini"

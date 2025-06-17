@@ -25,7 +25,7 @@ def populated_db(db_session):
     ChatMessageFactory.create_batch(4, session=user_session)
 
 
-def test_backup_and_restore_db(enable_factory_create, populated_db, caplog):
+def test_backup_and_restore_db(enable_factory_create, populated_db, app_config, caplog):
     with caplog.at_level(logging.INFO), tempfile.TemporaryDirectory() as tmpdirname:
         dumpfile = f"{tmpdirname}/db.dump"
         pg_dump_util.backup_db(dumpfile, "local")
@@ -95,7 +95,9 @@ def mock_s3_dev_bucket(mock_s3):
     yield bucket
 
 
-def test_backup_db_for_dev(enable_factory_create, populated_db, caplog, mock_s3_dev_bucket):
+def test_backup_db_for_dev(
+    enable_factory_create, populated_db, app_config, caplog, mock_s3_dev_bucket
+):
     with caplog.at_level(logging.INFO):
         dumpfile = "dev_db.dump"
         pg_dump_util.backup_db(dumpfile, "dev")

@@ -95,7 +95,7 @@ def test_process_and_ingest_sys_args_calls_ingest(caplog):
 
 
 def test_process_and_ingest_sys_args_drops_existing_dataset(
-    db_session, caplog, enable_factory_create
+    db_session, app_config, caplog, enable_factory_create
 ):
     db_session.execute(delete(Document))
     logger = logging.getLogger(__name__)
@@ -144,7 +144,7 @@ def test_process_and_ingest_sys_args_drops_existing_dataset(
         assert db_session.execute(select(Document).where(Document.dataset == "other dataset")).one()
 
 
-def test_process_and_ingest_sys_args_resume(db_session, caplog, enable_factory_create):
+def test_process_and_ingest_sys_args_resume(db_session, app_config, caplog, enable_factory_create):
     db_session.execute(delete(Document))
     logger = logging.getLogger(__name__)
     ingest = Mock()

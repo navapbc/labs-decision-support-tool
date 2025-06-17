@@ -81,6 +81,8 @@ def test_get_models(monkeypatch):
         monkeypatch.delenv("AWS_ACCESS_KEY_ID")
     if "OPENAI_API_KEY" in os.environ:
         monkeypatch.delenv("OPENAI_API_KEY")
+    if "GEMINI_API_KEY" in os.environ:
+        monkeypatch.delenv("GEMINI_API_KEY")
     if "OLLAMA_HOST" in os.environ:
         monkeypatch.delenv("OLLAMA_HOST")
     assert get_models() == {}
