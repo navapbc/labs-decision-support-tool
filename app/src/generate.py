@@ -12,7 +12,6 @@ from src.app_config import app_config
 
 logger = logging.getLogger(__name__)
 
-
 def get_models() -> dict[str, str]:
     """
     Returns a dictionary of the available models, based on
@@ -25,6 +24,11 @@ def get_models() -> dict[str, str]:
         models |= {"OpenAI GPT-4o": "gpt-4o"}
     if "ANTHROPIC_API_KEY" in os.environ:
         models |= {"Anthropic Claude 3.5 Sonnet": "claude-3-5-sonnet-20240620"}
+    if "GEMINI_API_KEY" in os.environ:
+        models |= {
+            "Google Gemini 1.5 Pro": "gemini/gemini-1.5-pro",
+            "Google Gemini 2.5 Pro": "gemini/gemini-2.5-pro-preview-06-05",
+        }
     if _has_aws_access():
         # If you get "You don't have access to the model with the specified model ID." error,
         # remember to request access to Bedrock models ...aws.amazon.com/bedrock/home?region=us-east-1#/modelaccess
