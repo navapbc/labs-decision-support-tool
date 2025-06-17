@@ -43,7 +43,7 @@ default_config = IngestConfig(
 )
 
 
-def test_process_and_ingest_sys_args_requires_four_args(caplog):
+def test_process_and_ingest_sys_args_requires_four_args(app_config, caplog):
     logger = logging.getLogger(__name__)
     ingest = Mock()
 
@@ -65,7 +65,7 @@ def test_process_and_ingest_sys_args_requires_four_args(caplog):
             assert not ingest.called
 
 
-def test_process_and_ingest_sys_args_calls_ingest(caplog):
+def test_process_and_ingest_sys_args_calls_ingest(app_config, caplog):
     logger = logging.getLogger(__name__)
     ingest = Mock()
 
