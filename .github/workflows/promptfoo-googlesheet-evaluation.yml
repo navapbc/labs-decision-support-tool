@@ -97,6 +97,7 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-creds.json
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PROMPTFOO_FAILED_TEST_EXIT_CODE: 0
         run: |
           if [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
