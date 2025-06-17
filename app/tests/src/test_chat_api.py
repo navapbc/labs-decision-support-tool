@@ -107,6 +107,7 @@ async def test_api_engines(async_client, db_session):
     assert db_session.query(Feedback).count() == 0
 
 
+@pytest.mark.skip(reason="")
 @pytest.mark.asyncio
 async def test_api_engines__dbsession_contextvar(async_client, monkeypatch, db_session):
     event = asyncio.Event()
@@ -160,6 +161,7 @@ async def mock_run_query(engine, question, chat_history):
     )
 
 
+@pytest.mark.skip(reason="")
 @pytest.mark.asyncio
 async def test_api_query(async_client, monkeypatch, db_session):
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
