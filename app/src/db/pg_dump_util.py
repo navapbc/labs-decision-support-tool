@@ -43,8 +43,6 @@ def backup_db(dumpfilename: str, env: str) -> None:
     _print_row_counts()
     logger.info("Writing DB dump to %r", dumpfilename)
     config_dict = _get_db_config()
-    print("---------------DB config:")
-    print(config_dict)
     if not _pg_dump(config_dict, dumpfilename):
         logger.fatal("Failed to dump DB data to %r", dumpfilename)
         return
@@ -160,7 +158,6 @@ def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
         os.environ["PGPASSWORD"] = config_dict["password"]
         # Unit test sets DB_SCHEMA to avoid affecting the real DB
         schema = _get_schema_name()
-        print("schema:", schema)
         command = [
             "pg_dump",
             "--data-only",
@@ -173,8 +170,6 @@ def _pg_dump(config_dict: dict[str, str], stdout_file: str) -> bool:
             schema,
             config_dict["dbname"],
         ]
-        print("command:", " ".join(command))
-        # import pdb; pdb.set_trace()
         return _run_command(command, dumpfile)
 
 

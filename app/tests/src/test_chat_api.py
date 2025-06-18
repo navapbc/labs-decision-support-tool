@@ -115,7 +115,6 @@ async def test_api_engines__dbsession_contextvar(async_client, monkeypatch, db_s
 
     async def wait_for_all_requests(_self, *_args):
         db_session = chat_api.dbsession.get()
-        print(f"DB session in wait_for_all_requests: {db_session}")
         db_sessions.append(db_session)
         if len(db_sessions) < 2:
             # Wait to allow the event loop to run other tasks
