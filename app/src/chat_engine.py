@@ -504,15 +504,6 @@ def simplify_for_sixth_grade(response):
 	explain_complex_ideas_step_by_step(response)
 	use_active_voice(response)
 	return response
-Follow these writing rules:
-- Use simple language and common words.
-- Break up ideas into short, clear sentences.
-- Use bullet points to organize information. (No numbered lists.)
-- Be concise: Remove unnecessary words.
-- Be direct and actionable: Tell the user what to do next.
-- Define all acronyms the first time you use them.
-- Always respond in the same language as the user.
-- When asked for a list, show the full list—do not summarize.
 
 
 Provide citation numbers:
