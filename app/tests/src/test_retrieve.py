@@ -22,8 +22,8 @@ def _create_chunks(document=None):
     ]
 
 
-def _format_retrieval_results(retrieval_results):
-    return [chunk_with_score.chunk for chunk_with_score in retrieval_results]
+def _chunk_ids(retrieval_results):
+    return [chunk_with_score.chunk.id for chunk_with_score in retrieval_results]
 
 
 def test_retrieve__with_empty_filter(app_config, db_session, enable_factory_create):
@@ -33,7 +33,7 @@ def test_retrieve__with_empty_filter(app_config, db_session, enable_factory_crea
     results = retrieve_with_scores(
         "Very tiny words.", retrieval_k=2, retrieval_k_min_score=0.0, datasets=[]
     )
-    assert _format_retrieval_results(results) == [short_chunk, medium_chunk]
+    assert _chunk_ids(results) == [short_chunk.id, medium_chunk.id]
 
 
 def test_retrieve__with_unknown_filter(app_config, db_session, enable_factory_create):
@@ -59,7 +59,7 @@ def test_retrieve__with_dataset_filter(app_config, db_session, enable_factory_cr
         retrieval_k_min_score=0.0,
         datasets=["SNAP"],
     )
-    assert _format_retrieval_results(results) == [snap_short_chunk, snap_medium_chunk]
+    assert _chunk_ids(results) == [snap_short_chunk.id, snap_medium_chunk.id]
 
 
 def test_retrieve__with_other_filters(app_config, db_session, enable_factory_create):
@@ -76,7 +76,7 @@ def test_retrieve__with_other_filters(app_config, db_session, enable_factory_cre
         programs=["SNAP"],
         regions=["MI"],
     )
-    assert _format_retrieval_results(results) == [snap_short_chunk, snap_medium_chunk]
+    assert _chunk_ids(results) == [snap_short_chunk.id, snap_medium_chunk.id]
 
 
 def test_retrieve_with_scores(app_config, db_session, enable_factory_create):
@@ -86,7 +86,7 @@ def test_retrieve_with_scores(app_config, db_session, enable_factory_create):
     results = retrieve_with_scores("Very tiny words.", retrieval_k=2, retrieval_k_min_score=0.0)
 
     assert len(results) == 2
-    assert results[0].chunk == short_chunk
+    assert results[0].chunk.id == short_chunk.id
     assert results[0].score == 0.7071067690849304
-    assert results[1].chunk == medium_chunk
+    assert results[1].chunk.id == medium_chunk.id
     assert results[1].score == 0.25881901383399963
