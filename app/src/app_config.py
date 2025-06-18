@@ -46,13 +46,13 @@ class AppConfig(PydanticBaseEnvConfig):
     def db_client(self) -> db.PostgresDBClient:
         return db.PostgresDBClient()
 
-    def db_session(self) -> db.Session:
-        import pdb
-        pdb.set_trace()
-        return db.PostgresDBClient().get_session()
-
     # def db_session(self) -> db.Session:
-    #     return self.db_client.get_session()
+    #     import pdb
+    #     pdb.set_trace()
+    #     return db.PostgresDBClient().get_session()
+
+    def db_session(self) -> db.Session:
+        return self.db_client.get_session()
 
     @cached_property
     def embedding_model(self) -> EmbeddingModel:

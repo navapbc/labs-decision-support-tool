@@ -335,7 +335,7 @@ class ImagineLaEngine(BaseEngine):
     ]
 
     engine_id: str = "imagine-la"
-    # llm: str = "gemini/gemini-2.5-pro-preview-06-05"
+    llm: str = "gemini/gemini-2.5-pro-preview-06-05"
     name: str = "SBN Chat Engine"
     datasets = [
         "CA EDD",
