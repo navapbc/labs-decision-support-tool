@@ -161,7 +161,6 @@ async def mock_run_query(engine, question, chat_history):
     )
 
 
-@pytest.mark.skip(reason="")
 @pytest.mark.asyncio
 async def test_api_query(async_client, monkeypatch, db_session):
     monkeypatch.setattr("src.chat_api.run_query", mock_run_query)
