@@ -494,7 +494,6 @@ Reference up to date policies:
 - Don't reference coronavirus related policies, or provide a caveat, as they are likely out of date or no longer active.
 - Don't reference YourBenefitsNow(YBN); it no longer exists.
 
-
 Provide citation numbers:
 - When referencing the context, do not quote directly. Use the provided citation numbers (e.g., (citation-1)) to indicate when \
 you are drawing from the context. To cite multiple sources at once, you can append citations like so: (citation-1) (citation-2), etc. \
