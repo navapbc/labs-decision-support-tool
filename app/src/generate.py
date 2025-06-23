@@ -22,7 +22,7 @@ def get_models() -> dict[str, str]:
     """
     models: dict[str, str] = {}
     if "OPENAI_API_KEY" in os.environ:
-        models |= {"OpenAI GPT-4o": "gpt-4o"}
+        models |= {"OpenAI GPT-4o": "gpt-4o", "OpenAI GPT-4o-mini": "gpt-4o-mini"}
     if "ANTHROPIC_API_KEY" in os.environ:
         models |= {"Anthropic Claude 3.5 Sonnet": "claude-3-5-sonnet-20240620"}
     if _has_aws_access():
@@ -100,6 +100,7 @@ def _prepare_messages(
 
 def generate(
     llm: str,
+    temperature: float,
     system_prompt: str,
     query: str,
     context_text: str | None = None,
@@ -111,8 +112,12 @@ def generate(
     messages = _prepare_messages(system_prompt, query, context_text, chat_history)
     logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
 
+    logger.info("========= LLM: %s, temperature: %s", llm, temperature)
+
+    os.environ["OPENAI_API_KEY"] = os.environ.get("GEORGETOWN_OPENAI_API_KEY", "")
+
     response = completion(
-        model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
+        model=llm, messages=messages, **completion_args(llm), temperature=temperature
     )
 
     return response["choices"][0]["message"]["content"]
@@ -133,6 +138,7 @@ async def generate_streaming_async(
         "Async streaming from %s for query: %s with context:\n%s", llm, query, context_text
     )
 
+    os.environ["OPENAI_API_KEY"] = os.environ.get("GEORGETOWN_OPENAI_API_KEY", "")
     response_stream = completion(
         model=llm,
         messages=messages,
@@ -167,6 +173,7 @@ MessageAttributesT = TypeVar("MessageAttributesT", bound=MessageAttributes)
 def analyze_message(
     llm: str, system_prompt: str, message: str, response_format: type[MessageAttributesT]
 ) -> MessageAttributesT:
+    os.environ["OPENAI_API_KEY"] = os.environ.get("GEORGETOWN_OPENAI_API_KEY", "")
     response = (
         completion(
             model=llm,

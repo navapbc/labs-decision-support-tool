@@ -138,6 +138,14 @@ _WIDGET_FACTORIES = {
         initial_value=default_value,
         items=get_models(),
     ),
+    "temperature": lambda default_value: Slider(
+        id="temperature",
+        label="Temperature for LLM response generation",
+        initial=default_value,
+        min=0,
+        max=2,
+        step=.5,
+    ),
     "retrieval_k": lambda default_value: Slider(
         id="retrieval_k",
         label="Number of citations to retrieve for generating LLM response",

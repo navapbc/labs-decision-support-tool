@@ -66,6 +66,7 @@ class ChatEngineInterface(ABC):
     engine_id: str
     name: str
     llm: str = "gpt-4o"  # Default LLM to use
+    temperature: float = 0.0  # Default temperature for LLM responses
 
     # Configuration for formatting responses
     formatting_config: FormattingConfig
@@ -131,6 +132,7 @@ class BaseEngine(ChatEngineInterface):
 
     user_settings = [
         "llm",
+        "temperature",
         "retrieval_k",
         "retrieval_k_min_score",
         "show_msg_attributes",
@@ -182,6 +184,7 @@ class BaseEngine(ChatEngineInterface):
         start_time = time.perf_counter()
         response = generate(
             self.llm,
+            self.temperature,
             self.system_prompt_2,
             question,
             None,
@@ -222,6 +225,7 @@ class BaseEngine(ChatEngineInterface):
         start_time = time.perf_counter()
         response = generate(
             self.llm,
+            self.temperature,
             self.system_prompt_2,
             question,
             context_text,
@@ -327,6 +331,7 @@ class ImagineLaEngine(BaseEngine):
 
     user_settings = [
         "llm",
+        "temperature",
         "retrieval_k",
         "retrieval_k_min_score",
         "show_msg_attributes",
