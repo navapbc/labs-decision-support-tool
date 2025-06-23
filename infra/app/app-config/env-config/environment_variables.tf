@@ -36,6 +36,10 @@ locals {
       manage_method     = "manual"
       secret_store_name = "/${var.app_name}-${var.environment}/OPENAI_API_KEY"
     }
+    GEMINI_API_KEY = {
+      manage_method     = "manual"
+      secret_store_name = "/${var.app_name}-${var.environment}/GEMINI_API_KEY"
+    }
     LITERAL_API_KEY = {
       manage_method     = "manual"
       secret_store_name = "/${var.app_name}-${var.environment}/LITERAL_API_KEY"
