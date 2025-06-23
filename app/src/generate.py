@@ -113,6 +113,9 @@ def generate(
     logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
 
     logger.info("========= LLM: %s, temperature: %s", llm, temperature)
+
+    os.environ["OPENAI_API_KEY"] = os.environ.get("GEORGETOWN_OPENAI_API_KEY", "")
+
     response = completion(
         model=llm, messages=messages, **completion_args(llm), temperature=temperature
     )
@@ -135,6 +138,7 @@ async def generate_streaming_async(
         "Async streaming from %s for query: %s with context:\n%s", llm, query, context_text
     )
 
+    os.environ["OPENAI_API_KEY"] = os.environ.get("GEORGETOWN_OPENAI_API_KEY", "")
     response_stream = completion(
         model=llm,
         messages=messages,
@@ -169,6 +173,7 @@ MessageAttributesT = TypeVar("MessageAttributesT", bound=MessageAttributes)
 def analyze_message(
     llm: str, system_prompt: str, message: str, response_format: type[MessageAttributesT]
 ) -> MessageAttributesT:
+    os.environ["OPENAI_API_KEY"] = os.environ.get("GEORGETOWN_OPENAI_API_KEY", "")
     response = (
         completion(
             model=llm,
