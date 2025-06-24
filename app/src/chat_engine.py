@@ -410,35 +410,125 @@ For referral links below, only set canned_response to a referral link if:
 - User is explicitly asking how to obtain/access/find that specific resource (e.g., "How do I get an ID card?")
 - Question is narrowly about the process of obtaining that resource
 - Question does not appear to be about eligibility, benefits programs, or resources for specific populations
+- The question includes a keyword related to the referral link
 
 If these criteria are met, then set canned_response to:
 "Here's a trusted link to learn more: [referral link title](referral link). \
 I can give more detail about the benefit programs and tax credits in the [Benefits Information Hub](https://benefitnavigator.web.app/contenthub).", \
 but translated to the same language as the user's question.
 
-Referral links: Format: [referral link title](referral link):
-- [Get an ID card](https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/)
-- [Get a Passport](https://travel.state.gov/content/travel/en/passports/need-passport/apply-in-person.html)
-- [Request Birth Certificates](https://www.cdph.ca.gov/Programs/CHSI/Pages/Vital-Records-Obtaining-Certified-Copies-of-Birth-Records.aspx)
-- [Request a Social Security Number](https://www.ssa.gov/number-card/request-number-first-time)
-- [Request an ITIN](https://www.irs.gov/tin/itin/how-to-apply-for-an-itin)
-- [Apply for Citizenship](https://www.uscis.gov/citizenship/apply-for-citizenship)
-- [Apply for a Green Card](https://www.uscis.gov/green-card/how-to-apply-for-a-green-card)
-- [Get Transit Cards (TAP cards)](https://www.metro.net/riding/fares/life/)
-- [Find DPSS contact info or office locations](https://dpss.lacounty.gov/en/resources/offices.html)
-- [Learn about DPSS appeals](https://dpss.lacounty.gov/en/rights/ash/request-hearing.html)
-- [Transportation for people with disabilities](https://accessla.org/)
-- [Find Food Banks](https://www.lafoodbank.org/find-food/pantry-locator/)
-- [Get Wildfire Resources](https://recovery.lacounty.gov/resources/)
-- [Start a Benefit Navigator screening](https://benefitnavigator.web.app/start)
-- [Find Hospitals and Clinics](https://dhs.lacounty.gov/find-a-clinic-or-hospital/)
-- [Find LGBTQ Resources](https://dpss.lacounty.gov/en/rights/rights/sogie.html)
-- [Learn about LIHEAP](https://www.ladwp.com/residential-services/assistance-programs/low-income-home-energy-assistance-program-liheap)
-- [Search Affordable and Accessible Housing](https://lahousing.lacity.org/AAHR/ComCon/Tab/RenderTab?tabName=Search%20for%20Accessible%20Housing)
-- [Find LADWP contact info](https://www.ladwp.com/account/customer-service/customer-service-centers)
-- [Find Legal Aid](https://lafla.org/get-help/)
-- [See Federal Poverty Levels](https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines)
-- [Find Diapers](https://www.phfewic.org/en/diaper-resources-in-la-county)
+Referral links:
+[ 
+    {
+        "referral link title":"Get an ID card", 
+        "referral link":"https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/identification-id-cards/", 
+        "keyword":"ID, id, driver's license"
+    },
+    {
+        "referral link title":"Get a Passport", 
+        "referral link":"https://travel.state.gov/content/travel/en/passports/need-passport/apply-in-person.html", 
+        "keyword":"passport"
+    },
+    {
+        "referral link title":"Request Birth Certificates", 
+        "referral link":"https://www.cdph.ca.gov/Programs/CHSI/Pages/Vital-Records-Obtaining-Certified-Copies-of-Birth-Records.aspx", 
+        "keyword":"birth certificate, proof of citizenship"
+    },
+    {
+        "referral link title":"Request a Social Security Number", 
+        "referral link":"https://www.ssa.gov/number-card/request-number-first-time", 
+        "keyword":"social security number, ssn"},
+    {
+        "referral link title":"Request an ITIN", 
+        "referral link":"https://www.irs.gov/tin/itin/how-to-apply-for-an-itin", 
+        "keyword":"ITIN, Individual Taxpayer Identification Number"
+    },
+    {
+        "referral link title":"Apply for Citizenship", 
+        "referral link":"https://www.uscis.gov/citizenship/apply-for-citizenship", 
+        "keyword":"citizenship, green card, visa, naturalization"
+    },
+    {
+        "referral link title":"Apply for a Green Card", 
+        "referral link":"https://www.uscis.gov/green-card/how-to-apply-for-a-green-card", 
+        "keyword":"green card, alien, asylum, immigrant, adjustment of status"
+    },
+    {
+        "referral link title":"Get Transit Cards (TAP cards)", 
+        "referral link":"https://www.metro.net/riding/fares/life/", 
+        "keyword":"transit cards, metro, bus, transportation"
+    },
+    {
+        "referral link title":"Find DPSS contact info or office locations", 
+        "referral link":"https://dpss.lacounty.gov/en/resources/offices.html", 
+        "keyword":"DPSS, Department of Social Services, social services, social service locations"
+    },
+    {
+        "referral link title":"Learn about DPSS appeals", 
+        "referral link":"https://dpss.lacounty.gov/en/rights/ash/request-hearing.html", 
+        "keyword":"DPSS appeals"
+    },
+    {
+        "referral link title":"Transportation for people with disabilities",
+        "referral link":"https://accessla.org/", 
+        "keyword":"disability, disabilities, transportation"
+    },
+    {
+        "referral link title":"Find Food Banks", 
+        "referral link":"https://www.lafoodbank.org/find-food/pantry-locator/", 
+        "keyword":"SNAP, Food Banks, nutrition"
+    },
+    {
+        "referral link title":"Get Wildfire Resources",
+        "referral link":"https://recovery.lacounty.gov/resources/",
+        "keyword":"wildfire resources, wildfire, fire"
+    },
+    {
+        "referral link title":"Start a Benefit Navigator screening",
+        "referral link":"https://benefitnavigator.web.app/start",
+        "keyword":"Benefit Navigator, screening, apply for benefits"
+    },
+    {
+        "referral link title":"Find Hospitals and Clinics",
+        "referral link":"https://dhs.lacounty.gov/find-a-clinic-or-hospital/", 
+        "keyword":"hospitals, clinics, nurse practitioner, health, family care"
+    },
+    {
+        "referral link title":"Find LGBTQ Resources",
+        "referral link":"https://dpss.lacounty.gov/en/rights/rights/sogie.html", 
+        "keyword":"LGBTQ, gay, lesbian, HIV, PrEP"
+    },
+    {
+        "referral link title":"Learn about LIHEAP",
+        "referral link":"https://www.ladwp.com/residential-services/assistance-programs/low-income-home-energy-assistance-program-liheap",
+        "keyword":"LIHEAP, energy assistance, low income, heat, electric, gas, utilities"
+    },
+    {
+        "referral link title":"Search Affordable and Accessible Housing",
+        "referral link":"https://lahousing.lacity.org/AAHR/ComCon/Tab/RenderTab?tabName=Search%20for%20Accessible%20Housing",
+        "keyword":"Affordable, accessible, housing, rent, shelter"
+    },
+    {
+        "referral link title":"Find LADWP contact info",
+        "referral link":"https://www.ladwp.com/account/customer-service/customer-service-centers",
+        "keyword":"LADWP, water, power, utilities"
+    },
+    {
+        "referral link title":"Find Legal Aid",
+        "referral link":"https://lafla.org/get-help/",
+        "keyword":"legal aid, lawyers, clerk, representation"
+    },
+    {
+        "referral link title":"See Federal Poverty Levels",
+        "referral link":"https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines",
+        "keyword":"poverty levels, income, poverty guidelines"
+    },
+    {
+        "referral link title":"Find Diapers",
+        "referral link":"https://www.phfewic.org/en/diaper-resources-in-la-county",
+        "keyword":"diapers, baby, infant, diaper cost"
+    },
+]
 
 Examples to illustrate correct referral link decisions:
 - Question: "How do I get an ID card?" → Use referral link for "Get an ID card"
