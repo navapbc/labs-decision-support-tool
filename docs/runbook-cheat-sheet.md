@@ -70,5 +70,6 @@ By default, commits to `main` automatically trigger a deployment to the `dev` en
 1. Click the `Run workflow` button
 1. Ignore the `Use workflow from` dropdown
 1. Select the environment you want to deploy to under `Environment to deploy to`
-1. Select the code you'd like to deploy under `Tag or branch or SHA to deploy` (usually `main`)
+1. Select the code you'd like to deploy under `Tag or branch or SHA to deploy`
+    1. For simplicity, you could use `main` here, but it's often useful to cut a specific release so you can keep track of the code. GitHub has a built in feature to create new releases from branches into tags, and you can enter the tag name here after generating the release.
 1. Click `Run workflow`
