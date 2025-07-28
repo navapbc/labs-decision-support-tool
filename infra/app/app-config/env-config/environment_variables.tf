@@ -40,7 +40,7 @@ locals {
     GEORGETOWN_OPENAI_API_KEY = {
       manage_method     = "manual"
       secret_store_name = "/${var.app_name}-${var.environment}/GEORGETOWN_OPENAI_API_KEY"
-
+}
     GEMINI_API_KEY = {
       manage_method     = "manual"
       secret_store_name = "/${var.app_name}-${var.environment}/GEMINI_API_KEY"
