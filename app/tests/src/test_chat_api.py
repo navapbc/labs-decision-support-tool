@@ -38,7 +38,7 @@ def no_literalai_data_layer(monkeypatch):
 
 
 @pytest.fixture
-def async_client(no_literalai_data_layer, db_session):
+def async_client(no_literalai_data_layer, db_session, app_config):
     """
     The typical FastAPI TestClient creates its own event loop to handle requests,
     which led to issues when testing code that relies on asynchronous operations
@@ -108,7 +108,7 @@ async def test_api_engines(async_client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_api_engines__dbsession_contextvar(async_client, monkeypatch, db_session):
+async def test_api_engines__dbsession_contextvar(async_client, monkeypatch, db_session, app_config):
     event = asyncio.Event()
     db_sessions = []
     orig_init_chat_session = chat_api._init_chat_session

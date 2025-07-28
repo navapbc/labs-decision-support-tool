@@ -91,7 +91,7 @@ def test_invalid_arguments():
 
 
 @pytest.mark.integration
-def test_main_integration(temp_output_dir):
+def test_main_integration(temp_output_dir, app_config):
     """Integration test with minimal test data."""
     with mock.patch(
         "sys.argv",
@@ -122,7 +122,7 @@ def test_main_integration(temp_output_dir):
             assert mock_qa_pairs_path.exists()
 
 
-def test_error_handling_no_documents():
+def test_error_handling_no_documents(app_config):
     """Test handling of 'No documents found' error."""
     with mock.patch("sys.argv", ["generate.py"]):
         with mock.patch("src.evaluation.qa_generation.runner.run_generation") as mock_run:

@@ -108,8 +108,8 @@ def enable_factory_create(monkeypatch, db_session) -> db.Session:
 
 
 @pytest.fixture
-def app_config(monkeypatch, db_session):
-    monkeypatch.setattr(AppConfig, "db_session", lambda _self: db_session)
+def app_config(monkeypatch, db_client: db.DBClient):
+    monkeypatch.setattr(AppConfig, "db_session", lambda _self: db_client.get_session())
     monkeypatch.setattr(AppConfig, "embedding_model", MockEmbeddingModel())
 
 

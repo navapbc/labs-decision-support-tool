@@ -42,8 +42,12 @@ class AppConfig(PydanticBaseEnvConfig):
     # If set, used instead of LITERAL_API_KEY for API
     literal_api_key_for_api: str | None = None
 
+    @cached_property
+    def db_client(self) -> db.PostgresDBClient:
+        return db.PostgresDBClient()
+
     def db_session(self) -> db.Session:
-        return db.PostgresDBClient().get_session()
+        return self.db_client.get_session()
 
     @cached_property
     def embedding_model(self) -> EmbeddingModel:
