@@ -32,7 +32,7 @@ class AppConfig(PydanticBaseEnvConfig):
 
     # Default chat engine
     chat_engine: str = "imagine-la"
-    temperature: float = 0.0
+    temperature: float = 0.0 
 
     # Default LLM model
     llm: str | None = None
