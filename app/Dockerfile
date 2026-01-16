@@ -12,8 +12,9 @@ RUN pip install --no-cache-dir poetry==1.5
 
 RUN apt-get update && apt-get install -y lsb-release wget gnupg && \
     # Need to add the official PostgreSQL repo to install v16 -- https://askubuntu.com/a/1442247
-    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
-    echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/postgres.list && \
+    # Using modern signed-by approach instead of deprecated apt-key
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/postgresql-archive-keyring.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/postgres.list && \
     apt-get update \
     # Install security updates
     # https://pythonspeed.com/articles/security-updates-in-docker/

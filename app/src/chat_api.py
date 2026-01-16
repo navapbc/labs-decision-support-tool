@@ -73,6 +73,123 @@ async def healthcheck(request: Request) -> HealthCheck:
     return healthcheck_response
 
 
+# region: ===================  Authentication  ===================
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    success: bool
+    user_id: str | None = None
+    error: str | None = None
+
+
+@router.post("/auth/login")
+async def login(request: LoginRequest) -> LoginResponse:
+    """Simple password authentication endpoint."""
+    if not app_config.global_password:
+        # No password configured, allow any user
+        return LoginResponse(success=True, user_id=request.username)
+
+    if request.password == app_config.global_password:
+        return LoginResponse(success=True, user_id=request.username)
+    else:
+        return LoginResponse(success=False, error="Invalid password")
+
+
+# endregion
+# region: ===================  Chat History  ===================
+
+
+class SessionSummary(BaseModel):
+    session_id: str
+    title: str
+    created_at: str
+    message_count: int
+
+
+class SessionListResponse(BaseModel):
+    sessions: list[SessionSummary]
+
+
+@router.get("/sessions")
+async def list_sessions(user_id: str) -> SessionListResponse:
+    """List all chat sessions for a user."""
+    with db_session_context_var():
+        with dbsession.get().begin():
+            sessions = (
+                dbsession.get()
+                .scalars(
+                    select(UserSession)
+                    .where(UserSession.user_id == user_id)
+                    .order_by(UserSession.created_at.desc())
+                )
+                .all()
+            )
+
+            summaries = []
+            for session in sessions:
+                # Get message count and first user message as title
+                messages = session.chat_messages
+                message_count = len(messages)
+                if message_count == 0:
+                    continue  # Skip empty sessions
+
+                # Use first user message as title
+                first_user_msg = next((m for m in messages if m.role == "user"), None)
+                title = first_user_msg.content[:100] if first_user_msg else "New conversation"
+                if len(first_user_msg.content if first_user_msg else "") > 100:
+                    title += "..."
+
+                summaries.append(
+                    SessionSummary(
+                        session_id=session.session_id,
+                        title=title,
+                        created_at=session.created_at.isoformat() if session.created_at else "",
+                        message_count=message_count,
+                    )
+                )
+
+            return SessionListResponse(sessions=summaries)
+
+
+class ChatHistoryMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatHistoryResponse(BaseModel):
+    session_id: str
+    messages: list[ChatHistoryMessage]
+
+
+@router.get("/chat_history")
+async def get_chat_history(user_id: str, session_id: str) -> ChatHistoryResponse:
+    """Retrieve chat history for a session."""
+    with db_session_context_var():
+        user_session = _load_user_session(session_id)
+        if not user_session:
+            raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
+
+        if user_session.user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Session {session_id!r} is not associated with user {user_id!r}",
+            )
+
+        messages = _load_chat_history(user_session)
+        return ChatHistoryResponse(
+            session_id=session_id,
+            messages=[ChatHistoryMessage(role=m["role"], content=m["content"]) for m in messages],
+        )
+
+
+# endregion
+
+
 # region: ===================  Session Management ===================
 
 

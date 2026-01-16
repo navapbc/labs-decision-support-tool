@@ -44,5 +44,20 @@ services:
     depends_on:
       - main-db
 
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    container_name: frontend
+    ports:
+      - 3000:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://main-app:8000
+    depends_on:
+      - main-app
+
 volumes:
   dbdata:
