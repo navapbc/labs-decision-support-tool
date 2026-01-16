@@ -96,5 +96,32 @@ export function sanitizeStreamingMarkdown(content: string): string {
   result = result.replace(/(\w)\s+-\s*(\w)/g, '$1-$2');
   result = result.replace(/(\w)\s*-\s+(\w)/g, '$1-$2');
 
+  // Fix tokenization splits within words - be conservative to avoid joining real words
+  // Only fix patterns that are clearly tokenization artifacts
+
+  // Single uppercase letter followed by space and more uppercase (acronyms): `W IC` → `WIC`
+  result = result.replace(/\b([A-Z])\s+([A-Z]+)\b/g, '$1$2');
+
+  // Single uppercase followed by space and lowercase (word starts): `D ried` → `Dried`, `C anned` → `Canned`
+  // But NOT after common words - only at start of sentence or after punctuation
+  result = result.replace(/(^|[.!?:]\s*)([A-Z])\s+([a-z]{3,})/gm, '$1$2$3');
+
+  // Fix specific common tokenization patterns (suffixes getting split)
+  // `ort ified` → `ortified` (fragments before -ified, -tion, -ing, -ness, etc.)
+  result = result.replace(/\b([a-z]{2,4})\s+(ified|tion|ing|ness|ment|able|ible)\b/g, '$1$2');
+
+  // Fix word-internal splits where first fragment isn't a common word
+  // Common 2-3 letter words to preserve: a, an, as, at, be, by, do, go, he, if, in, is, it, me, my, no, of, on, or, so, to, up, us, we
+  // `Yog urt` → `Yogurt` - capital + lowercase fragment not in common words list
+  const commonWords = /^(a|an|as|at|be|by|do|go|he|if|in|is|it|me|my|no|of|on|or|so|to|up|us|we|the|and|for|are|but|not|you|all|can|has|her|was|one|our|out|his|its)$/i;
+
+  result = result.replace(/\b([A-Z][a-z]{1,2})\s+([a-z]{2,})\b/g, (match, p1, p2) => {
+    // Only join if the first part isn't a common word
+    if (commonWords.test(p1)) {
+      return match; // Keep as-is
+    }
+    return p1 + p2;
+  });
+
   return result;
 }
