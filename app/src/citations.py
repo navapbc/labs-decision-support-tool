@@ -43,6 +43,32 @@ class CitationFactory:
 citation_factory = CitationFactory()
 
 
+def merge_heading_paths(base_headings: Sequence[str], text_headings: Sequence[str]) -> list[str]:
+    """
+    Merge chunk-level headings with subsection headings while avoiding duplicated ancestry.
+    This handles cases where the subsection markdown repeats the same heading chain that the
+    chunk already stores in `chunk.headings`.
+    """
+    base = [heading for heading in base_headings if heading]
+    text = [heading for heading in text_headings if heading]
+
+    if not base:
+        return text
+    if not text:
+        return base
+    if text[: len(base)] == base:
+        return text
+    if base[: len(text)] == text:
+        return base
+
+    max_overlap = min(len(base), len(text))
+    for overlap in range(max_overlap, 0, -1):
+        if base[-overlap:] == text[:overlap]:
+            return base + text[overlap:]
+
+    return base + text
+
+
 def default_chunk_splitter(
     chunk: Chunk, factory: CitationFactory = citation_factory
 ) -> list[Subsection]:
@@ -73,7 +99,7 @@ def basic_chunk_splitter(
                 curr_headings[i] = ""
             continue
 
-        headings = [text for text in base_headings + curr_headings if text]
+        headings = merge_heading_paths(base_headings, [text for text in curr_headings if text])
         better_splits.append(factory.create_citation(chunk, next(split_index), split, headings))
     return better_splits
 
@@ -102,7 +128,7 @@ def _split_section(
         elif node.data_type == "Heading":
             pass
         elif node.has_token() and node.is_block_token():
-            headings = headings or (base_headings + get_parent_headings_raw(node))
+            headings = headings or merge_heading_paths(base_headings, get_parent_headings_raw(node))
             markdown = node.render().strip()
 
             if (

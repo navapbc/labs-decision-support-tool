@@ -383,6 +383,7 @@ def test_citation_from_subsection__pdf_source_uses_page_link():
 
     citation = Citation.from_subsection(subsection)
     assert citation.uri == "http://localhost:8080/sources/bem-mobile.pdf#page=7"
+    assert citation.subsection_index == 0
     assert citation.page_number == 7
     assert citation.citation_text == "Exact quoted policy text"
 

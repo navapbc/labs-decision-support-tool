@@ -58,6 +58,7 @@ export interface Citation {
   source_id: string;
   source_name: string;
   source_dataset: string;
+  subsection_index: number | null;
   page_number: number | null;
   uri: string | null;
   headings: string[];

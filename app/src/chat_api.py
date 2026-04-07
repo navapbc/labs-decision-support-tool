@@ -487,6 +487,7 @@ class Citation(BaseModel):
     source_id: str
     source_name: str
     source_dataset: str
+    subsection_index: Optional[int] | None
     page_number: Optional[int] | None
     uri: Optional[str] | None
     headings: Sequence[str]
@@ -504,6 +505,7 @@ class Citation(BaseModel):
             source_id=str(chunk.document.id),
             source_name=chunk.document.name,
             source_dataset=chunk.document.dataset,
+            subsection_index=subsection.subsection_index,
             page_number=chunk.page_number,
             uri=uri,
             headings=subsection.text_headings,
