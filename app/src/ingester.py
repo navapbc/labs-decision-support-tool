@@ -33,6 +33,7 @@ class Split:
         text: str,
         context_str: str,
         text_to_encode: Optional[str] = None,
+        page_number: Optional[int] = None,
     ):
         self.headings = headings
         self.text = text
@@ -40,6 +41,7 @@ class Split:
             self.text_to_encode = text_to_encode
         else:
             self.text_to_encode = f"{context_str.strip()}\n\n" + remove_links(text)
+        self.page_number = page_number
 
         self.token_count = app_config.embedding_model.token_length(self.text_to_encode)
 
@@ -54,6 +56,7 @@ class Split:
             split_dict["text"],  # text used for citations
             "",
             split_dict["text_to_encode"],  # text used for embeddings
+            split_dict.get("page_number"),
         )
         split.chunk_id = split_dict.get("chunk_id", "")
         split.data_ids = split_dict.get("data_ids", "")
@@ -134,6 +137,7 @@ def save_to_db(
                 document=document,
                 content=split.text,
                 headings=split.headings,
+                page_number=split.page_number,
                 num_splits=len(splits),
                 split_index=index,
                 tokens=split.token_count,

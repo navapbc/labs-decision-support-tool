@@ -5,7 +5,7 @@ from typing import AsyncGenerator, Optional, Sequence
 
 from src.citations import CitationFactory, create_prompt_context, split_into_subsections
 from src.db.models.document import ChunkWithScore, Subsection
-from src.format import FormattingConfig
+from src.format import BemFormattingConfig, FormattingConfig
 from src.generate import (
     ChatHistory,
     MessageAttributes,
@@ -307,6 +307,35 @@ If you can't find information about the user's prompt in your context, don't ans
 If a prompt is about an EDD program, but you can't tell which one, detect and clarify program ambiguity. Ask: "The EDD administers several programs such as State Disability Insurance (SDI), Paid Family Leave (PFL), and Unemployment Insurance (UI). I'm not sure which benefit program your prompt is about; could you let me know?"
 
 {PROMPT}"""
+
+
+class BridgesEligibilityManualEngine(BaseEngine):
+    llm: str = "gpt-5.3-chat-latest"
+    retrieval_k: int = 10
+    retrieval_k_min_score: float = -1
+
+    chunks_shown_min_score: float = -1
+    chunks_shown_max_num: int = 8
+
+    engine_id: str = "bridges-eligibility-manual"
+    name: str = "Michigan Bridges Eligibility Manual Chat Engine"
+    datasets = ["bridges-eligibility-manual"]
+
+    formatting_config = BemFormattingConfig()
+
+    def on_message(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> OnMessageResult:
+        attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
+        attributes.needs_context = True
+        return self._build_response_with_context(question, attributes, chat_history)
+
+    async def on_message_streaming(
+        self, question: str, chat_history: Optional[ChatHistory] = None
+    ) -> tuple[AsyncGenerator[str, None], MessageAttributes, Sequence[Subsection]]:
+        attributes = analyze_message(self.llm, self.system_prompt_1, question, MessageAttributes)
+        attributes.needs_context = True
+        return await self._build_streaming_response(question, attributes, chat_history)
 
 
 class ImagineLA_MessageAttributes(MessageAttributes):

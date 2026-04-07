@@ -35,6 +35,7 @@ from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Subsection
 from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
+from src.util.bem_util import build_pdf_page_url, is_pdf_url
 from src.util.string_utils import format_highlighted_uri
 
 logger = logging.getLogger(__name__)
@@ -233,7 +234,7 @@ def __get_or_create_chat_session(
             user_session = UserSession(
                 session_id=session_id or str(uuid.uuid4()),
                 user_id=user_id,
-                chat_engine_id="imagine-la",
+                chat_engine_id=app_config.api_default_chat_engine,
                 # Assign a new thread ID for the session
                 # This will be used as Message/Step.thread_id and Thread.id when they're created
                 lai_thread_id=str(uuid.uuid4()),
@@ -256,7 +257,7 @@ def __get_or_create_chat_session(
         user_session=user_session,
         is_new=session_created,
         chat_engine_settings=ChatEngineSettings(user_session.chat_engine_id),
-        allowed_engines=["imagine-la"],
+        allowed_engines=app_config.api_allowed_chat_engines,
     )
 
 
@@ -494,14 +495,17 @@ class Citation(BaseModel):
     @staticmethod
     def from_subsection(subsection: Subsection) -> "Citation":
         chunk = subsection.chunk
-        highlighted_text_src = format_highlighted_uri(chunk.document.source, subsection.text)
+        if is_pdf_url(chunk.document.source):
+            uri = build_pdf_page_url(chunk.document.source, chunk.page_number)
+        else:
+            uri = format_highlighted_uri(chunk.document.source, subsection.text)
         return Citation(
             citation_id=f"citation-{subsection.id}",
             source_id=str(chunk.document.id),
             source_name=chunk.document.name,
             source_dataset=chunk.document.dataset,
             page_number=chunk.page_number,
-            uri=highlighted_text_src,
+            uri=uri,
             headings=subsection.text_headings,
             citation_text=subsection.text,
         )
