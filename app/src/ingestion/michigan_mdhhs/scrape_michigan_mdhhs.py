@@ -65,11 +65,15 @@ DENY_PATTERNS = [
     re.compile(r"/keeping-michigan-healthy/"),
     re.compile(r"/safety-injury-prev/"),
     re.compile(r"/adult-child-serv/"),
+    # Administrative/archival content not useful for caseworkers
+    re.compile(r"/lhd-links/"),       # Local health dept admin links (CSHCS)
+    re.compile(r"/lhd-info-emails/"), # Archived info emails (CSHCS)
+    re.compile(r"/past-alerts/"),     # Historical alert email archives
     re.compile(r"\.(pdf|docx?|xlsx?|pptx?|zip)$", re.IGNORECASE),
 ]
 
 MAX_DEPTH = 4
-DELAY_SECONDS = 1.5
+DELAY_SECONDS = 0.5
 
 OUTPUT_DIR = Path(__file__).parent / "pages"
 MAPPING_FILE = Path(__file__).parent / "url_mapping.json"
@@ -132,7 +136,7 @@ def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     p = sync_playwright().start()
-    install(p.chromium)
+    install([p.chromium])
     browser = p.chromium.launch(headless=True)
     context = browser.new_context(
         user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"

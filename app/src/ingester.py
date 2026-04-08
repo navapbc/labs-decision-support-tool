@@ -178,6 +178,10 @@ def _chunk_into_splits_from_json(
 
         assert "title" in item, f"Item {url} has no title"
 
+        if not item.get("markdown", "").strip():
+            logger.warning("Skipping %s: empty markdown content", url)
+            continue
+
         file_path = create_file_path(md_base_dir, common_base_url, url)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         if "md_file" in item:
@@ -202,7 +206,11 @@ def _chunk_into_splits_from_json(
             splits: Sequence[Split] = [Split.from_dict(split_dict) for split_dict in splits_dicts]
             logger.info("  Loaded %d splits from file: %r", len(splits), chunks_file_path)
         else:
-            splits = _chunk_page(document, chunking_config)
+            try:
+                splits = _chunk_page(document, chunking_config)
+            except Exception as e:
+                logger.warning("  Skipping %r due to chunking error: %s", document.name, e)
+                continue
             logger.info("  Chunked into %d splits: %r", len(splits), document.name)
             _save_splits_to_files(chunks_file_path, url, splits)
 
@@ -246,7 +254,8 @@ def _create_splits_using_markdown_tree(
             split.data_ids = ", ".join(chunk.data_ids)
     except (Exception, KeyboardInterrupt) as e:  # pragma: no cover
         logger.error("Error chunking %s (%s): %s", document.name, document.source, e)
-        logger.error(tree.format())
+        if "tree" in dir():
+            logger.error(tree.format())
         raise e
     return splits
 
