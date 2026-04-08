@@ -47,7 +47,7 @@ For the imagine_la dataset:
 CONTENT_HUB_SPACE_ID="space_id_here" CONTENT_HUB_ACCESS_TOKEN="access_token_here" ./refresh-ingestion.sh imagine_la
 ```
 
-Available datasets include: imagine_la, ca_ftb, ca_public_charge, ca_wic, covered_ca, irs, edd, la_policy, and ssa.
+Available datasets include: imagine_la, ca_ftb, ca_public_charge, ca_wic, covered_ca, irs, edd, la_policy, ssa, michigan_mdhhs, bridges-eligibility-manual (BEM), and bridges-administrative-manual (BAM).
 
 ### Manual Process: Individual Steps
 
@@ -72,6 +72,32 @@ For la_policy, which requires dynamic content scraping:
 ```bash
 make scrape-la-county-policy
 make scrapy-runner args="la_policy --debug"
+```
+
+For michigan_mdhhs, which requires a two-stage pipeline because michigan.gov's WAF blocks all non-browser HTTP clients (returns 403 to Scrapy, requests, httpx, etc.):
+
+```bash
+# Stage 1: Playwright pre-scraper fetches pages using a real Chromium browser
+# Saves rendered HTML to src/ingestion/michigan_mdhhs/pages/ and writes url_mapping.json
+make scrape-michigan-mdhhs
+
+# Stage 2: Scrapy reads local HTML files and produces JSON
+make scrapy-runner args="michigan_mdhhs"
+
+# Stage 3: Ingest into DB
+make ingest-runner args="michigan_mdhhs"
+```
+
+The Playwright stage is required — michigan.gov fingerprints TLS handshakes and header order, so user-agent spoofing alone does not work. See `src/ingestion/michigan_mdhhs/scrape_michigan_mdhhs.py` for crawl scope configuration (ALLOW_PATTERNS, DENY_PATTERNS, delay).
+
+For BEM (Bridges Eligibility Manual) and BAM (Bridges Administrative Manual) PDFs:
+
+```bash
+# BEM — download from https://dhhs.michigan.gov/OLMWeb/ex/BP/Mobile/BEM/BEM%20Mobile.pdf
+make ingest-bem-pdfs FILEPATH=/path/to/bem-mobile.pdf
+
+# BAM — download from https://dhhs.michigan.gov/OLMWeb/exF/BP/Mobile/BAM/BAM%20Mobile.pdf
+make ingest-bam-pdfs FILEPATH=/path/to/bam-mobile.pdf
 ```
 
 ### Loading documents locally
