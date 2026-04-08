@@ -311,7 +311,7 @@ If a prompt is about an EDD program, but you can't tell which one, detect and cl
 
 class BridgesEligibilityManualEngine(BaseEngine):
     llm: str = "gpt-5.3-chat-latest"
-    retrieval_k: int = 10
+    retrieval_k: int = 25
     retrieval_k_min_score: float = -1
 
     chunks_shown_min_score: float = -1
@@ -319,7 +319,7 @@ class BridgesEligibilityManualEngine(BaseEngine):
 
     engine_id: str = "bridges-eligibility-manual"
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
-    datasets = ["bridges-eligibility-manual"]
+    datasets = ["bridges-eligibility-manual", "bridges-administrative-manual"]
 
     formatting_config = BemFormattingConfig()
 

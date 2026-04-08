@@ -274,6 +274,13 @@ else
 	docker compose run $(DOCKER_EXEC_ARGS) --rm -v "$(FILEPATH)":/tmp/bem-input.pdf $(APP_NAME) poetry run ingest-bem-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" /tmp/bem-input.pdf $(args)
 endif
 
+ingest-bam-pdfs: check-ingest-arguments
+ifeq "$(PY_RUN_APPROACH)" "local"
+	poetry run ingest-bam-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" "$(FILEPATH)" $(args)
+else
+	docker compose run $(DOCKER_EXEC_ARGS) --rm -v "$(FILEPATH)":/tmp/bam-input.pdf $(APP_NAME) poetry run ingest-bam-pdfs "$(DATASET_ID)" "$(BENEFIT_PROGRAM)" "$(BENEFIT_REGION)" /tmp/bam-input.pdf $(args)
+endif
+
 
 scrape-la-county-policy:
 	# Use playwright to scrape dynamic la_policy_nav_bar.html, required for the next step

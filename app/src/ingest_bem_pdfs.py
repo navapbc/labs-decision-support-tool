@@ -30,12 +30,11 @@ from src.util.string_utils import headings_as_markdown, split_list, split_paragr
 
 logger = logging.getLogger(__name__)
 
-PUBLIC_SOURCE_FILENAME = "bem-mobile.pdf"
 PAGE_COUNT_PATTERN = re.compile(r"^\d+\s+of\s+\d+$", re.IGNORECASE)
 HEADER_DATE_PATTERN = re.compile(r"^\d{1,2}-\d{1,2}-\d{4}$")
 HEADER_BULLETIN_PATTERN = re.compile(r"^[A-Z]{2,}\s+\d{4}-\d{3,}$")
 FOOTER_BLOCK_PATTERNS = (
-    re.compile(r"^BRIDGES ELIGIBILITY MANUAL$", re.IGNORECASE),
+    re.compile(r"^BRIDGES (ELIGIBILITY|ADMINISTRATIVE) MANUAL$", re.IGNORECASE),
     re.compile(r"^MICHIGAN DEPARTMENT OF [A-Z ]+$", re.IGNORECASE),
     re.compile(r"^CHILD DEVELOPMENT AND CARE$", re.IGNORECASE),
 )
@@ -67,38 +66,39 @@ def _public_sources_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "documents" / "public_sources"
 
 
-def _cache_public_source_pdf(pdf_bytes: bytes) -> str:
+def _cache_public_source_pdf(pdf_bytes: bytes, prefix: str = "BEM") -> str:
+    filename = f"{prefix.lower()}-mobile.pdf"
     output_dir = _public_sources_dir()
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / PUBLIC_SOURCE_FILENAME
+    output_path = output_dir / filename
     output_path.write_bytes(pdf_bytes)
-    return PUBLIC_SOURCE_FILENAME
+    return filename
 
 
 def _get_public_source_url(filename: str) -> str:
     return f"{app_config.resolved_public_source_base_url}/sources/{filename}"
 
 
-def _extract_page_sections(pdf_bytes: bytes) -> dict[int, BemPageSection]:
+def _extract_page_sections(pdf_bytes: bytes, prefix: str = "BEM") -> dict[int, BemPageSection]:
     page_texts = extract_text(BytesIO(pdf_bytes)).split("\x0c")
     sections: dict[int, BemPageSection] = {}
 
     for page_number, page_text in enumerate(page_texts, start=1):
-        if section := _extract_page_section(page_text, page_number):
+        if section := _extract_page_section(page_text, page_number, prefix):
             sections[page_number] = section
 
     return sections
 
 
-def _extract_page_section(page_text: str, page_number: int) -> BemPageSection | None:
+def _extract_page_section(page_text: str, page_number: int, prefix: str = "BEM") -> BemPageSection | None:
     lines = [re.sub(r"\s+", " ", line).strip() for line in page_text.splitlines()]
     nonempty = [line for line in lines if line]
 
-    bem_line_index = next((i for i, line in enumerate(nonempty) if "BEM " in line), None)
+    bem_line_index = next((i for i, line in enumerate(nonempty) if f"{prefix} " in line), None)
     if bem_line_index is None:
         return None
 
-    bem_number = extract_bem_number(nonempty[bem_line_index])
+    bem_number = extract_bem_number(nonempty[bem_line_index], prefix)
     remaining_lines = nonempty[bem_line_index + 1 :]
 
     if remaining_lines and PAGE_COUNT_PATTERN.fullmatch(remaining_lines[0]):
@@ -198,6 +198,7 @@ def _group_texts_by_document(
     source_url: str,
     file_path: str,
     pdf_bytes: bytes,
+    prefix: str = "BEM",
 ) -> Sequence[tuple[Document, Sequence[EnrichedText]]]:
     if not page_sections:
         document = Document(
@@ -217,14 +218,14 @@ def _group_texts_by_document(
         page_section = page_sections.get(grouped_text.page_number)
         if not page_section:
             logger.warning(
-                "Skipping text on page %s with no BEM section metadata", grouped_text.page_number
+                "Skipping text on page %s with no %s section metadata", grouped_text.page_number, prefix
             )
             continue
 
         if page_section.bem_number not in documents:
             documents[page_section.bem_number] = (
                 Document(
-                    name=build_bem_document_name(page_section.bem_number, page_section.title),
+                    name=build_bem_document_name(page_section.bem_number, page_section.title, prefix),
                     source=source_url,
                     content="",
                     **config.doc_attribs,
@@ -256,16 +257,17 @@ def _ingest_bem_pdfs(
     *,
     skip_db: bool = False,
     resume: bool = False,
+    prefix: str = "BEM",
 ) -> None:
     del resume  # Resume does not materially change single-file ingestion behavior.
 
-    logger.info("Processing BEM PDF: %s using %s", pdf_path, app_config.embedding_model)
+    logger.info("Processing %s PDF: %s using %s", prefix, pdf_path, app_config.embedding_model)
     pdf_bytes = _load_pdf_bytes(pdf_path)
-    source_filename = _cache_public_source_pdf(pdf_bytes)
+    source_filename = _cache_public_source_pdf(pdf_bytes, prefix)
     source_url = _get_public_source_url(source_filename)
 
-    grouped_texts = _parse_pdf(pdf_bytes, get_file_name(pdf_path))
-    page_sections = _extract_page_sections(pdf_bytes)
+    grouped_texts = _parse_pdf(pdf_bytes, get_file_name(pdf_path), prefix)
+    page_sections = _extract_page_sections(pdf_bytes, prefix)
     grouped_documents = _group_texts_by_document(
         grouped_texts,
         page_sections,
@@ -273,25 +275,27 @@ def _ingest_bem_pdfs(
         source_url,
         pdf_path,
         pdf_bytes,
+        prefix,
     )
     all_splits = _create_all_splits(grouped_documents)
 
     logger.info(
-        "Prepared %d BEM documents and %d chunk splits from %s",
+        "Prepared %d %s documents and %d chunk splits from %s",
         len(all_splits),
+        prefix,
         sum(len(splits) for _, splits in all_splits),
         pdf_path,
     )
 
     if skip_db:
-        logger.info("Skipping DB writes for BEM ingestion")
+        logger.info("Skipping DB writes for %s ingestion", prefix)
         return
 
     save_to_db(db_session, resume=False, all_splits=all_splits)
 
 
-def _parse_pdf(pdf_bytes: bytes, file_path: str) -> list[EnrichedText]:
-    enriched_texts = _enrich_texts(pdf_bytes)
+def _parse_pdf(pdf_bytes: bytes, file_path: str, prefix: str = "BEM") -> list[EnrichedText]:
+    enriched_texts = _enrich_texts(pdf_bytes, prefix)
     try:
         stylings = extract_stylings(BytesIO(pdf_bytes))
         associate_stylings(enriched_texts, stylings)
@@ -301,17 +305,17 @@ def _parse_pdf(pdf_bytes: bytes, file_path: str) -> list[EnrichedText]:
     return group_texts(markdown_texts)
 
 
-def _enrich_texts(pdf_bytes: bytes) -> list[EnrichedText]:
+def _enrich_texts(pdf_bytes: bytes, prefix: str = "BEM") -> list[EnrichedText]:
     outline: list[Heading] = extract_outline(BytesIO(pdf_bytes))
     try:
         unstructured_elem_list = partition_pdf(file=BytesIO(pdf_bytes), strategy="fast")
     except Exception as exc:
         logger.warning("Falling back to pdfminer text extraction after partition_pdf failed: %s", exc)
-        return _fallback_enrich_texts(pdf_bytes, outline)
+        return _fallback_enrich_texts(pdf_bytes, outline, prefix)
 
     if not any(getattr(element, "text", "").strip() for element in unstructured_elem_list):
         logger.warning("partition_pdf returned no text; falling back to pdfminer text extraction")
-        return _fallback_enrich_texts(pdf_bytes, outline)
+        return _fallback_enrich_texts(pdf_bytes, outline, prefix)
 
     enrich_text_list = []
     current_headings: list[Heading] = []
@@ -368,7 +372,7 @@ def _enrich_texts(pdf_bytes: bytes) -> list[EnrichedText]:
     return enrich_text_list
 
 
-def _fallback_enrich_texts(pdf_bytes: bytes, outline: list[Heading]) -> list[EnrichedText]:
+def _fallback_enrich_texts(pdf_bytes: bytes, outline: list[Heading], prefix: str = "BEM") -> list[EnrichedText]:
     try:
         parser = OutlineAwarePdfParser(BytesIO(pdf_bytes), BemTagExtractor)
         extracted_texts = parser.flatten_xml(parser.extract_xml())
@@ -404,10 +408,10 @@ def _fallback_enrich_texts(pdf_bytes: bytes, outline: list[Heading]) -> list[Enr
             "Structured pdfminer fallback failed; falling back to raw page text extraction: %s", exc
         )
 
-    return _fallback_enrich_texts_from_page_text(pdf_bytes, outline)
+    return _fallback_enrich_texts_from_page_text(pdf_bytes, outline, prefix)
 
 
-def _fallback_enrich_texts_from_page_text(pdf_bytes: bytes, outline: list[Heading]) -> list[EnrichedText]:
+def _fallback_enrich_texts_from_page_text(pdf_bytes: bytes, outline: list[Heading], prefix: str = "BEM") -> list[EnrichedText]:
     enrich_text_list: list[EnrichedText] = []
     current_headings: list[Heading] = []
 
@@ -419,7 +423,7 @@ def _fallback_enrich_texts_from_page_text(pdf_bytes: bytes, outline: list[Headin
         raw_blocks = [block for block in re.split(r"\n\s*\n+", page_text) if block.strip()]
         for block_index, block in enumerate(raw_blocks, start=1):
             normalized_block = re.sub(r"\s+", " ", block).strip()
-            if not normalized_block or _is_header_or_footer_block(normalized_block):
+            if not normalized_block or _is_header_or_footer_block(normalized_block, prefix):
                 continue
 
             if heading := _match_heading(outline, normalized_block, page_number):
@@ -446,12 +450,12 @@ def _fallback_enrich_texts_from_page_text(pdf_bytes: bytes, outline: list[Headin
     return enrich_text_list
 
 
-def _is_header_or_footer_block(block: str) -> bool:
+def _is_header_or_footer_block(block: str, prefix: str = "BEM") -> bool:
     return (
         bool(PAGE_COUNT_PATTERN.fullmatch(block))
         or bool(HEADER_DATE_PATTERN.fullmatch(block))
         or bool(HEADER_BULLETIN_PATTERN.fullmatch(block))
-        or bool(re.fullmatch(r"BEM\s+\d+", block, flags=re.IGNORECASE))
+        or bool(re.fullmatch(rf"{prefix}\s+\d+", block, flags=re.IGNORECASE))
         or any(pattern.fullmatch(block) for pattern in FOOTER_BLOCK_PATTERNS)
     )
 
