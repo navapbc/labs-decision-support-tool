@@ -52,6 +52,9 @@ scrape_and_ingest() {
     if [ "$DATASET_ID" = "la_policy" ]; then
         # Use playwright to scrape dynamic content
         make scrape-la-county-policy 2>&1 | tee "logs/${DATASET_ID}-0playwright-scrape.log"
+    elif [ "$DATASET_ID" = "michigan_mdhhs" ]; then
+        # Use playwright to scrape michigan.gov (WAF blocks non-browser clients)
+        make scrape-michigan-mdhhs 2>&1 | tee "logs/${DATASET_ID}-0playwright-scrape.log"
     fi
 
     # Clear out the Scrapy cache if it's not from today
@@ -366,7 +369,7 @@ case "$1" in
         export DEPLOY_ENV=dev
 
         # Skip 'ssa' dataset since it was manually scraped and hence needs to be refreshed manually
-        DATASETS="ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy"
+        DATASETS="ca_ftb ca_public_charge ca_wic covered_ca irs edd la_policy michigan_mdhhs"
 
         for DATASET_ID in $DATASETS; do
             scrape_and_ingest "$DATASET_ID"

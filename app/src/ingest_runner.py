@@ -120,6 +120,14 @@ def get_ingester_config(scraper_dataset: str) -> IngestConfig:  # pragma: no cov
             return IngestConfig(
                 "SSA", "social security", "US", "https://www.ssa.gov/", scraper_dataset
             )
+        case "michigan_mdhhs":
+            return IngestConfig(
+                "Michigan MDHHS",
+                "mixed",
+                "Michigan",
+                "https://www.michigan.gov/mdhhs/",
+                scraper_dataset,
+            )
         case _:
             raise ValueError(
                 f"Unknown dataset: {scraper_dataset!r}.  Run `make scrapy-runner` to see available datasets"

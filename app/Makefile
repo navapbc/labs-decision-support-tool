@@ -282,6 +282,9 @@ else
 endif
 
 
+scrape-michigan-mdhhs:
+	cd src/ingestion && uv run --no-project michigan_mdhhs/scrape_michigan_mdhhs.py
+
 scrape-la-county-policy:
 	# Use playwright to scrape dynamic la_policy_nav_bar.html, required for the next step
 	cd src/ingestion/la_policy/scrape; uv run --no-project scrape_la_policy_nav_bar.py

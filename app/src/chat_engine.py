@@ -319,7 +319,7 @@ class BridgesEligibilityManualEngine(BaseEngine):
 
     engine_id: str = "bridges-eligibility-manual"
     name: str = "Michigan Bridges Eligibility Manual Chat Engine"
-    datasets = ["bridges-eligibility-manual", "bridges-administrative-manual"]
+    datasets = ["bridges-eligibility-manual", "bridges-administrative-manual", "Michigan MDHHS"]
 
     formatting_config = BemFormattingConfig()
 
