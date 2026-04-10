@@ -32,8 +32,8 @@ class UserSession(Base, TimestampMixin):
         comment="External user ID that this session was created for"
     )
     chat_engine_id: Mapped[str] = mapped_column(comment="Chat engine ID for this session")
-    lai_thread_id: Mapped[str | None] = mapped_column(
-        comment="LiteralAI's thread ID corresponding to session_id"
+    thread_id: Mapped[str | None] = mapped_column(
+        comment="Chainlit thread ID corresponding to session_id"
     )
     chat_messages: Mapped[list[ChatMessage]] = relationship(
         back_populates="session",

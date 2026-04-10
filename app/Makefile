@@ -308,11 +308,3 @@ generate-qa: ## Generate QA pairs from documents
 		$(if $(random_seed),--random-seed=$(random_seed),) \
 		--commit=$(shell git rev-parse HEAD)
 
-literalai-exporter:
-	$(PY_RUN_CMD) literalai-exporter $(args)
-
-literalai-archiver:
-	$(PY_RUN_CMD) literalai-archiver $(args)
-
-literalai-tagger:
-	$(PY_RUN_CMD) literalai-tagger $(args)

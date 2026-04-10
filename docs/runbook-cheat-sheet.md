@@ -29,7 +29,7 @@ You'll need:
 ### Create the infrastructure
 
 1. In the AWS console, create a new IAM user and add them to an IAM group with the `AdministratorAccess` policy
-1. In the AWS console, navigate to the parameter store and create two new secrets, `/app-dev/OPENAI_API_KEY` and `/app-dev/LITERAL_API_KEY`. The secret type should be "secure string". Enter the API keys the chatbot will use for these two services as the values.
+1. In the AWS console, navigate to the parameter store and create a new secret, `/app-dev/OPENAI_API_KEY`. The secret type should be "secure string". Enter the API key the chatbot will use as the value.
 1. Navigate to the root of the repo in the terminal.
 1. Authenticate in your local terminal:
     1. Run `aws configure --profile <name of IAM user>`, replacing `<name of IAM user>` with the username

@@ -95,7 +95,7 @@ class UserSessionFactory(BaseFactory):
 
     session_id = factory.Faker("sha1")
     user_id = factory.Faker("sha1")
-    lai_thread_id = None
+    thread_id = None
     chat_engine_id = factory.Faker("random_element", elements=["imagine-la", "imagine-llama"])
 
 

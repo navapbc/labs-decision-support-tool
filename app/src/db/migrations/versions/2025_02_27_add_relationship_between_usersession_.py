@@ -31,7 +31,7 @@ def upgrade():
                 session_id=session_id,
                 user_id="CREATED_TO_ADD_FOREIGN_KEY_CONSTRAINT",
                 chat_engine_id="imagine-la",
-                lai_thread_id=None,
+                thread_id=None,
             )
             session.add(user_session)
         session.commit()

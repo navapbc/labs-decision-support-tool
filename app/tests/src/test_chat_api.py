@@ -27,18 +27,7 @@ from tests.src.test_chainlit_data import clear_data_layer_data
 
 
 @pytest.fixture
-def no_literalai_data_layer(monkeypatch):
-    """
-    Disables the LiteralAI data layer by clearing the API key environment variable
-    and resetting the `literal_api_key_for_api` attribute in the app configuration.
-    This prevents unintentional creation of the data layer during tests.
-    """
-    monkeypatch.setenv("LITERAL_API_KEY", "")
-    monkeypatch.setattr(app_config, "literal_api_key_for_api", "")
-
-
-@pytest.fixture
-def async_client(no_literalai_data_layer, db_session, app_config):
+def async_client(db_session, app_config):
     """
     The typical FastAPI TestClient creates its own event loop to handle requests,
     which led to issues when testing code that relies on asynchronous operations
@@ -425,7 +414,7 @@ def test_get_chat_engine():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
         is_new=True,
-        user_uuid="some_literalai_user_id",
+        user_uuid="some_user_id",
         chat_engine_settings=ChatEngineSettings("ca-edd-web", retrieval_k=6),
         allowed_engines=["ca-edd-web"],
     )
@@ -437,7 +426,7 @@ def test_get_chat_engine__unknown():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
         is_new=True,
-        user_uuid="some_literalai_user_id",
+        user_uuid="some_user_id",
         chat_engine_settings=ChatEngineSettings("engine_y"),
         allowed_engines=["ca-edd-web"],
     )
@@ -449,7 +438,7 @@ def test_get_chat_engine_not_allowed():
     session = ChatSession(
         user_session=UserSessionFactory.build(),
         is_new=True,
-        user_uuid="some_literalai_user_id",
+        user_uuid="some_user_id",
         chat_engine_settings=ChatEngineSettings("bridges-eligibility-manual"),
         allowed_engines=["ca-edd-web"],
     )

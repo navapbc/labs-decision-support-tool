@@ -31,10 +31,10 @@ def upgrade():
             "chat_engine_id", sa.Text(), nullable=False, comment="Chat engine ID for this session"
         ),
         sa.Column(
-            "lai_thread_id",
+            "thread_id",
             sa.Text(),
             nullable=True,
-            comment="LiteralAI's thread ID corresponding to session_id",
+            comment="Chainlit thread ID corresponding to session_id",
         ),
         sa.Column(
             "created_at",

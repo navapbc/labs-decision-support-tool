@@ -1,7 +1,5 @@
 import logging
 import pprint
-import tempfile
-from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -14,11 +12,9 @@ from src.batch_process import batch_process
 from src.chainlit_data import ChainlitPolyDataLayer
 from src.chat_engine import ChatEngineInterface, OnMessageResult
 from src.citations import simplify_citation_numbers
-from src.evaluation import literalai_exporter
 from src.format import format_response
 from src.generate import ChatHistory, MessageAttributesT, get_models
 from src.login import require_login
-from src.util import literalai_util as lai
 
 logger = logging.getLogger(__name__)
 
@@ -326,31 +322,6 @@ async def special_command(msg_text: str) -> bool:
             # await so that the step UI shows that BP is in progress
             await _batch_proccessing(files[0])
         return True
-    elif msg_text == "export literalai":
-        try:
-            step_dict = await cl.AskUserMessage(
-                content="Specify the start timestamp and (exclusive) end timestamp for the data export (such as '2025-03-04 2025-03-06' to get 2 days of data starting on March 4th).",
-                timeout=180,
-            ).send()
-            if step_dict:
-                dates = step_dict["output"].strip().split()
-                start_date = datetime.fromisoformat(dates[0])
-                end_date = datetime.fromisoformat(dates[1])
-                # await so that the step UI shows that task is in progress
-                await _export_lai(start_date, end_date)
-        except ValueError as e:
-            await cl.Message(
-                type="system_message",
-                author="backend",
-                content=f"Date parsing error: {e}",
-            ).send()
-        except IndexError as e:
-            await cl.Message(
-                type="system_message",
-                author="backend",
-                content=f"Error: {e}.  Specify both start and end timestamps.",
-            ).send()
-        return True
     return False
 
 
@@ -385,41 +356,3 @@ async def _batch_proccessing(file: AskFileResponse) -> None:
         logger.exception("batch_process error", stack_info=True)
 
 
-@cl.step(name="export Literal AI question-answer pairs", type="tool")
-async def _export_lai(start_date: datetime, end_date: datetime) -> None:
-    await cl.Message(
-        type="system_message",
-        author="backend",
-        content=f"Exporting QA pairs from {start_date} up to {end_date} ...",
-    ).send()
-
-    try:
-        project_id = lai.get_project_id()
-        threads = lai.query_threads_between(start_date, end_date)
-        qa_rows = literalai_exporter.convert_to_qa_rows(project_id, threads)
-
-        filename_suffix = f"{start_date.strftime('%Y-%m-%d')}-{end_date.strftime('%Y-%m-%d')}.csv"
-        with tempfile.NamedTemporaryFile(
-            delete=False,
-            mode="w",
-            encoding="utf-8",
-            prefix=f"literalai_qa_pairs-{project_id}",
-            suffix=filename_suffix,
-        ) as result_file:
-            literalai_exporter.save_csv(qa_rows, result_file)
-
-        filename = f"literalai_qa_pairs_{project_id}_{filename_suffix}"
-        await cl.Message(
-            content="Data exported, results attached.",
-            elements=[cl.File(name=filename, path=result_file.name)],
-            metadata={"result_file_path": result_file.name},
-        ).send()
-
-    except Exception as err:  # pylint: disable=broad-exception-caught
-        await cl.Message(
-            type="system_message",
-            author="backend",
-            metadata={"error_class": err.__class__.__name__, "error": str(err)},
-            content=f"export_lai: {err.__class__.__name__}: {err}",
-        ).send()
-        logger.exception("export_lai error", stack_info=True)

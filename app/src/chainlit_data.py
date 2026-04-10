@@ -8,7 +8,6 @@ import asyncpg
 
 from chainlit.data.base import BaseDataLayer
 from chainlit.data.chainlit_data_layer import ChainlitDataLayer
-from chainlit.data.literalai import LiteralDataLayer
 from chainlit.data.storage_clients.base import BaseStorageClient
 from chainlit.data.utils import queue_until_user_message
 from chainlit.element import Element, ElementDict
@@ -23,11 +22,6 @@ def get_postgres_data_layer(database_url: Optional[str] = None) -> "PostgresData
     return PostgresDataLayer(database_url=database_url)
 
 
-def get_literal_data_layer(api_key: str) -> LiteralDataLayer:
-    server = os.environ.get("LITERAL_API_URL")
-    return LiteralDataLayer(api_key=api_key, server=server)
-
-
 def get_default_data_layers() -> List[BaseDataLayer]:
     data_layers: List[BaseDataLayer] = []
 
@@ -35,8 +29,6 @@ def get_default_data_layers() -> List[BaseDataLayer]:
     database_url = os.environ.get("DATABASE_URL")
     data_layers.append(get_postgres_data_layer(database_url))
 
-    if api_key := os.environ.get("LITERAL_API_KEY"):
-        data_layers.append(get_literal_data_layer(api_key))
     return data_layers
 
 
@@ -77,38 +69,9 @@ class ChainlitPolyDataLayer(BaseDataLayer):
         results = await self._call_method(lambda dl: dl.get_user(identifier))
         return results[0]
 
-    @property
-    def literalai_layer(self) -> Optional[BaseDataLayer]:
-        return next((dl for dl in self.data_layers if isinstance(dl, LiteralDataLayer)), None)
-
     async def create_user(self, user: User) -> Optional[PersistedUser]:
-        """
-        Unlike other persisted objects (like Thread and Step), the User argument has no id that can be set.
-        The ChainlitDataLayer and LiteralDataLayer implementations return a generated UUID user.id.
-        Unfortunately, since the UUIDs are different, referencing the user from the Thread consistently
-        across data layers is not possible.
-        (These Chainlit data layers were implemented to use a single data layer at a time.)
-        While the LiteralDataLayer does not allow setting the user.id, the ChainlitDataLayer fortunately does.
-        So call LiteralDataLayer.create_user() first and use the generated UUID in the call to
-        ChainlitDataLayer.create_user() via User.metadata["uuid"]. In this way, the user.id is the same
-        across all data layers.
-        """
         assert user.identifier, "User identifier is required"
-
-        if self.literalai_layer:
-            if lai_user := await self.literalai_layer.create_user(user):
-                user.metadata = (user.metadata or {}) | {"uuid": lai_user.id}
-                logger.info("Created LiteralAI user %r (%r)", user.identifier, lai_user.id)
-            else:
-                logger.warning("Failed to create LiteralAI user %r", user.identifier)
-                # 2 User objects will be created in LiteralAI:
-                # - one with a string identifier that we assigned but this User is not associated with a thread
-                #   because the primary data layer's (Postgres's) user.id is being used for Thread.user_id
-                # - one with identifier=a generated UUID that is automatically created later when a thread is created
-                # This means the user's identifier (a UUID) is shown in LiteralAI's UI instead of user.identifier,
-                # which is more meaningful since it was provided as part of the user argument.
-
-        results = await self._call_method(lambda dl: dl.create_user(user), self.literalai_layer)
+        results = await self._call_method(lambda dl: dl.create_user(user))
         return results[0]
 
     async def delete_feedback(
@@ -197,8 +160,8 @@ class ChainlitPolyDataLayer(BaseDataLayer):
 
     async def build_debug_url(self) -> str:  # pragma: no cover
         results = await self._call_method(lambda dl: dl.build_debug_url())
-        # ChainlitDataLayer.build_debug_url() returns "" which isn't useful
-        return next(res for res in results if res)
+        # Return the first non-empty result, or empty string if none
+        return next((res for res in results if res), "")
 
 
 class PostgresDataLayer(ChainlitDataLayer):

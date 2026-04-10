@@ -39,8 +39,6 @@ class AppConfig(PydanticBaseEnvConfig):
 
     # Starts the chat API if set to True
     enable_chat_api: bool = True
-    # If set, used instead of LITERAL_API_KEY for API
-    literal_api_key_for_api: str | None = None
 
     @cached_property
     def db_client(self) -> db.PostgresDBClient:

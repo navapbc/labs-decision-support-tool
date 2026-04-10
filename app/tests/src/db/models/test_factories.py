@@ -52,7 +52,7 @@ def test_user_session_factory(enable_factory_create, db_session: db.Session):
     assert user_session_record.session_id == user_session.session_id
     assert user_session_record.user_id == user_session.user_id
     assert user_session_record.chat_engine_id == user_session.chat_engine_id
-    assert user_session_record.lai_thread_id == user_session.lai_thread_id
+    assert user_session_record.thread_id == user_session.thread_id
     assert user_session_record.created_at == user_session.created_at
     assert user_session_record.updated_at == user_session.updated_at
     assert user_session_record.chat_messages == []

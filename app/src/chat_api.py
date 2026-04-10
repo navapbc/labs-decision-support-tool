@@ -6,7 +6,6 @@ This creates API endpoints using FastAPI, which is compatible with Chainlit.
 
 import asyncio
 import logging
-import os
 import time
 import uuid
 from contextlib import asynccontextmanager, contextmanager
@@ -28,7 +27,7 @@ from chainlit.step import StepDict
 from src import chat_engine
 from src.adapters import db
 from src.app_config import app_config
-from src.chainlit_data import ChainlitPolyDataLayer, get_literal_data_layer, get_postgres_data_layer
+from src.chainlit_data import ChainlitPolyDataLayer
 from src.chat_engine import ChatEngineInterface
 from src.citations import simplify_citation_numbers
 from src.db.models.conversation import ChatMessage, UserSession
@@ -42,14 +41,8 @@ logger = logging.getLogger(__name__)
 
 @cl.data_layer
 def chainlit_data_layer() -> ChainlitPolyDataLayer:
-    data_layers = None
-    if app_config.literal_api_key_for_api:
-        data_layers = [
-            get_postgres_data_layer(os.environ.get("DATABASE_URL")),
-            get_literal_data_layer(app_config.literal_api_key_for_api),
-        ]
-    logger.info("API: creating chainlit_data_layer: ChainlitPolyDataLayer(%r)", data_layers)
-    return ChainlitPolyDataLayer(data_layers)
+    logger.info("API: creating chainlit_data_layer: ChainlitPolyDataLayer()")
+    return ChainlitPolyDataLayer()
 
 
 @asynccontextmanager
@@ -119,12 +112,12 @@ def __get_or_create_chat_session(
                 chat_engine_id="imagine-la",
                 # Assign a new thread ID for the session
                 # This will be used as Message/Step.thread_id and Thread.id when they're created
-                lai_thread_id=str(uuid.uuid4()),
+                thread_id=str(uuid.uuid4()),
             )
             logger.info(
                 "Creating new user session %r (thread.id %r) for user %r",
                 user_session.session_id,
-                user_session.lai_thread_id,
+                user_session.thread_id,
                 user_id,
             )
             dbsession.get().add(user_session)
@@ -189,7 +182,7 @@ async def _init_chat_session(
     chat_session.user_uuid = stored_user.id
 
     # The thread_id is set in store_thread_id() after the thread is automatically created
-    thread_id = chat_session.user_session.lai_thread_id
+    thread_id = chat_session.user_session.thread_id
     # Set the thread ID in the http_context so that new cl.Message instances will be associated
     # with the thread when cl.MessageBase.__post_init__() accesses cl.context.session.thread_id.
     # The http_context uses ContextVars to avoid concurrency issues.
@@ -217,7 +210,7 @@ def _load_chat_history(user_session: UserSession) -> ChatHistory:
 
 
 # endregion
-# region: ===================  Example API Endpoint and logging to LiteralAI  ===================
+# region: ===================  API Endpoint Helpers  ===================
 
 dbsession: ContextVar[db.Session] = ContextVar(
     "api_db_session", default=LazyProxy(app_config.db_session(), enable_cache=False)
@@ -280,7 +273,7 @@ async def engines(user_id: str, session_id: str | None = None) -> list[str]:
     with db_session_context_var():
         user_meta = {"engines": True}
         session = await _init_chat_session(user_id, session_id, user_meta)
-        # Only if new session (i.e., lai_thread_id hasn't been set), set the thread name
+        # Only if new session (i.e., thread_id hasn't been set), set the thread name
         thread_name = "API:/engines" if session.is_new else None
 
         request_step = cl.Message(
@@ -395,7 +388,7 @@ class QueryResponse(BaseModel):
     alert_message: Optional[str] = None
     citations: list[Citation]
 
-    # Populated after instantiation based on LiteralAI message ID
+    # Populated after instantiation based on persisted message ID
     response_id: Optional[str] = None
 
 
