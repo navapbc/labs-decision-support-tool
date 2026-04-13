@@ -181,7 +181,7 @@ async def _init_chat_session(
     # cl_init_context() will use stored_user.id as the thread.user_id
     chat_session.user_uuid = stored_user.id
 
-    # The thread_id is set in store_thread_id() after the thread is automatically created
+    # The thread_id is already assigned on the UserSession created or loaded for this chat session.
     thread_id = chat_session.user_session.thread_id
     # Set the thread ID in the http_context so that new cl.Message instances will be associated
     # with the thread when cl.MessageBase.__post_init__() accesses cl.context.session.thread_id.
