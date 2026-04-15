@@ -33,7 +33,11 @@ def test_create_engine_bridges_eligibility_manual():
     assert engine is not None
     assert engine.name == BridgesEligibilityManualEngine.name
     assert engine.llm == "gpt-5.3-chat-latest"
-    assert engine.datasets == ["bridges-eligibility-manual"]
+    assert engine.datasets == [
+        "bridges-eligibility-manual",
+        "bridges-administrative-manual",
+        "Michigan MDHHS",
+    ]
 
 
 def test_create_engine_Imagine_LA():

@@ -2,22 +2,22 @@ import asyncio
 import logging
 
 import pytest
+from chainlit import data as cl_data
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
-from chainlit import data as cl_data
 from src import chat_api
 from src.chat_api import (
+    app_config,
     Citation,
     ChatEngineSettings,
     ChatSession,
     QueryResponse,
-    app_config,
     get_chat_engine,
-    router,
     run_query,
+    router,
 )
 from src.chat_engine import ImagineLA_MessageAttributes, OnMessageResult
 from src.citations import CitationFactory, split_into_subsections

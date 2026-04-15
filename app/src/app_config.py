@@ -78,7 +78,8 @@ class AppConfig(PydanticBaseEnvConfig):
         if self.public_source_base_url:
             return self.public_source_base_url.rstrip("/")
 
-        host = "127.0.0.1" if self.host in {"0.0.0.0", "::"} else self.host
+        # Normalizing wildcard bind addresses to a browser-reachable loopback host is intentional.
+        host = "127.0.0.1" if self.host in {"0.0.0.0", "::"} else self.host  # nosec B104
         return f"http://{host}:{self.port}"
 
 

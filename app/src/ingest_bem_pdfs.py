@@ -21,11 +21,16 @@ from src.ingestion.markdown_chunking import chunk_tree
 from src.ingestion.markdown_tree import create_markdown_tree
 from src.ingestion.pdf_elements import EnrichedText, TextType
 from src.ingestion.pdf_postprocess import add_markdown, associate_stylings, group_texts
-from src.ingestion.pdf_stylings import BemTagExtractor, OutlineAwarePdfParser, PageZone, extract_stylings
+from src.ingestion.pdf_stylings import (
+    BemTagExtractor,
+    extract_stylings,
+    OutlineAwarePdfParser,
+    PageZone,
+)
 from src.util.bem_util import build_bem_document_name, extract_bem_number
 from src.util.file_util import get_file_name
 from src.util.ingest_utils import DefaultChunkingConfig, IngestConfig, process_and_ingest_sys_args
-from src.util.pdf_utils import Heading, extract_outline, get_pdf_info
+from src.util.pdf_utils import extract_outline, get_pdf_info, Heading
 from src.util.string_utils import headings_as_markdown, split_list, split_paragraph
 
 logger = logging.getLogger(__name__)
