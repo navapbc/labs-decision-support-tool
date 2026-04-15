@@ -2,25 +2,26 @@ import asyncio
 import logging
 
 import pytest
+from chainlit import data as cl_data
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
-from chainlit import data as cl_data
 from src import chat_api
 from src.chat_api import (
+    app_config,
+    Citation,
     ChatEngineSettings,
     ChatSession,
     QueryResponse,
-    app_config,
     get_chat_engine,
-    router,
     run_query,
+    router,
 )
 from src.chat_engine import ImagineLA_MessageAttributes, OnMessageResult
 from src.citations import CitationFactory, split_into_subsections
-from src.db.models.conversation import Feedback, Step, Thread, User
+from src.db.models.conversation import Feedback, Step, Thread, User, UserSession
 from src.generate import MessageAttributes
 from tests.src.db.models.factories import ChunkFactory, UserSessionFactory
 from tests.src.test_chainlit_data import clear_data_layer_data
@@ -79,7 +80,10 @@ def reset_cl_data_layer():
 
 
 @pytest.mark.asyncio
-async def test_api_engines(async_client, db_session):
+async def test_api_engines(async_client, monkeypatch, db_session):
+    monkeypatch.setattr(app_config, "default_chat_engine", "imagine-la")
+    monkeypatch.setattr(app_config, "allowed_chat_engines", "imagine-la")
+
     response = await async_client.get("/api/engines?user_id=TestUser")
     assert response.status_code == 200
     assert response.json() == ["imagine-la"]
@@ -105,6 +109,27 @@ async def test_api_engines(async_client, db_session):
     assert response_step.output == "['imagine-la']"
 
     assert db_session.query(Feedback).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_api_engines__uses_configured_engines(async_client, monkeypatch, db_session):
+    monkeypatch.setattr(app_config, "default_chat_engine", "bridges-eligibility-manual")
+    monkeypatch.setattr(
+        app_config,
+        "allowed_chat_engines",
+        "bridges-eligibility-manual,ca-edd-web",
+    )
+
+    response = await async_client.get("/api/engines?user_id=TestUser")
+    assert response.status_code == 200
+    assert set(response.json()) == {"bridges-eligibility-manual", "ca-edd-web"}
+
+    user_sessions = (
+        db_session.query(UserSession)
+        .filter(UserSession.chat_engine_id == "bridges-eligibility-manual")
+        .all()
+    )
+    assert len(user_sessions) == 1
 
 
 @pytest.mark.asyncio
@@ -348,6 +373,19 @@ async def test_api_query__bad_request(async_client, db_session):
 def subsections():
     # Provide a factory to reset the citation id counter
     return split_into_subsections(ChunkFactory.build_batch(3), factory=CitationFactory())
+
+
+def test_citation_from_subsection__pdf_source_uses_page_link():
+    chunk = ChunkFactory.build(page_number=7)
+    chunk.document.source = "http://localhost:8080/sources/bem-mobile.pdf"
+    chunk.document.dataset = "bridges-eligibility-manual"
+    subsection = CitationFactory().create_citation(chunk, 0, "Exact quoted policy text")
+
+    citation = Citation.from_subsection(subsection)
+    assert citation.uri == "http://localhost:8080/sources/bem-mobile.pdf#page=7"
+    assert citation.subsection_index == 0
+    assert citation.page_number == 7
+    assert citation.citation_text == "Exact quoted policy text"
 
 
 @pytest.mark.asyncio

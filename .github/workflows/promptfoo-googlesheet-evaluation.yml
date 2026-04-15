@@ -131,7 +131,7 @@ jobs:
             if [ -n "${EVAL_ID}" ]; then
               echo "Found evaluation ID: ${EVAL_ID}"
               echo "Exporting results to Google Sheets..."
-              promptfoo export "${EVAL_ID}" --output "${GOOGLE_SHEET_OUTPUT_URL}"
+              promptfoo export eval "${EVAL_ID}" --output "${GOOGLE_SHEET_OUTPUT_URL}"
             fi
 
             if [ -n "$PROMPTFOO_API_KEY" ]; then

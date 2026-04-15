@@ -32,10 +32,15 @@ class AppConfig(PydanticBaseEnvConfig):
 
     # Default chat engine
     chat_engine: str = "imagine-la"
+    default_chat_engine: str | None = None
+    allowed_chat_engines: str | None = None
     temperature: float = 0.0
 
     # Default LLM model
     llm: str | None = None
+
+    # Absolute base URL used when creating browser-facing source links.
+    public_source_base_url: str | None = None
 
     # Starts the chat API if set to True
     enable_chat_api: bool = True
@@ -57,6 +62,25 @@ class AppConfig(PydanticBaseEnvConfig):
             return CohereEmbedding(self.embedding_model_name)
 
         return SentenceTransformerEmbedding(self.embedding_model_name)
+
+    @property
+    def api_default_chat_engine(self) -> str:
+        return self.default_chat_engine or self.chat_engine
+
+    @property
+    def api_allowed_chat_engines(self) -> list[str]:
+        if self.allowed_chat_engines:
+            return [engine.strip() for engine in self.allowed_chat_engines.split(",") if engine.strip()]
+        return [self.api_default_chat_engine]
+
+    @property
+    def resolved_public_source_base_url(self) -> str:
+        if self.public_source_base_url:
+            return self.public_source_base_url.rstrip("/")
+
+        # Normalizing wildcard bind addresses to a browser-reachable loopback host is intentional.
+        host = "127.0.0.1" if self.host in {"0.0.0.0", "::"} else self.host  # nosec B104
+        return f"http://{host}:{self.port}"
 
 
 app_config = AppConfig()

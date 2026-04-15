@@ -1,11 +1,19 @@
 import os
+from types import SimpleNamespace
 
 import ollama
 import pytest
 
 from src.chat_engine import PROMPT
 from src.citations import create_prompt_context, split_into_subsections
-from src.generate import generate, generate_streaming_async, get_models
+from src.generate import (
+    MessageAttributes,
+    analyze_message,
+    generate,
+    generate_streaming_async,
+    get_models,
+    temperature_arg,
+)
 from tests.mock import mock_completion
 
 
@@ -88,10 +96,41 @@ def test_get_models(monkeypatch):
     assert get_models() == {}
 
     monkeypatch.setenv("OPENAI_API_KEY", "mock_key")
+    assert get_models()["OpenAI GPT-5.3 Instant"] == "gpt-5.3-chat-latest"
     assert get_models()["OpenAI GPT-4o"] == "gpt-4o"
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "mock_key")
     assert get_models()["Anthropic Claude 3.5 Sonnet"] == "claude-3-5-sonnet-20240620"
+
+
+def test_temperature_arg_for_gpt_5_3_chat_latest():
+    assert temperature_arg("gpt-5.3-chat-latest") == {}
+    assert temperature_arg("gpt-4o") == {"temperature": 0.0}
+
+
+def test_analyze_message_accepts_duplicate_json_output(monkeypatch):
+    duplicate_json = (
+        '{"needs_context":false,"users_language":"English","translated_message":""}\n'
+        '{"needs_context":false,"users_language":"English","translated_message":""}'
+    )
+
+    monkeypatch.setattr(
+        "src.generate.completion",
+        lambda *args, **kwargs: SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=duplicate_json))]
+        ),
+    )
+
+    result = analyze_message(
+        "gpt-5.3-chat-latest",
+        "system prompt",
+        "hello",
+        MessageAttributes,
+    )
+
+    assert result.needs_context is False
+    assert result.users_language == "English"
+    assert result.translated_message == ""
 
 
 def test_get_models_ollama(monkeypatch):

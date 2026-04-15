@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from src.app_config import app_config
 
 logger = logging.getLogger(__name__)
+DEFAULT_TEMPERATURE_ONLY_MODELS = {"gpt-5.3-chat-latest"}
 
 
 def get_models() -> dict[str, str]:
@@ -22,7 +23,10 @@ def get_models() -> dict[str, str]:
     """
     models: dict[str, str] = {}
     if "OPENAI_API_KEY" in os.environ:
-        models |= {"OpenAI GPT-4o": "gpt-4o"}
+        models |= {
+            "OpenAI GPT-5.3 Instant": "gpt-5.3-chat-latest",
+            "OpenAI GPT-4o": "gpt-4o",
+        }
     if "ANTHROPIC_API_KEY" in os.environ:
         models |= {"Anthropic Claude 3.5 Sonnet": "claude-3-5-sonnet-20240620"}
     if "GEMINI_API_KEY" in os.environ:
@@ -117,7 +121,10 @@ def generate(
     logger.debug("Calling %s for query: %s with context:\n%s", llm, query, context_text)
 
     response = completion(
-        model=llm, messages=messages, **completion_args(llm), temperature=app_config.temperature
+        model=llm,
+        messages=messages,
+        **completion_args(llm),
+        **temperature_arg(llm),
     )
 
     return response["choices"][0]["message"]["content"]
@@ -143,7 +150,7 @@ async def generate_streaming_async(
         messages=messages,
         stream=True,  # Enable streaming
         **completion_args(llm),
-        temperature=app_config.temperature,
+        **temperature_arg(llm),
     )
 
     for chunk in response_stream:
@@ -155,6 +162,23 @@ def completion_args(llm: str) -> dict[str, Any]:
     if llm.startswith("ollama/"):
         return {"api_base": os.environ["OLLAMA_HOST"]}
     return {}
+
+
+def temperature_arg(llm: str) -> dict[str, Any]:
+    # Some hosted chat aliases reject explicit temperature overrides and only accept the
+    # provider default. In those cases, omit temperature entirely.
+    if llm in DEFAULT_TEMPERATURE_ONLY_MODELS:
+        return {}
+    return {"temperature": app_config.temperature}
+
+
+def parse_json_response(response: str) -> Any:
+    normalized_response = response.strip()
+    try:
+        return json.loads(normalized_response)
+    except json.JSONDecodeError:
+        parsed_response, _ = json.JSONDecoder().raw_decode(normalized_response)
+        return parsed_response
 
 
 class MessageAttributes(BaseModel):
@@ -186,7 +210,7 @@ def analyze_message(
                 },
             ],
             response_format=response_format,
-            temperature=app_config.temperature,
+            **temperature_arg(llm),
             **completion_args(llm),
         )
         .choices[0]
@@ -195,5 +219,5 @@ def analyze_message(
 
     logger.info("Analyzed message: %s", response)
 
-    response_as_json = json.loads(response)
+    response_as_json = parse_json_response(response)
     return response_format.model_validate(response_as_json)

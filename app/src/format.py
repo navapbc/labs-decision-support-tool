@@ -10,6 +10,7 @@ import markdown
 from src.citations import CITATION_PATTERN
 from src.db.models.document import Chunk, Document, Subsection
 from src.generate import MessageAttributesT
+from src.util.bem_util import build_pdf_page_url
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +35,26 @@ class FormattingConfig:
         return self.get_document_link(subsection.chunk.document)
 
     def get_superscript_link(self, chunk: Chunk) -> str:
-        return chunk.document.source if chunk.document.source else "#"
+        link = build_pdf_page_url(chunk.document.source, chunk.page_number)
+        return link if link else "#"
 
     def format_accordion_body(self, citation_body: str) -> str:
         return citation_body
+
+
+class BemFormattingConfig(FormattingConfig):
+    "BEM-specific formatting configuration"
+
+    def __init__(self) -> None:
+        self.add_citation_link_per_subsection = True
+
+    def get_citation_link(self, subsection: Subsection) -> str:
+        link = build_pdf_page_url(subsection.chunk.document.source, subsection.chunk.page_number)
+        if not link:
+            return ""
+        if subsection.chunk.page_number:
+            return f"<a href={link!r}>Open document to page {subsection.chunk.page_number}</a>"
+        return f"<a href={link!r}>Open document</a>"
 
 
 def to_html(text: str) -> str:

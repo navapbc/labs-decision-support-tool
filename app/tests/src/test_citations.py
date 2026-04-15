@@ -8,6 +8,7 @@ from src.citations import (
     basic_chunk_splitter,
     create_prompt_context,
     merge_contiguous_cited_subsections,
+    merge_heading_paths,
     move_citations_after_punctuation,
     remap_citation_ids,
     replace_citation_ids,
@@ -152,6 +153,38 @@ def test_tree_based_chunk_splitter():
     ] == EXPECTED_SUBSECTIONS + [
         (["Heading 1", "Some Heading"], "Text with no empty line between heading and paragraph."),
     ]
+
+
+def test_merge_heading_paths_deduplicates_repeated_breadcrumbs():
+    base = ["Overview", "DEPARTMENT POLICY", "Medicaid Benefits"]
+    repeated = ["Overview", "DEPARTMENT POLICY", "Medicaid Benefits"]
+    extended = ["Overview", "DEPARTMENT POLICY", "Medicaid Benefits", "Eligibility"]
+
+    assert merge_heading_paths(base, repeated) == base
+    assert merge_heading_paths(base, extended) == extended
+    assert merge_heading_paths(base, ["Medicaid Benefits", "Eligibility"]) == extended
+
+
+def test_splitters_do_not_duplicate_headings_when_chunk_content_repeats_them():
+    chunk = ChunkFactory.build(
+        content=(
+            "## Overview\n\n"
+            "### DEPARTMENT POLICY\n\n"
+            "#### Medicaid Benefits\n\n"
+            "Clients may receive both benefits at the same time."
+        ),
+        headings=["Overview", "DEPARTMENT POLICY", "Medicaid Benefits"],
+    )
+
+    expected = [
+        (
+            ["Overview", "DEPARTMENT POLICY", "Medicaid Benefits"],
+            "Clients may receive both benefits at the same time.",
+        )
+    ]
+
+    assert [(subsection.text_headings, subsection.text) for subsection in basic_chunk_splitter(chunk)] == expected
+    assert [(subsection.text_headings, subsection.text) for subsection in tree_based_chunk_splitter(chunk)] == expected
 
 
 def test_replace_citation_ids():

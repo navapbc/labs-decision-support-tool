@@ -35,6 +35,7 @@ from src.db.models.conversation import ChatMessage, UserSession
 from src.db.models.document import Subsection
 from src.generate import ChatHistory
 from src.healthcheck import HealthCheck, health
+from src.util.bem_util import build_pdf_page_url, is_pdf_url
 from src.util.string_utils import format_highlighted_uri
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,123 @@ async def healthcheck(request: Request) -> HealthCheck:
     logger.info(request.headers)
     healthcheck_response = await health(request)
     return healthcheck_response
+
+
+# region: ===================  Authentication  ===================
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    success: bool
+    user_id: str | None = None
+    error: str | None = None
+
+
+@router.post("/auth/login")
+async def login(request: LoginRequest) -> LoginResponse:
+    """Simple password authentication endpoint."""
+    if not app_config.global_password:
+        # No password configured, allow any user
+        return LoginResponse(success=True, user_id=request.username)
+
+    if request.password == app_config.global_password:
+        return LoginResponse(success=True, user_id=request.username)
+    else:
+        return LoginResponse(success=False, error="Invalid password")
+
+
+# endregion
+# region: ===================  Chat History  ===================
+
+
+class SessionSummary(BaseModel):
+    session_id: str
+    title: str
+    created_at: str
+    message_count: int
+
+
+class SessionListResponse(BaseModel):
+    sessions: list[SessionSummary]
+
+
+@router.get("/sessions")
+async def list_sessions(user_id: str) -> SessionListResponse:
+    """List all chat sessions for a user."""
+    with db_session_context_var():
+        with dbsession.get().begin():
+            sessions = (
+                dbsession.get()
+                .scalars(
+                    select(UserSession)
+                    .where(UserSession.user_id == user_id)
+                    .order_by(UserSession.created_at.desc())
+                )
+                .all()
+            )
+
+            summaries = []
+            for session in sessions:
+                # Get message count and first user message as title
+                messages = session.chat_messages
+                message_count = len(messages)
+                if message_count == 0:
+                    continue  # Skip empty sessions
+
+                # Use first user message as title
+                first_user_msg = next((m for m in messages if m.role == "user"), None)
+                title = first_user_msg.content[:100] if first_user_msg else "New conversation"
+                if len(first_user_msg.content if first_user_msg else "") > 100:
+                    title += "..."
+
+                summaries.append(
+                    SessionSummary(
+                        session_id=session.session_id,
+                        title=title,
+                        created_at=session.created_at.isoformat() if session.created_at else "",
+                        message_count=message_count,
+                    )
+                )
+
+            return SessionListResponse(sessions=summaries)
+
+
+class ChatHistoryMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatHistoryResponse(BaseModel):
+    session_id: str
+    messages: list[ChatHistoryMessage]
+
+
+@router.get("/chat_history")
+async def get_chat_history(user_id: str, session_id: str) -> ChatHistoryResponse:
+    """Retrieve chat history for a session."""
+    with db_session_context_var():
+        user_session = _load_user_session(session_id)
+        if not user_session:
+            raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
+
+        if user_session.user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Session {session_id!r} is not associated with user {user_id!r}",
+            )
+
+        messages = _load_chat_history(user_session)
+        return ChatHistoryResponse(
+            session_id=session_id,
+            messages=[ChatHistoryMessage(role=m["role"], content=m["content"]) for m in messages],
+        )
+
+
+# endregion
 
 
 # region: ===================  Session Management ===================
@@ -116,7 +234,7 @@ def __get_or_create_chat_session(
             user_session = UserSession(
                 session_id=session_id or str(uuid.uuid4()),
                 user_id=user_id,
-                chat_engine_id="imagine-la",
+                chat_engine_id=app_config.api_default_chat_engine,
                 # Assign a new thread ID for the session
                 # This will be used as Message/Step.thread_id and Thread.id when they're created
                 lai_thread_id=str(uuid.uuid4()),
@@ -139,7 +257,7 @@ def __get_or_create_chat_session(
         user_session=user_session,
         is_new=session_created,
         chat_engine_settings=ChatEngineSettings(user_session.chat_engine_id),
-        allowed_engines=["imagine-la"],
+        allowed_engines=app_config.api_allowed_chat_engines,
     )
 
 
@@ -369,6 +487,7 @@ class Citation(BaseModel):
     source_id: str
     source_name: str
     source_dataset: str
+    subsection_index: Optional[int] | None
     page_number: Optional[int] | None
     uri: Optional[str] | None
     headings: Sequence[str]
@@ -377,14 +496,18 @@ class Citation(BaseModel):
     @staticmethod
     def from_subsection(subsection: Subsection) -> "Citation":
         chunk = subsection.chunk
-        highlighted_text_src = format_highlighted_uri(chunk.document.source, subsection.text)
+        if is_pdf_url(chunk.document.source):
+            uri = build_pdf_page_url(chunk.document.source, chunk.page_number)
+        else:
+            uri = format_highlighted_uri(chunk.document.source, subsection.text)
         return Citation(
             citation_id=f"citation-{subsection.id}",
             source_id=str(chunk.document.id),
             source_name=chunk.document.name,
             source_dataset=chunk.document.dataset,
+            subsection_index=subsection.subsection_index,
             page_number=chunk.page_number,
-            uri=highlighted_text_src,
+            uri=uri,
             headings=subsection.text_headings,
             citation_text=subsection.text,
         )

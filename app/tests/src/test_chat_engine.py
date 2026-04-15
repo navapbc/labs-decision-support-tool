@@ -1,13 +1,20 @@
 import pytest
 
 from src import chat_engine
-from src.chat_engine import CaEddWebEngine, ImagineLA_MessageAttributes, ImagineLaEngine
+from src.chat_engine import (
+    BridgesEligibilityManualEngine,
+    CaEddWebEngine,
+    ImagineLA_MessageAttributes,
+    ImagineLaEngine,
+)
+from src.generate import MessageAttributes
 
 
 def test_available_engines():
     engines = chat_engine.available_engines()
     assert isinstance(engines, list)
     assert len(engines) > 0
+    assert "bridges-eligibility-manual" in engines
     assert "ca-edd-web" in engines
     assert "imagine-la" in engines
 
@@ -18,6 +25,19 @@ def test_create_engine_CA_EDD():
     assert engine is not None
     assert engine.name == CaEddWebEngine.name
     assert engine.datasets == ["CA EDD"]
+
+
+def test_create_engine_bridges_eligibility_manual():
+    engine_id = "bridges-eligibility-manual"
+    engine = chat_engine.create_engine(engine_id)
+    assert engine is not None
+    assert engine.name == BridgesEligibilityManualEngine.name
+    assert engine.llm == "gpt-5.3-chat-latest"
+    assert engine.datasets == [
+        "bridges-eligibility-manual",
+        "bridges-administrative-manual",
+        "Michigan MDHHS",
+    ]
 
 
 def test_create_engine_Imagine_LA():
@@ -104,6 +124,34 @@ def test_on_message_Imagine_LA_needs_context_False(monkeypatch):
     assert not result.subsections
     assert result.attributes.benefit_program == "CalFresh"
     assert result.attributes.alert_message == "Some alert message"
+
+
+def test_on_message_bridges_eligibility_manual_always_uses_context(monkeypatch):
+    retrieval_called = False
+
+    def mock_retrieve(*args, **kwargs):
+        nonlocal retrieval_called
+        retrieval_called = True
+        return []
+
+    monkeypatch.setattr(
+        chat_engine,
+        "analyze_message",
+        lambda *_, **_kw: MessageAttributes(
+            needs_context=False,
+            users_language="en",
+            translated_message="",
+        ),
+    )
+    monkeypatch.setattr(chat_engine, "retrieve_with_scores", mock_retrieve)
+    monkeypatch.setattr(chat_engine, "generate", lambda *_, **_kw: "This is a generated response")
+
+    engine = chat_engine.create_engine("bridges-eligibility-manual")
+    result = engine.on_message("Can a client receive both Medicaid and Medicare at the same time?")
+
+    assert retrieval_called is True
+    assert result.response == "This is a generated response"
+    assert result.attributes.needs_context is True
 
 
 @pytest.mark.asyncio
